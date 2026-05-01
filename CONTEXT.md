@@ -61,14 +61,37 @@ Entries are append-only with the date the decision was made.
 - Final product name is **not yet locked**. Renaming later is acceptable; we keep
   marketing-language and branding out of code identifiers (per spec module 13).
 
+### Test execution & CI (resolved 2026-05-01 mid-session)
+
+- **Tests run on every commit** locally via a versioned pre-commit hook
+  (`.githooks/pre-commit`) — runs `pytest` inside the backend container.
+- **GitHub Actions** workflow (`.github/workflows/tests.yml`) mirrors the local hook:
+  same script, same image, same exit semantics. Set up now so it activates the moment
+  the repo is pushed.
+- **One git repo from the start** (initialized at M0). Stages tracked through commits.
+- **Bypass policy**: `--no-verify` only when the spec author explicitly authorizes
+  it. Never silently.
+
 ### What is *not* yet decided
 
-- **CI provider** (Q8 from this session) — pending user answer.
 - **Real-network milestone scope** (testnet → mainnet) — separate work, after local
-  proof.
+  proof. Will get its own Q&A pass before being scheduled.
 - **Multisig descriptor support timing** (spec Q11) — defer until v1 personal use shows
   the dissonance is unbearable; otherwise v2.
 - **Test fixture recording strategy for ccxt** — recorded once against a real Kraken /
   Bitstamp test account during M8, then versioned in the repo.
+
+---
+
+## M0 — completed 2026-05-01
+
+Project scaffolded, Docker Compose stack working end-to-end:
+- `postgres`, `redis`, `bitcoind` (regtest), `backend`, `worker`, `frontend` all start
+  cleanly and stay healthy.
+- `/api/v1/health` returns the locked-shape contract; status `degraded` because
+  subsystem probes are placeholders pending their respective milestones.
+- 4 unit tests in the NRT, all green.
+- Pre-commit hook + GitHub Actions both wired to `./scripts/run-tests.sh`.
+- One commit on `main`.
 
 ---
