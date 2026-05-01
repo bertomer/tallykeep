@@ -97,8 +97,10 @@ services:
     # Live source mount: edits on the host appear in the container without rebuild.
     # Read-only ensures container changes do not leak back to the host.
     volumes:
-      - ./backend/tallykeep:/app/tallykeep:ro
-      - ./backend/tests:/app/tests:ro
+      # Note: source is mounted read-write so dev tools (alembic revision) can write
+      # back generated files. Containers do not modify source as a runtime side-effect.
+      - ./backend/tallykeep:/app/tallykeep
+      - ./backend/tests:/app/tests
     ports:
       - "127.0.0.1:8000:8000"
     networks: [tallykeep]
@@ -130,8 +132,10 @@ services:
       TALLYKEEP_BITCOIND_ZMQ_BLOCK_ENDPOINT: tcp://bitcoind:28332
       TALLYKEEP_BITCOIND_ZMQ_TX_ENDPOINT: tcp://bitcoind:28333
     volumes:
-      - ./backend/tallykeep:/app/tallykeep:ro
-      - ./backend/tests:/app/tests:ro
+      # Note: source is mounted read-write so dev tools (alembic revision) can write
+      # back generated files. Containers do not modify source as a runtime side-effect.
+      - ./backend/tallykeep:/app/tallykeep
+      - ./backend/tests:/app/tests
     networks: [tallykeep]
     depends_on:
       postgres:

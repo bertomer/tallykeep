@@ -46,6 +46,7 @@ RUN pip install --upgrade pip \
         "mypy==1.13.0"
 
 # Source comes last so source edits invalidate fewer cached layers.
+COPY alembic.ini ./
 COPY tallykeep ./tallykeep
 COPY tests ./tests
 
