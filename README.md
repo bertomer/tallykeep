@@ -90,8 +90,8 @@ lands with its own non-regression tests; the suite must stay green forever.
 | #   | Milestone                                                           | Status  |
 |-----|---------------------------------------------------------------------|---------|
 | M0  | Scaffold & Docker stack, /health endpoint, pytest, pre-commit, CI   | done    |
-| M1  | Domain types, DB schema, secrets module, unlock flow                | next    |
-| M2  | Event bus + job queue + persist-first audit                         | pending |
+| M1  | Domain types, DB schema, secrets module, unlock flow                | done    |
+| M2  | Event bus + job queue + persist-first audit                         | next    |
 | M3  | API skeleton (all module-04 routes registered)                      | pending |
 | M4  | Savings layer — Holdings & Descriptors (BDK address derivation)     | pending |
 | M5  | Savings layer — chain scan, UTXOs, LedgerEntry, hygiene, security   | pending |

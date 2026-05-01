@@ -26,11 +26,14 @@ def get_engine() -> Engine:
         settings = get_settings()
         if not settings.database_url:
             raise RuntimeError("TALLYKEEP_DATABASE_URL is not configured")
+        # connect_timeout caps how long a single connection attempt blocks. Important
+        # so that /health probes do not hang the API when Postgres is briefly down.
         _engine = create_engine(
             settings.database_url,
             future=True,
             pool_pre_ping=True,  # Survives Postgres restarts without bouncing the app.
             echo=False,
+            connect_args={"connect_timeout": 2},
         )
     return _engine
 

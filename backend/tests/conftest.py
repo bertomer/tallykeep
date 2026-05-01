@@ -14,21 +14,44 @@ import pytest
 import sqlalchemy as sa
 from fastapi.testclient import TestClient
 
+from tallykeep.configuration import get_settings
+from tallykeep.infrastructure import database
+from tallykeep.infrastructure.secrets import InMemorySecretStore
 from tallykeep.main import create_app
 
 
-@pytest.fixture(scope="session")
-def app() -> Iterator:
-    """Fresh FastAPI app for the test session."""
-    yield create_app()
+@pytest.fixture(autouse=True)
+def _isolate_unit_tests_from_database(
+    request: pytest.FixtureRequest, monkeypatch: pytest.MonkeyPatch
+) -> Iterator[None]:
+    """Tests marked `unit` run with no live database.
+
+    Without this, `/health`'s database probe waits the full TCP connect timeout
+    against the configured (but possibly unreachable) Postgres on every health
+    request, slowing the unit-test loop by orders of magnitude.
+
+    Integration tests opt back into the real URL by depending on `base_database_url`.
+    """
+    is_unit = any(m.name == "unit" for m in request.node.iter_markers())
+    if is_unit:
+        monkeypatch.setenv("TALLYKEEP_DATABASE_URL", "")
+        get_settings.cache_clear()
+        database.reset_engine_for_tests()
+    yield
+    if is_unit:
+        get_settings.cache_clear()
+        database.reset_engine_for_tests()
 
 
 @pytest.fixture()
-def client(app) -> Iterator[TestClient]:
-    """Synchronous TestClient bound to a fresh app instance.
+def client() -> Iterator[TestClient]:
+    """Synchronous TestClient with an in-memory SecretStore.
 
-    Per-test scope so route registrations or app state from one test cannot leak.
+    Tests that need a real database (or a different store) build their own app and
+    bypass this fixture.
     """
+    app = create_app()
+    app.state.secret_store = InMemorySecretStore()
     with TestClient(app) as test_client:
         yield test_client
 

@@ -95,3 +95,36 @@ Project scaffolded, Docker Compose stack working end-to-end:
 - One commit on `main`.
 
 ---
+
+## M1 — completed 2026-05-01
+
+Domain types, persistence layer, secret store, and unlock flow.
+
+Four sub-commits (M1.1 → M1.4):
+- **M1.1** — every spec-module-02 entity as a frozen dataclass with construction-time
+  invariants, including the structural commitment that no domain entity has a field
+  for Bitcoin signing material.
+- **M1.2** — SQLAlchemy 2.0 declarative models for all 21 spec-module-03 tables, an
+  Alembic environment that respects test-injected URLs, and the initial migration
+  with reversible `upgrade()` / `downgrade()`.
+- **M1.3** — `infrastructure/cryptography.py` (Argon2id KDF, AES-256-GCM authenticated
+  encryption, 12-byte fresh nonce per encryption) and `infrastructure/secrets.py`
+  (SecretStore ABC + InMemorySecretStore + EncryptedDatabaseSecretStore, with a
+  reserved canary secret for passphrase verification).
+- **M1.4** — `POST /api/v1/unlock` and `POST /api/v1/unlock/initialize`,
+  `LockMiddleware` returning 423 for non-allowlisted paths while the store is locked,
+  and real probes for `database` (SELECT 1) and `unlocked` (store state) on
+  `/api/v1/health`. Other subsystem probes still return `not_yet_implemented` until
+  their owning milestone lands.
+
+NRT now **121 tests** (109 unit + 12 integration). Integration tests auto-skip when
+Postgres is not running locally; they execute on every CI run via the GitHub Actions
+workflow. Unit tests run with the database URL cleared via an autouse marker-aware
+fixture so they stay fast (~5s for 109 tests).
+
+Verified end-to-end against the live Compose stack:
+- `423` while locked → `503` on `/unlock` before init → `200` on initialize →
+  `404` on `/api/v1/holdings` (route doesn't exist yet, but the middleware passes
+  through, proving unlock succeeded) → `401` on `/unlock` with a wrong passphrase.
+
+---
