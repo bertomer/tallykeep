@@ -34,6 +34,11 @@ RUN pip install --upgrade pip \
         "pydantic-settings==2.7.0" \
         "structlog==24.4.0" \
         "httpx==0.28.1" \
+        "sqlalchemy==2.0.36" \
+        "alembic==1.14.0" \
+        "psycopg[binary]==3.2.3" \
+        "argon2-cffi==23.1.0" \
+        "cryptography==44.0.0" \
         "pytest==8.3.4" \
         "pytest-asyncio==0.25.0" \
         "pytest-cov==6.0.0" \
