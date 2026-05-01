@@ -1,0 +1,64 @@
+# Non-regression suite — runs on every push and pull request.
+#
+# Same execution path as the local pre-commit hook: `./scripts/run-tests.sh` invokes
+# pytest inside the backend container. This guarantees CI failures correspond exactly
+# to what the contributor would see locally.
+
+name: tests
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+    branches: ["main"]
+
+concurrency:
+  group: tests-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  pytest:
+    name: backend pytest
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Cache Docker layers
+        uses: actions/cache@v4
+        with:
+          path: /tmp/.buildx-cache
+          key: ${{ runner.os }}-buildx-${{ hashFiles('backend/Dockerfile', 'backend/pyproject.toml') }}
+          restore-keys: |
+            ${{ runner.os }}-buildx-
+
+      - name: Build backend image
+        run: docker compose build backend
+
+      - name: Run non-regression suite
+        run: ./scripts/run-tests.sh --tb=short
+
+  lint:
+    name: backend lint (ruff + mypy)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build backend image
+        run: docker compose build backend
+
+      - name: Ruff
+        run: docker compose run --rm --no-deps -T backend ruff check tallykeep tests
+
+      - name: Mypy
+        # mypy is informative for now; we don't fail CI on type issues until M1 lands the
+        # full domain types. Promoted to a hard gate at the M1 commit.
+        continue-on-error: true
+        run: docker compose run --rm --no-deps -T backend mypy tallykeep

@@ -1,0 +1,27 @@
+#!/usr/bin/env bash
+# Pre-commit hook: run the non-regression test suite inside the backend container.
+#
+# Per CONTEXT.md: "every iteration must end with the full NRT green" and the user
+# asked for tests on every commit. This hook enforces that.
+#
+# Skipping is possible via `git commit --no-verify`; do this only when the spec
+# author explicitly authorizes it.
+
+set -euo pipefail
+
+# Resolve the repo root from the hook's location (.githooks/pre-commit).
+HOOK_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "${HOOK_DIR}/.." && pwd)"
+
+cd "${REPO_ROOT}"
+
+# Refuse if Docker is not running. We want a clear error rather than a misleading hook
+# success.
+if ! docker info >/dev/null 2>&1; then
+  echo "pre-commit: Docker is not running. Start Docker Desktop and retry." >&2
+  echo "            (To bypass once: 'git commit --no-verify'.)" >&2
+  exit 1
+fi
+
+echo "pre-commit: running non-regression tests in container..."
+exec ./scripts/run-tests.sh

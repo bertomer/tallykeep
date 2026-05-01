@@ -1,0 +1,69 @@
+[build-system]
+requires = ["hatchling>=1.25.0"]
+build-backend = "hatchling.build"
+
+[project]
+name = "tallykeep"
+version = "0.1.0-dev"
+description = "BTC-centric self-hosted banking, savings, and trading app — backend"
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "Proprietary" }
+authors = [{ name = "TallyKeep" }]
+
+# Runtime dependencies are pinned by exact version per spec module 01:
+# "All Python dependencies pinned via pyproject.toml with exact versions."
+# Each milestone may add to this list; never remove without a migration.
+dependencies = [
+  "fastapi==0.115.6",
+  "uvicorn[standard]==0.32.1",
+  "pydantic==2.10.3",
+  "pydantic-settings==2.7.0",
+  "structlog==24.4.0",
+  "httpx==0.28.1",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest==8.3.4",
+  "pytest-asyncio==0.25.0",
+  "pytest-cov==6.0.0",
+  "ruff==0.8.4",
+  "mypy==1.13.0",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["tallykeep"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+addopts = [
+  "-ra",
+  "--strict-markers",
+  "--strict-config",
+]
+markers = [
+  "integration: requires running infrastructure (postgres, redis, bitcoind)",
+  "regtest: requires bitcoind in regtest mode",
+  "unit: pure unit test, no infrastructure",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+# Conservative rule set; we can tighten later. No project rules forbid these,
+# we just keep things sane.
+select = ["E", "F", "I", "B", "UP", "N", "RUF"]
+ignore = []
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+ignore_missing_imports = true
