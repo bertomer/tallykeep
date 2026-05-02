@@ -58,6 +58,55 @@ def client() -> Iterator[TestClient]:
         yield test_client
 
 
+@pytest.fixture()
+def app_with_db(
+    clean_test_database: str, monkeypatch: pytest.MonkeyPatch
+):  # type: ignore[no-untyped-def]
+    """TestClient backed by a freshly-migrated Postgres database.
+
+    Yields a tuple `(client, session_factory)` so tests can poke at the
+    database directly when assertions need it.
+    """
+    from alembic import command
+    from alembic.config import Config
+    from sqlalchemy.orm import sessionmaker
+
+    cfg = Config("alembic.ini")
+    cfg.set_main_option("sqlalchemy.url", clean_test_database)
+    command.upgrade(cfg, "head")
+
+    engine = sa.create_engine(clean_test_database, future=True)
+    factory = sessionmaker(bind=engine, autoflush=False, expire_on_commit=False)
+
+    # Cheap Argon2id so per-test setup is ~1ms instead of ~100ms — the secret
+    # store is the only KDF user in this fixture and we only need it to gate
+    # the lock middleware.
+    monkeypatch.setattr(
+        "tallykeep.infrastructure.secrets.DEFAULT_KDF_MEMORY_COST_KIB", 8
+    )
+    monkeypatch.setattr(
+        "tallykeep.infrastructure.secrets.DEFAULT_KDF_TIME_COST", 1
+    )
+    monkeypatch.setattr(
+        "tallykeep.infrastructure.secrets.DEFAULT_KDF_PARALLELISM", 1
+    )
+
+    # Endpoints behind the lock middleware require an unlocked store; initialize
+    # an InMemoryStore so tests reach their handlers. Lock semantics are
+    # exercised separately by tests/unit/test_unlock_endpoints.py.
+    store = InMemorySecretStore()
+    store.initialize("test passphrase")
+
+    app = create_app()
+    app.state.secret_store = store
+    app.state.session_factory = factory
+
+    with TestClient(app) as test_client:
+        yield test_client, factory
+
+    engine.dispose()
+
+
 # --- Integration test plumbing ----------------------------------------------------
 
 

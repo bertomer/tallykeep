@@ -14,7 +14,9 @@ import logging
 
 from tallykeep import __version__
 from tallykeep.api.lock_middleware import LockMiddleware
-from tallykeep.api.v1 import health, unlock
+from tallykeep.api.v1 import configuration as configuration_routes
+from tallykeep.api.v1 import feature_flags as feature_flags_routes
+from tallykeep.api.v1 import health, profile as profile_routes, unlock
 from tallykeep.configuration import get_settings
 from tallykeep.infrastructure.database import get_session_factory
 from tallykeep.infrastructure.event_bus import EventBus, RedisEventBus
@@ -36,6 +38,11 @@ async def _lifespan(app: FastAPI):
     because we only seed defaults here when nothing has been set.
     """
     settings = get_settings()
+
+    if not hasattr(app.state, "session_factory"):
+        app.state.session_factory = (
+            get_session_factory() if settings.database_url else None
+        )
 
     if not hasattr(app.state, "secret_store"):
         if settings.database_url:
@@ -94,6 +101,9 @@ def create_app() -> FastAPI:
 
     app.include_router(health.router, prefix="/api/v1")
     app.include_router(unlock.router, prefix="/api/v1")
+    app.include_router(profile_routes.router, prefix="/api/v1")
+    app.include_router(feature_flags_routes.router, prefix="/api/v1")
+    app.include_router(configuration_routes.router, prefix="/api/v1")
 
     return app
 
