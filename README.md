@@ -99,6 +99,56 @@ Run tests manually:
 ./scripts/run-tests.sh -k health        # filter by name
 ```
 
+Integration tests need infrastructure running. Bring just what's needed and the
+suite picks it up automatically (skips integration tests when nothing is up):
+
+```bash
+docker compose up -d postgres redis     # bring up just what's needed
+./scripts/run-tests.sh                  # full suite, integration tests now run
+```
+
+## Inspecting the live stack
+
+```bash
+# Backend health (database / bitcoind / redis / event_bus / unlocked probes)
+curl.exe http://127.0.0.1:8000/api/v1/health
+
+# Initialize the secret store (one time per fresh Postgres volume)
+curl.exe --% -X POST -H "Content-Type: application/json" \
+  -d "{\"passphrase\":\"your_passphrase_here\"}" \
+  http://127.0.0.1:8000/api/v1/unlock/initialize
+
+# Re-unlock after a container restart
+curl.exe --% -X POST -H "Content-Type: application/json" \
+  -d "{\"passphrase\":\"your_passphrase_here\"}" \
+  http://127.0.0.1:8000/api/v1/unlock
+
+# Worker output (event bus + audit reconciler activity)
+docker compose logs -f worker
+
+# Tail backend logs
+docker compose logs -f backend
+
+# Inspect the Postgres schema or query the database
+docker compose exec postgres psql -U tallykeep -d tallykeep
+docker compose exec postgres psql -U tallykeep -d tallykeep -c "\dt"
+docker compose exec postgres psql -U tallykeep -d tallykeep -c "TABLE event_emission_log;"
+
+# Inspect Redis (event-bus channels, RQ queues)
+docker compose exec redis redis-cli
+docker compose exec redis redis-cli PUBSUB CHANNELS
+docker compose exec redis redis-cli LRANGE rq:queue:tallykeep 0 -1
+
+# Reset state — wipes Postgres + Redis volumes (asks for confirmation in Claude)
+docker compose down -v
+docker compose up -d
+```
+
+## Frontend
+
+Static placeholder served by nginx at [http://127.0.0.1:8080](http://127.0.0.1:8080).
+The real SvelteKit PWA lands in M10.
+
 ## Development plan
 
 We implement v1 in horizontal layers (per spec module 00 ordering). Each milestone
@@ -108,8 +158,8 @@ lands with its own non-regression tests; the suite must stay green forever.
 |-----|---------------------------------------------------------------------|---------|
 | M0  | Scaffold & Docker stack, /health endpoint, pytest, pre-commit, CI   | done    |
 | M1  | Domain types, DB schema, secrets module, unlock flow                | done    |
-| M2  | Event bus + job queue + persist-first audit                         | next    |
-| M3  | API skeleton (all module-04 routes registered)                      | pending |
+| M2  | Event bus + job queue + persist-first audit                         | done    |
+| M3  | API skeleton (all module-04 routes registered)                      | next    |
 | M4  | Savings layer — Holdings & Descriptors (BDK address derivation)     | pending |
 | M5  | Savings layer — chain scan, UTXOs, LedgerEntry, hygiene, security   | pending |
 | M6  | Banking layer — outgoing PSBT + incoming Invoice (regtest)          | pending |

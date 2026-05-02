@@ -128,3 +128,55 @@ Verified end-to-end against the live Compose stack:
   through, proving unlock succeeded) → `401` on `/unlock` with a wrong passphrase.
 
 ---
+
+## 2026-05-02 — Permissions and tooling
+
+- **Project Claude permissions** committed at `.claude/settings.json`. Allows the
+  in-milestone workflow (git read & non-destructive write, `docker compose` without
+  `-v`, test scripts, project-local file edits, `curl`/`curl.exe`) without prompts.
+  Denies destructive operations (`docker compose down -v`, volume rm, force push,
+  `git reset --hard`, `git rebase -i`, `git commit --amend`, `--no-verify`,
+  `rm -rf`, `Remove-Item -Recurse|-Force`).
+- **`.gitignore`** updated: `.claude/settings.json` is committed (team-wide source
+  of truth); `.claude/settings.local.json` and session caches are ignored.
+- **README quickstart**: PowerShell users need `curl.exe --%` (stop-parsing token)
+  to pass JSON bodies cleanly — documented in the README quickstart.
+
+---
+
+## M2 — completed 2026-05-02
+
+Event bus + job queue + persist-first audit reconciler.
+
+Three sub-commits (M2.1 → M2.3):
+- **M2.1** — `infrastructure/event_bus.py`: `Event` dataclass, `EventBus` ABC,
+  topic-pattern matcher (`*` wildcard, dotted segments), `InMemoryEventBus`
+  (synchronous, used in tests and in-process subscribers), `RedisEventBus` (Redis
+  pub/sub with a background-thread read loop, JSON envelopes carrying
+  id/topic/payload/timestamp). Both backends swallow handler exceptions so a
+  failing subscriber cannot poison others.
+- **M2.2** — `infrastructure/job_queue.py`: `JobInfo` snapshot, `JobQueue` ABC,
+  `InMemoryJobQueue` (synchronous), `RedisQueueJobQueue` wrapping `rq.Queue` with
+  `rq.SimpleWorker` available as a `drain_for_tests()` helper. Job ids are UUIDs.
+  RQ status strings translate to our domain `JobStatus` enum.
+- **M2.3** — `infrastructure/event_emission.py`: `PersistentEmitter` for the
+  persist-first-emit-second pattern (writes `event_emission_log` row before
+  publishing; `acknowledge(event_id)` sets `acknowledged_at`); `AuditReconciler`
+  scans rows older than the grace period that are still unacknowledged and
+  re-emits them with `__replay__: True` in the payload.
+- `/api/v1/health` now includes real `redis` (PING with 2s timeout) and
+  `event_bus` (delegates to bus.is_healthy()) probes alongside `database` and
+  `unlocked`. Only `bitcoind` still returns `not_yet_implemented`.
+- `tallykeep.worker` registers the AuditReconciler at startup (5-minute grace
+  period, scans every 30s) when both Redis and Postgres are configured. Tolerates
+  degraded environments — runs no-ops if its dependencies are missing.
+
+Pinned new deps: redis 5.2.0, rq 1.16.2.
+
+NRT now **181 tests** (141 unit + 40 integration). Full suite green in ~13s with
+all infrastructure up.
+
+Verified live: `database`, `redis`, `event_bus` all `ok: true`; worker logs show
+`worker: started (bus=redis, reconciler=on)`.
+
+---

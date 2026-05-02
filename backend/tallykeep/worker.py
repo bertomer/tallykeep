@@ -3,16 +3,31 @@
 Spec module 01: a single Python codebase with two entry points (backend, worker).
 The worker runs three kinds of components: listeners, schedulers, subscribers.
 
-This module is a stub for M0 — it stays alive so the Compose service is healthy and
-later milestones can register components without changing the entry point.
+M2 wires the EventBus and the AuditReconciler scheduler. Listeners and the
+domain-specific subscribers (CustodialPoller, SweepEngine, CategorizerSuggester,
+ChainListener, LiveUpdateBridge) land with their owning milestones (M5+).
 """
 
 from __future__ import annotations
 
+import logging
 import signal
 import sys
 import time
+from datetime import timedelta
 from types import FrameType
+
+from tallykeep.configuration import get_settings
+from tallykeep.infrastructure.database import get_session_factory
+from tallykeep.infrastructure.event_bus import EventBus, RedisEventBus
+from tallykeep.infrastructure.event_emission import AuditReconciler
+
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s %(levelname)-5s [%(name)s] %(message)s",
+)
+logger = logging.getLogger("tallykeep.worker")
 
 
 _running = True
@@ -20,6 +35,7 @@ _running = True
 
 def _handle_signal(signum: int, frame: FrameType | None) -> None:
     global _running
+    logger.info("worker: received signal %d, shutting down", signum)
     _running = False
 
 
@@ -27,14 +43,62 @@ def main() -> int:
     signal.signal(signal.SIGTERM, _handle_signal)
     signal.signal(signal.SIGINT, _handle_signal)
 
-    # Component registry placeholder — listeners, schedulers, subscribers register here
-    # in subsequent milestones (M2 onwards).
-    print("tallykeep worker: starting (M0 stub — no components registered)", flush=True)
+    settings = get_settings()
+
+    bus: EventBus | None = None
+    reconciler: AuditReconciler | None = None
+    reconciler_interval_seconds = 30  # how often to scan for unacked events
+
+    # Best-effort start. Workers tolerate degraded environments — the audit
+    # reconciler simply runs no-ops when its dependencies are missing.
+    if settings.redis_url:
+        try:
+            bus = RedisEventBus(settings.redis_url)
+            logger.info("worker: connected to Redis at %s", settings.redis_url)
+        except Exception:  # noqa: BLE001
+            logger.exception("worker: failed to connect to Redis")
+
+    if bus is not None and settings.database_url:
+        try:
+            session_factory = get_session_factory()
+            # Conservative grace period in production: events older than 5 min
+            # without acknowledgement are considered lost. Tunable later via
+            # runtime_configuration.
+            reconciler = AuditReconciler(
+                bus=bus,
+                session_factory=session_factory,
+                grace_period=timedelta(minutes=5),
+            )
+            logger.info("worker: AuditReconciler registered")
+        except Exception:  # noqa: BLE001
+            logger.exception("worker: failed to set up AuditReconciler")
+
+    last_reconcile = 0.0
+    logger.info(
+        "worker: started (bus=%s, reconciler=%s)",
+        "redis" if bus else "none",
+        "on" if reconciler else "off",
+    )
 
     while _running:
+        now = time.time()
+        if reconciler is not None and now - last_reconcile >= reconciler_interval_seconds:
+            try:
+                count = reconciler.run_once()
+                if count:
+                    logger.info("worker: AuditReconciler re-emitted %d event(s)", count)
+            except Exception:  # noqa: BLE001
+                logger.exception("worker: AuditReconciler failed")
+            last_reconcile = now
         time.sleep(1)
 
-    print("tallykeep worker: shutting down", flush=True)
+    if bus is not None:
+        try:
+            bus.close()
+        except Exception:  # noqa: BLE001
+            pass
+
+    logger.info("worker: shut down cleanly")
     return 0
 
 

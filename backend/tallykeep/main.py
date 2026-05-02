@@ -10,27 +10,34 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
+import logging
+
 from tallykeep import __version__
 from tallykeep.api.lock_middleware import LockMiddleware
 from tallykeep.api.v1 import health, unlock
 from tallykeep.configuration import get_settings
 from tallykeep.infrastructure.database import get_session_factory
+from tallykeep.infrastructure.event_bus import EventBus, RedisEventBus
 from tallykeep.infrastructure.secrets import (
     EncryptedDatabaseSecretStore,
     SecretStore,
 )
 
 
+logger = logging.getLogger(__name__)
+
+
 @asynccontextmanager
 async def _lifespan(app: FastAPI):
     """Wire long-lived state on startup, tear it down on shutdown.
 
-    Tests can override `app.state.secret_store` *after* the app is created and
-    before the first request — the override survives because we only seed the
-    default store here when nothing has been set.
+    Tests can override `app.state.secret_store` and `app.state.event_bus` *after*
+    the app is created and before the first request — the override survives
+    because we only seed defaults here when nothing has been set.
     """
+    settings = get_settings()
+
     if not hasattr(app.state, "secret_store"):
-        settings = get_settings()
         if settings.database_url:
             store: SecretStore = EncryptedDatabaseSecretStore(get_session_factory())
         else:
@@ -38,6 +45,19 @@ async def _lifespan(app: FastAPI):
             # The lock middleware will return 423 for any non-allowlisted request.
             store = None  # type: ignore[assignment]
         app.state.secret_store = store
+
+    if not hasattr(app.state, "event_bus"):
+        if settings.redis_url:
+            try:
+                bus: EventBus | None = RedisEventBus(settings.redis_url)
+            except Exception:  # noqa: BLE001 — Redis can be unreachable at boot
+                logger.exception(
+                    "RedisEventBus failed to start; /health will report degraded"
+                )
+                bus = None
+        else:
+            bus = None
+        app.state.event_bus = bus
 
     yield
 
@@ -47,6 +67,13 @@ async def _lifespan(app: FastAPI):
     if store is not None:
         try:
             store.lock()
+        except Exception:  # pragma: no cover — best-effort cleanup
+            pass
+
+    bus = getattr(app.state, "event_bus", None)
+    if bus is not None:
+        try:
+            bus.close()
         except Exception:  # pragma: no cover — best-effort cleanup
             pass
 
