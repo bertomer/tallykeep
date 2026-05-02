@@ -123,6 +123,33 @@ curl.exe --% -X POST -H "Content-Type: application/json" \
   -d "{\"passphrase\":\"your_passphrase_here\"}" \
   http://127.0.0.1:8000/api/v1/unlock
 
+# User profile (auto-created on first call)
+curl.exe http://127.0.0.1:8000/api/v1/profile
+
+# Switch profile preset (beginner | intermediate | sovereign | custom)
+curl.exe --% -X PATCH -H "Content-Type: application/json" \
+  -d "{\"preset\":\"sovereign\"}" \
+  http://127.0.0.1:8000/api/v1/profile
+
+# Resolved feature flags (preset + overrides)
+curl.exe http://127.0.0.1:8000/api/v1/feature-flags
+
+# Runtime configuration (full nested object, fields default to null)
+curl.exe http://127.0.0.1:8000/api/v1/configuration
+
+# Persist a configuration value
+curl.exe --% -X PATCH -H "Content-Type: application/json" \
+  -d "{\"custodial_polling\":{\"interval_seconds\":600}}" \
+  http://127.0.0.1:8000/api/v1/configuration
+
+# Subscribe to the live event stream (text/event-stream).
+# Default subscribes to all topics. Use ?topics=chain.*,banking.* to filter.
+curl.exe -N http://127.0.0.1:8000/api/v1/events/stream
+
+# Browse the full OpenAPI surface (every spec-module-04 route, real or stub)
+# in a browser:
+#   http://127.0.0.1:8000/docs
+
 # Worker output (event bus + audit reconciler activity)
 docker compose logs -f worker
 
@@ -159,8 +186,8 @@ lands with its own non-regression tests; the suite must stay green forever.
 | M0  | Scaffold & Docker stack, /health endpoint, pytest, pre-commit, CI   | done    |
 | M1  | Domain types, DB schema, secrets module, unlock flow                | done    |
 | M2  | Event bus + job queue + persist-first audit                         | done    |
-| M3  | API skeleton (all module-04 routes registered)                      | next    |
-| M4  | Savings layer — Holdings & Descriptors (BDK address derivation)     | pending |
+| M3  | API skeleton (all module-04 routes registered)                      | done    |
+| M4  | Savings layer — Holdings & Descriptors (BDK address derivation)     | next    |
 | M5  | Savings layer — chain scan, UTXOs, LedgerEntry, hygiene, security   | pending |
 | M6  | Banking layer — outgoing PSBT + incoming Invoice (regtest)          | pending |
 | M7  | Profiles & feature flags                                            | pending |

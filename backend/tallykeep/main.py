@@ -21,12 +21,14 @@ from tallykeep.api.v1 import (
     configuration as configuration_routes,
     custodial_providers as custodial_providers_routes,
     descriptors as descriptors_routes,
+    events_stream as events_stream_routes,
     export as export_routes,
     feature_flags as feature_flags_routes,
     health,
     holdings as holdings_routes,
     jobs as jobs_routes,
     ledger_entries as ledger_entries_routes,
+    lightning as lightning_routes,
     profile as profile_routes,
     trading as trading_routes,
     unlock,
@@ -136,6 +138,11 @@ def create_app() -> FastAPI:
     app.include_router(analysis_routes.router, prefix="/api/v1")
     app.include_router(jobs_routes.router, prefix="/api/v1")
     app.include_router(export_routes.router, prefix="/api/v1")
+    app.include_router(lightning_routes.router, prefix="/api/v1")
+
+    # SSE event stream — implemented as a working scaffold in M3.3, refined in
+    # M9 with the full LiveUpdateBridge.
+    app.include_router(events_stream_routes.router, prefix="/api/v1")
 
     return app
 

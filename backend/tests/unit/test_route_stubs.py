@@ -124,6 +124,13 @@ STUB_ROUTES: list[tuple[str, str, str]] = [
     ("GET", "/api/v1/jobs/{job_id}", "M5"),
     ("DELETE", "/api/v1/jobs/{job_id}", "M5"),
     ("GET", "/api/v1/export/configuration", "M14"),
+    # --- Lightning (spec module 08): all stubs land in v1.5 ---
+    ("GET", "/api/v1/lightning/status", "v1.5"),
+    ("GET", "/api/v1/lightning/balance", "v1.5"),
+    ("POST", "/api/v1/lightning/invoices", "v1.5"),
+    ("POST", "/api/v1/lightning/pay", "v1.5"),
+    ("GET", "/api/v1/lightning/payments", "v1.5"),
+    ("GET", "/api/v1/lightning/channels", "v1.5"),
 ]
 
 

@@ -180,3 +180,58 @@ Verified live: `database`, `redis`, `event_bus` all `ok: true`; worker logs show
 `worker: started (bus=redis, reconciler=on)`.
 
 ---
+
+## M3 — completed 2026-05-02
+
+API skeleton: every spec-module-04 route registered. Three sub-commits:
+
+- **M3.1** — `/api/v1/profile` GET/PATCH, `/api/v1/feature-flags` GET,
+  `/api/v1/configuration` GET/PATCH (full implementations).
+  - `services/profile_presets.py` is the canonical preset table (BEGINNER /
+    INTERMEDIATE / SOVEREIGN dicts) plus `resolve_feature_flags(preset, overrides)`.
+  - `repositories/user_profile.py` and `repositories/runtime_configuration.py`
+    give thin DAOs over the singleton row and the flat key-value table.
+  - `services/configuration_service.py` un/groups dotted keys into the nested
+    section shape (`bitcoind`, `fee_estimation`, `custodial_polling`, `analysis`,
+    `notifications`). Pydantic schemas use `extra="forbid"` so unknown sections
+    or fields return 422.
+- **M3.2** — Every other module-04 route registered as a 501-stub with an
+  RFC 7807 Problem Details body that names the milestone the real handler lands
+  in (M4: descriptors and per-type Holding creation; M5: chain-derived queries,
+  utxo, ledger-entries, analysis, jobs; M6: banking; M8: trading; M14: export).
+  - `api/v1/_stubs.py::not_implemented_response(milestone, route)` returns a
+    `JSONResponse` directly so the body sits at the top level
+    (RFC 7807-compliant; no FastAPI `{"detail": ...}` envelope).
+  - 73 parametrized contract tests verify each (method, path) returns 501 with
+    the right milestone tag round-tripped.
+- **M3.3** — `/api/v1/events/stream` SSE scaffold + Lightning stubs (spec module
+  08, milestone v1.5).
+  - SSE endpoint subscribes to the bus, marshals events into an asyncio queue
+    via `loop.call_soon_threadsafe` (bus handlers run on a different thread for
+    Redis), formats SSE frames, drops oldest on backlog (1000-event cap), and
+    unsubscribes on client disconnect. Emits a handshake comment when the
+    subscription is registered so clients know the stream is live.
+  - Returns 503 when no event bus is configured (e.g. `TALLYKEEP_REDIS_URL`
+    unset).
+  - Lightning stubs at `/api/v1/lightning/{status,balance,invoices,pay,
+    payments,channels}`, all reserved for v1.5.
+
+**Test fixture changes during M3**:
+- `tests/conftest.py::client` now installs an *unlocked* InMemoryStore so tests
+  reach the routes without each one re-implementing the unlock dance. The
+  lock-middleware behavior is still exercised explicitly by
+  `tests/unit/test_unlock_endpoints.py` via its own fixture.
+- `tests/conftest.py::app_with_db` is the new fixture for endpoint integration
+  tests: fresh per-test Postgres DB, migrations applied, app wired with an
+  unlocked store + cheap-Argon2id parameters.
+
+**Deferred**: SSE end-to-end streaming tests through TestClient deadlock on the
+httpx + StreamingResponse + cross-thread publisher combination. The route is
+covered by 503-with-no-bus, OpenAPI-inclusion, and the SSE-frame-format
+helpers. Full streaming verification lands in M9 with the LiveUpdateBridge,
+against a real running uvicorn or via async httpx.
+
+NRT now **301 tests** (239 unit + 62 integration). Suite ~27s with infra up,
+~5s without.
+
+---
