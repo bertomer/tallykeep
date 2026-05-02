@@ -14,9 +14,24 @@ import logging
 
 from tallykeep import __version__
 from tallykeep.api.lock_middleware import LockMiddleware
-from tallykeep.api.v1 import configuration as configuration_routes
-from tallykeep.api.v1 import feature_flags as feature_flags_routes
-from tallykeep.api.v1 import health, profile as profile_routes, unlock
+from tallykeep.api.v1 import (
+    addresses as addresses_routes,
+    analysis as analysis_routes,
+    banking as banking_routes,
+    configuration as configuration_routes,
+    custodial_providers as custodial_providers_routes,
+    descriptors as descriptors_routes,
+    export as export_routes,
+    feature_flags as feature_flags_routes,
+    health,
+    holdings as holdings_routes,
+    jobs as jobs_routes,
+    ledger_entries as ledger_entries_routes,
+    profile as profile_routes,
+    trading as trading_routes,
+    unlock,
+    utxos as utxos_routes,
+)
 from tallykeep.configuration import get_settings
 from tallykeep.infrastructure.database import get_session_factory
 from tallykeep.infrastructure.event_bus import EventBus, RedisEventBus
@@ -99,11 +114,28 @@ def create_app() -> FastAPI:
     # enforced uniformly.
     app.add_middleware(LockMiddleware)
 
+    # Implemented in M0–M3.1
     app.include_router(health.router, prefix="/api/v1")
     app.include_router(unlock.router, prefix="/api/v1")
     app.include_router(profile_routes.router, prefix="/api/v1")
     app.include_router(feature_flags_routes.router, prefix="/api/v1")
     app.include_router(configuration_routes.router, prefix="/api/v1")
+
+    # M3.2 — every other spec-module-04 route registered as a 501 stub. The
+    # OpenAPI spec covers the full surface so the frontend can generate its
+    # typed client today; each stub raises with a milestone-tagged Problem
+    # Details body so the user knows when to expect the real handler.
+    app.include_router(holdings_routes.router, prefix="/api/v1")
+    app.include_router(descriptors_routes.router, prefix="/api/v1")
+    app.include_router(custodial_providers_routes.router, prefix="/api/v1")
+    app.include_router(addresses_routes.router, prefix="/api/v1")
+    app.include_router(utxos_routes.router, prefix="/api/v1")
+    app.include_router(ledger_entries_routes.router, prefix="/api/v1")
+    app.include_router(banking_routes.router, prefix="/api/v1")
+    app.include_router(trading_routes.router, prefix="/api/v1")
+    app.include_router(analysis_routes.router, prefix="/api/v1")
+    app.include_router(jobs_routes.router, prefix="/api/v1")
+    app.include_router(export_routes.router, prefix="/api/v1")
 
     return app
 

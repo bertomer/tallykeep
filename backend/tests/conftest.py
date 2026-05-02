@@ -46,14 +46,30 @@ def _isolate_unit_tests_from_infrastructure(
 
 
 @pytest.fixture()
-def client() -> Iterator[TestClient]:
-    """Synchronous TestClient with an in-memory SecretStore.
+def client(monkeypatch: pytest.MonkeyPatch) -> Iterator[TestClient]:
+    """Synchronous TestClient with an unlocked in-memory SecretStore.
 
-    Tests that need a real database (or a different store) build their own app and
-    bypass this fixture.
+    The store is pre-initialized so the lock middleware passes through; tests
+    that exercise the lock semantics build their own app and bypass this
+    fixture (see tests/unit/test_unlock_endpoints.py).
+
+    Cheap-Argon2id parameters keep per-test setup at ~1ms.
     """
+    monkeypatch.setattr(
+        "tallykeep.infrastructure.secrets.DEFAULT_KDF_MEMORY_COST_KIB", 8
+    )
+    monkeypatch.setattr(
+        "tallykeep.infrastructure.secrets.DEFAULT_KDF_TIME_COST", 1
+    )
+    monkeypatch.setattr(
+        "tallykeep.infrastructure.secrets.DEFAULT_KDF_PARALLELISM", 1
+    )
+
+    store = InMemorySecretStore()
+    store.initialize("test passphrase")
+
     app = create_app()
-    app.state.secret_store = InMemorySecretStore()
+    app.state.secret_store = store
     with TestClient(app) as test_client:
         yield test_client
 
