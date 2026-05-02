@@ -52,6 +52,23 @@ curl http://127.0.0.1:8000/api/v1/health
 #    http://127.0.0.1:8080
 ```
 
+> **Windows note.** PowerShell aliases `curl` to `Invoke-WebRequest`, which uses
+> different flag syntax. Either call the real curl explicitly via `curl.exe ...`
+> (shipped with Windows 10+), or use the PowerShell-native command:
+>
+> ```powershell
+> Invoke-RestMethod -Uri http://127.0.0.1:8000/api/v1/health
+> ```
+>
+> For commands with a JSON body:
+>
+> ```powershell
+> Invoke-RestMethod -Method Post `
+>   -Uri http://127.0.0.1:8000/api/v1/unlock/initialize `
+>   -ContentType 'application/json' `
+>   -Body '{"passphrase":"hunter2"}'
+> ```
+
 Services and their localhost ports (per spec module 01: localhost-only):
 
 | Service     | Port (host)  | Purpose                          |
