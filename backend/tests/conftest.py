@@ -93,6 +93,32 @@ def base_database_url() -> str:
     return url
 
 
+@pytest.fixture(scope="session")
+def redis_url() -> str:
+    """Configured Redis URL, or skip when unavailable.
+
+    Integration tests share one Redis instance. Per-test isolation is achieved by
+    using a unique key prefix or channel name, since Redis pub/sub is broadcast
+    and stateless across tests.
+    """
+    url = os.environ.get("TALLYKEEP_REDIS_URL", "")
+    if not url:
+        pytest.skip(
+            "TALLYKEEP_REDIS_URL not set — redis integration tests skipped"
+        )
+
+    try:
+        import redis as _redis
+
+        client = _redis.Redis.from_url(url)
+        client.ping()
+        client.close()
+    except Exception as exc:  # noqa: BLE001
+        pytest.skip(f"redis unreachable at {url!r}: {exc}")
+
+    return url
+
+
 @pytest.fixture()
 def clean_test_database(base_database_url: str) -> Iterator[str]:
     """Provide a fresh, empty Postgres database for one test, drop it after.

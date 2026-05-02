@@ -39,6 +39,8 @@ RUN pip install --upgrade pip \
         "psycopg[binary]==3.2.3" \
         "argon2-cffi==23.1.0" \
         "cryptography==44.0.0" \
+        "redis==5.2.0" \
+        "rq==1.16.2" \
         "pytest==8.3.4" \
         "pytest-asyncio==0.25.0" \
         "pytest-cov==6.0.0" \
