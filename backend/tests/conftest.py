@@ -21,20 +21,22 @@ from tallykeep.main import create_app
 
 
 @pytest.fixture(autouse=True)
-def _isolate_unit_tests_from_database(
+def _isolate_unit_tests_from_infrastructure(
     request: pytest.FixtureRequest, monkeypatch: pytest.MonkeyPatch
 ) -> Iterator[None]:
-    """Tests marked `unit` run with no live database.
+    """Tests marked `unit` run with no live database or redis.
 
-    Without this, `/health`'s database probe waits the full TCP connect timeout
-    against the configured (but possibly unreachable) Postgres on every health
+    Without this, `/health`'s probes wait the full TCP connect timeout against
+    the configured (but possibly unreachable) backing services on every health
     request, slowing the unit-test loop by orders of magnitude.
 
-    Integration tests opt back into the real URL by depending on `base_database_url`.
+    Integration tests opt back in by depending on `base_database_url` /
+    `redis_url`, which read the original env values from the host.
     """
     is_unit = any(m.name == "unit" for m in request.node.iter_markers())
     if is_unit:
         monkeypatch.setenv("TALLYKEEP_DATABASE_URL", "")
+        monkeypatch.setenv("TALLYKEEP_REDIS_URL", "")
         get_settings.cache_clear()
         database.reset_engine_for_tests()
     yield
