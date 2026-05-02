@@ -52,4 +52,10 @@ logs/
 
 # Local notes / scratch
 SCRATCH.md
-.claude/
+
+# Claude Code settings — commit the project-wide file, ignore personal overrides
+# and any session/transcript artifacts.
+.claude/settings.local.json
+.claude/sessions/
+.claude/transcripts/
+.claude/cache/
