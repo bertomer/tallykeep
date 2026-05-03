@@ -83,6 +83,18 @@ async def _lifespan(app: FastAPI):
             bus = None
         app.state.event_bus = bus
 
+    if not hasattr(app.state, "node_adapter"):
+        if settings.bitcoind_rpc_url:
+            from tallykeep.adapters.node_adapter import NodeAdapter
+
+            # Long-lived adapter — owns an httpx connection pool that gets
+            # reused across requests. Closed in the shutdown path below.
+            app.state.node_adapter = NodeAdapter(
+                settings.bitcoind_rpc_url, timeout_seconds=30.0
+            )
+        else:
+            app.state.node_adapter = None
+
     yield
 
     # Discard in-memory key on shutdown so a fast restart doesn't leak it via
@@ -98,6 +110,13 @@ async def _lifespan(app: FastAPI):
     if bus is not None:
         try:
             bus.close()
+        except Exception:  # pragma: no cover — best-effort cleanup
+            pass
+
+    node = getattr(app.state, "node_adapter", None)
+    if node is not None:
+        try:
+            node.close()
         except Exception:  # pragma: no cover — best-effort cleanup
             pass
 

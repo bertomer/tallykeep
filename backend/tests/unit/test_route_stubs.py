@@ -37,10 +37,8 @@ STUB_ROUTES: list[tuple[str, str, str]] = [
     ("GET", "/api/v1/holdings/{holding_id}/summary", "M5"),
     # --- Descriptors ---
     # M4 implemented: list, attach, get, patch, delete, addresses,
-    # next-receiving. Tested in test_descriptor_endpoints.py.
-    ("POST", "/api/v1/descriptors/{descriptor_id}/rescan", "M5"),
-    ("GET", "/api/v1/descriptors/{descriptor_id}/utxos", "M5"),
-    ("GET", "/api/v1/descriptors/{descriptor_id}/balance", "M5"),
+    # next-receiving. M5.2 implemented: rescan, utxos, balance.
+    # All tested in test_descriptor_endpoints.py / test_chain_scan.py.
     # --- Custodial providers ---
     ("GET", "/api/v1/custodial-providers/supported", "M8"),
     ("GET", "/api/v1/custodial-providers/{provider_id}", "M8"),
@@ -52,12 +50,9 @@ STUB_ROUTES: list[tuple[str, str, str]] = [
         "/api/v1/custodial-providers/{provider_id}/verify-whitelist",
         "M8",
     ),
-    # --- Addresses + UTXOs + Ledger entries ---
+    # --- Addresses + Ledger entries ---
+    # UTXO endpoints implemented in M5.2 (tests in test_utxos_endpoints.py).
     ("PATCH", "/api/v1/addresses/{address_id}", "M5"),
-    ("GET", "/api/v1/utxos", "M5"),
-    ("POST", "/api/v1/utxos/{utxo_id}/freeze", "M5"),
-    ("POST", "/api/v1/utxos/{utxo_id}/unfreeze", "M5"),
-    ("GET", "/api/v1/utxos/{utxo_id}/hygiene", "M5"),
     ("GET", "/api/v1/ledger-entries", "M5"),
     ("GET", "/api/v1/ledger-entries/pending-categorization", "M5"),
     ("GET", "/api/v1/ledger-entries/{entry_id}", "M5"),

@@ -24,9 +24,10 @@ pytestmark = pytest.mark.integration
 
 
 @pytest.fixture()
-def node(bitcoind_rpc_url: str) -> Iterator[NodeAdapter]:
-    # Generous timeout — `generate_to_address(101, ...)` on a busy CI runner
-    # can take 20+ seconds for the first invocation when bitcoind warms up.
+def node(bitcoind_rpc_url: str, bitcoind_clean_chain) -> Iterator[NodeAdapter]:  # type: ignore[no-untyped-def]
+    # Depends on bitcoind_clean_chain so multi-test sessions don't accumulate
+    # blocks past the halving cliff. 60s timeout covers `generate_to_address`
+    # bursts on slow CI runners.
     with NodeAdapter(bitcoind_rpc_url, timeout_seconds=60.0) as adapter:
         yield adapter
 

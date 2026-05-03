@@ -124,6 +124,59 @@ def app_with_db(
     engine.dispose()
 
 
+@pytest.fixture()
+def app_with_db_and_node(
+    clean_test_database: str,
+    bitcoind_rpc_url: str,
+    bitcoind_clean_chain,  # type: ignore[no-untyped-def]
+    monkeypatch: pytest.MonkeyPatch,
+):  # type: ignore[no-untyped-def]
+    """TestClient with both a fresh DB and a live NodeAdapter wired.
+
+    Used by chain-scan integration tests. Yields
+    `(client, session_factory, node_adapter)`. Depends on
+    `bitcoind_clean_chain` so the regtest chain isn't past the halving
+    cliff at session start.
+    """
+    from alembic import command
+    from alembic.config import Config
+    from sqlalchemy.orm import sessionmaker
+
+    from tallykeep.adapters.node_adapter import NodeAdapter
+
+    cfg = Config("alembic.ini")
+    cfg.set_main_option("sqlalchemy.url", clean_test_database)
+    command.upgrade(cfg, "head")
+
+    engine = sa.create_engine(clean_test_database, future=True)
+    factory = sessionmaker(bind=engine, autoflush=False, expire_on_commit=False)
+
+    monkeypatch.setattr(
+        "tallykeep.infrastructure.secrets.DEFAULT_KDF_MEMORY_COST_KIB", 8
+    )
+    monkeypatch.setattr(
+        "tallykeep.infrastructure.secrets.DEFAULT_KDF_TIME_COST", 1
+    )
+    monkeypatch.setattr(
+        "tallykeep.infrastructure.secrets.DEFAULT_KDF_PARALLELISM", 1
+    )
+
+    store = InMemorySecretStore()
+    store.initialize("test passphrase")
+    node = NodeAdapter(bitcoind_rpc_url, timeout_seconds=60.0)
+
+    app = create_app()
+    app.state.secret_store = store
+    app.state.session_factory = factory
+    app.state.node_adapter = node
+
+    with TestClient(app) as test_client:
+        yield test_client, factory, node
+
+    node.close()
+    engine.dispose()
+
+
 # --- Integration test plumbing ----------------------------------------------------
 
 
@@ -185,6 +238,40 @@ def bitcoind_rpc_url() -> str:
         pytest.skip(f"bitcoind unreachable at {url!r}: {exc}")
 
     return url
+
+
+@pytest.fixture(scope="session")
+def bitcoind_clean_chain(bitcoind_rpc_url: str) -> None:
+    """Roll the regtest chain back near genesis if it has accumulated past
+    a depth where halvings make spending tests unreliable.
+
+    Regtest's block subsidy halves every 150 blocks. Past ~10 halvings
+    (height ~1500) the per-block reward is so small that newly-created
+    wallets struggle to send 1000-3000 sats from a 150-block faucet
+    fixture. This fixture invalidates the chain back to height 1 once
+    per test session when needed; subsequent sessions on a fresh chain
+    skip the rollback.
+
+    Tests that need a faucet should depend on this fixture by listing it
+    in their signature (it's session-scoped so the cost is paid once
+    per test session).
+    """
+    from tallykeep.adapters.node_adapter import NodeAdapter
+
+    DEPTH_LIMIT = 1500
+
+    with NodeAdapter(bitcoind_rpc_url, timeout_seconds=60.0) as node:
+        info = node.get_blockchain_info()
+        if info.blocks <= DEPTH_LIMIT:
+            return
+        # Invalidate the block at height 2 to roll the tip back to height 1
+        # (regtest only — `invalidateblock` is allowed there).
+        block_at_2 = node._call("getblockhash", [2])
+        node._call("invalidateblock", [block_at_2])
+        new_info = node.get_blockchain_info()
+        assert new_info.blocks <= 1, (
+            f"chain reset failed; still at height {new_info.blocks}"
+        )
 
 
 @pytest.fixture(scope="session")

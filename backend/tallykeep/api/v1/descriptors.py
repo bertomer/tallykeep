@@ -30,8 +30,8 @@ from tallykeep.adapters.descriptor_adapter import (
     DescriptorParseError,
     UnsupportedDescriptorError,
 )
-from tallykeep.api.dependencies import get_db_session
-from tallykeep.api.v1._stubs import not_implemented_response
+from tallykeep.adapters.node_adapter import NodeAdapter, NodeError
+from tallykeep.api.dependencies import get_db_session, get_node_adapter
 from tallykeep.domain.descriptor import Address, Descriptor
 from tallykeep.repositories import descriptor as descriptor_repo
 from tallykeep.repositories import holding as holding_repo
@@ -322,25 +322,126 @@ async def next_receiving_address(
     )
 
 
-# --- M5 stubs ----------------------------------------------------------------
+# --- chain-aware endpoints (M5.2) -------------------------------------------
 
 
-@router.post("/descriptors/{descriptor_id}/rescan", status_code=501)
-async def rescan_descriptor(descriptor_id: UUID) -> JSONResponse:
-    return not_implemented_response(
-        milestone="M5", route="POST /api/v1/descriptors/{id}/rescan"
+from pydantic import BaseModel as _BaseModel
+
+
+class RescanResponse(_BaseModel):
+    descriptor_id: UUID
+    height_at_scan: int
+    utxos_discovered: int
+    utxos_pre_existing: int
+    ledger_entries_created: int
+
+
+class DescriptorUtxosResponse(_BaseModel):
+    descriptor_id: UUID
+    utxos: list
+
+
+class DescriptorBalanceResponse(_BaseModel):
+    descriptor_id: UUID
+    confirmed_sats: int
+
+
+@router.post(
+    "/descriptors/{descriptor_id}/rescan",
+    response_model=RescanResponse,
+)
+async def rescan_descriptor(
+    descriptor_id: UUID,
+    session: Session = Depends(get_db_session),
+    node: NodeAdapter = Depends(get_node_adapter),
+) -> RescanResponse:
+    """Run a one-shot scan of bitcoind's UTXO set against this descriptor.
+
+    Persists newly-discovered UTXOs, the OnChainTransactions that produced
+    them, and a LedgerEntry per UTXO with `direction=INCOMING`. Re-runs are
+    idempotent (UTXOs upsert by (txid, vout); LedgerEntries de-dupe per
+    holding by source_reference).
+
+    Synchronous in M5.2 — moved to a job queue in M5.3 once we wire the
+    worker process for the live ZMQ listener.
+    """
+    descriptor = descriptor_repo.get_descriptor(session, descriptor_id)
+    if descriptor is None:
+        raise HTTPException(status_code=404, detail="Descriptor not found")
+
+    from tallykeep.services.chain_scan_service import ChainScanService
+
+    service = ChainScanService(node)
+    try:
+        report = service.initial_scan(session, descriptor)
+        session.commit()
+    except NodeError as exc:
+        session.rollback()
+        raise HTTPException(
+            status_code=503, detail=f"bitcoind RPC failed: {exc}"
+        ) from exc
+    return RescanResponse(
+        descriptor_id=report.descriptor_id,
+        height_at_scan=report.height_at_scan,
+        utxos_discovered=report.utxos_discovered,
+        utxos_pre_existing=report.utxos_pre_existing,
+        ledger_entries_created=report.ledger_entries_created,
     )
 
 
-@router.get("/descriptors/{descriptor_id}/utxos", status_code=501)
-async def list_descriptor_utxos(descriptor_id: UUID) -> JSONResponse:
-    return not_implemented_response(
-        milestone="M5", route="GET /api/v1/descriptors/{id}/utxos"
+@router.get(
+    "/descriptors/{descriptor_id}/utxos",
+    response_model=DescriptorUtxosResponse,
+)
+async def list_descriptor_utxos(
+    descriptor_id: UUID,
+    only_unspent: bool = True,
+    limit: int = 50,
+    offset: int = 0,
+    session: Session = Depends(get_db_session),
+) -> DescriptorUtxosResponse:
+    if descriptor_repo.get_descriptor(session, descriptor_id) is None:
+        raise HTTPException(status_code=404, detail="Descriptor not found")
+    from tallykeep.repositories import utxo as utxo_repo
+
+    utxos = utxo_repo.list_for_descriptor(
+        session,
+        descriptor_id,
+        only_unspent=only_unspent,
+        limit=min(max(limit, 1), 200),
+        offset=max(offset, 0),
+    )
+    return DescriptorUtxosResponse(
+        descriptor_id=descriptor_id,
+        utxos=[
+            {
+                "id": str(u.id),
+                "txid": u.txid,
+                "vout": u.vout,
+                "value_sats": u.value_sats,
+                "confirmation_height": u.confirmation_height,
+                "is_frozen": u.is_frozen,
+                "is_spent": u.is_spent,
+                "hygiene_flags": [f.value for f in u.hygiene_flags],
+            }
+            for u in utxos
+        ],
     )
 
 
-@router.get("/descriptors/{descriptor_id}/balance", status_code=501)
-async def descriptor_balance(descriptor_id: UUID) -> JSONResponse:
-    return not_implemented_response(
-        milestone="M5", route="GET /api/v1/descriptors/{id}/balance"
+@router.get(
+    "/descriptors/{descriptor_id}/balance",
+    response_model=DescriptorBalanceResponse,
+)
+async def descriptor_balance(
+    descriptor_id: UUID,
+    session: Session = Depends(get_db_session),
+) -> DescriptorBalanceResponse:
+    if descriptor_repo.get_descriptor(session, descriptor_id) is None:
+        raise HTTPException(status_code=404, detail="Descriptor not found")
+    from tallykeep.repositories import utxo as utxo_repo
+
+    return DescriptorBalanceResponse(
+        descriptor_id=descriptor_id,
+        confirmed_sats=utxo_repo.descriptor_balance_sats(session, descriptor_id),
     )
