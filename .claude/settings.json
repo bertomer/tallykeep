@@ -52,9 +52,11 @@
       "Bash(./scripts/run-tests.sh*)",
       "Bash(./scripts/install-git-hooks.sh*)",
       "Bash(./scripts/dev-reset.sh*)",
+      "Bash(./scripts/smoke-test.sh*)",
       "Bash(scripts/run-tests.sh*)",
       "Bash(scripts/install-git-hooks.sh*)",
       "Bash(scripts/dev-reset.sh*)",
+      "Bash(scripts/smoke-test.sh*)",
 
       "Bash(curl *)",
       "Bash(curl.exe *)",
@@ -100,6 +102,7 @@
       "PowerShell(.\\scripts\\run-tests.ps1*)",
       "PowerShell(.\\scripts\\install-git-hooks.ps1*)",
       "PowerShell(.\\scripts\\dev-reset.ps1*)",
+      "PowerShell(.\\scripts\\smoke-test.ps1*)",
 
       "PowerShell(curl.exe *)",
       "PowerShell(Get-ChildItem*)",

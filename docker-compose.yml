@@ -117,7 +117,13 @@ services:
       timeout: 3s
       retries: 20
       start_period: 5s
-    command: ["uvicorn", "tallykeep.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+    # Spec module 03: 'on container startup, the backend runs `alembic upgrade
+    # head` before opening the API port.' We wrap the uvicorn invocation in a
+    # shell command so the migration runs first; failure stops startup.
+    command:
+      - sh
+      - -c
+      - "alembic upgrade head && exec uvicorn tallykeep.main:app --host 0.0.0.0 --port 8000 --reload"
     restart: unless-stopped
 
   worker:
