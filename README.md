@@ -146,6 +146,24 @@ curl.exe --% -X PATCH -H "Content-Type: application/json" \
 # Default subscribes to all topics. Use ?topics=chain.*,banking.* to filter.
 curl.exe -N http://127.0.0.1:8000/api/v1/events/stream
 
+# Create a Purse (watch-only). Uses the standard
+# abandon-abandon-...-about test mnemonic; replace with your own xpub.
+curl.exe --% -X POST -H "Content-Type: application/json" `
+  -d "{\"name\":\"My phone wallet\",\"purpose\":\"spending\",\"declared_security\":{\"custody_model\":\"self_single\",\"signing_model\":\"software_hot\"},\"display_color\":\"#10b981\",\"display_order\":0,\"descriptors\":[{\"name\":\"main\",\"expression\":\"wpkh(xpub6BosfCnifzxcFwrSzQiqu2DBVTshkCXacvNsWGYJVVhhawA7d4R5WSWGFNbi8Aw6ZRc1brxMyWMzG3DSSSSoekkudhUd9yLb6qx39T9nMdj/0/*)\",\"network\":\"mainnet\",\"gap_limit\":5}]}" `
+  http://127.0.0.1:8000/api/v1/holdings/purse
+
+# List holdings
+curl.exe http://127.0.0.1:8000/api/v1/holdings
+
+# List descriptors (optionally filter by holding_id)
+curl.exe http://127.0.0.1:8000/api/v1/descriptors
+
+# View the addresses pre-derived for a descriptor (replace ID)
+curl.exe http://127.0.0.1:8000/api/v1/descriptors/<DESCRIPTOR_ID>/addresses
+
+# Get the next unused receiving address
+curl.exe -X POST http://127.0.0.1:8000/api/v1/descriptors/<DESCRIPTOR_ID>/addresses/next-receiving
+
 # Browse the full OpenAPI surface (every spec-module-04 route, real or stub)
 # in a browser:
 #   http://127.0.0.1:8000/docs
@@ -192,8 +210,8 @@ lands with its own non-regression tests; the suite must stay green forever.
 | M1  | Domain types, DB schema, secrets module, unlock flow                | done    |
 | M2  | Event bus + job queue + persist-first audit                         | done    |
 | M3  | API skeleton (all module-04 routes registered)                      | done    |
-| M4  | Savings layer — Holdings & Descriptors (BDK address derivation)     | next    |
-| M5  | Savings layer — chain scan, UTXOs, LedgerEntry, hygiene, security   | pending |
+| M4  | Savings layer — Holdings & Descriptors (BDK address derivation)     | done    |
+| M5  | Savings layer — chain scan, UTXOs, LedgerEntry, hygiene, security   | next    |
 | M6  | Banking layer — outgoing PSBT + incoming Invoice (regtest)          | pending |
 | M7  | Profiles & feature flags                                            | pending |
 | M8  | Trading layer — adapters, sweeps, validators                        | pending |

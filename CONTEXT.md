@@ -235,3 +235,67 @@ NRT now **301 tests** (239 unit + 62 integration). Suite ~27s with infra up,
 ~5s without.
 
 ---
+
+## 2026-05-03 — Tooling
+
+- **`scripts/dev-reset.sh` and `.ps1`** — one-command wipe + restart of the
+  Compose stack volumes (Postgres, Redis, bitcoind regtest). Optional
+  `--keep-down` / `-KeepDown`. Allowlisted in `.claude/settings.json` so I
+  can run it autonomously; the bare `docker compose down -v` stays denied.
+
+---
+
+## M4 — completed 2026-05-03
+
+Savings layer foundations: Holdings + Descriptors + BDK address derivation.
+
+Pinned new dep: bdkpython 2.3.1 (the BDK Rust library bindings). Spec
+module 13 flags it as a "known risk"; if API churn becomes a problem we have
+the option of falling back to a thin Rust sidecar — not needed at this point.
+
+Two sub-commits:
+
+- **M4.1** — `adapters/descriptor_adapter.py`: anti-corruption layer around
+  bdkpython for parse + address derivation. Domain code never imports bdk.
+  - Single-key descriptors only (PKH, WPKH, SH_WPKH, TR-single). Multisig and
+    multipath descriptors parse but are rejected at import; multisig support
+    is deferred to v2 per spec module 13.
+  - Network mapping: bdk's `Network.BITCOIN` → our `Network.MAINNET`.
+  - Cap on input length (4 KB) per spec module 10 / S6.
+- **M4.2** — Holdings + Descriptors + Addresses persistence and endpoints.
+  - `repositories/holding.py` adds `insert_row(...)` taking explicit fields so
+    the service can write the holding row before descriptors that FK back to
+    it (the domain dataclass requires non-empty `descriptor_ids` for non-Account
+    types, which can only be true after descriptors are inserted).
+  - `repositories/descriptor.py` covers Descriptor + Address CRUD plus
+    `next_unused_address` (M5 will repopulate this once the chain scanner
+    advances `first_seen_height`).
+  - `services/holding_service.py` orchestrates per-type creation atomically:
+    holding row → flush → descriptors + their gap-limit-many derived addresses
+    → return the canonical domain Holding (validated by `__post_init__` once
+    descriptor_ids is populated).
+  - Endpoints fully implemented: per-type creation (Purse / Strongbox / Vault),
+    list (with filters), get, patch, archive, change-type. Account creation
+    stays a 501 stub pending M8's CustodialProvider integration. Descriptors
+    have CRUD + addresses listing + next-receiving.
+
+**Test fixture changes during M4**:
+- `tests/conftest.py::app_with_db` carried over from M3 — fresh per-test
+  Postgres database with migrations applied, unlocked InMemoryStore
+  pre-installed, cheap-Argon2id parameters. Used by every M4 endpoint test.
+
+**Notes for the reviewer**:
+- BDK derivation is exercised against the standard
+  `abandon abandon ... about` test mnemonic so address values are
+  mnemonic-derived facts, not bdk-version-bound. Tests assert exact prefixes
+  (bc1q for native segwit on mainnet, tb1q for testnet, 1 for legacy).
+- Descriptor uniqueness is a database-level invariant (spec module 03):
+  `uq_descriptor_expression` enforces that two holdings can't share the same
+  descriptor expression. Endpoint surfaces this as 409 Conflict.
+- Descriptor delete refuses if any addresses still reference it (returns 409).
+  Address cascade-delete lands in M5 with the chain scanner — for now,
+  archiving the owning holding is the right way to retire it.
+
+NRT now **339 tests** (260 unit + 79 integration). Suite ~43s with infra up.
+
+---
