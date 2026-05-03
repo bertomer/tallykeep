@@ -37,6 +37,7 @@ def _isolate_unit_tests_from_infrastructure(
     if is_unit:
         monkeypatch.setenv("TALLYKEEP_DATABASE_URL", "")
         monkeypatch.setenv("TALLYKEEP_REDIS_URL", "")
+        monkeypatch.setenv("TALLYKEEP_BITCOIND_RPC_URL", "")
         get_settings.cache_clear()
         database.reset_engine_for_tests()
     yield
@@ -156,6 +157,32 @@ def base_database_url() -> str:
         engine.dispose()
     except Exception as exc:
         pytest.skip(f"postgres unreachable at {admin_url!r}: {exc}")
+
+    return url
+
+
+@pytest.fixture(scope="session")
+def bitcoind_rpc_url() -> str:
+    """Configured bitcoind RPC URL, or skip when unavailable.
+
+    Integration tests share one bitcoind regtest instance. Per-test isolation
+    is achieved by using throwaway addresses / wallet names — bitcoind's
+    in-memory state is small and the regtest chain is cheap to extend.
+    """
+    url = os.environ.get("TALLYKEEP_BITCOIND_RPC_URL", "")
+    if not url:
+        pytest.skip(
+            "TALLYKEEP_BITCOIND_RPC_URL not set — bitcoind integration tests skipped"
+        )
+
+    try:
+        from tallykeep.adapters.node_adapter import NodeAdapter
+
+        with NodeAdapter(url, timeout_seconds=2.0) as node:
+            if not node.is_healthy():
+                pytest.skip(f"bitcoind unreachable at {url!r}")
+    except Exception as exc:  # noqa: BLE001
+        pytest.skip(f"bitcoind unreachable at {url!r}: {exc}")
 
     return url
 

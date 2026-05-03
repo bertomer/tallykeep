@@ -90,6 +90,23 @@ def _probe_redis() -> CheckResult:
         return CheckResult(ok=False, reason="unreachable", detail=str(exc)[:200])
 
 
+def _probe_bitcoind() -> CheckResult:
+    settings = get_settings()
+    if not settings.bitcoind_rpc_url:
+        return CheckResult(ok=False, reason="not_configured")
+    try:
+        from tallykeep.adapters.node_adapter import NodeAdapter
+
+        with NodeAdapter(settings.bitcoind_rpc_url, timeout_seconds=2.0) as node:
+            info = node.get_blockchain_info()
+        return CheckResult(
+            ok=True,
+            detail=f"chain={info.chain} height={info.blocks}",
+        )
+    except Exception as exc:  # noqa: BLE001 — health probes never raise
+        return CheckResult(ok=False, reason="unreachable", detail=str(exc)[:200])
+
+
 def _probe_event_bus(request: Request) -> CheckResult:
     """Reflects the running app's bus health.
 
@@ -113,10 +130,9 @@ def _probe_event_bus(request: Request) -> CheckResult:
 
 @router.get("/health", response_model=HealthResponse)
 async def get_health(request: Request) -> HealthResponse:
-    not_yet = CheckResult(ok=False, reason="not_yet_implemented")
     checks: dict[str, CheckResult] = {
         "database": _probe_database(),
-        "bitcoind": not_yet,
+        "bitcoind": _probe_bitcoind(),
         "redis": _probe_redis(),
         "event_bus": _probe_event_bus(request),
         "unlocked": _probe_unlocked(request),
