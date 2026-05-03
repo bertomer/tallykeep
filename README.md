@@ -164,6 +164,23 @@ curl.exe http://127.0.0.1:8000/api/v1/descriptors/<DESCRIPTOR_ID>/addresses
 # Get the next unused receiving address
 curl.exe -X POST http://127.0.0.1:8000/api/v1/descriptors/<DESCRIPTOR_ID>/addresses/next-receiving
 
+# Run an initial chain scan (M5.2). Pulls UTXOs from bitcoind for the
+# descriptor and persists the on-chain state. Re-runs are idempotent.
+curl.exe -X POST http://127.0.0.1:8000/api/v1/descriptors/<DESCRIPTOR_ID>/rescan
+
+# List the descriptor's UTXOs (only-unspent by default)
+curl.exe http://127.0.0.1:8000/api/v1/descriptors/<DESCRIPTOR_ID>/utxos
+
+# Confirmed balance for a descriptor (sum of unspent UTXOs)
+curl.exe http://127.0.0.1:8000/api/v1/descriptors/<DESCRIPTOR_ID>/balance
+
+# Cross-descriptor UTXO list with filters
+curl.exe "http://127.0.0.1:8000/api/v1/utxos?holding_id=<HOLDING_ID>&min_value_sats=10000"
+
+# Freeze a UTXO (excludes from coin selection in M6)
+curl.exe -X POST http://127.0.0.1:8000/api/v1/utxos/<UTXO_ID>/freeze
+curl.exe -X POST http://127.0.0.1:8000/api/v1/utxos/<UTXO_ID>/unfreeze
+
 # Browse the full OpenAPI surface (every spec-module-04 route, real or stub)
 # in a browser:
 #   http://127.0.0.1:8000/docs
@@ -211,7 +228,7 @@ lands with its own non-regression tests; the suite must stay green forever.
 | M2  | Event bus + job queue + persist-first audit                         | done    |
 | M3  | API skeleton (all module-04 routes registered)                      | done    |
 | M4  | Savings layer — Holdings & Descriptors (BDK address derivation)     | done    |
-| M5  | Savings layer — chain scan, UTXOs, LedgerEntry, hygiene, security   | next    |
+| M5  | Savings layer — chain scan, UTXOs, LedgerEntry, hygiene, security   | partial |
 | M6  | Banking layer — outgoing PSBT + incoming Invoice (regtest)          | pending |
 | M7  | Profiles & feature flags                                            | pending |
 | M8  | Trading layer — adapters, sweeps, validators                        | pending |

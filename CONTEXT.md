@@ -308,3 +308,58 @@ Two sub-commits:
 NRT now **339 tests** (260 unit + 79 integration). Suite ~43s with infra up.
 
 ---
+
+## M5 — in progress (M5.1 + M5.2 complete, 2026-05-03)
+
+Savings layer foundations: live bitcoind RPC + the first end-to-end chain
+scan that turns `scantxoutset` results into UTXO / OnChainTransaction /
+LedgerEntry rows.
+
+- **M5.1** — `adapters/node_adapter.py` is the anti-corruption layer for
+  bitcoind JSON-RPC. Public surface: `get_blockchain_info`,
+  `scan_descriptors`, `get_raw_transaction`, `get_mempool_entry`,
+  `estimate_smart_fee`, `send_raw_transaction`, `is_healthy`. Translates RPC
+  failures into typed exceptions (`NodeUnavailable`, `NodeAuthError`,
+  `NodeMethodNotFound`, `NodeRpcError`). `/api/v1/health` adds the real
+  `bitcoind` probe (`chain=regtest height=N` detail) — was the last
+  `not_yet_implemented` probe.
+- **M5.2** — `services/chain_scan_service.py` ties the adapter to the
+  persistence layer. `ChainScanService.initial_scan(descriptor)` runs
+  `scantxoutset` on the descriptor's external + change branches separately,
+  parses the leaf index out of bitcoind's per-UTXO `desc` annotation
+  (`wpkh([fp/branch/index]pubkey)#chk`), looks up the matching `address`
+  row by `(is_change, derivation_index)`, and upserts UTXO +
+  OnChainTransaction + LedgerEntry rows. Idempotent on re-run.
+
+  Endpoints implemented (replacing M5 stubs):
+    `POST /descriptors/{id}/rescan`, `GET /descriptors/{id}/utxos`,
+    `GET /descriptors/{id}/balance`, `GET /utxos`,
+    `POST /utxos/{id}/freeze`, `POST /utxos/{id}/unfreeze`,
+    `GET /utxos/{id}/hygiene` (returns the empty hygiene_flags list — the
+    actual flag computation lands in M5.4).
+
+Two non-obvious bits worth recording for future-me:
+
+- **bitcoind's `scantxoutset` does NOT populate the `address` field** for
+  descriptor scans, only `scriptPubKey` + `desc`. String-equality matching
+  on address would silently miss every UTXO; matching by leaf index parsed
+  from the desc annotation works.
+- **Regtest's halving cliff** at ~10 halvings (height ~1500) makes a
+  newly-mined faucet wallet effectively zero-balance because the per-block
+  subsidy has shrunk to fractions of a sat. The session-scoped
+  `bitcoind_clean_chain` fixture in `tests/conftest.py` invalidates the
+  chain back to height 1 once per session when the chain is past depth
+  1500. That keeps multi-test integration sessions reliably funded.
+
+NRT now **377 tests** (282 unit + 95 integration). Suite ~100s with infra
+up.
+
+Remaining M5 sub-stages:
+- **M5.3** — ChainEventAdapter (bitcoind ZMQ) + ChainListener worker
+  (live tx detection, no manual rescan needed)
+- **M5.4** — UTXO hygiene flags computation
+- **M5.5** — Declared-vs-observable security analyzer
+- **M5.6** — LedgerEntry endpoints + categorization suggestions
+- **M5.7** — Holding summary + global summary endpoints + final docs
+
+---
