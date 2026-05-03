@@ -1,4 +1,4 @@
-# Smoke-test the live local stack — exercises every M0..M4 endpoint and a few
+# Smoke-test the live local stack -- exercises every M0..M4 endpoint and a few
 # of the still-501 stubs to confirm the API surface.
 #
 # Prereqs:
@@ -58,7 +58,7 @@ try {
     Show "initialize" "ok ($($r.unlocked))"
 } catch {
     if ($_.Exception.Response.StatusCode -eq 409) {
-        # Already initialized — try unlock instead.
+        # Already initialized -- try unlock instead.
         try {
             $r = Invoke-RestMethod -Method Post `
                 -Uri "$BaseUrl/api/v1/unlock" `
@@ -94,7 +94,7 @@ Show "trading.enabled"            $flags.flags."trading.enabled"
 Show "banking.custom_fee_rate"    $flags.flags."banking.custom_fee_rate.enabled"
 Show "advanced.api_docs_link"     $flags.flags."advanced.api_docs_link"
 
-Section "6. Configuration — set bitcoind RPC host"
+Section "6. Configuration -- set bitcoind RPC host"
 $body = @{ bitcoind = @{ rpc_host = "192.168.1.42"; rpc_port = 8332 } } | ConvertTo-Json -Compress -Depth 4
 $config = Invoke-RestMethod -Method Patch -Uri "$BaseUrl/api/v1/configuration" `
     -ContentType 'application/json' -Body $body
