@@ -223,7 +223,7 @@ Section "15. Archive the smoke-test holding"
 $resp = Invoke-WebRequest -Method Post -Uri "$BaseUrl/api/v1/holdings/$purseId/archive"
 Show "status" $resp.StatusCode
 
-Section "16. Verify it's hidden from default list, visible with include_archived"
+Section "16. Verify archived holding is hidden by default, visible with include_archived"
 $default = Invoke-RestMethod -Uri "$BaseUrl/api/v1/holdings"
 $archived = Invoke-RestMethod -Uri "$BaseUrl/api/v1/holdings?include_archived=true"
 Show "without archived" $default.Count
