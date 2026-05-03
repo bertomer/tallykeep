@@ -228,19 +228,23 @@ try {
     Show "first address"  $firstAddr
 
     # Fund the address from a fresh bitcoind-side faucet wallet via bitcoin-cli.
+    # PowerShell 5.1 mangles native-command arguments containing `=`, so we
+    # build the wallet flag once into a single string and pass it as a single
+    # token; that survives argument-tokenization on every host shell.
     $walletName = "smoketest_$(Get-Random -Maximum 99999)"
-    docker compose exec -T bitcoind bitcoin-cli -regtest -rpcuser=tallykeep -rpcpassword=tallykeep_dev `
-        createwallet $walletName 2>&1 | Out-Null
-    $faucetAddr = (docker compose exec -T bitcoind bitcoin-cli -regtest -rpcuser=tallykeep -rpcpassword=tallykeep_dev `
-        -rpcwallet=$walletName getnewaddress).Trim()
-    docker compose exec -T bitcoind bitcoin-cli -regtest -rpcuser=tallykeep -rpcpassword=tallykeep_dev `
-        generatetoaddress 150 $faucetAddr | Out-Null
-    $sendTxid = (docker compose exec -T bitcoind bitcoin-cli -regtest -rpcuser=tallykeep -rpcpassword=tallykeep_dev `
-        -rpcwallet=$walletName sendtoaddress $firstAddr 0.00001500).Trim()
-    $minerAddr = (docker compose exec -T bitcoind bitcoin-cli -regtest -rpcuser=tallykeep -rpcpassword=tallykeep_dev `
-        -rpcwallet=$walletName getnewaddress).Trim()
-    docker compose exec -T bitcoind bitcoin-cli -regtest -rpcuser=tallykeep -rpcpassword=tallykeep_dev `
-        generatetoaddress 1 $minerAddr | Out-Null
+    $walletFlag = "-rpcwallet=$walletName"
+    $rpcAuth = "-rpcuser=tallykeep", "-rpcpassword=tallykeep_dev", "-regtest"
+
+    $createOutput = docker compose exec -T bitcoind bitcoin-cli @rpcAuth createwallet $walletName 2>&1
+    if ($LASTEXITCODE -ne 0) {
+        throw "createwallet '$walletName' failed: $createOutput"
+    }
+
+    $faucetAddr = (docker compose exec -T bitcoind bitcoin-cli @rpcAuth $walletFlag getnewaddress).Trim()
+    docker compose exec -T bitcoind bitcoin-cli @rpcAuth generatetoaddress 150 $faucetAddr | Out-Null
+    $sendTxid = (docker compose exec -T bitcoind bitcoin-cli @rpcAuth $walletFlag sendtoaddress $firstAddr 0.00001500).Trim()
+    $minerAddr = (docker compose exec -T bitcoind bitcoin-cli @rpcAuth $walletFlag getnewaddress).Trim()
+    docker compose exec -T bitcoind bitcoin-cli @rpcAuth generatetoaddress 1 $minerAddr | Out-Null
     Show "funded txid" $sendTxid
 
     $rescan = Invoke-RestMethod -Method Post -Uri "$BaseUrl/api/v1/descriptors/$regtestDescId/rescan"
