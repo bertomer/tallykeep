@@ -62,7 +62,8 @@ class DescriptorPatch(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     name: str | None = Field(default=None, min_length=1, max_length=100)
-    gap_limit: int | None = Field(default=None, ge=1, le=10_000)
+    # Same cap as DescriptorInput.gap_limit (2× the BIP 44 standard of 20).
+    gap_limit: int | None = Field(default=None, ge=1, le=40)
 
 
 # --- helpers -----------------------------------------------------------------

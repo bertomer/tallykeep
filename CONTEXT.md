@@ -81,6 +81,15 @@ Entries are append-only with the date the decision was made.
 - **Test fixture recording strategy for ccxt** — recorded once against a real Kraken /
   Bitstamp test account during M8, then versioned in the repo.
 
+### Deferred to v2
+
+- **Manual address registration past the gap-limit cap.** Descriptor `gap_limit`
+  is capped at 40 (2× the BIP 44 standard of 20). Users who've already issued
+  addresses far beyond that in another wallet — and so won't be picked up by a
+  40-deep scan — need a way to register those addresses manually so the
+  scanner can attach them to the right descriptor. Out of scope for v1;
+  revisit in v2 alongside the multisig descriptor work.
+
 ---
 
 ## M0 — completed 2026-05-01

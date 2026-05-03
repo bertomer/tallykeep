@@ -166,12 +166,33 @@ def test_patch_descriptor_renames_and_updates_gap_limit(app_with_db) -> None:
 
     response = client.patch(
         f"/api/v1/descriptors/{descriptor_id}",
-        json={"name": "renamed", "gap_limit": 50},
+        json={"name": "renamed", "gap_limit": 30},
     )
     assert response.status_code == 200, response.text
     body = response.json()
     assert body["name"] == "renamed"
-    assert body["gap_limit"] == 50
+    assert body["gap_limit"] == 30
+
+
+def test_patch_gap_limit_above_cap_rejected(app_with_db) -> None:
+    """Cap is 2× the BIP 44 standard of 20. v2 will add a manual-address-
+    registration path for users with addresses past that range."""
+    client, _ = app_with_db
+    h = client.post("/api/v1/holdings/purse", json=_purse_body()).json()
+    descriptor_id = h["descriptor_ids"][0]
+
+    response = client.patch(
+        f"/api/v1/descriptors/{descriptor_id}",
+        json={"gap_limit": 100},
+    )
+    assert response.status_code == 422
+
+
+def test_create_with_gap_limit_above_cap_rejected(app_with_db) -> None:
+    client, _ = app_with_db
+    body = _purse_body(gap_limit=200)
+    response = client.post("/api/v1/holdings/purse", json=body)
+    assert response.status_code == 422
 
 
 def test_patch_empty_body_rejected(app_with_db) -> None:

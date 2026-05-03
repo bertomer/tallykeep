@@ -44,7 +44,16 @@ class SecurityClaimInput(BaseModel):
 
 
 class DescriptorInput(BaseModel):
-    """Single descriptor specification at holding-creation time."""
+    """Single descriptor specification at holding-creation time.
+
+    `gap_limit` is the number of consecutive unused addresses we derive when
+    importing a descriptor. The BIP 44 standard is 20 (also the BDK / Sparrow
+    / Electrum default); capped at 40 (2× the standard) to leave headroom for
+    power users who've issued a few extra addresses outside the app, without
+    inviting nonsense workflows that pre-derive thousands of addresses. Users
+    who've issued addresses far past the default gap need a manual-address-
+    registration path — deferred to v2 (see CONTEXT.md).
+    """
 
     model_config = _StrictBase
 
@@ -52,7 +61,7 @@ class DescriptorInput(BaseModel):
     expression: str = Field(..., min_length=1, max_length=4096)
     change_expression: str | None = Field(default=None, max_length=4096)
     network: Network
-    gap_limit: int = Field(default=20, ge=1, le=10_000)
+    gap_limit: int = Field(default=20, ge=1, le=40)
 
 
 # --- inputs: per-type creation requests --------------------------------------
