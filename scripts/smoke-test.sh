@@ -197,13 +197,84 @@ print("  holding_type=" + json.load(sys.stdin)["holding_type"])
 '
 
 
-# --- 13. 501 stubs ------------------------------------------------------------
+# --- 13. Chain scan against regtest (M5.2) -----------------------------------
 
-section "13. Stubs return 501 with milestone tag"
+section "13. Chain scan: create regtest Purse, fund it, /rescan, check balance"
+WPKH_REGTEST='wpkh(tpubD6NzVbkrYhZ4XHndKkuB8FifXm8r5FQHwrN6oZuWCz13qb93rtgKvD4PQsqC4HP4yhV3tA2fqr2RbY5mNXfM7RxXUoeABoDtsFUq2zJq6YK/0/*)'
+REGTEST_BODY=$(cat <<EOF
+{
+  "name":"Smoke regtest wallet",
+  "purpose":"spending",
+  "declared_security":{"custody_model":"self_single","signing_model":"software_hot"},
+  "display_color":"#10b981",
+  "display_order":1,
+  "descriptors":[{"name":"main","expression":"${WPKH_REGTEST}","network":"regtest","gap_limit":10}]
+}
+EOF
+)
+CREATE_STATUS=$(curl -sS -o /tmp/tk_regtest_purse.json -w "%{http_code}" \
+    -X POST -H "Content-Type: application/json" \
+    -d "$REGTEST_BODY" "${BASE_URL}/api/v1/holdings/purse")
+
+if [ "$CREATE_STATUS" = "201" ]; then
+    REGTEST_DESC_ID=$(cat /tmp/tk_regtest_purse.json | jpy 'import json,sys;print(json.load(sys.stdin)["descriptor_ids"][0])' | tr -d '\r')
+    REGTEST_ADDR=$(curl -fsS "${BASE_URL}/api/v1/descriptors/${REGTEST_DESC_ID}/addresses?limit=1" \
+        | jpy 'import json,sys;print(json.load(sys.stdin)["addresses"][0]["address"])' | tr -d '\r')
+    show "regtest descriptor"  "$REGTEST_DESC_ID"
+    show "first address"       "$REGTEST_ADDR"
+
+    # Fund the address from a fresh bitcoind-side faucet wallet.
+    WALLET_NAME="smoketest_$(printf '%x' $$)"
+    docker compose exec -T bitcoind bitcoin-cli -regtest -rpcuser=tallykeep -rpcpassword=tallykeep_dev \
+        createwallet "$WALLET_NAME" >/dev/null 2>&1 || true
+    FAUCET_ADDR=$(docker compose exec -T bitcoind bitcoin-cli -regtest -rpcuser=tallykeep -rpcpassword=tallykeep_dev \
+        -rpcwallet="$WALLET_NAME" getnewaddress | tr -d '\r')
+    docker compose exec -T bitcoind bitcoin-cli -regtest -rpcuser=tallykeep -rpcpassword=tallykeep_dev \
+        generatetoaddress 150 "$FAUCET_ADDR" >/dev/null
+    SEND_TXID=$(docker compose exec -T bitcoind bitcoin-cli -regtest -rpcuser=tallykeep -rpcpassword=tallykeep_dev \
+        -rpcwallet="$WALLET_NAME" sendtoaddress "$REGTEST_ADDR" 0.00001500 | tr -d '\r')
+    MINER_ADDR=$(docker compose exec -T bitcoind bitcoin-cli -regtest -rpcuser=tallykeep -rpcpassword=tallykeep_dev \
+        -rpcwallet="$WALLET_NAME" getnewaddress | tr -d '\r')
+    docker compose exec -T bitcoind bitcoin-cli -regtest -rpcuser=tallykeep -rpcpassword=tallykeep_dev \
+        generatetoaddress 1 "$MINER_ADDR" >/dev/null
+    show "funded txid" "$SEND_TXID"
+
+    curl -fsS -X POST "${BASE_URL}/api/v1/descriptors/${REGTEST_DESC_ID}/rescan" | jpy '
+import json, sys
+r = json.load(sys.stdin)
+print("  rescan: utxos_discovered=" + str(r["utxos_discovered"]) +
+      " ledger_entries=" + str(r["ledger_entries_created"]) +
+      " height=" + str(r["height_at_scan"]))
+'
+
+    curl -fsS "${BASE_URL}/api/v1/descriptors/${REGTEST_DESC_ID}/balance" | jpy '
+import json, sys
+b = json.load(sys.stdin)
+print("  confirmed_sats=" + str(b["confirmed_sats"]))
+'
+
+    # Cross-descriptor /utxos with holding filter.
+    REGTEST_HOLDING_ID=$(cat /tmp/tk_regtest_purse.json | jpy 'import json,sys;print(json.load(sys.stdin)["id"])' | tr -d '\r')
+    curl -fsS "${BASE_URL}/api/v1/utxos?holding_id=${REGTEST_HOLDING_ID}&limit=200" | jpy '
+import json, sys
+us = json.load(sys.stdin)["utxos"]
+print("  /utxos for holding: count=" + str(len(us)))
+for u in us[:3]:
+    print("    - txid=" + u["txid"][:8] + "... value_sats=" + str(u["value_sats"]) + " confirmed=" + str(u["confirmation_height"] is not None))
+'
+elif [ "$CREATE_STATUS" = "409" ]; then
+    show "skipped" "regtest descriptor already imported (run dev-reset for a clean run)"
+else
+    show "skipped" "create returned status=$CREATE_STATUS"
+fi
+
+
+# --- 14. 501 stubs ------------------------------------------------------------
+
+section "14. Stubs return 501 with milestone tag"
 for pair in \
     "GET /api/v1/holdings/${PURSE_ID}/summary" \
     "GET /api/v1/analysis/holding/${PURSE_ID}/security" \
-    "GET /api/v1/utxos" \
     "GET /api/v1/banking/payment-requests" \
     "GET /api/v1/lightning/status" \
     "GET /api/v1/sweep-policies"; do
@@ -215,9 +286,9 @@ for pair in \
 done
 
 
-# --- 14-15. Archive -----------------------------------------------------------
+# --- 15. Archive --------------------------------------------------------------
 
-section "14. Archive + verify default list excludes it"
+section "15. Archive + verify default list excludes it"
 curl -fsS -X POST "${BASE_URL}/api/v1/holdings/${PURSE_ID}/archive" -o /dev/null
 DEFAULT_COUNT=$(curl -fsS "${BASE_URL}/api/v1/holdings" | jpy 'import json,sys;print(len(json.load(sys.stdin)))' | tr -d '\r')
 WITH_COUNT=$(curl -fsS "${BASE_URL}/api/v1/holdings?include_archived=true" | jpy 'import json,sys;print(len(json.load(sys.stdin)))' | tr -d '\r')

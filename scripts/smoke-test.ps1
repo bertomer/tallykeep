@@ -193,13 +193,82 @@ $changed = Invoke-RestMethod -Method Post -Uri "$BaseUrl/api/v1/holdings/$purseI
 Show "holding_type"  $changed.holding_type
 
 
-# --- 14. Stubs (sanity-check the OpenAPI surface) -----------------------------
+# --- 14. Chain scan against regtest (M5.2) -----------------------------------
 
-Section "14. Stubs return 501 with milestone tag"
+Section "14. Chain scan: create regtest Purse, fund, /rescan, balance"
+$wpkhRegtest = "wpkh(tpubD6NzVbkrYhZ4XHndKkuB8FifXm8r5FQHwrN6oZuWCz13qb93rtgKvD4PQsqC4HP4yhV3tA2fqr2RbY5mNXfM7RxXUoeABoDtsFUq2zJq6YK/0/*)"
+$regtestBody = @{
+    name = "Smoke regtest wallet"
+    purpose = "spending"
+    declared_security = @{
+        custody_model = "self_single"
+        signing_model = "software_hot"
+    }
+    display_color = "#10b981"
+    display_order = 1
+    descriptors = @(
+        @{
+            name = "main"
+            expression = $wpkhRegtest
+            network = "regtest"
+            gap_limit = 10
+        }
+    )
+} | ConvertTo-Json -Compress -Depth 6
+
+$regtestSkipped = $false
+try {
+    $regtestPurse = Invoke-RestMethod -Method Post -Uri "$BaseUrl/api/v1/holdings/purse" `
+        -ContentType 'application/json' -Body $regtestBody
+    $regtestDescId = $regtestPurse.descriptor_ids[0]
+    $regtestHoldingId = $regtestPurse.id
+    Show "regtest descriptor" $regtestDescId
+
+    $firstAddr = (Invoke-RestMethod -Uri "$BaseUrl/api/v1/descriptors/$regtestDescId/addresses?limit=1").addresses[0].address
+    Show "first address"  $firstAddr
+
+    # Fund the address from a fresh bitcoind-side faucet wallet via bitcoin-cli.
+    $walletName = "smoketest_$(Get-Random -Maximum 99999)"
+    docker compose exec -T bitcoind bitcoin-cli -regtest -rpcuser=tallykeep -rpcpassword=tallykeep_dev `
+        createwallet $walletName 2>&1 | Out-Null
+    $faucetAddr = (docker compose exec -T bitcoind bitcoin-cli -regtest -rpcuser=tallykeep -rpcpassword=tallykeep_dev `
+        -rpcwallet=$walletName getnewaddress).Trim()
+    docker compose exec -T bitcoind bitcoin-cli -regtest -rpcuser=tallykeep -rpcpassword=tallykeep_dev `
+        generatetoaddress 150 $faucetAddr | Out-Null
+    $sendTxid = (docker compose exec -T bitcoind bitcoin-cli -regtest -rpcuser=tallykeep -rpcpassword=tallykeep_dev `
+        -rpcwallet=$walletName sendtoaddress $firstAddr 0.00001500).Trim()
+    $minerAddr = (docker compose exec -T bitcoind bitcoin-cli -regtest -rpcuser=tallykeep -rpcpassword=tallykeep_dev `
+        -rpcwallet=$walletName getnewaddress).Trim()
+    docker compose exec -T bitcoind bitcoin-cli -regtest -rpcuser=tallykeep -rpcpassword=tallykeep_dev `
+        generatetoaddress 1 $minerAddr | Out-Null
+    Show "funded txid" $sendTxid
+
+    $rescan = Invoke-RestMethod -Method Post -Uri "$BaseUrl/api/v1/descriptors/$regtestDescId/rescan"
+    Show "utxos_discovered"      $rescan.utxos_discovered
+    Show "ledger_entries"        $rescan.ledger_entries_created
+    Show "height_at_scan"        $rescan.height_at_scan
+
+    $balance = Invoke-RestMethod -Uri "$BaseUrl/api/v1/descriptors/$regtestDescId/balance"
+    Show "confirmed_sats"        $balance.confirmed_sats
+
+    $crossList = Invoke-RestMethod -Uri "$BaseUrl/api/v1/utxos?holding_id=$regtestHoldingId&limit=200"
+    Show "/utxos for holding"    $crossList.utxos.Count
+} catch {
+    if ($_.Exception.Response.StatusCode -eq 409) {
+        Show "skipped" "regtest descriptor already imported (run dev-reset.ps1 first)"
+        $regtestSkipped = $true
+    } else {
+        throw
+    }
+}
+
+
+# --- 15. Stubs (sanity-check the OpenAPI surface) -----------------------------
+
+Section "15. Stubs return 501 with milestone tag"
 foreach ($pair in @(
     @("GET",  "/api/v1/holdings/$purseId/summary"),
     @("GET",  "/api/v1/analysis/holding/$purseId/security"),
-    @("GET",  "/api/v1/utxos"),
     @("GET",  "/api/v1/banking/payment-requests"),
     @("GET",  "/api/v1/lightning/status"),
     @("GET",  "/api/v1/sweep-policies"),
@@ -226,13 +295,13 @@ foreach ($pair in @(
 }
 
 
-# --- 15. Archive & cleanup ----------------------------------------------------
+# --- 16. Archive & cleanup ----------------------------------------------------
 
-Section "15. Archive the smoke-test holding"
+Section "16. Archive the smoke-test holding"
 $resp = Invoke-WebRequest -Method Post -Uri "$BaseUrl/api/v1/holdings/$purseId/archive"
 Show "status" $resp.StatusCode
 
-Section "16. Verify archived holding is hidden by default, visible with include_archived"
+Section "17. Verify archived holding is hidden by default, visible with include_archived"
 $default = Invoke-RestMethod -Uri "$BaseUrl/api/v1/holdings"
 $archived = Invoke-RestMethod -Uri "$BaseUrl/api/v1/holdings?include_archived=true"
 Show "without archived" $default.Count
