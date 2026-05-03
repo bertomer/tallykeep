@@ -22,6 +22,7 @@ from tallykeep.api.dependencies import get_db_session
 from tallykeep.api.v1._stubs import not_implemented_response
 from tallykeep.domain.enums import HoldingType, Purpose
 from tallykeep.domain.holding import Holding, SecurityClaim
+from tallykeep.repositories.descriptor import DescriptorAlreadyExists
 from tallykeep.schemas.holding import (
     ChangeTypeRequest,
     HoldingResponse,
@@ -105,6 +106,9 @@ async def create_purse(
             adapter=_ADAPTER,
         )
         session.commit()
+    except DescriptorAlreadyExists as exc:
+        session.rollback()
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
     except (ValueError, HoldingServiceError) as exc:
         session.rollback()
         raise HTTPException(status_code=422, detail=str(exc)) from exc
@@ -133,6 +137,9 @@ async def create_strongbox(
             signing_device_label=body.signing_device_label,
         )
         session.commit()
+    except DescriptorAlreadyExists as exc:
+        session.rollback()
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
     except (ValueError, HoldingServiceError) as exc:
         session.rollback()
         raise HTTPException(status_code=422, detail=str(exc)) from exc
@@ -164,6 +171,9 @@ async def create_vault(
             recovery_setup_notes=body.recovery_setup_notes,
         )
         session.commit()
+    except DescriptorAlreadyExists as exc:
+        session.rollback()
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
     except (ValueError, HoldingServiceError) as exc:
         session.rollback()
         raise HTTPException(status_code=422, detail=str(exc)) from exc

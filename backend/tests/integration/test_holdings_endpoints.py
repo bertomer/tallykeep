@@ -159,6 +159,23 @@ class TestCreatePurse:
             count = session.query(HoldingRow).count()
             assert count == 0  # rolled back cleanly
 
+    def test_create_with_existing_descriptor_returns_409(
+        self, app_with_db
+    ) -> None:
+        """Two holdings can't share a descriptor (uq_descriptor_expression).
+        The second create attempt must return 409 Conflict, not 500."""
+        client, _ = app_with_db
+        # First create succeeds.
+        first = client.post("/api/v1/holdings/purse", json=_purse_body())
+        assert first.status_code == 201, first.text
+        # Second create with the same descriptor expression returns 409.
+        second = client.post(
+            "/api/v1/holdings/purse",
+            json=_purse_body(name="Second wallet"),
+        )
+        assert second.status_code == 409
+        assert "already exists" in second.text
+
     def test_create_with_multisig_descriptor_rejected(self, app_with_db) -> None:
         client, _ = app_with_db
         multisig = (

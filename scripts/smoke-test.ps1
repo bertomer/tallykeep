@@ -125,13 +125,22 @@ $body = @{
         }
     )
 } | ConvertTo-Json -Compress -Depth 6
-$purse = Invoke-RestMethod -Method Post -Uri "$BaseUrl/api/v1/holdings/purse" `
-    -ContentType 'application/json' -Body $body
-Show "id"                $purse.id
-Show "holding_type"      $purse.holding_type
-Show "descriptor_ids[0]" $purse.descriptor_ids[0]
-$purseId = $purse.id
-$descriptorId = $purse.descriptor_ids[0]
+try {
+    $purse = Invoke-RestMethod -Method Post -Uri "$BaseUrl/api/v1/holdings/purse" `
+        -ContentType 'application/json' -Body $body
+    Show "id"                $purse.id
+    Show "holding_type"      $purse.holding_type
+    Show "descriptor_ids[0]" $purse.descriptor_ids[0]
+    $purseId = $purse.id
+    $descriptorId = $purse.descriptor_ids[0]
+} catch {
+    if ($_.Exception.Response.StatusCode -eq 409) {
+        Write-Host "  Stack already has the smoke-test descriptor (re-run on existing data)." -ForegroundColor Yellow
+        Write-Host "  Run '.\scripts\dev-reset.ps1' first to start clean, then re-run this." -ForegroundColor Yellow
+        exit 1
+    }
+    throw
+}
 
 
 # --- 8. Inspect ----------------------------------------------------------------

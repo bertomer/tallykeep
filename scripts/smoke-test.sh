@@ -121,8 +121,20 @@ PURSE_BODY=$(cat <<EOF
 }
 EOF
 )
-PURSE=$(curl -fsS -X POST -H "Content-Type: application/json" \
+CREATE_STATUS=$(curl -sS -o /tmp/tk_create.json -w "%{http_code}" \
+    -X POST -H "Content-Type: application/json" \
     -d "$PURSE_BODY" "${BASE_URL}/api/v1/holdings/purse")
+if [ "$CREATE_STATUS" = "409" ]; then
+    echo "  Stack already has the smoke-test descriptor (re-run on existing data)." >&2
+    echo "  Run './scripts/dev-reset.sh' first to start clean, then re-run this." >&2
+    exit 1
+fi
+if [ "$CREATE_STATUS" != "201" ]; then
+    echo "  Create failed with status=$CREATE_STATUS:" >&2
+    cat /tmp/tk_create.json >&2
+    exit 1
+fi
+PURSE=$(cat /tmp/tk_create.json)
 
 PURSE_ID=$(echo "$PURSE" | jpy 'import json,sys;print(json.load(sys.stdin)["id"])' | tr -d '\r')
 DESCRIPTOR_ID=$(echo "$PURSE" | jpy 'import json,sys;print(json.load(sys.stdin)["descriptor_ids"][0])' | tr -d '\r')
