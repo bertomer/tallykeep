@@ -166,9 +166,14 @@ docker compose exec redis redis-cli
 docker compose exec redis redis-cli PUBSUB CHANNELS
 docker compose exec redis redis-cli LRANGE rq:queue:tallykeep 0 -1
 
-# Reset state — wipes Postgres + Redis volumes (asks for confirmation in Claude)
-docker compose down -v
-docker compose up -d
+# Reset state — DESTRUCTIVE. Wipes Postgres, Redis, and bitcoind volumes,
+# then brings the stack back up healthy.
+./scripts/dev-reset.sh                  # Bash
+.\scripts\dev-reset.ps1                 # PowerShell
+
+# Reset and leave the stack down (e.g. before a long break)
+./scripts/dev-reset.sh --keep-down
+.\scripts\dev-reset.ps1 -KeepDown
 ```
 
 ## Frontend
