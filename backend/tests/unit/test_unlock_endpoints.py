@@ -153,11 +153,13 @@ class TestLockMiddleware:
         self, client_with_store: TestClient, store: InMemorySecretStore
     ) -> None:
         store.initialize("p")
-        # /api/v1/holdings is registered as an M5 stub (M3.2). Once unlocked,
-        # the middleware lets the request through and the stub responds with
-        # 501. The point of this test is "anything other than 423 means the
-        # middleware passed the request along".
-        response = client_with_store.get("/api/v1/holdings")
+        # POST /api/v1/holdings/account is an M8 stub that does not touch the
+        # database — perfect probe here, since this fixture has no DB wired.
+        # Any non-423 response proves the lock middleware passed the request
+        # through to the handler.
+        response = client_with_store.post(
+            "/api/v1/holdings/account", json={}
+        )
         assert response.status_code != 423
 
     def test_no_store_configured_returns_423(self) -> None:

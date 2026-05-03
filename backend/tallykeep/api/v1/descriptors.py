@@ -1,74 +1,333 @@
-"""Descriptor endpoints — spec module 04. Stubs land in M4 (CRUD) and M5 (scan/derive)."""
+"""Descriptor endpoints — spec module 04.
+
+M4 implements:
+  - GET    /api/v1/descriptors                            (list, with holding_id filter)
+  - POST   /api/v1/descriptors                            (attach a new descriptor to an existing holding)
+  - GET    /api/v1/descriptors/{id}
+  - PATCH  /api/v1/descriptors/{id}                       (rename, change gap_limit)
+  - DELETE /api/v1/descriptors/{id}
+  - GET    /api/v1/descriptors/{id}/addresses             (paginated)
+  - POST   /api/v1/descriptors/{id}/addresses/next-receiving
+
+Stubs (deferred to M5):
+  - POST   /api/v1/descriptors/{id}/rescan                (chain scan)
+  - GET    /api/v1/descriptors/{id}/utxos
+  - GET    /api/v1/descriptors/{id}/balance
+"""
 
 from __future__ import annotations
 
-from uuid import UUID
+from datetime import UTC, datetime
+from uuid import UUID, uuid4
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends, HTTPException, Response
 from fastapi.responses import JSONResponse
+from pydantic import BaseModel, ConfigDict, Field
+from sqlalchemy.orm import Session
 
+from tallykeep.adapters.descriptor_adapter import (
+    DescriptorAdapter,
+    DescriptorParseError,
+    UnsupportedDescriptorError,
+)
+from tallykeep.api.dependencies import get_db_session
 from tallykeep.api.v1._stubs import not_implemented_response
+from tallykeep.domain.descriptor import Address, Descriptor
+from tallykeep.repositories import descriptor as descriptor_repo
+from tallykeep.repositories import holding as holding_repo
+from tallykeep.schemas.holding import (
+    AddressListResponse,
+    AddressResponse,
+    DescriptorInput,
+    DescriptorResponse,
+    NextReceivingAddressResponse,
+)
 
 
 router = APIRouter(tags=["descriptors"])
+_ADAPTER = DescriptorAdapter()
 
 
-@router.get("/descriptors", status_code=501)
-async def list_descriptors(holding_id: UUID | None = None) -> JSONResponse:
-    return not_implemented_response(
-        milestone="M4", route="GET /api/v1/descriptors"
+# --- attach-to-existing-holding input ---------------------------------------
+
+
+class AttachDescriptorRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    holding_id: UUID
+    descriptor: DescriptorInput
+
+
+class DescriptorPatch(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    name: str | None = Field(default=None, min_length=1, max_length=100)
+    gap_limit: int | None = Field(default=None, ge=1, le=10_000)
+
+
+# --- helpers -----------------------------------------------------------------
+
+
+def _now() -> datetime:
+    return datetime.now(UTC)
+
+
+def _descriptor_to_response(descriptor: Descriptor) -> DescriptorResponse:
+    return DescriptorResponse(
+        id=descriptor.id,
+        holding_id=descriptor.holding_id,
+        name=descriptor.name,
+        expression=descriptor.expression,
+        change_expression=descriptor.change_expression,
+        network=descriptor.network,
+        address_type=descriptor.address_type,
+        gap_limit=descriptor.gap_limit,
+        is_watch_only=descriptor.is_watch_only,
+        last_scanned_height=descriptor.last_scanned_height,
+        created_at=descriptor.created_at,
     )
 
 
-@router.post("/descriptors", status_code=501)
-async def create_descriptor() -> JSONResponse:
-    return not_implemented_response(
-        milestone="M4", route="POST /api/v1/descriptors"
+def _address_to_response(address: Address) -> AddressResponse:
+    return AddressResponse(
+        id=address.id,
+        descriptor_id=address.descriptor_id,
+        address=address.address,
+        derivation_path=address.derivation_path,
+        is_change=address.is_change,
+        derivation_index=address.derivation_index,
+        label=address.label,
+        first_seen_height=address.first_seen_height,
+        is_reused=address.is_reused,
     )
 
 
-@router.get("/descriptors/{descriptor_id}", status_code=501)
-async def get_descriptor(descriptor_id: UUID) -> JSONResponse:
-    return not_implemented_response(
-        milestone="M4", route="GET /api/v1/descriptors/{id}"
+# --- list / attach -----------------------------------------------------------
+
+
+@router.get("/descriptors", response_model=list[DescriptorResponse])
+async def list_descriptors(
+    holding_id: UUID | None = None,
+    session: Session = Depends(get_db_session),
+) -> list[DescriptorResponse]:
+    descriptors = descriptor_repo.list_descriptors(session, holding_id=holding_id)
+    return [_descriptor_to_response(d) for d in descriptors]
+
+
+@router.post(
+    "/descriptors",
+    response_model=DescriptorResponse,
+    status_code=201,
+)
+async def attach_descriptor(
+    body: AttachDescriptorRequest,
+    session: Session = Depends(get_db_session),
+) -> DescriptorResponse:
+    """Attach a new Descriptor + its derived addresses to an existing Holding."""
+    # We cannot construct the domain Holding without knowing its
+    # descriptor_ids first (dataclass invariant). Read the raw row to check
+    # existence + type.
+    from tallykeep.models import HoldingRow
+
+    target_row = session.get(HoldingRow, body.holding_id)
+    if target_row is None:
+        raise HTTPException(status_code=404, detail="Holding not found")
+    if target_row.holding_type == "account":
+        raise HTTPException(
+            status_code=422,
+            detail="Account holdings cannot have descriptors",
+        )
+
+    spec = body.descriptor
+    try:
+        parsed = _ADAPTER.parse(spec.expression, spec.network)
+    except (DescriptorParseError, UnsupportedDescriptorError) as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    descriptor = Descriptor(
+        id=uuid4(),
+        holding_id=body.holding_id,
+        name=spec.name,
+        expression=spec.expression,
+        change_expression=spec.change_expression,
+        network=spec.network,
+        address_type=parsed.address_type,
+        gap_limit=spec.gap_limit,
+        is_watch_only=True,
+        last_scanned_height=0,
+        created_at=_now(),
+    )
+    try:
+        descriptor_repo.insert_descriptor(session, descriptor)
+    except descriptor_repo.DescriptorAlreadyExists as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+    derived = _ADAPTER.derive_addresses(
+        spec.expression, spec.network, count=spec.gap_limit
+    )
+    addresses = [
+        Address(
+            id=uuid4(),
+            descriptor_id=descriptor.id,
+            address=d.address,
+            derivation_path=f"m/0/{d.derivation_index}",
+            is_change=False,
+            derivation_index=d.derivation_index,
+            label=None,
+            first_seen_height=None,
+            is_reused=False,
+            created_at=_now(),
+        )
+        for d in derived
+    ]
+    descriptor_repo.insert_addresses(session, addresses)
+    if spec.change_expression is not None:
+        derived_change = _ADAPTER.derive_addresses(
+            spec.change_expression, spec.network, count=spec.gap_limit
+        )
+        change_addresses = [
+            Address(
+                id=uuid4(),
+                descriptor_id=descriptor.id,
+                address=d.address,
+                derivation_path=f"m/1/{d.derivation_index}",
+                is_change=True,
+                derivation_index=d.derivation_index,
+                label=None,
+                first_seen_height=None,
+                is_reused=False,
+                created_at=_now(),
+            )
+            for d in derived_change
+        ]
+        descriptor_repo.insert_addresses(session, change_addresses)
+
+    session.commit()
+    return _descriptor_to_response(descriptor)
+
+
+# --- single descriptor -------------------------------------------------------
+
+
+@router.get("/descriptors/{descriptor_id}", response_model=DescriptorResponse)
+async def get_descriptor(
+    descriptor_id: UUID, session: Session = Depends(get_db_session)
+) -> DescriptorResponse:
+    descriptor = descriptor_repo.get_descriptor(session, descriptor_id)
+    if descriptor is None:
+        raise HTTPException(status_code=404, detail="Descriptor not found")
+    return _descriptor_to_response(descriptor)
+
+
+@router.patch("/descriptors/{descriptor_id}", response_model=DescriptorResponse)
+async def patch_descriptor(
+    descriptor_id: UUID,
+    body: DescriptorPatch,
+    session: Session = Depends(get_db_session),
+) -> DescriptorResponse:
+    if body.model_dump(exclude_unset=True) == {}:
+        raise HTTPException(status_code=422, detail="empty update")
+
+    descriptor = descriptor_repo.update_descriptor(
+        session, descriptor_id, name=body.name, gap_limit=body.gap_limit
+    )
+    if descriptor is None:
+        raise HTTPException(status_code=404, detail="Descriptor not found")
+    session.commit()
+    return _descriptor_to_response(descriptor)
+
+
+@router.delete("/descriptors/{descriptor_id}", status_code=204)
+async def delete_descriptor(
+    descriptor_id: UUID, session: Session = Depends(get_db_session)
+) -> Response:
+    """Hard-delete a descriptor.
+
+    Refuses if any addresses still reference it. Address cascade-cleanup is
+    M5 territory; for now archive the owning holding instead of deleting the
+    descriptor.
+    """
+    addresses = descriptor_repo.list_addresses_for_descriptor(
+        session, descriptor_id, limit=1
+    )
+    if addresses:
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                "Descriptor has derived addresses. Address cleanup lands "
+                "in M5; archive the owning holding instead."
+            ),
+        )
+    ok = descriptor_repo.delete_descriptor(session, descriptor_id)
+    if not ok:
+        raise HTTPException(status_code=404, detail="Descriptor not found")
+    session.commit()
+    return Response(status_code=204)
+
+
+# --- addresses ---------------------------------------------------------------
+
+
+@router.get(
+    "/descriptors/{descriptor_id}/addresses",
+    response_model=AddressListResponse,
+)
+async def list_descriptor_addresses(
+    descriptor_id: UUID,
+    is_change: bool | None = None,
+    limit: int = 50,
+    offset: int = 0,
+    session: Session = Depends(get_db_session),
+) -> AddressListResponse:
+    if descriptor_repo.get_descriptor(session, descriptor_id) is None:
+        raise HTTPException(status_code=404, detail="Descriptor not found")
+    addresses = descriptor_repo.list_addresses_for_descriptor(
+        session,
+        descriptor_id,
+        is_change=is_change,
+        limit=min(max(limit, 1), 200),
+        offset=max(offset, 0),
+    )
+    return AddressListResponse(
+        addresses=[_address_to_response(a) for a in addresses]
     )
 
 
-@router.patch("/descriptors/{descriptor_id}", status_code=501)
-async def patch_descriptor(descriptor_id: UUID) -> JSONResponse:
-    return not_implemented_response(
-        milestone="M4", route="PATCH /api/v1/descriptors/{id}"
+@router.post(
+    "/descriptors/{descriptor_id}/addresses/next-receiving",
+    response_model=NextReceivingAddressResponse,
+)
+async def next_receiving_address(
+    descriptor_id: UUID, session: Session = Depends(get_db_session)
+) -> NextReceivingAddressResponse:
+    if descriptor_repo.get_descriptor(session, descriptor_id) is None:
+        raise HTTPException(status_code=404, detail="Descriptor not found")
+    address = descriptor_repo.next_unused_address(
+        session, descriptor_id, is_change=False
+    )
+    if address is None:
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                "No unused address available — increase the descriptor's "
+                "gap_limit or wait for the chain scanner (M5) to advance "
+                "the next-receiving pointer."
+            ),
+        )
+    return NextReceivingAddressResponse(
+        address=address.address,
+        derivation_path=address.derivation_path,
+        derivation_index=address.derivation_index,
     )
 
 
-@router.delete("/descriptors/{descriptor_id}", status_code=501)
-async def delete_descriptor(descriptor_id: UUID) -> JSONResponse:
-    return not_implemented_response(
-        milestone="M4", route="DELETE /api/v1/descriptors/{id}"
-    )
+# --- M5 stubs ----------------------------------------------------------------
 
 
 @router.post("/descriptors/{descriptor_id}/rescan", status_code=501)
 async def rescan_descriptor(descriptor_id: UUID) -> JSONResponse:
     return not_implemented_response(
         milestone="M5", route="POST /api/v1/descriptors/{id}/rescan"
-    )
-
-
-@router.get("/descriptors/{descriptor_id}/addresses", status_code=501)
-async def list_descriptor_addresses(descriptor_id: UUID) -> JSONResponse:
-    return not_implemented_response(
-        milestone="M4", route="GET /api/v1/descriptors/{id}/addresses"
-    )
-
-
-@router.post(
-    "/descriptors/{descriptor_id}/addresses/next-receiving", status_code=501
-)
-async def next_receiving_address(descriptor_id: UUID) -> JSONResponse:
-    return not_implemented_response(
-        milestone="M4",
-        route="POST /api/v1/descriptors/{id}/addresses/next-receiving",
     )
 
 

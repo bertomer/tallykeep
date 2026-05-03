@@ -29,30 +29,16 @@ pytestmark = pytest.mark.unit
 STUB_ROUTES: list[tuple[str, str, str]] = [
     # method, openapi-path, milestone
     # --- Holdings ---
-    ("GET", "/api/v1/holdings", "M5"),
+    # M4 implemented: per-type creation (purse/strongbox/vault), list, get,
+    # patch, archive, change-type. Tested in test_holdings_endpoints.py.
+    # POST /holdings/account stays a stub until M8 wires CustodialProvider.
+    ("POST", "/api/v1/holdings/account", "M8"),
     ("GET", "/api/v1/holdings/summary/global", "M5"),
-    ("GET", "/api/v1/holdings/{holding_id}", "M5"),
-    ("PATCH", "/api/v1/holdings/{holding_id}", "M5"),
-    ("POST", "/api/v1/holdings/{holding_id}/archive", "M5"),
-    ("POST", "/api/v1/holdings/{holding_id}/change-type", "M5"),
     ("GET", "/api/v1/holdings/{holding_id}/summary", "M5"),
-    ("POST", "/api/v1/holdings/account", "M4"),
-    ("POST", "/api/v1/holdings/purse", "M4"),
-    ("POST", "/api/v1/holdings/strongbox", "M4"),
-    ("POST", "/api/v1/holdings/vault", "M4"),
     # --- Descriptors ---
-    ("GET", "/api/v1/descriptors", "M4"),
-    ("POST", "/api/v1/descriptors", "M4"),
-    ("GET", "/api/v1/descriptors/{descriptor_id}", "M4"),
-    ("PATCH", "/api/v1/descriptors/{descriptor_id}", "M4"),
-    ("DELETE", "/api/v1/descriptors/{descriptor_id}", "M4"),
+    # M4 implemented: list, attach, get, patch, delete, addresses,
+    # next-receiving. Tested in test_descriptor_endpoints.py.
     ("POST", "/api/v1/descriptors/{descriptor_id}/rescan", "M5"),
-    ("GET", "/api/v1/descriptors/{descriptor_id}/addresses", "M4"),
-    (
-        "POST",
-        "/api/v1/descriptors/{descriptor_id}/addresses/next-receiving",
-        "M4",
-    ),
     ("GET", "/api/v1/descriptors/{descriptor_id}/utxos", "M5"),
     ("GET", "/api/v1/descriptors/{descriptor_id}/balance", "M5"),
     # --- Custodial providers ---
