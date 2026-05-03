@@ -41,6 +41,7 @@ RUN pip install --upgrade pip \
         "cryptography==44.0.0" \
         "redis==5.2.0" \
         "rq==1.16.2" \
+        "bdkpython==2.3.1" \
         "pytest==8.3.4" \
         "pytest-asyncio==0.25.0" \
         "pytest-cov==6.0.0" \
