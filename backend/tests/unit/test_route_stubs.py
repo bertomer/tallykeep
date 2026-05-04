@@ -33,8 +33,6 @@ STUB_ROUTES: list[tuple[str, str, str]] = [
     # patch, archive, change-type. Tested in test_holdings_endpoints.py.
     # POST /holdings/account stays a stub until M8 wires CustodialProvider.
     ("POST", "/api/v1/holdings/account", "M8"),
-    ("GET", "/api/v1/holdings/summary/global", "M5"),
-    ("GET", "/api/v1/holdings/{holding_id}/summary", "M5"),
     # --- Descriptors ---
     # M4 implemented: list, attach, get, patch, delete, addresses,
     # next-receiving. M5.2 implemented: rescan, utxos, balance.

@@ -210,11 +210,135 @@ async def list_holdings(
     return [_to_response(h) for h in holdings]
 
 
-@router.get("/holdings/summary/global", status_code=501)
-async def global_holdings_summary() -> JSONResponse:
-    return not_implemented_response(
-        milestone="M5", route="GET /api/v1/holdings/summary/global"
+@router.get("/holdings/summary/global")
+async def global_holdings_summary(
+    include_archived: bool = False,
+    session: Session = Depends(get_db_session),
+):  # type: ignore[no-untyped-def]
+    """Fortune view: per-Holding summary plus cross-Holding rollups.
+
+    Spec module 05: "the global view always shows the per-Holding
+    breakdown alongside the total. No silent consolidation." We honour
+    that — the response includes the full summary list, not just the
+    totals.
+    """
+    from tallykeep.repositories import (
+        descriptor as descriptor_repo,
+        utxo as utxo_repo,
     )
+
+    holdings = holding_service.list_holdings(
+        session, include_archived=include_archived
+    )
+
+    summaries: list[dict] = []
+    by_type: dict[str, int] = {}
+    by_purpose: dict[str, int] = {}
+    total_sats = 0
+
+    for h in holdings:
+        descriptor_ids = descriptor_repo.descriptor_ids_for_holding(session, h.id)
+        confirmed = 0
+        utxo_count = 0
+        for d_id in descriptor_ids:
+            confirmed += utxo_repo.descriptor_balance_sats(session, d_id)
+            utxo_count += len(
+                utxo_repo.list_for_descriptor(session, d_id, only_unspent=True)
+            )
+        summaries.append(
+            {
+                "holding_id": str(h.id),
+                "holding_type": h.holding_type.value,
+                "name": h.name,
+                "purpose": h.purpose.value,
+                "confirmed_sats": confirmed,
+                "descriptor_count": len(descriptor_ids),
+                "utxo_count": utxo_count,
+                "is_archived": h.is_archived,
+                "display_color": h.display_color,
+                "display_order": h.display_order,
+            }
+        )
+        total_sats += confirmed
+        by_type[h.holding_type.value] = (
+            by_type.get(h.holding_type.value, 0) + confirmed
+        )
+        by_purpose[h.purpose.value] = (
+            by_purpose.get(h.purpose.value, 0) + confirmed
+        )
+
+    return {
+        "holdings": summaries,
+        "total_sats": total_sats,
+        "by_type": by_type,
+        "by_purpose": by_purpose,
+    }
+
+
+@router.get("/holdings/{holding_id}/summary")
+async def holding_summary(
+    holding_id: UUID, session: Session = Depends(get_db_session)
+):  # type: ignore[no-untyped-def]
+    """Per-Holding deep summary: balance + descriptor/UTXO counts +
+    observable security analysis.
+
+    Returns 404 when the holding doesn't exist.
+    """
+    from tallykeep.repositories import (
+        descriptor as descriptor_repo,
+        utxo as utxo_repo,
+    )
+    from tallykeep.services.analysis_service import analyze_holding
+
+    holding = holding_service.get_holding(session, holding_id)
+    if holding is None:
+        raise HTTPException(status_code=404, detail="Holding not found")
+
+    descriptor_ids = descriptor_repo.descriptor_ids_for_holding(session, holding_id)
+    confirmed = 0
+    utxo_count = 0
+    for d_id in descriptor_ids:
+        confirmed += utxo_repo.descriptor_balance_sats(session, d_id)
+        utxo_count += len(
+            utxo_repo.list_for_descriptor(session, d_id, only_unspent=True)
+        )
+
+    analysis = analyze_holding(session, holding_id)
+    observable = analysis.observable if analysis is not None else None
+    discrepancies = analysis.discrepancies if analysis is not None else []
+
+    return {
+        "holding": _to_response(holding).model_dump(),
+        # `unconfirmed` will land alongside the mempool-watching path in
+        # M5.x+; for now only confirmed balance is tracked. We surface 0
+        # for unconfirmed and the same value for total so the contract
+        # in spec module 04 stays the right shape.
+        "total_balance_sats": confirmed,
+        "confirmed_sats": confirmed,
+        "unconfirmed_sats": 0,
+        "descriptor_count": len(descriptor_ids),
+        "utxo_count": utxo_count,
+        "observable_security": (
+            {
+                "inferred_custody_model": observable.inferred_custody_model.value,
+                "inferred_signing_model": observable.inferred_signing_model.value,
+                "inferred_multisig_parameters": observable.inferred_multisig_parameters,
+                "inferred_timelock_blocks": observable.inferred_timelock_blocks,
+                "last_computed_at": observable.last_computed_at.isoformat(),
+            }
+            if observable is not None
+            else None
+        ),
+        "discrepancies": [
+            {
+                "kind": d.kind.value,
+                "severity": d.severity.value,
+                "message": d.message,
+                "first_detected_at": d.first_detected_at.isoformat(),
+            }
+            for d in discrepancies
+        ],
+    }
 
 
 @router.get("/holdings/{holding_id}", response_model=HoldingResponse)

@@ -204,6 +204,14 @@ curl.exe -X PATCH http://127.0.0.1:8000/api/v1/ledger-entries/<ENTRY_ID> `
     -H "Content-Type: application/json" `
     -d '{"category":"merchant_payment","counterparty_label":"Acme Coffee","note":"Espresso"}'
 
+# M5.7 — Per-Holding summary (balance + descriptor/UTXO counts +
+# observable security + discrepancies, in one shot)
+curl.exe http://127.0.0.1:8000/api/v1/holdings/<HOLDING_ID>/summary
+
+# Fortune view: all-Holdings summary with per-type / per-purpose rollups
+curl.exe http://127.0.0.1:8000/api/v1/holdings/summary/global
+curl.exe "http://127.0.0.1:8000/api/v1/holdings/summary/global?include_archived=true"
+
 # M5.3 — live chain listener: send to a watched address and the worker
 # auto-detects + persists it (no /rescan needed). Watch the worker logs
 # while sending a tx.
@@ -264,7 +272,7 @@ lands with its own non-regression tests; the suite must stay green forever.
 | M2  | Event bus + job queue + persist-first audit                         | done    |
 | M3  | API skeleton (all module-04 routes registered)                      | done    |
 | M4  | Savings layer — Holdings & Descriptors (BDK address derivation)     | done    |
-| M5  | Savings layer — chain scan, UTXOs, LedgerEntry, hygiene, security   | partial |
+| M5  | Savings layer — chain scan, UTXOs, LedgerEntry, hygiene, security   | done    |
 | M6  | Banking layer — outgoing PSBT + incoming Invoice (regtest)          | pending |
 | M7  | Profiles & feature flags                                            | pending |
 | M8  | Trading layer — adapters, sweeps, validators                        | pending |

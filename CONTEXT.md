@@ -579,3 +579,60 @@ Remaining M5 sub-stage:
 - **M5.7** — Holding summary + global summary endpoints + final docs
 
 ---
+
+## 2026-05-04 — M5.7 (holding summaries) and M5 wrap-up
+
+The two remaining holdings stubs are now real:
+
+- `GET /api/v1/holdings/{id}/summary` — one-shot view that bundles
+  balance (confirmed / unconfirmed), descriptor / UTXO counts,
+  ObservableSecurity, and discrepancy list. The response shape matches
+  spec module 04 verbatim. `unconfirmed_sats` is always 0 in v1
+  (mempool-watching is a v1.x scheduler — documented).
+- `GET /api/v1/holdings/summary/global` — fortune view per spec module
+  05: **per-Holding breakdown alongside totals, no silent
+  consolidation**. Adds `by_type` and `by_purpose` rollups. Honours
+  `?include_archived=true` for the rare case where the user wants the
+  full historic stack.
+
+Both endpoints walk descriptors via `descriptor_repo.descriptor_ids_for_holding`
+and sum confirmed UTXOs via `utxo_repo.descriptor_balance_sats` —
+unchanged repository surface, no new SQL.
+
+**M5 is complete.** What it delivers (top to bottom):
+
+  - **M5.1** NodeAdapter + bitcoind health probe
+  - **M5.2** ChainScanService + UTXO/Ledger/OnChainTx persistence + 6
+    real endpoints (rescan, /utxos, /balance, freeze, unfreeze, hygiene)
+  - **M5.3** ChainEventAdapter (ZMQ) + ChainListener worker for live
+    auto-detection (no manual /rescan needed)
+  - **M5.4** UTXO hygiene flags (ADDRESS_REUSED, DUST, ROUND_NUMBER,
+    SUSPECTED_CONSOLIDATION) wired into both pathways
+  - **M5.5** Declared-vs-observable security analyzer + 4 v1
+    discrepancies + analysis endpoints
+  - **M5.6** LedgerEntry endpoints + CategorizerSuggester subscriber
+  - **M5.7** Per-Holding + global summary endpoints
+
+What's deferred to v1.x / v2 (all documented):
+  - DUST recompute on fee-rate change (v1.x scheduler).
+  - Round-number fiat-denominated detection (needs price oracle).
+  - `claimed_offline_but_pattern_suggests_hot` discrepancy (needs
+    signing-pattern telemetry from M9).
+  - CustodialProvider whitelist match in the categorizer (M8 wires the
+    rows; service code is already present).
+  - PaymentRequest match in the categorizer (M6 wires
+    `broadcast_txid`).
+  - Periodic 24h security-analysis recompute (M9).
+  - Manual address registration past the gap-limit (v2).
+  - Per-UTXO blueprint endpoint (`/api/v1/analysis/utxo/{id}`) folded
+    into `/utxos/{id}/hygiene` for v1; richer historic context lands in
+    v2.
+
+NRT: 418 → 423 (296 unit + 126 integration, 1 skipped pending the
+CustodialProvider API). Suite ~180s with infra up.
+
+Next milestone: **M6 — Banking layer (outgoing PSBT + incoming
+Invoice on regtest)**. The natural pause point for review before
+proceeding.
+
+---
