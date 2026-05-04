@@ -186,6 +186,15 @@ curl.exe -X POST http://127.0.0.1:8000/api/v1/utxos/<UTXO_ID>/unfreeze
 # and the live-listener paths.
 curl.exe http://127.0.0.1:8000/api/v1/utxos/<UTXO_ID>/hygiene
 
+# M5.5 — declared-vs-observable security check. Returns the declared shape
+# (what the user said), the observable shape (what the descriptor implies),
+# and any discrepancies between them. Severity: high / medium / low /
+# informational.
+curl.exe http://127.0.0.1:8000/api/v1/analysis/holding/<HOLDING_ID>/security
+
+# Per-Holding hygiene rollup + recommendations
+curl.exe http://127.0.0.1:8000/api/v1/analysis/holding/<HOLDING_ID>/blueprint
+
 # M5.3 — live chain listener: send to a watched address and the worker
 # auto-detects + persists it (no /rescan needed). Watch the worker logs
 # while sending a tx.

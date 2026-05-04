@@ -97,10 +97,11 @@ STUB_ROUTES: list[tuple[str, str, str]] = [
     ("GET", "/api/v1/sweep-executions/{execution_id}", "M8"),
     ("POST", "/api/v1/sweep-executions/{execution_id}/confirm", "M8"),
     # --- Analysis + Jobs + Export ---
-    ("GET", "/api/v1/analysis/holding/{holding_id}/security", "M5"),
-    ("GET", "/api/v1/analysis/holding/{holding_id}/blueprint", "M5"),
-    ("GET", "/api/v1/analysis/utxo/{utxo_id}", "M5"),
-    ("POST", "/api/v1/analysis/recompute", "M5"),
+    # /security and /blueprint are real as of M5.5; the per-UTXO blueprint and
+    # the manual recompute trigger are still stubs (UTXO blueprint is folded
+    # into /utxos/{id}/hygiene; recompute will land alongside the M9 scheduler).
+    ("GET", "/api/v1/analysis/utxo/{utxo_id}", "v2"),
+    ("POST", "/api/v1/analysis/recompute", "M9"),
     ("GET", "/api/v1/jobs", "M5"),
     ("GET", "/api/v1/jobs/{job_id}", "M5"),
     ("DELETE", "/api/v1/jobs/{job_id}", "M5"),

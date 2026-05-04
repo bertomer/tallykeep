@@ -483,3 +483,59 @@ Remaining M5 sub-stages:
 - **M5.7** — Holding summary + global summary endpoints + final docs
 
 ---
+
+## 2026-05-04 — M5.5 (declared-vs-observable security analyzer)
+
+`services/analysis_service.py` parses each attached descriptor and
+derives an `ObservableSecurity` view (custody model, multisig
+parameters, timelock blocks). Then it compares against
+`declared_security` and emits the spec module 05 discrepancy table.
+
+Inference scope in v1:
+- **Custody model**: regex `multi(k,...)`, `multi_a(k,...)`,
+  `sortedmulti(k,...)` → SELF_MULTISIG with parsed (required, total).
+  Otherwise SELF_SINGLE.
+- **Timelock**: regex `older(N)` / `after(N)` → N blocks.
+- **Signing model**: spec says heuristics depend on tx-timing telemetry
+  we don't ship in v1; the analyzer always returns
+  `SigningModel.UNKNOWN` and the discrepancy detector treats UNKNOWN as
+  "no information," not a contradiction. The
+  `claimed_offline_but_pattern_suggests_hot` discrepancy never fires in
+  v1 (documented; will land alongside M9's scheduler).
+
+Discrepancies fired in v1:
+- HIGH: `claimed_multisig_but_single_key`
+- INFORMATIONAL: `claimed_single_but_observable_multisig`
+- MEDIUM: `claimed_vault_no_timelock_no_multisig`
+- LOW: `claimed_inheritance_no_recovery_path`
+
+Why a regex parser instead of BDK? bdkpython doesn't expose a stable
+multi-arity / timelock fragment API across the versions we support.
+The regex covers v1's surface and is straightforward to reason about;
+graduating to a real Miniscript parser is a v2 enhancement.
+
+Endpoints:
+- `GET /api/v1/analysis/holding/{id}/security` — declared + observable
+  + discrepancies (with templated messages from the spec).
+- `GET /api/v1/analysis/holding/{id}/blueprint` — per-flag count rollup
+  (address_reuse_count, dust_utxo_count, round_number_outputs,
+  suspected_consolidations) plus one recommendation per flag kind
+  present.
+
+Recomputation cadence in v1: fully on-demand (every endpoint call runs
+fresh). The spec also calls for a 24h periodic scheduler; that lands
+alongside the SSE / scheduler infrastructure in M9 (the recompute
+endpoint stub points at M9).
+
+The `/api/v1/analysis/utxo/{id}` endpoint is folded into
+`/utxos/{id}/hygiene` for v1; the standalone per-UTXO blueprint is
+deferred to v2 with richer historic context.
+
+NRT: 398 → 410 (296 unit + 113 integration, 1 skipped pending the
+CustodialProvider API). Suite ~175s with infra up.
+
+Remaining M5 sub-stages:
+- **M5.6** — LedgerEntry endpoints + categorization suggestions
+- **M5.7** — Holding summary + global summary endpoints + final docs
+
+---
