@@ -51,12 +51,8 @@ STUB_ROUTES: list[tuple[str, str, str]] = [
         "M8",
     ),
     # --- Addresses + Ledger entries ---
-    # UTXO endpoints implemented in M5.2 (tests in test_utxos_endpoints.py).
+    # UTXO endpoints implemented in M5.2; LedgerEntry list/get/patch land in M5.6.
     ("PATCH", "/api/v1/addresses/{address_id}", "M5"),
-    ("GET", "/api/v1/ledger-entries", "M5"),
-    ("GET", "/api/v1/ledger-entries/pending-categorization", "M5"),
-    ("GET", "/api/v1/ledger-entries/{entry_id}", "M5"),
-    ("PATCH", "/api/v1/ledger-entries/{entry_id}", "M5"),
     # --- Banking ---
     ("GET", "/api/v1/banking/payment-requests", "M6"),
     ("POST", "/api/v1/banking/payment-requests", "M6"),

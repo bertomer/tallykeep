@@ -23,6 +23,7 @@ from tallykeep.infrastructure.database import get_session_factory
 from tallykeep.infrastructure.event_bus import EventBus, RedisEventBus
 from tallykeep.infrastructure.event_emission import AuditReconciler
 from tallykeep.workers.listeners.chain_listener import ChainListener
+from tallykeep.workers.subscribers.categorizer_suggester import CategorizerSuggester
 
 
 logging.basicConfig(
@@ -50,6 +51,7 @@ def main() -> int:
     bus: EventBus | None = None
     reconciler: AuditReconciler | None = None
     chain_listener: ChainListener | None = None
+    categorizer: CategorizerSuggester | None = None
     node: NodeAdapter | None = None
     reconciler_interval_seconds = 30  # how often to scan for unacked events
 
@@ -77,6 +79,17 @@ def main() -> int:
         except Exception:  # noqa: BLE001
             logger.exception("worker: failed to set up AuditReconciler")
 
+    if bus is not None and settings.database_url:
+        try:
+            categorizer = CategorizerSuggester(
+                bus=bus, session_factory=get_session_factory()
+            )
+            categorizer.start()
+            logger.info("worker: CategorizerSuggester registered")
+        except Exception:  # noqa: BLE001
+            logger.exception("worker: failed to start CategorizerSuggester")
+            categorizer = None
+
     if (
         bus is not None
         and settings.database_url
@@ -102,10 +115,11 @@ def main() -> int:
 
     last_reconcile = 0.0
     logger.info(
-        "worker: started (bus=%s, reconciler=%s, chain_listener=%s)",
+        "worker: started (bus=%s, reconciler=%s, chain_listener=%s, categorizer=%s)",
         "redis" if bus else "none",
         "on" if reconciler else "off",
         "on" if chain_listener else "off",
+        "on" if categorizer else "off",
     )
 
     while _running:
@@ -119,6 +133,12 @@ def main() -> int:
                 logger.exception("worker: AuditReconciler failed")
             last_reconcile = now
         time.sleep(1)
+
+    if categorizer is not None:
+        try:
+            categorizer.stop()
+        except Exception:  # noqa: BLE001
+            pass
 
     if chain_listener is not None:
         try:

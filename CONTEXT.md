@@ -539,3 +539,43 @@ Remaining M5 sub-stages:
 - **M5.7** — Holding summary + global summary endpoints + final docs
 
 ---
+
+## 2026-05-04 — M5.6 (LedgerEntry endpoints + categorization)
+
+`api/v1/ledger_entries.py` is now real:
+
+- `GET /api/v1/ledger-entries` with full filter set (`holding_id`,
+  `direction`, `category`, `from_date`, `to_date`, `uncategorized`).
+- `GET /api/v1/ledger-entries/{id}` with the holding-link rollout.
+- `GET /api/v1/ledger-entries/pending-categorization` (convenience).
+- `PATCH /api/v1/ledger-entries/{id}` for `category` /
+  `counterparty_label` / `note`. Setting `category` stamps
+  `categorized_at`.
+
+Cross-holding queries use a new `repositories/ledger_entry.list_filtered`
+that joins through `ledger_entry_holding_link` only when `holding_id` is
+set; otherwise it walks the `ledger_entry` table directly so the
+all-holdings list isn't paying for a join it doesn't need.
+
+`services/categorizer_service.py` runs the spec heuristics; in v1 only
+the INTERNAL-direction rule fires unconditionally. The custodial-match
+and PaymentRequest-match branches are wired but inert until M8 / M6 add
+the data they need (`CustodialProviderRow.whitelist_address`,
+`PaymentRequest.broadcast_txid`). Suggestions are advisory; the user
+binds `category` via the PATCH endpoint, never via the suggester.
+
+`workers/subscribers/categorizer_suggester.py` reacts to
+`ledger_entry.requires_categorization` (which the ChainListener already
+emits per M5.3) and writes `suggested_category`. Re-emits the same topic
+after writing so the LiveUpdateBridge / SSE pickups the refresh once
+M9 lands.
+
+Worker boot wires the new subscriber alongside the listener; both share
+the same Redis bus + SQLAlchemy session factory.
+
+NRT: 410 → 418 (296 unit + 121 integration, 1 skipped). Suite ~167s.
+
+Remaining M5 sub-stage:
+- **M5.7** — Holding summary + global summary endpoints + final docs
+
+---

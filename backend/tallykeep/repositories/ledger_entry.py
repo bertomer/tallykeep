@@ -111,6 +111,59 @@ def insert(
             )
 
 
+def list_filtered(
+    session: Session,
+    *,
+    holding_id: UUID | None = None,
+    direction: Direction | None = None,
+    category: LedgerCategory | None = None,
+    uncategorized_only: bool = False,
+    from_timestamp: datetime | None = None,
+    to_timestamp: datetime | None = None,
+    limit: int = 50,
+    offset: int = 0,
+) -> list[LedgerEntry]:
+    """Cross-holding LedgerEntry query.
+
+    `holding_id`, when set, joins through `ledger_entry_holding_link` so that
+    only entries touching that holding come back. The other filters apply to
+    the entry row directly.
+    """
+    stmt = select(LedgerEntryRow)
+    if holding_id is not None:
+        stmt = stmt.join(
+            LedgerEntryHoldingLinkRow,
+            LedgerEntryHoldingLinkRow.ledger_entry_id == LedgerEntryRow.id,
+        ).where(LedgerEntryHoldingLinkRow.holding_id == holding_id)
+    if direction is not None:
+        stmt = stmt.where(LedgerEntryRow.direction == direction.value)
+    if category is not None:
+        stmt = stmt.where(LedgerEntryRow.category == category.value)
+    if uncategorized_only:
+        stmt = stmt.where(LedgerEntryRow.category.is_(None))
+    if from_timestamp is not None:
+        stmt = stmt.where(LedgerEntryRow.timestamp >= from_timestamp)
+    if to_timestamp is not None:
+        stmt = stmt.where(LedgerEntryRow.timestamp <= to_timestamp)
+    stmt = stmt.order_by(LedgerEntryRow.timestamp.desc())
+    stmt = stmt.offset(max(offset, 0)).limit(min(max(limit, 1), 200))
+    rows = session.execute(stmt).scalars().all()
+    return [_row_to_domain(row) for row in rows]
+
+
+def list_holdings_for_entry(
+    session: Session, entry_id: UUID
+) -> list[tuple[UUID, int]]:
+    """Return (holding_id, holding_amount_sats) tuples for one entry."""
+    rows = session.execute(
+        select(
+            LedgerEntryHoldingLinkRow.holding_id,
+            LedgerEntryHoldingLinkRow.holding_amount_sats,
+        ).where(LedgerEntryHoldingLinkRow.ledger_entry_id == entry_id)
+    ).all()
+    return [(r[0], int(r[1])) for r in rows]
+
+
 def list_for_holding(
     session: Session,
     holding_id: UUID,
@@ -159,4 +212,12 @@ def patch(
     return _row_to_domain(row)
 
 
-__all__ = ["get", "get_by_source", "insert", "list_for_holding", "patch"]
+__all__ = [
+    "get",
+    "get_by_source",
+    "insert",
+    "list_filtered",
+    "list_for_holding",
+    "list_holdings_for_entry",
+    "patch",
+]

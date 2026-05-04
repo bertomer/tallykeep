@@ -195,6 +195,15 @@ curl.exe http://127.0.0.1:8000/api/v1/analysis/holding/<HOLDING_ID>/security
 # Per-Holding hygiene rollup + recommendations
 curl.exe http://127.0.0.1:8000/api/v1/analysis/holding/<HOLDING_ID>/blueprint
 
+# M5.6 — Ledger entries: filtered list, single get, pending-categorization,
+# and a PATCH that binds the user's chosen category.
+curl.exe http://127.0.0.1:8000/api/v1/ledger-entries
+curl.exe "http://127.0.0.1:8000/api/v1/ledger-entries?holding_id=<HOLDING_ID>&direction=incoming"
+curl.exe http://127.0.0.1:8000/api/v1/ledger-entries/pending-categorization
+curl.exe -X PATCH http://127.0.0.1:8000/api/v1/ledger-entries/<ENTRY_ID> `
+    -H "Content-Type: application/json" `
+    -d '{"category":"merchant_payment","counterparty_label":"Acme Coffee","note":"Espresso"}'
+
 # M5.3 — live chain listener: send to a watched address and the worker
 # auto-detects + persists it (no /rescan needed). Watch the worker logs
 # while sending a tx.
