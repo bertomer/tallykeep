@@ -38,6 +38,7 @@ def _isolate_unit_tests_from_infrastructure(
         monkeypatch.setenv("TALLYKEEP_DATABASE_URL", "")
         monkeypatch.setenv("TALLYKEEP_REDIS_URL", "")
         monkeypatch.setenv("TALLYKEEP_BITCOIND_RPC_URL", "")
+        monkeypatch.setenv("TALLYKEEP_BITCOIND_ZMQ_ENDPOINT", "")
         get_settings.cache_clear()
         database.reset_engine_for_tests()
     yield

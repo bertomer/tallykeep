@@ -363,3 +363,74 @@ Remaining M5 sub-stages:
 - **M5.7** — Holding summary + global summary endpoints + final docs
 
 ---
+
+## 2026-05-04 — M5.3 (live chain listener)
+
+`adapters/chain_event_adapter.py` is the anti-corruption layer for
+bitcoind's ZeroMQ pub/sub. v1 subscribes to `hashtx` + `hashblock` only —
+we use the hash to drive a follow-up `getrawtransaction` / `getblock`
+RPC call rather than parsing the raw serialized objects ourselves. A
+single PUB socket on bitcoind multiplexes all four ZMQ topics; the
+docker-compose was simplified to one host port (28332) to match.
+
+`services/chain_processing_service.py` is the bus-agnostic processor: it
+takes one decoded transaction (the shape `getrawtransaction verbose=true`
+returns) and applies the domain effects — mark spent UTXOs, persist new
+ones, infer `direction` (INCOMING/OUTGOING/INTERNAL), create one
+LedgerEntry per touched holding. Probes inputs+outputs *before* writing
+anything, so unrelated coinbase / external txs never bloat
+`onchain_transaction`.
+
+`workers/listeners/chain_listener.py` runs the ZMQ loop on a daemon
+thread under the worker process. It emits the spec-defined topics:
+`chain.tx.mempool` / `chain.tx.confirmed` / `chain.block.new` /
+`holding.utxo.received` / `holding.utxo.spent` /
+`ledger_entry.requires_categorization`. Wired into `worker.py` startup
+when `TALLYKEEP_BITCOIND_ZMQ_ENDPOINT` is set; absence of either ZMQ or
+RPC config simply skips the listener (graceful degradation).
+
+Three non-obvious things worth recording:
+
+- **bitcoind ZMQ already byte-reverses the hash** before publishing
+  (`zmqpublishnotifier.cpp` writes `data[31-i] = hash[i]`). The wire
+  payload IS already in display order — calling `.hex()` on it directly
+  gives the hash string `getblockhash` would return. No further reversal.
+- **pyzmq sockets are not thread-safe.** Closing one from a different
+  thread than the one in `recv_multipart` aborts the process at C-level.
+  The adapter's `close()` only sets a flag; the read loop closes its own
+  socket inside its `finally` clause when iter_messages exits. RCVTIMEO
+  on the SUB socket lets the loop notice the flag every 1s without
+  needing a kick from another thread.
+- **NodeAdapter is not thread-safe** either — it mutates `self._rpc_url`
+  for wallet-scoped RPC. The worker boot path now constructs a *separate*
+  NodeAdapter for the listener (not shared with the API layer), and the
+  live integration test follows the same rule.
+
+Test coverage:
+- `tests/unit/test_chain_event_adapter.py` (6 tests) — fakes pyzmq via
+  `monkeypatch.setitem(sys.modules, "zmq", ...)` to assert subscribe-time
+  socket options, multipart decoding, slow-joiner robustness.
+- `tests/integration/test_chain_processing_service.py` (4 tests) — feeds
+  hand-crafted decoded-tx dicts to the processor against a real Postgres,
+  exercises the mempool→confirm dedup, OUTGOING via spent UTXOs, INTERNAL
+  for cross-holding transfer, and the unwatched no-op fast path.
+- `tests/integration/test_chain_listener_live.py` (1 test) — full
+  end-to-end against bitcoind regtest: subscribe, fund, send, mine, and
+  verify both DB persistence and the bus events fired.
+
+A subtle test-side gotcha: bitcoind randomizes output ordering for
+privacy, so the spend output can land at vout=0 OR vout=1 in the same
+tx. Match on `(txid, value_sats)` instead of `(txid, vout=0)` for stable
+assertions.
+
+NRT now **388 tests** (288 unit + 100 integration). Suite ~98s with infra
+up; the live listener test adds ~6s when the mempool hashtx fires
+promptly, up to ~22s when bitcoind's RPC pool serialises briefly.
+
+Remaining M5 sub-stages:
+- **M5.4** — UTXO hygiene flags computation
+- **M5.5** — Declared-vs-observable security analyzer
+- **M5.6** — LedgerEntry endpoints + categorization suggestions
+- **M5.7** — Holding summary + global summary endpoints + final docs
+
+---

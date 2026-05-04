@@ -267,6 +267,42 @@ try {
 }
 
 
+# --- 14b. Live listener (M5.3): send without /rescan, watcher auto-detects ----
+
+Section "14b. Live listener: send to a fresh address, no /rescan, expect UTXO"
+if ($regtestSkipped) {
+    Show "skipped" "section 14 was skipped, nothing to verify here"
+} else {
+    # Take the next unused address on the same descriptor so we can distinguish
+    # the auto-detection from the prior /rescan persistence.
+    $newAddrResp = Invoke-RestMethod -Method Post `
+        -Uri "$BaseUrl/api/v1/descriptors/$regtestDescId/addresses/next-receiving"
+    $liveAddr = $newAddrResp.address
+    Show "fresh address" $liveAddr
+
+    $liveTxid = (docker compose exec -T bitcoind bitcoin-cli @rpcAuth $walletFlag sendtoaddress $liveAddr 0.00002000).Trim()
+    Show "live txid" $liveTxid
+    docker compose exec -T bitcoind bitcoin-cli @rpcAuth generatetoaddress 1 $minerAddr | Out-Null
+
+    # Poll the cross-descriptor UTXO endpoint for our txid showing up. The
+    # listener thread fetches getrawtransaction + getblock then commits, so
+    # most runs see it in <2s; allow up to 30s before declaring failure.
+    $deadline = (Get-Date).AddSeconds(30)
+    $found = $false
+    while ((Get-Date) -lt $deadline) {
+        $list = Invoke-RestMethod -Uri "$BaseUrl/api/v1/utxos?holding_id=$regtestHoldingId&limit=200"
+        $match = $list.utxos | Where-Object { $_.txid -eq $liveTxid -and $_.value_sats -eq 2000 }
+        if ($match) { $found = $true; break }
+        Start-Sleep -Milliseconds 300
+    }
+    if (-not $found) {
+        throw "live listener never persisted UTXO for $liveTxid (worker logs: 'docker compose logs worker')"
+    }
+    Show "auto-detected sats" $match.value_sats
+    Show "confirmation_height" $match.confirmation_height
+}
+
+
 # --- 15. Stubs (sanity-check the OpenAPI surface) -----------------------------
 
 Section "15. Stubs return 501 with milestone tag"

@@ -269,6 +269,46 @@ else
 fi
 
 
+# --- 13b. Live listener (M5.3): send without /rescan, watcher auto-detects ----
+
+section "13b. Live listener: send to a fresh address, no /rescan, expect UTXO"
+if [ "$CREATE_STATUS" != "201" ]; then
+    show "skipped" "section 13 was skipped, nothing to verify here"
+else
+    LIVE_ADDR=$(curl -fsS -X POST "${BASE_URL}/api/v1/descriptors/${REGTEST_DESC_ID}/addresses/next-receiving" \
+        | jpy 'import json,sys;print(json.load(sys.stdin)["address"])' | tr -d '\r')
+    show "fresh address" "$LIVE_ADDR"
+
+    LIVE_TXID=$(docker compose exec -T bitcoind bitcoin-cli -regtest -rpcuser=tallykeep -rpcpassword=tallykeep_dev \
+        -rpcwallet="$WALLET_NAME" sendtoaddress "$LIVE_ADDR" 0.00002000 | tr -d '\r')
+    show "live txid" "$LIVE_TXID"
+    docker compose exec -T bitcoind bitcoin-cli -regtest -rpcuser=tallykeep -rpcpassword=tallykeep_dev \
+        -rpcwallet="$WALLET_NAME" generatetoaddress 1 "$MINER_ADDR" >/dev/null
+
+    # Poll for the listener to persist the UTXO (matches by txid+value to be
+    # vout-order-agnostic). Most runs converge in <2s.
+    DEADLINE=$(($(date +%s) + 30))
+    FOUND=""
+    while [ "$(date +%s)" -lt "$DEADLINE" ]; do
+        FOUND=$(curl -fsS "${BASE_URL}/api/v1/utxos?holding_id=${REGTEST_HOLDING_ID}&limit=200" | jpy "
+import json, sys
+us = json.load(sys.stdin)['utxos']
+for u in us:
+    if u['txid'] == '${LIVE_TXID}' and u['value_sats'] == 2000:
+        print(str(u['value_sats']) + ' ' + str(u['confirmation_height']))
+        break
+" | tr -d '\r')
+        [ -n "$FOUND" ] && break
+        sleep 0.3
+    done
+    if [ -z "$FOUND" ]; then
+        show "FAILED" "live listener never persisted UTXO for $LIVE_TXID"
+        exit 1
+    fi
+    show "auto-detected"  "$FOUND"
+fi
+
+
 # --- 14. 501 stubs ------------------------------------------------------------
 
 section "14. Stubs return 501 with milestone tag"

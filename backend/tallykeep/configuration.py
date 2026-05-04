@@ -30,8 +30,10 @@ class Settings(BaseSettings):
     database_url: str = Field(default="")
     redis_url: str = Field(default="")
     bitcoind_rpc_url: str = Field(default="")
-    bitcoind_zmq_block_endpoint: str = Field(default="")
-    bitcoind_zmq_tx_endpoint: str = Field(default="")
+    # Single ZMQ endpoint — bitcoind multiplexes hashblock/hashtx/rawblock/rawtx
+    # over the same PUB socket via topic frames. Spec module 05 documents the
+    # bitcoin.conf lines users add to enable it.
+    bitcoind_zmq_endpoint: str = Field(default="")
 
 
 @lru_cache(maxsize=1)

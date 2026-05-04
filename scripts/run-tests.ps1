@@ -12,5 +12,5 @@ $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $RepoRoot = Resolve-Path (Join-Path $ScriptDir "..")
 Set-Location $RepoRoot
 
-docker compose run --rm --no-deps -T backend pytest @args
+docker compose run --rm --build --no-deps -T backend pytest @args
 exit $LASTEXITCODE

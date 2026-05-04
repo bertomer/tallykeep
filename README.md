@@ -181,6 +181,19 @@ curl.exe "http://127.0.0.1:8000/api/v1/utxos?holding_id=<HOLDING_ID>&min_value_s
 curl.exe -X POST http://127.0.0.1:8000/api/v1/utxos/<UTXO_ID>/freeze
 curl.exe -X POST http://127.0.0.1:8000/api/v1/utxos/<UTXO_ID>/unfreeze
 
+# M5.3 — live chain listener: send to a watched address and the worker
+# auto-detects + persists it (no /rescan needed). Watch the worker logs
+# while sending a tx.
+docker compose logs -f worker
+# In another shell, send to your address from the bitcoind faucet wallet:
+docker compose exec bitcoind bitcoin-cli -rpcuser=tallykeep `
+    -rpcpassword=tallykeep_dev -regtest -rpcwallet=<FAUCET_WALLET> `
+    sendtoaddress <YOUR_WATCHED_ADDRESS> 0.00001500
+# Then mine one block to trigger confirmation:
+docker compose exec bitcoind bitcoin-cli -rpcuser=tallykeep `
+    -rpcpassword=tallykeep_dev -regtest -rpcwallet=<FAUCET_WALLET> `
+    generatetoaddress 1 <ANY_ADDRESS>
+
 # Browse the full OpenAPI surface (every spec-module-04 route, real or stub)
 # in a browser:
 #   http://127.0.0.1:8000/docs

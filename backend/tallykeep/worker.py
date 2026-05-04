@@ -17,10 +17,12 @@ import time
 from datetime import timedelta
 from types import FrameType
 
+from tallykeep.adapters.node_adapter import NodeAdapter
 from tallykeep.configuration import get_settings
 from tallykeep.infrastructure.database import get_session_factory
 from tallykeep.infrastructure.event_bus import EventBus, RedisEventBus
 from tallykeep.infrastructure.event_emission import AuditReconciler
+from tallykeep.workers.listeners.chain_listener import ChainListener
 
 
 logging.basicConfig(
@@ -47,6 +49,8 @@ def main() -> int:
 
     bus: EventBus | None = None
     reconciler: AuditReconciler | None = None
+    chain_listener: ChainListener | None = None
+    node: NodeAdapter | None = None
     reconciler_interval_seconds = 30  # how often to scan for unacked events
 
     # Best-effort start. Workers tolerate degraded environments — the audit
@@ -73,11 +77,35 @@ def main() -> int:
         except Exception:  # noqa: BLE001
             logger.exception("worker: failed to set up AuditReconciler")
 
+    if (
+        bus is not None
+        and settings.database_url
+        and settings.bitcoind_zmq_endpoint
+        and settings.bitcoind_rpc_url
+    ):
+        try:
+            node = NodeAdapter(settings.bitcoind_rpc_url, timeout_seconds=30.0)
+            session_factory = get_session_factory()
+            chain_listener = ChainListener(
+                zmq_endpoint=settings.bitcoind_zmq_endpoint,
+                node=node,
+                bus=bus,
+                session_factory=session_factory,
+            )
+            chain_listener.start()
+            logger.info(
+                "worker: ChainListener started on %s", settings.bitcoind_zmq_endpoint
+            )
+        except Exception:  # noqa: BLE001
+            logger.exception("worker: failed to start ChainListener")
+            chain_listener = None
+
     last_reconcile = 0.0
     logger.info(
-        "worker: started (bus=%s, reconciler=%s)",
+        "worker: started (bus=%s, reconciler=%s, chain_listener=%s)",
         "redis" if bus else "none",
         "on" if reconciler else "off",
+        "on" if chain_listener else "off",
     )
 
     while _running:
@@ -91,6 +119,18 @@ def main() -> int:
                 logger.exception("worker: AuditReconciler failed")
             last_reconcile = now
         time.sleep(1)
+
+    if chain_listener is not None:
+        try:
+            chain_listener.stop()
+        except Exception:  # noqa: BLE001
+            pass
+
+    if node is not None:
+        try:
+            node.close()
+        except Exception:  # noqa: BLE001
+            pass
 
     if bus is not None:
         try:

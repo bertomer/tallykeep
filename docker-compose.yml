@@ -66,9 +66,14 @@ services:
       - -rpcpassword=tallykeep_dev
       - -rpcbind=0.0.0.0
       - -rpcallowip=0.0.0.0/0
+      # ZMQ topics — the listener uses hashtx + hashblock primarily; rawtx /
+      # rawblock are kept so power-users can attach external tooling. bitcoind
+      # multiplexes topics on the same socket by topic-frame, so a single port
+      # serves all four notifications.
       - -zmqpubrawblock=tcp://0.0.0.0:28332
-      - -zmqpubrawtx=tcp://0.0.0.0:28333
-      - -zmqpubhashblock=tcp://0.0.0.0:28334
+      - -zmqpubrawtx=tcp://0.0.0.0:28332
+      - -zmqpubhashblock=tcp://0.0.0.0:28332
+      - -zmqpubhashtx=tcp://0.0.0.0:28332
       - -fallbackfee=0.0002
     volumes:
       - bitcoind-data:/data/.bitcoin
@@ -76,8 +81,6 @@ services:
       # regtest RPC is 18443; only exposed to localhost.
       - "127.0.0.1:18443:18443"
       - "127.0.0.1:28332:28332"
-      - "127.0.0.1:28333:28333"
-      - "127.0.0.1:28334:28334"
     networks: [tallykeep]
     restart: unless-stopped
 
@@ -92,8 +95,7 @@ services:
       TALLYKEEP_DATABASE_URL: postgresql+psycopg://tallykeep:tallykeep_dev@postgres:5432/tallykeep
       TALLYKEEP_REDIS_URL: redis://redis:6379/0
       TALLYKEEP_BITCOIND_RPC_URL: http://tallykeep:tallykeep_dev@bitcoind:18443
-      TALLYKEEP_BITCOIND_ZMQ_BLOCK_ENDPOINT: tcp://bitcoind:28332
-      TALLYKEEP_BITCOIND_ZMQ_TX_ENDPOINT: tcp://bitcoind:28333
+      TALLYKEEP_BITCOIND_ZMQ_ENDPOINT: tcp://bitcoind:28332
     # Live source mount: edits on the host appear in the container without rebuild.
     # Read-only ensures container changes do not leak back to the host.
     volumes:
@@ -135,8 +137,7 @@ services:
       TALLYKEEP_DATABASE_URL: postgresql+psycopg://tallykeep:tallykeep_dev@postgres:5432/tallykeep
       TALLYKEEP_REDIS_URL: redis://redis:6379/0
       TALLYKEEP_BITCOIND_RPC_URL: http://tallykeep:tallykeep_dev@bitcoind:18443
-      TALLYKEEP_BITCOIND_ZMQ_BLOCK_ENDPOINT: tcp://bitcoind:28332
-      TALLYKEEP_BITCOIND_ZMQ_TX_ENDPOINT: tcp://bitcoind:28333
+      TALLYKEEP_BITCOIND_ZMQ_ENDPOINT: tcp://bitcoind:28332
     volumes:
       # Note: source is mounted read-write so dev tools (alembic revision) can write
       # back generated files. Containers do not modify source as a runtime side-effect.

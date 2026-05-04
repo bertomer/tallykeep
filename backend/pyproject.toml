@@ -32,6 +32,8 @@ dependencies = [
   "rq==1.16.2",
   # M4 — BDK for descriptor parsing and address derivation
   "bdkpython==2.3.1",
+  # M5.3 — bitcoind ZeroMQ subscription for live chain events
+  "pyzmq==26.2.0",
 ]
 
 [project.optional-dependencies]
