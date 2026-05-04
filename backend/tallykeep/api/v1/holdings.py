@@ -416,10 +416,3 @@ async def change_holding_type(
     if holding is None:
         raise HTTPException(status_code=404, detail="Holding not found")
     return _to_response(holding)
-
-
-@router.get("/holdings/{holding_id}/summary", status_code=501)
-async def holding_summary(holding_id: UUID) -> JSONResponse:
-    return not_implemented_response(
-        milestone="M5", route="GET /api/v1/holdings/{id}/summary"
-    )
