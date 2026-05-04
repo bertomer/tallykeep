@@ -434,3 +434,52 @@ Remaining M5 sub-stages:
 - **M5.7** — Holding summary + global summary endpoints + final docs
 
 ---
+
+## 2026-05-04 — M5.4 (UTXO hygiene flags)
+
+`services/utxo_hygiene_service.py` computes the four spec-defined flags
+at UTXO detection time. Hooked into both pathways:
+
+- **ChainScanService** (M5.2): on-import scan, fee rate from
+  `estimatesmartfee` (with a 10 sat/vB fallback for regtest), no decoded
+  tx in hand so SUSPECTED_CONSOLIDATION + ROUND_NUMBER are skipped on
+  this path. ADDRESS_REUSED + DUST run.
+- **ChainProcessingService** (M5.3): live listener path, full decoded tx
+  available so all four flags run. The listener caches the fee rate for
+  60s so we don't pay an estimatesmartfee per tx.
+
+Implementation choices worth remembering:
+
+- **ADDRESS_REUSED triggers retro-flagging.** When the second tx pays a
+  watched address, we mark BOTH the new UTXO and any existing siblings
+  at that address. Also flips `address.is_reused = True`. This avoids
+  leaving the original UTXO unflagged forever — it wasn't reused at
+  insert time but is now.
+- **JSONB list mutation isn't tracked by SQLAlchemy.** Have to
+  re-assign `row.hygiene_flags = [...]` instead of `.append(...)` so
+  the dirty tracker fires.
+- **Round-number heuristic** is sat-multiple-only in v1: any positive
+  multiple of 100_000 sats (0.001 BTC). Fiat-denominated detection
+  ("matches USD 100 at the block-time price") needs a price oracle and
+  is documented for v2.
+- **DUST recompute on fee-rate changes** is a v2 scheduler. v1 captures
+  the flag at detection time and stops there.
+
+Endpoint:
+- `GET /api/v1/utxos/{id}/hygiene` now returns both `hygiene_flags` and a
+  list of `recommendations` (with `severity` + per-flag `message` rendered
+  from spec module 05's templates).
+
+Test coverage: 10 new integration tests in
+`test_utxo_hygiene_service.py`, including an end-to-end exercise of the
+chain-scan path that funds 1500 sats (under the 2040 sat DUST threshold)
+and asserts the flag landed on the persisted UTXO row.
+
+NRT: 388 → 398 (288 unit + 110 integration). Suite ~118s with infra up.
+
+Remaining M5 sub-stages:
+- **M5.5** — Declared-vs-observable security analyzer
+- **M5.6** — LedgerEntry endpoints + categorization suggestions
+- **M5.7** — Holding summary + global summary endpoints + final docs
+
+---

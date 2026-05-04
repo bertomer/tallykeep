@@ -181,6 +181,11 @@ curl.exe "http://127.0.0.1:8000/api/v1/utxos?holding_id=<HOLDING_ID>&min_value_s
 curl.exe -X POST http://127.0.0.1:8000/api/v1/utxos/<UTXO_ID>/freeze
 curl.exe -X POST http://127.0.0.1:8000/api/v1/utxos/<UTXO_ID>/unfreeze
 
+# Hygiene flags + recommendations (M5.4): address_reused, dust, round_number,
+# suspected_consolidation. Computed at UTXO detection time on both the rescan
+# and the live-listener paths.
+curl.exe http://127.0.0.1:8000/api/v1/utxos/<UTXO_ID>/hygiene
+
 # M5.3 — live chain listener: send to a watched address and the worker
 # auto-detects + persists it (no /rescan needed). Watch the worker logs
 # while sending a tx.

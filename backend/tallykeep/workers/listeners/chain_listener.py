@@ -40,6 +40,9 @@ from tallykeep.services.chain_processing_service import (
     ChainProcessingService,
     TxProcessingResult,
 )
+from tallykeep.services.utxo_hygiene_service import (
+    estimate_fee_rate_sat_per_vbyte,
+)
 
 
 logger = logging.getLogger(__name__)
@@ -64,6 +67,11 @@ class ChainListener:
         self._processor = processor or ChainProcessingService()
         self._thread: threading.Thread | None = None
         self._stop = threading.Event()
+        # Cache the fee rate so the hygiene service doesn't pay an
+        # estimatesmartfee RPC on every tx. 60-second TTL is fine — block
+        # times set the natural cadence.
+        self._fee_rate_cache: tuple[float, float] | None = None
+        self._fee_rate_ttl_seconds = 60.0
 
     # --- lifecycle ----------------------------------------------------------
 
@@ -150,12 +158,15 @@ class ChainListener:
 
             block_time = datetime.fromtimestamp(decoded["blocktime"], tz=UTC)
 
+        fee_rate = self._cached_fee_rate()
+
         with self._session_scope() as session:
             result = self._processor.process_decoded_transaction(
                 session,
                 decoded,
                 confirmation_height=actual_height,
                 block_time=block_time,
+                fee_rate_sat_per_vbyte=fee_rate,
             )
             session.commit()
 
@@ -283,6 +294,20 @@ class ChainListener:
                 "ledger_entry.requires_categorization",
                 {"ledger_entry_id": str(entry_id)},
             )
+
+    def _cached_fee_rate(self) -> float:
+        """estimatesmartfee response cached for `_fee_rate_ttl_seconds`."""
+        import time as _time
+
+        now = _time.time()
+        if (
+            self._fee_rate_cache is not None
+            and now - self._fee_rate_cache[0] < self._fee_rate_ttl_seconds
+        ):
+            return self._fee_rate_cache[1]
+        rate = estimate_fee_rate_sat_per_vbyte(self._node)
+        self._fee_rate_cache = (now, rate)
+        return rate
 
     @staticmethod
     def _lookup_holding_id(session: Session, descriptor_id: UUID) -> UUID | None:

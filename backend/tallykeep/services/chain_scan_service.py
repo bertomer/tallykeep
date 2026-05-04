@@ -117,9 +117,10 @@ class ChainScanService:
                     session, unspent.txid, unspent.vout
                 )
                 if existing is None:
+                    new_utxo_id = uuid4()
                     utxo_repo.upsert_unspent(
                         session,
-                        utxo_id=uuid4(),
+                        utxo_id=new_utxo_id,
                         descriptor_id=descriptor.id,
                         address_id=address_row.id,
                         txid=unspent.txid,
@@ -133,6 +134,12 @@ class ChainScanService:
                         session,
                         txid=unspent.txid,
                         confirmation_height=unspent.height or None,
+                    )
+
+                    self._compute_and_apply_hygiene(
+                        session,
+                        descriptor=descriptor,
+                        utxo_id=new_utxo_id,
                     )
 
                     self._maybe_create_ledger_entry(
@@ -164,6 +171,47 @@ class ChainScanService:
         )
 
     # --- helpers --------------------------------------------------------------
+
+    def _compute_and_apply_hygiene(
+        self,
+        session: Session,
+        *,
+        descriptor: Descriptor,
+        utxo_id: UUID,
+    ) -> None:
+        """Compute and persist hygiene flags for a freshly-imported UTXO.
+
+        The initial scan path doesn't have the decoded tx in hand (we only
+        used `scantxoutset`), so SUSPECTED_CONSOLIDATION and ROUND_NUMBER's
+        per-output context are skipped — those flag families need the full
+        transaction shape, which the live listener path does have. We
+        still get ADDRESS_REUSED + DUST here, which are the two with the
+        highest user-actionable value.
+
+        Fee rate uses the configured `NodeAdapter`'s estimate_smart_fee
+        (with a fallback when bitcoind has no estimate, e.g. on regtest).
+        """
+        from tallykeep.models import UTXORow as _UTXORow
+        from tallykeep.services.utxo_hygiene_service import (
+            HygieneContext,
+            apply_flags_and_propagate_reuse,
+            estimate_fee_rate_sat_per_vbyte,
+        )
+
+        # We flush so the upsert is queryable by the ADDRESS_REUSED scan
+        # which reads sibling UTXO rows at the same address.
+        session.flush()
+        new_row = session.get(_UTXORow, utxo_id)
+        if new_row is None:  # pragma: no cover — upsert just ran
+            return
+
+        fee_rate = estimate_fee_rate_sat_per_vbyte(self._node)
+        ctx = HygieneContext(
+            decoded_tx=None,  # initial scan: tx-shape-derived flags skipped
+            address_type=descriptor.address_type,
+            fee_rate_sat_per_vbyte=fee_rate,
+        )
+        apply_flags_and_propagate_reuse(session, utxo=new_row, context=ctx)
 
     def _maybe_create_ledger_entry(
         self,

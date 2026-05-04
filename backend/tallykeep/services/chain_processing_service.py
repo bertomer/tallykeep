@@ -31,7 +31,7 @@ from uuid import UUID, uuid4
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from tallykeep.domain.enums import Direction, LedgerEntrySource
+from tallykeep.domain.enums import AddressType, Direction, LedgerEntrySource
 from tallykeep.domain.ledger_entry import (
     LedgerEntry,
     LedgerEntryHoldingLink,
@@ -46,6 +46,10 @@ from tallykeep.models import (
 from tallykeep.repositories import (
     ledger_entry as ledger_repo,
     onchain_transaction as onchain_repo,
+)
+from tallykeep.services.utxo_hygiene_service import (
+    HygieneContext,
+    apply_flags_and_propagate_reuse,
 )
 
 
@@ -91,6 +95,7 @@ class ChainProcessingService:
         *,
         confirmation_height: int | None,
         block_time: datetime | None = None,
+        fee_rate_sat_per_vbyte: float | None = None,
     ) -> TxProcessingResult:
         """Apply effects of one tx (decoded as bitcoind's getrawtransaction returns).
 
@@ -151,6 +156,7 @@ class ChainProcessingService:
         affected_descriptors: set[UUID] = set(spent_descriptor_ids)
         received_value_per_holding: dict[UUID, int] = {}
 
+        descriptor_address_types: dict[UUID, AddressType] = {}
         for found in discovered:
             affected_holdings.add(found.holding_id)
             affected_descriptors.add(found.descriptor_id)
@@ -165,21 +171,46 @@ class ChainProcessingService:
             ).scalar_one_or_none()
             if existing_utxo_row is None:
                 utxo_id = uuid4()
-                session.add(
-                    UTXORow(
-                        id=utxo_id,
-                        descriptor_id=found.descriptor_id,
-                        address_id=found.address_id,
-                        txid=txid,
-                        vout=found.vout,
-                        value_sats=found.value_sats,
-                        confirmation_height=confirmation_height,
-                        is_frozen=False,
-                        is_spent=False,
-                        spent_in_txid=None,
-                        hygiene_flags=[],
-                    )
+                new_row = UTXORow(
+                    id=utxo_id,
+                    descriptor_id=found.descriptor_id,
+                    address_id=found.address_id,
+                    txid=txid,
+                    vout=found.vout,
+                    value_sats=found.value_sats,
+                    confirmation_height=confirmation_height,
+                    is_frozen=False,
+                    is_spent=False,
+                    spent_in_txid=None,
+                    hygiene_flags=[],
                 )
+                session.add(new_row)
+                # Flush so the row is visible to the hygiene service's sibling
+                # queries (ADDRESS_REUSED scans every UTXO at the same address;
+                # without the flush the new row wouldn't be in the result set).
+                session.flush()
+
+                if found.descriptor_id not in descriptor_address_types:
+                    desc_row = session.get(DescriptorRow, found.descriptor_id)
+                    descriptor_address_types[found.descriptor_id] = (
+                        AddressType(desc_row.address_type)
+                        if desc_row is not None
+                        else AddressType.NATIVE_SEGWIT
+                    )
+
+                hygiene_ctx = HygieneContext(
+                    decoded_tx=decoded,  # type: ignore[arg-type]
+                    address_type=descriptor_address_types[found.descriptor_id],
+                    fee_rate_sat_per_vbyte=(
+                        fee_rate_sat_per_vbyte
+                        if fee_rate_sat_per_vbyte is not None
+                        else 10.0
+                    ),
+                )
+                apply_flags_and_propagate_reuse(
+                    session, utxo=new_row, context=hygiene_ctx
+                )
+
                 discovered_utxo_ids.append(utxo_id)
             else:
                 # Already known — just refresh confirmation height if we just
