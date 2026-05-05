@@ -303,13 +303,151 @@ if ($regtestSkipped) {
 }
 
 
-# --- 15. Stubs (sanity-check the OpenAPI surface) -----------------------------
+# --- 14c. Banking (M6): fee-estimate / payment-request / invoice / cancel ------
+
+Section "14c. Banking: fee-estimate, payment-request, invoice, cancel"
+
+# Use a dedicated tpub branch so descriptor uniqueness never conflicts with
+# section 14's single-expression xpub.  Branches 800 (external) + 801 (change)
+# are reserved for this smoke section.
+$bankingExt = "wpkh([73c5da0a]tpubD6NzVbkrYhZ4XYa9MoLt4BiMZ4gkt2faZ4BcmKu2a9te4LDpQmvEz2L2yDERivHxFPnxXXhqDRkUNnQCpZggCyEZLBktV7VaSmwayqMJy1s/800/*)"
+$bankingChg = "wpkh([73c5da0a]tpubD6NzVbkrYhZ4XYa9MoLt4BiMZ4gkt2faZ4BcmKu2a9te4LDpQmvEz2L2yDERivHxFPnxXXhqDRkUNnQCpZggCyEZLBktV7VaSmwayqMJy1s/801/*)"
+
+$bankingSkipped = $false
+try {
+    $bankPurseBody = @{
+        name = "Smoke banking wallet"
+        purpose = "spending"
+        declared_security = @{
+            custody_model = "self_single"
+            signing_model = "software_hot"
+        }
+        display_color = "#3b82f6"
+        display_order = 2
+        descriptors = @(
+            @{
+                name              = "main"
+                expression        = $bankingExt
+                change_expression = $bankingChg
+                network           = "regtest"
+                gap_limit         = 5
+            }
+        )
+    } | ConvertTo-Json -Compress -Depth 6
+
+    $bankPurse     = Invoke-RestMethod -Method Post -Uri "$BaseUrl/api/v1/holdings/purse" `
+        -ContentType 'application/json' -Body $bankPurseBody
+    $bankDescId    = $bankPurse.descriptor_ids[0]
+    $bankHoldingId = $bankPurse.id
+    Show "bank holding id" $bankHoldingId
+
+    # Self-contained funder wallet so this section works even if section 14 was
+    # skipped.
+    $bankFunder     = "smoke_bank_$(Get-Random -Maximum 99999)"
+    $bankFunderFlag = "-rpcwallet=$bankFunder"
+    docker compose exec -T bitcoind bitcoin-cli @rpcAuth createwallet $bankFunder | Out-Null
+    $bankFunderAddr = (docker compose exec -T bitcoind bitcoin-cli @rpcAuth $bankFunderFlag getnewaddress).Trim()
+    docker compose exec -T bitcoind bitcoin-cli @rpcAuth generatetoaddress 150 $bankFunderAddr | Out-Null
+
+    $bankRecvAddr = (Invoke-RestMethod `
+        -Uri "$BaseUrl/api/v1/descriptors/$bankDescId/addresses?limit=1").addresses[0].address
+    (docker compose exec -T bitcoind bitcoin-cli @rpcAuth $bankFunderFlag sendtoaddress $bankRecvAddr 0.00050000).Trim() | Out-Null
+    $bankMinerAddr = (docker compose exec -T bitcoind bitcoin-cli @rpcAuth $bankFunderFlag getnewaddress).Trim()
+    docker compose exec -T bitcoind bitcoin-cli @rpcAuth generatetoaddress 1 $bankMinerAddr | Out-Null
+
+    $bankRescan = Invoke-RestMethod -Method Post -Uri "$BaseUrl/api/v1/descriptors/$bankDescId/rescan"
+    Show "utxos_discovered" $bankRescan.utxos_discovered
+} catch {
+    if ($_.Exception.Response.StatusCode -eq 409) {
+        Show "skipped" "banking descriptor already imported (run dev-reset.ps1 first)"
+        $bankingSkipped = $true
+    } else {
+        throw
+    }
+}
+
+if (-not $bankingSkipped) {
+    # -- 1. Fee estimate --
+    $feeResp = Invoke-RestMethod -Method Post -Uri "$BaseUrl/api/v1/banking/fee-estimate" `
+        -ContentType 'application/json' `
+        -Body (@{ strategy = "normal" } | ConvertTo-Json -Compress)
+    Show "normal fee sat/vB" $feeResp.sat_per_vbyte
+    Show "is_fallback"       $feeResp.is_fallback
+
+    # -- 2. PaymentRequest (builds PSBT; no signing in smoke test) --
+    $destWallet = "smoke_dest_$(Get-Random -Maximum 99999)"
+    docker compose exec -T bitcoind bitcoin-cli @rpcAuth createwallet $destWallet | Out-Null
+    $destAddr = (docker compose exec -T bitcoind bitcoin-cli @rpcAuth "-rpcwallet=$destWallet" getnewaddress).Trim()
+
+    $pr = Invoke-RestMethod -Method Post -Uri "$BaseUrl/api/v1/banking/payment-requests" `
+        -ContentType 'application/json' `
+        -Body (@{
+            holding_id   = $bankHoldingId
+            destination  = $destAddr
+            amount_sats  = 10000
+            fee_strategy = "normal"
+            description  = "Smoke test send"
+        } | ConvertTo-Json -Compress)
+    $prId = $pr.id
+    Show "payment_request.status"   $pr.status
+    Show "psbt_base64 length (b64)" $pr.psbt_base64.Length
+
+    # PSBT download — JSON form (binary form tested in integration tests)
+    $psbtJson = Invoke-RestMethod -Uri "$BaseUrl/api/v1/banking/payment-requests/$prId/psbt"
+    Show "psbt filename"  $psbtJson.filename
+
+    # List + get by id
+    $prList = Invoke-RestMethod -Uri "$BaseUrl/api/v1/banking/payment-requests?holding_id=$bankHoldingId"
+    Show "payment_requests count" $prList.payment_requests.Count
+
+    # -- 3. Invoice --
+    $inv = Invoke-RestMethod -Method Post -Uri "$BaseUrl/api/v1/banking/invoices" `
+        -ContentType 'application/json' `
+        -Body (@{
+            holding_id  = $bankHoldingId
+            amount_sats = 25000
+            description = "Smoke test invoice"
+        } | ConvertTo-Json -Compress)
+    $invId = $inv.id
+    Show "invoice.status"         $inv.status
+    Show "invoice.recv_address"   $inv.receiving_address
+    # Truncate BIP21 for display
+    $bip21Preview = if ($inv.bip21_uri.Length -gt 55) { $inv.bip21_uri.Substring(0, 55) + "..." } else { $inv.bip21_uri }
+    Show "invoice.bip21"          $bip21Preview
+
+    # QR code
+    $qrResp = Invoke-WebRequest -Uri "$BaseUrl/api/v1/banking/invoices/$invId/qr"
+    Show "invoice QR content-type" ($qrResp.Headers.'Content-Type')
+
+    # List invoices
+    $invList = Invoke-RestMethod -Uri "$BaseUrl/api/v1/banking/invoices?holding_id=$bankHoldingId"
+    Show "invoices count" $invList.invoices.Count
+
+    # -- 4. Cancel both --
+    $cancelledPr  = Invoke-RestMethod -Method Post `
+        -Uri "$BaseUrl/api/v1/banking/payment-requests/$prId/cancel"
+    Show "payment_request after cancel" $cancelledPr.status
+
+    $cancelledInv = Invoke-RestMethod -Method Post `
+        -Uri "$BaseUrl/api/v1/banking/invoices/$invId/cancel"
+    Show "invoice after cancel" $cancelledInv.status
+
+    # Double-cancel must return 409 (already cancelled)
+    try {
+        Invoke-RestMethod -Method Post `
+            -Uri "$BaseUrl/api/v1/banking/payment-requests/$prId/cancel" | Out-Null
+        Show "double-cancel" "(unexpected 200!)"
+    } catch {
+        $sc = $_.Exception.Response.StatusCode.value__
+        Show "double-cancel returns" "409=$($sc -eq 409)"
+    }
+}
+
+
+# --- 15. Stubs (sanity-check the OpenAPI surface for routes not yet landed) ----
 
 Section "15. Stubs return 501 with milestone tag"
 foreach ($pair in @(
-    @("GET",  "/api/v1/holdings/$purseId/summary"),
-    @("GET",  "/api/v1/analysis/holding/$purseId/security"),
-    @("GET",  "/api/v1/banking/payment-requests"),
     @("GET",  "/api/v1/lightning/status"),
     @("GET",  "/api/v1/sweep-policies"),
     @("POST", "/api/v1/holdings/account")

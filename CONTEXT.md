@@ -886,3 +886,86 @@ Remaining M6 sub-stages:
   - **M6.6** — docs + smoke test extension
 
 ---
+
+## 2026-05-05 — M6.5 (PaymentRequest cancellation)
+
+`POST /api/v1/banking/payment-requests/{id}/cancel` is now real.
+
+Spec module 06 rules enforced:
+  - Allowed in `{DRAFT, AWAITING_SIGNATURE, AWAITING_BROADCAST}`.
+  - BROADCAST (transaction already in the mempool) → 409. The node
+    cannot be asked to retract a broadcast transaction; RBF is the
+    v1.x answer.
+  - CONFIRMED / FAILED / EXPIRED / CANCELLED → 409 (wrong status).
+  - Unknown id → 404.
+
+Implementation shape:
+  - `payment_request_repo.cancel` already existed (written in M6.1
+    ahead of time); it enforces the allowed-status guard and raises
+    `ValueError` for disallowed states.
+  - `banking_service.cancel_payment_request` is the new service
+    function; it translates the `ValueError` to `WrongStatusForOperation`
+    and exposes the function in `__all__`.
+  - Route handler in `banking.py` replaces the M6.5 stub, emits
+    `banking.payment_request.cancelled` on success.
+
+Key behavioural invariant: cancellation releases the in-flight-per-Holding
+lock. `has_in_flight_for_holding` counts `{DRAFT, AWAITING_SIGNATURE,
+AWAITING_BROADCAST, BROADCAST}` as in-flight; CANCELLED is not in that
+set, so the spec's one-in-flight-per-Holding concurrency rule is
+restored immediately after a cancel.
+
+Tests (5 new integration tests in `test_banking_cancel.py`):
+  - 404 for unknown id (app_with_db, no node needed)
+  - Cancel from AWAITING_SIGNATURE → 200 with status=cancelled
+  - Cancel releases in-flight lock → subsequent PaymentRequest succeeds
+  - Cancel from AWAITING_BROADCAST → 200 with status=cancelled
+  - Cancel after BROADCAST → 409
+
+NRT: 439 → 444 (291 unit + 153 integration + 1 skip).
+
+Remaining M6 sub-stages:
+  - **M6.6** — docs + smoke test extension
+
+---
+
+## 2026-05-05 — M6.6 (smoke test extension + stubs cleanup)
+
+`scripts/smoke-test.ps1` gains section **14c** covering the full M6
+banking surface:
+
+  - Creates a fresh Purse with both `expression` and `change_expression`
+    (required for PSBT construction). Uses tpub branches 800/801 so it
+    never conflicts with section 14's single-expression descriptor.
+  - Self-contained funder wallet: 150-block coinbase + `sendtoaddress
+    0.00050000` + mine 1 block + `/rescan`.
+  - **Fee estimate** — `POST /banking/fee-estimate` with
+    strategy=normal; displays sat/vB and is_fallback flag.
+  - **Payment request** — creates a 10 000 sat outgoing request (no
+    signing in smoke test; just verifies PSBT is present and 
+    downloadable).
+  - **Invoice** — creates a 25 000 sat invoice; downloads the QR PNG;
+    lists invoices.
+  - **Cancel both** — cancels the payment request and the invoice;
+    verifies status=cancelled. Also verifies double-cancel returns 409.
+
+Section **15** stubs list pruned: removed the three entries that were
+already real as of M5.5/M5.7/M6.1 (`/holdings/{id}/summary`,
+`/analysis/holding/{id}/security`, `/banking/payment-requests`).
+Remaining stubs: lightning/status (v1.5), sweep-policies (M8),
+holdings/account (M8).
+
+**M6 is complete.** What it delivers end-to-end:
+
+  - **M6.1** PSBT construction via BDK + PaymentRequest creation
+  - **M6.2** submit-signed + broadcast + broadcast_attempt audit
+  - **M6.3** Confirmation tracking (PaymentRequest → LedgerEntry)
+  - **M6.4** Invoice flow (BIP21, QR, payment detection, PAID/OVERPAID)
+  - **M6.5** PaymentRequest cancellation
+  - **M6.6** Smoke test coverage + stubs cleanup
+
+Next milestone: **M7/M8 — Trading layer** (CustodialProvider registration,
+balance polling, SweepPolicy CRUD + safety validator, SweepEngine
+execution against Kraken/Bitstamp).
+
+---

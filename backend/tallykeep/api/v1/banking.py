@@ -446,12 +446,37 @@ async def get_payment_psbt_qr(request_id: UUID) -> JSONResponse:
     )
 
 
-@router.post("/payment-requests/{request_id}/cancel", status_code=501)
-async def cancel_payment_request(request_id: UUID) -> JSONResponse:
-    return not_implemented_response(
-        milestone="M6.5",
-        route="POST /api/v1/banking/payment-requests/{id}/cancel",
-    )
+@router.post(
+    "/payment-requests/{request_id}/cancel",
+    response_model=PaymentRequestOut,
+)
+async def cancel_payment_request(
+    request_id: UUID,
+    request: Request,
+    session: Session = Depends(get_db_session),
+) -> PaymentRequestOut:
+    """Cancel a PaymentRequest.
+
+    Allowed when status is DRAFT, AWAITING_SIGNATURE, or AWAITING_BROADCAST.
+    Returns 409 if the request is already broadcast, confirmed, or cancelled.
+    """
+    try:
+        cancelled = banking_service.cancel_payment_request(
+            session, request_id=request_id
+        )
+    except banking_service.PaymentRequestNotFound as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except banking_service.WrongStatusForOperation as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    session.commit()
+
+    bus = get_event_bus(request)
+    if bus is not None:
+        bus.publish(
+            "banking.payment_request.cancelled",
+            {"id": str(request_id)},
+        )
+    return _to_out(cancelled)
 
 
 # --- Incoming invoices (M6.4) ----------------------------------------------

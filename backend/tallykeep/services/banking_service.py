@@ -731,6 +731,35 @@ def create_invoice(
     return invoice
 
 
+# --- M6.5: PaymentRequest cancellation -------------------------------------
+
+
+def cancel_payment_request(
+    session: Session,
+    *,
+    request_id: UUID,
+) -> PaymentRequest:
+    """Cancel a PaymentRequest. Spec module 06 cancellation rules.
+
+    Allowed in {DRAFT, AWAITING_SIGNATURE, AWAITING_BROADCAST}. Once a
+    transaction has been broadcast to bitcoind (status=BROADCAST) it is in
+    the mempool and cannot be undone on-chain; the caller gets
+    WrongStatusForOperation instead.
+    """
+    request = payment_request_repo.get(session, request_id)
+    if request is None:
+        raise PaymentRequestNotFound(f"PaymentRequest {request_id} not found")
+    try:
+        cancelled = payment_request_repo.cancel(session, request_id)
+    except ValueError as exc:
+        raise WrongStatusForOperation(str(exc)) from exc
+    if cancelled is None:  # pragma: no cover — already checked above
+        raise PaymentRequestNotFound(
+            f"PaymentRequest {request_id} disappeared during cancel"
+        )
+    return cancelled
+
+
 __all__ = [
     "BankingError",
     "BroadcastRejected",
@@ -750,6 +779,7 @@ __all__ = [
     "WrongStatusForOperation",
     "broadcast_payment_request",
     "build_payment_request",
+    "cancel_payment_request",
     "create_invoice",
     "submit_signed_payment_request",
 ]
