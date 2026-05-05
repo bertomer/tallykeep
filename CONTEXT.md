@@ -636,3 +636,87 @@ Invoice on regtest)**. The natural pause point for review before
 proceeding.
 
 ---
+
+## 2026-05-05 — M6.1 (PaymentRequest construction + PSBT)
+
+`services/banking_service.build_payment_request` is the orchestrator for
+the outgoing flow's first half:
+
+  - Pre-build validation: holding exists; signing_model isn't
+    NOT_APPLICABLE (Account holdings 400 with
+    `/errors/account-cannot-send`); Vault long-term guardrail; in-flight
+    concurrency check; descriptor count; sufficient confirmed balance;
+    valid destination address.
+  - Fee resolution: `economy` (24 blocks) / `normal` (6) / `priority`
+    (2) via `estimatesmartfee`, with an explicit `sat_per_vbyte`
+    override and a 10 sat/vB fallback when bitcoind has no useful
+    estimate (regtest's typical state).
+  - PSBT construction via BDK: feed the wallet our UTXOs by
+    `apply_unconfirmed_txs`-ing each parent transaction (raw hex
+    fetched from bitcoind on demand), then run BDK's TxBuilder with the
+    chosen fee rate. Default coin selection is BDK's BranchAndBound.
+
+Endpoints:
+  - `POST /api/v1/banking/payment-requests` returns 201 with the new
+    record (PSBT base64 included), or 200 with
+    `requires_confirmation=true` on the Vault long-term guardrail path.
+  - `GET /api/v1/banking/payment-requests` (filtered list)
+  - `GET /api/v1/banking/payment-requests/{id}`
+  - `GET /api/v1/banking/payment-requests/{id}/psbt` returns the PSBT
+    base64 in JSON; pass `Accept: application/octet-stream` for the raw
+    binary form (with `Content-Disposition: attachment` so the browser
+    saves the `.psbt` file directly).
+  - `POST /api/v1/banking/payment-requests` emits
+    `banking.payment_request.created` on the event bus.
+
+Known constraints / deferred:
+  - **Single-descriptor only.** Multi-descriptor spending is rejected
+    in v1 — coin selection across multiple descriptor ranges
+    complicates change-address derivation. v1.x feature.
+  - **Confirmed balance only.** Mempool UTXOs are filtered out of
+    coin selection; spec module 06's "available confirmed balance" rule.
+  - **Drains require `amount_sats=null`.** Coin selection uses
+    BDK's drain_wallet/drain_to combo so the fee comes out of the
+    single recipient output.
+  - **BDK requires distinct external + change descriptors.** When the
+    user's Holding has no `change_expression`, the build fails with
+    "External and internal descriptors are the same"; the API
+    schema accepts both, the test fixtures provide both, and the
+    smoke-test will too. v1.x can auto-synthesize one by
+    branch-swapping but the surface area to handle uncommon
+    descriptor shapes is not worth it before we have a real user
+    case.
+  - **Submit-signed / broadcast / cancel** still 501; M6.2 / M6.5.
+
+Three non-obvious bits worth recording:
+
+- **bdkpython 2.3.1's `Psbt.serialize()` already returns base64.** Do
+  NOT call `base64.b64encode(...)` on it; the output is the wire format
+  for "PSBT base64" everywhere else.
+- **`Wallet.insert_txout` is for foreign UTXOs only** — it adds the
+  txout to the wallet's prevout cache but doesn't register it as a
+  spendable UTXO. `apply_unconfirmed_txs([UnconfirmedTx(tx, last_seen)])`
+  with the parent transaction is the path that registers UTXOs as
+  `is_mine` so the wallet picks them up in coin selection.
+- **`getrawtransaction` requires `txindex=1`** for any tx outside the
+  wallet / mempool. Compose already enables it; if it ever flips off
+  the build fails clean with a typed BankingError rather than a
+  silent stale PSBT.
+
+Tests: 9 integration tests covering the happy path (BDK round-trip,
+recipient-amount match, base64 + binary PSBT export), unknown holding
+(404), invalid destination (400), no balance (400), insufficient
+balance (400), in-flight concurrency (409), Vault long-term
+confirmation flow (200 → 201), get + list endpoints.
+
+NRT: 423 → 432 (296 unit + 135 integration + 1 skip). Suite ~200s with
+infra up.
+
+Remaining M6 sub-stages:
+  - **M6.2** — submit-signed + broadcast + broadcast_attempt audit
+  - **M6.3** — Confirmation tracking (link broadcast_txid → LedgerEntry)
+  - **M6.4** — Invoice flow
+  - **M6.5** — Cancellation, edge cases, mismatch validation
+  - **M6.6** — docs + smoke test extension
+
+---

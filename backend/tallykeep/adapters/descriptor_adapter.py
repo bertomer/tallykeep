@@ -191,11 +191,139 @@ class DescriptorAdapter:
         descriptor = bdk.Descriptor(expression, _NETWORK_TO_BDK[network])
         return str(descriptor.derive_address(index, _NETWORK_TO_BDK[network]))
 
+    # --- PSBT construction (M6.1) -------------------------------------------
+
+    def build_psbt(
+        self,
+        *,
+        external_descriptor: str,
+        change_descriptor: str | None,
+        network: Network,
+        utxos: list["UtxoForBuild"],
+        recipient_address: str,
+        amount_sats: int | None,
+        fee_rate_sat_per_vbyte: float,
+        max_external_index: int,
+        max_change_index: int,
+    ) -> "BuiltPsbt":
+        """Build an unsigned PSBT spending from `utxos` to `recipient_address`.
+
+        Pass `amount_sats=None` to drain the wallet (subtract fee from the
+        only output). The wallet's coin selection is BDK's default
+        BranchAndBound — coin-selection knobs land in v1.x with the
+        Sovereign-profile per-payment override.
+
+        We teach BDK about the wallet's UTXOs by `apply_unconfirmed_txs`-ing
+        every parent transaction. Each parent tx must be passed in serialized
+        form (the on-chain raw hex). Callers fetch raw hex via NodeAdapter
+        when our `onchain_transaction.raw_hex` is empty.
+        """
+        import time
+
+        bdk_network = _NETWORK_TO_BDK[network]
+        descriptor = bdk.Descriptor(external_descriptor, bdk_network)
+        if change_descriptor is None:
+            # bdkpython 2.x's two-keychain wallet *requires* a change descriptor.
+            # We synthesize one by reusing the external descriptor — funds
+            # going to "change" simply land back on the external chain. This
+            # matches what we've been doing in the address-derivation path
+            # for M4 when no change_expression was provided.
+            change = descriptor
+        else:
+            change = bdk.Descriptor(change_descriptor, bdk_network)
+
+        # Lookahead must be wide enough that BDK indexes any address we've
+        # derived so far. Use max(known indexes) + 25 (the default lookahead).
+        lookahead = max(max_external_index, max_change_index) + 25
+        wallet = bdk.Wallet(
+            descriptor,
+            change,
+            bdk_network,
+            bdk.Persister.new_in_memory(),
+            lookahead=lookahead,
+        )
+        # Reveal so the wallet's index covers the full range our DB knows.
+        wallet.reveal_addresses_to(bdk.KeychainKind.EXTERNAL, max_external_index)
+        wallet.reveal_addresses_to(bdk.KeychainKind.INTERNAL, max_change_index)
+
+        # Teach BDK about each parent tx so the wallet's UTXO set picks up
+        # our outputs. Deduplicate by raw_hex — the same parent tx may have
+        # paid us multiple UTXOs.
+        seen_hex: set[str] = set()
+        unconfirmed: list[bdk.UnconfirmedTx] = []
+        last_seen = int(time.time())
+        for u in utxos:
+            if u.parent_raw_hex in seen_hex:
+                continue
+            seen_hex.add(u.parent_raw_hex)
+            tx = bdk.Transaction(bytes.fromhex(u.parent_raw_hex))
+            unconfirmed.append(bdk.UnconfirmedTx(tx=tx, last_seen=last_seen))
+        if unconfirmed:
+            wallet.apply_unconfirmed_txs(unconfirmed)
+
+        recipient = bdk.Address(recipient_address, bdk_network)
+        recipient_script = recipient.script_pubkey()
+
+        builder = bdk.TxBuilder()
+        if amount_sats is None:
+            # Drain — single recipient output, fee deducted from balance.
+            builder = builder.drain_to(recipient_script).drain_wallet()
+        else:
+            builder = builder.add_recipient(
+                recipient_script, bdk.Amount.from_sat(amount_sats)
+            )
+        builder = builder.fee_rate(
+            bdk.FeeRate.from_sat_per_vb(int(round(fee_rate_sat_per_vbyte)))
+        )
+
+        psbt = builder.finish(wallet)
+
+        # bdkpython's Psbt.serialize() returns a base64 string directly —
+        # no further encoding step. (The binary form is recovered by
+        # base64-decoding when the API serves it as application/octet-stream.)
+        psbt_base64 = psbt.serialize()
+
+        # Pull the unsigned-tx vbytes for fee math + the change index for
+        # gap-tracking (the `change_descriptor` path advanced the wallet's
+        # internal derivation index, and we want to surface the new value
+        # to the caller).
+        new_change_index = wallet.derivation_index(bdk.KeychainKind.INTERNAL)
+
+        return BuiltPsbt(
+            psbt_base64=psbt_base64,
+            change_keychain_index=(
+                int(new_change_index) if new_change_index is not None else None
+            ),
+        )
+
+
+@dataclass(frozen=True)
+class UtxoForBuild:
+    """Minimum info DescriptorAdapter.build_psbt needs about each UTXO.
+
+    `parent_raw_hex` is the full serialized parent transaction (hex). BDK
+    needs it to register the UTXO via `apply_unconfirmed_txs` so the
+    wallet's coin selection considers it spendable.
+    """
+
+    txid: str
+    vout: int
+    value_sats: int
+    parent_raw_hex: str
+
+
+@dataclass(frozen=True)
+class BuiltPsbt:
+    psbt_base64: str
+    change_keychain_index: int | None
+
 
 __all__ = [
+    "BuiltPsbt",
     "DerivedAddress",
     "DescriptorAdapter",
     "DescriptorParseError",
     "ParsedDescriptor",
     "UnsupportedDescriptorError",
+    "UtxoForBuild",
 ]
