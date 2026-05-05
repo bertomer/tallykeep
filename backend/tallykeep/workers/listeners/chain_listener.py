@@ -168,11 +168,19 @@ class ChainListener:
                 block_time=block_time,
                 fee_rate_sat_per_vbyte=fee_rate,
             )
+            payment_confirmation = self._link_payment_request_if_any(
+                session, result
+            )
             session.commit()
 
         # Emit events outside the session so a slow Redis publish never holds
         # a transaction open.
         self._emit_tx_events(result)
+        if payment_confirmation is not None:
+            self._bus.publish(
+                "banking.payment_request.confirmed",
+                payment_confirmation,
+            )
 
     def _handle_block(self, block_hash: str) -> None:
         """A new block tip arrived. Emit chain.block.new and drive any
@@ -294,6 +302,66 @@ class ChainListener:
                 "ledger_entry.requires_categorization",
                 {"ledger_entry_id": str(entry_id)},
             )
+
+    def _link_payment_request_if_any(
+        self, session: Session, result: TxProcessingResult
+    ) -> dict | None:
+        """Spec module 06 step 7: when a confirmed tx matches a known
+        PaymentRequest's `broadcast_txid`, flip status to CONFIRMED and
+        link `resulting_ledger_entry_id` to the LedgerEntry created for
+        this tx.
+
+        Only fires when the tx confirmed (mempool acceptance doesn't
+        promote a PaymentRequest); also requires the listener to have
+        produced exactly one new LedgerEntry — outgoing payments
+        always touch a single source holding so this is the common
+        case.
+        """
+        if result.confirmation_height is None:
+            return None
+
+        from tallykeep.domain.enums import LedgerEntrySource, PaymentStatus
+        from tallykeep.repositories import (
+            ledger_entry as ledger_repo,
+            payment_request as pr_repo,
+        )
+
+        if not result.new_ledger_entry_ids:
+            # The tx may already have been processed via the mempool
+            # path; look up the existing entry by (source, source_ref).
+            existing = ledger_repo.get_by_source(
+                session,
+                LedgerEntrySource.ONCHAIN_TRANSACTION,
+                result.txid,
+            )
+            ledger_entry_id = existing.id if existing is not None else None
+        else:
+            ledger_entry_id = result.new_ledger_entry_ids[0]
+
+        if ledger_entry_id is None:
+            return None
+
+        pr = pr_repo.get_by_broadcast_txid(session, result.txid)
+        if pr is None:
+            return None
+        # Only flip from BROADCAST → CONFIRMED. Anything else (already
+        # confirmed, cancelled, etc.) is a no-op.
+        if pr.status != PaymentStatus.BROADCAST:
+            return None
+
+        updated = pr_repo.mark_confirmed(
+            session,
+            pr.id,
+            resulting_ledger_entry_id=ledger_entry_id,
+        )
+        if updated is None:  # pragma: no cover
+            return None
+        return {
+            "id": str(updated.id),
+            "txid": result.txid,
+            "height": result.confirmation_height,
+            "ledger_entry_id": str(ledger_entry_id),
+        }
 
     def _cached_fee_rate(self) -> float:
         """estimatesmartfee response cached for `_fee_rate_ttl_seconds`."""

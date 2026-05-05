@@ -787,3 +787,43 @@ Remaining M6 sub-stages:
   - **M6.6** — docs + smoke test extension
 
 ---
+
+## 2026-05-05 — M6.3 (PaymentRequest confirmation tracking)
+
+`workers/listeners/chain_listener` now links confirming transactions
+back to their `PaymentRequest`:
+
+  1. After `process_decoded_transaction` returns and the session
+     commits the new LedgerEntry, the listener calls
+     `_link_payment_request_if_any(session, result)`.
+  2. The helper looks up the PaymentRequest by `broadcast_txid` matching
+     `result.txid`. Only fires when `confirmation_height is not None`
+     (mempool-acceptance doesn't promote anything).
+  3. If found AND status is `BROADCAST`, flips status to `CONFIRMED`,
+     stamps `resulting_ledger_entry_id` with the LedgerEntry that was
+     just created (or the existing one if the mempool path created it
+     first), and commits.
+  4. Outside the session, emits `banking.payment_request.confirmed`
+     with `{id, txid, height, ledger_entry_id}`.
+
+The contract from spec module 06 step 7 is that the SSE bridge will
+forward the event to the frontend so the UI updates in real time. M9
+wires the bridge; for now the event is published on the bus and any
+subscriber (including the InMemoryEventBus an integration test wires
+up) can observe it.
+
+Tests: 1 new end-to-end integration covering the full flow — build
+PSBT, sign in-test with the matching tprv wallet, submit-signed,
+broadcast, mine a confirming block, and verify (a) the
+PaymentRequest reaches `confirmed` status with
+`resulting_ledger_entry_id` populated, and (b) the
+`banking.payment_request.confirmed` event fires.
+
+NRT: 433 → 434 (296 unit + 138 integration + 1 skip). Suite ~488s.
+
+Remaining M6 sub-stages:
+  - **M6.4** — Invoice flow
+  - **M6.5** — Cancellation, edge cases, mismatch validation
+  - **M6.6** — docs + smoke test extension
+
+---
