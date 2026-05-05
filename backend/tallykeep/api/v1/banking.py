@@ -457,38 +457,157 @@ async def cancel_payment_request(request_id: UUID) -> JSONResponse:
 # --- Incoming invoices (M6.4) ----------------------------------------------
 
 
-@router.get("/invoices", status_code=501)
+class InvoiceCreate(BaseModel):
+    holding_id: UUID
+    amount_sats: int | None = None
+    description: str | None = None
+
+
+class InvoiceOut(BaseModel):
+    id: UUID
+    holding_id: UUID
+    invoice_type: str
+    status: str
+    amount_sats: int | None
+    description: str | None
+    receiving_address: str | None
+    bip21_uri: str | None
+    resulting_ledger_entry_id: UUID | None
+
+
+class InvoiceListResponse(BaseModel):
+    invoices: list[InvoiceOut]
+
+
+def _invoice_to_out(inv) -> InvoiceOut:  # type: ignore[no-untyped-def]
+    return InvoiceOut(
+        id=inv.id,
+        holding_id=inv.holding_id,
+        invoice_type=inv.invoice_type.value,
+        status=inv.status.value,
+        amount_sats=inv.amount_sats,
+        description=inv.description,
+        receiving_address=inv.receiving_address,
+        bip21_uri=inv.bip21_uri,
+        resulting_ledger_entry_id=inv.resulting_ledger_entry_id,
+    )
+
+
+@router.post("/invoices", response_model=InvoiceOut, status_code=201)
+async def create_invoice(
+    body: InvoiceCreate,
+    request: Request,
+    session: Session = Depends(get_db_session),
+) -> InvoiceOut:
+    try:
+        invoice = banking_service.create_invoice(
+            session,
+            holding_id=body.holding_id,
+            amount_sats=body.amount_sats,
+            description=body.description,
+        )
+    except banking_service.HoldingNotFound as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except banking_service.HoldingCannotReceive as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except banking_service.NoUnusedAddress as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    except banking_service.InvoiceError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    session.commit()
+
+    bus = get_event_bus(request)
+    if bus is not None:
+        bus.publish(
+            "banking.invoice.created",
+            {"id": str(invoice.id), "holding_id": str(invoice.holding_id)},
+        )
+    return _invoice_to_out(invoice)
+
+
+@router.get("/invoices", response_model=InvoiceListResponse)
 async def list_invoices(
-    holding_id: UUID | None = None, status: str | None = None
-) -> JSONResponse:
-    return not_implemented_response(
-        milestone="M6.4", route="GET /api/v1/banking/invoices"
+    holding_id: UUID | None = None,
+    status: str | None = None,
+    limit: int = 50,
+    offset: int = 0,
+    session: Session = Depends(get_db_session),
+) -> InvoiceListResponse:
+    from tallykeep.domain.enums import InvoiceStatus
+    from tallykeep.repositories import invoice as invoice_repo
+
+    try:
+        status_enum = InvoiceStatus(status) if status else None
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    invoices = invoice_repo.list_filtered(
+        session,
+        holding_id=holding_id,
+        status=status_enum,
+        limit=limit,
+        offset=offset,
+    )
+    return InvoiceListResponse(
+        invoices=[_invoice_to_out(i) for i in invoices]
     )
 
 
-@router.post("/invoices", status_code=501)
-async def create_invoice() -> JSONResponse:
-    return not_implemented_response(
-        milestone="M6.4", route="POST /api/v1/banking/invoices"
+@router.get("/invoices/{invoice_id}", response_model=InvoiceOut)
+async def get_invoice(
+    invoice_id: UUID, session: Session = Depends(get_db_session)
+) -> InvoiceOut:
+    from tallykeep.repositories import invoice as invoice_repo
+
+    invoice = invoice_repo.get(session, invoice_id)
+    if invoice is None:
+        raise HTTPException(status_code=404, detail="Invoice not found")
+    return _invoice_to_out(invoice)
+
+
+@router.get("/invoices/{invoice_id}/qr")
+async def get_invoice_qr(
+    invoice_id: UUID, session: Session = Depends(get_db_session)
+):  # type: ignore[no-untyped-def]
+    """Render the BIP21 URI as a 400×400 PNG QR code."""
+    import io
+
+    import qrcode
+
+    from tallykeep.repositories import invoice as invoice_repo
+
+    invoice = invoice_repo.get(session, invoice_id)
+    if invoice is None:
+        raise HTTPException(status_code=404, detail="Invoice not found")
+    if invoice.bip21_uri is None:
+        raise HTTPException(
+            status_code=409,
+            detail="Invoice has no BIP21 URI to encode",
+        )
+
+    img = qrcode.make(invoice.bip21_uri, box_size=10, border=4)
+    buf = io.BytesIO()
+    img.save(buf, format="PNG")
+    return Response(
+        content=buf.getvalue(),
+        media_type="image/png",
+        headers={
+            "Content-Disposition": f'inline; filename="{invoice_id}.png"',
+        },
     )
 
 
-@router.get("/invoices/{invoice_id}", status_code=501)
-async def get_invoice(invoice_id: UUID) -> JSONResponse:
-    return not_implemented_response(
-        milestone="M6.4", route="GET /api/v1/banking/invoices/{id}"
-    )
+@router.post("/invoices/{invoice_id}/cancel", response_model=InvoiceOut)
+async def cancel_invoice(
+    invoice_id: UUID, session: Session = Depends(get_db_session)
+) -> InvoiceOut:
+    from tallykeep.repositories import invoice as invoice_repo
 
-
-@router.get("/invoices/{invoice_id}/qr", status_code=501)
-async def get_invoice_qr(invoice_id: UUID) -> JSONResponse:
-    return not_implemented_response(
-        milestone="M6.4", route="GET /api/v1/banking/invoices/{id}/qr"
-    )
-
-
-@router.post("/invoices/{invoice_id}/cancel", status_code=501)
-async def cancel_invoice(invoice_id: UUID) -> JSONResponse:
-    return not_implemented_response(
-        milestone="M6.4", route="POST /api/v1/banking/invoices/{id}/cancel"
-    )
+    try:
+        cancelled = invoice_repo.cancel(session, invoice_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    if cancelled is None:
+        raise HTTPException(status_code=404, detail="Invoice not found")
+    session.commit()
+    return _invoice_to_out(cancelled)

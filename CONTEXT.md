@@ -827,3 +827,62 @@ Remaining M6 sub-stages:
   - **M6.6** — docs + smoke test extension
 
 ---
+
+## 2026-05-05 — M6.4 (Invoice flow)
+
+`services/banking_service.create_invoice` mints an OPEN Invoice for a
+non-Account Holding:
+
+  1. Picks the first descriptor's external branch.
+  2. Calls `descriptor_repo.next_unused_address(...)` — its query now
+     also EXCLUDES addresses currently held by an open Invoice via the
+     `receiving_address_id` link, so consecutive `/invoices` POSTs
+     hand out distinct addresses.
+  3. Labels the address with "Invoice (reserved YYYY-MM-DD)" so the
+     addresses-list UI shows reservation context.
+  4. Builds a BIP21 URI (`bitcoin:addr?amount=...&label=...` when an
+     amount/description is provided; bare `bitcoin:addr` for
+     amount-less invoices).
+  5. Persists the Invoice with `status=OPEN` and emits
+     `banking.invoice.created`.
+
+Endpoints (real now):
+  - POST /api/v1/banking/invoices
+  - GET  /api/v1/banking/invoices                  filtered list
+  - GET  /api/v1/banking/invoices/{id}
+  - GET  /api/v1/banking/invoices/{id}/qr          400×400 PNG of BIP21
+  - POST /api/v1/banking/invoices/{id}/cancel      → CANCELLED + releases address
+
+Payment detection in the chain listener:
+`workers/listeners/chain_listener._link_invoice_if_any` walks the
+decoded tx's vouts, looks each address up via
+`invoice_repo.get_open_by_address`, and on a match flips the invoice to
+PAID (or OVERPAID when amount > requested) with
+`resulting_ledger_entry_id` linked. Mempool acceptance is enough — we
+don't wait for confirmation; the regular UTXO confirmation_height
+update refreshes the on-chain state. Emits `banking.invoice.paid` with
+`{id, txid, ledger_entry_id, amount_sats, overpaid}`.
+
+QR generation uses `qrcode==8.0` (with PIL extra). Added to deps.
+
+Address reservation gotcha: increasing gap_limit on a descriptor
+adds more addresses for future invoices; until then,
+`POST /invoices` returns 409 when every external address is reserved.
+This matches spec module 06's "subsequent payments to the same address
+are still received but the address is not reused for new Invoices"
+plus the standard gap_limit advance.
+
+Tests: 10 new integration tests covering create (201, amountless,
+404), reservation (distinct addresses, 409 on exhausted gap),
+get/list, cancel + release, QR PNG, and end-to-end payment detection
+(PAID for exact-amount, OVERPAID for excess).
+
+NRT: 434 → 439 (291 unit + 148 integration + 1 skip). Five
+parametrized route-stub tests went away as we converted the invoice
+stubs to real endpoints.
+
+Remaining M6 sub-stages:
+  - **M6.5** — Cancellation, Vault guardrail, mismatch validation
+  - **M6.6** — docs + smoke test extension
+
+---

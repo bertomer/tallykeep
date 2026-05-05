@@ -627,14 +627,121 @@ def broadcast_payment_request(
     return updated
 
 
+# --- M6.4: Invoice flow -----------------------------------------------------
+
+
+class InvoiceError(BankingError):
+    """Base class for invoice-creation errors."""
+
+
+class HoldingCannotReceive(InvoiceError):
+    """Account holdings can't have on-chain Invoices (no descriptors)."""
+
+
+class NoUnusedAddress(InvoiceError):
+    """All addresses up to gap_limit have been used; user needs to bump
+    gap_limit on the descriptor before another Invoice can reserve a
+    fresh receive address."""
+
+
+def create_invoice(
+    session: Session,
+    *,
+    holding_id: UUID,
+    amount_sats: int | None,
+    description: str | None,
+) -> object:
+    """Create an OPEN Invoice for `holding_id`.
+
+    Picks the first unused address on the holding's first descriptor's
+    external branch (the change branch is reserved for outgoing
+    payments, not invoices). Builds a BIP21 URI when an amount is set;
+    amount-less invoices use the bare `bitcoin:address` form.
+    """
+    from tallykeep.domain.enums import HoldingType, InvoiceStatus, PaymentType
+    from tallykeep.domain.invoice import Invoice
+
+    descriptor_ids = descriptor_repo.descriptor_ids_for_holding(session, holding_id)
+    holding = holding_repo.get(
+        session, holding_id, descriptor_ids=descriptor_ids
+    )
+    if holding is None:
+        raise HoldingNotFound(f"Holding {holding_id} not found")
+    if holding.holding_type == HoldingType.ACCOUNT:
+        raise HoldingCannotReceive(
+            "Account holdings cannot have on-chain Invoices; their incoming "
+            "payments come through the custodial provider, not this app."
+        )
+
+    descriptors = descriptor_repo.list_descriptors_for_holding(session, holding_id)
+    if not descriptors:
+        raise InvoiceError(
+            "Holding has no descriptors; cannot derive a receiving address"
+        )
+    primary = descriptors[0]
+
+    next_addr = descriptor_repo.next_unused_address(
+        session, primary.id, is_change=False
+    )
+    if next_addr is None:
+        raise NoUnusedAddress(
+            "All addresses up to gap_limit have been used or reserved. "
+            "Increase gap_limit on the descriptor and rescan to mint more."
+        )
+
+    # Reservation: we tag the address via the Invoice we're about to
+    # insert (its `receiving_address_id` becomes the lock). The matching
+    # query in `next_unused_address` excludes addresses currently held
+    # by an OPEN Invoice — see repository note. We label the address so
+    # the addresses-list endpoint shows the user it's reserved.
+    descriptor_repo.update_address_label(
+        session,
+        next_addr.id,
+        f"Invoice (reserved {datetime.now(UTC).date().isoformat()})",
+    )
+
+    bip21 = f"bitcoin:{next_addr.address}"
+    if amount_sats is not None:
+        bip21 += f"?amount={amount_sats / 100_000_000:.8f}"
+        if description:
+            from urllib.parse import quote
+
+            bip21 += f"&label={quote(description)}"
+    elif description:
+        from urllib.parse import quote
+
+        bip21 += f"?label={quote(description)}"
+
+    invoice = Invoice(
+        id=uuid4(),
+        holding_id=holding_id,
+        invoice_type=PaymentType.ONCHAIN,
+        amount_sats=amount_sats,
+        description=description,
+        status=InvoiceStatus.OPEN,
+        expires_at=None,
+        created_at=datetime.now(UTC),
+        receiving_address=next_addr.address,
+        receiving_address_id=next_addr.id,
+        bip21_uri=bip21,
+    )
+    from tallykeep.repositories import invoice as invoice_repo
+
+    invoice_repo.insert(session, invoice)
+    return invoice
+
+
 __all__ = [
     "BankingError",
     "BroadcastRejected",
+    "HoldingCannotReceive",
     "HoldingCannotSend",
     "HoldingNotFound",
     "InFlightPaymentExists",
     "InsufficientBalance",
     "InvalidDestination",
+    "InvoiceError",
+    "NoUnusedAddress",
     "PaymentRequestBuildResult",
     "PaymentRequestNotFound",
     "PsbtMismatch",
@@ -643,5 +750,6 @@ __all__ = [
     "WrongStatusForOperation",
     "broadcast_payment_request",
     "build_payment_request",
+    "create_invoice",
     "submit_signed_payment_request",
 ]

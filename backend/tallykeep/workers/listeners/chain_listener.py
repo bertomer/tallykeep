@@ -171,6 +171,7 @@ class ChainListener:
             payment_confirmation = self._link_payment_request_if_any(
                 session, result
             )
+            invoice_paid = self._link_invoice_if_any(session, result, decoded)
             session.commit()
 
         # Emit events outside the session so a slow Redis publish never holds
@@ -181,6 +182,8 @@ class ChainListener:
                 "banking.payment_request.confirmed",
                 payment_confirmation,
             )
+        if invoice_paid is not None:
+            self._bus.publish("banking.invoice.paid", invoice_paid)
 
     def _handle_block(self, block_hash: str) -> None:
         """A new block tip arrived. Emit chain.block.new and drive any
@@ -362,6 +365,80 @@ class ChainListener:
             "height": result.confirmation_height,
             "ledger_entry_id": str(ledger_entry_id),
         }
+
+    def _link_invoice_if_any(
+        self,
+        session: Session,
+        result: TxProcessingResult,
+        decoded: dict,
+    ) -> dict | None:
+        """Spec module 06 step 2 of the Invoice flow: when an output of the
+        observed tx pays an address reserved by an OPEN Invoice, mark the
+        Invoice paid (or overpaid) and link the resulting LedgerEntry.
+
+        Mempool acceptance is enough to consider the invoice paid; we
+        don't wait for confirmation. The user can see "Paid (unconfirmed)"
+        in the UI and the chain listener will refresh confirmation status
+        on the next block via the regular UTXO confirmation_height update.
+        """
+        if not result.discovered_utxo_ids and not result.new_ledger_entry_ids:
+            return None
+
+        from tallykeep.domain.enums import LedgerEntrySource
+        from tallykeep.repositories import (
+            invoice as invoice_repo,
+            ledger_entry as ledger_repo,
+        )
+
+        # Walk every output looking for one of OUR addresses that's locked
+        # by an open invoice.
+        vouts = decoded.get("vout", []) or []
+        for raw_out in vouts:
+            if not isinstance(raw_out, dict):
+                continue
+            spk = raw_out.get("scriptPubKey") or {}
+            address = spk.get("address") if isinstance(spk, dict) else None
+            if not isinstance(address, str) or not address:
+                continue
+
+            invoice = invoice_repo.get_open_by_address(session, address)
+            if invoice is None:
+                continue
+
+            ledger_entry = ledger_repo.get_by_source(
+                session,
+                LedgerEntrySource.ONCHAIN_TRANSACTION,
+                result.txid,
+            )
+            if ledger_entry is None:
+                continue
+
+            value_btc = raw_out.get("value")
+            if value_btc is None:
+                continue
+            from tallykeep.services.chain_processing_service import _btc_to_sats
+
+            value_sats = _btc_to_sats(value_btc)
+            overpaid = (
+                invoice.amount_sats is not None
+                and value_sats > invoice.amount_sats
+            )
+            updated = invoice_repo.mark_paid(
+                session,
+                invoice.id,
+                resulting_ledger_entry_id=ledger_entry.id,
+                overpaid=overpaid,
+            )
+            if updated is None:  # pragma: no cover
+                continue
+            return {
+                "id": str(updated.id),
+                "txid": result.txid,
+                "ledger_entry_id": str(ledger_entry.id),
+                "amount_sats": value_sats,
+                "overpaid": overpaid,
+            }
+        return None
 
     def _cached_fee_rate(self) -> float:
         """estimatesmartfee response cached for `_fee_rate_ttl_seconds`."""

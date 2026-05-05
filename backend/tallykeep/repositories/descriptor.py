@@ -219,19 +219,31 @@ def update_address_label(
 def next_unused_address(
     session: Session, descriptor_id: UUID, *, is_change: bool = False
 ) -> Address | None:
-    """Return the lowest-index Address with first_seen_height IS NULL.
+    """Return the lowest-index Address that's neither been seen on-chain
+    nor reserved by an open Invoice.
 
-    'Unused' here means we have not observed an on-chain transaction touching
-    it yet (M5 is what populates first_seen_height). For M4 every derived
-    address is unused, so this returns derivation_index=0 for the requested
-    branch.
+    "Unused" means: no on-chain tx has touched it yet
+    (`first_seen_height IS NULL`) AND no OPEN Invoice currently holds
+    it via its `receiving_address_id`. The Invoice reservation is the
+    M6.4 mechanism — without it, two consecutive Invoice creations
+    against the same descriptor would hand out the same address.
     """
+    from tallykeep.models import InvoiceRow
+
+    reserved_subq = (
+        select(InvoiceRow.receiving_address_id)
+        .where(
+            InvoiceRow.receiving_address_id.is_not(None),
+            InvoiceRow.status == "open",
+        )
+    )
     stmt = (
         select(AddressRow)
         .where(
             AddressRow.descriptor_id == descriptor_id,
             AddressRow.is_change.is_(is_change),
             AddressRow.first_seen_height.is_(None),
+            AddressRow.id.not_in(reserved_subq),
         )
         .order_by(AddressRow.derivation_index)
         .limit(1)
