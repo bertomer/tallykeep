@@ -30,24 +30,13 @@ STUB_ROUTES: list[tuple[str, str, str]] = [
     # method, openapi-path, milestone
     # --- Holdings ---
     # M4 implemented: per-type creation (purse/strongbox/vault), list, get,
-    # patch, archive, change-type. Tested in test_holdings_endpoints.py.
-    # POST /holdings/account stays a stub until M8 wires CustodialProvider.
-    ("POST", "/api/v1/holdings/account", "M8"),
+    # patch, archive, change-type. M8 implemented: account creation.
     # --- Descriptors ---
     # M4 implemented: list, attach, get, patch, delete, addresses,
     # next-receiving. M5.2 implemented: rescan, utxos, balance.
     # All tested in test_descriptor_endpoints.py / test_chain_scan.py.
     # --- Custodial providers ---
-    ("GET", "/api/v1/custodial-providers/supported", "M8"),
-    ("GET", "/api/v1/custodial-providers/{provider_id}", "M8"),
-    ("PATCH", "/api/v1/custodial-providers/{provider_id}", "M8"),
-    ("POST", "/api/v1/custodial-providers/{provider_id}/refresh", "M8"),
-    ("GET", "/api/v1/custodial-providers/{provider_id}/balance", "M8"),
-    (
-        "GET",
-        "/api/v1/custodial-providers/{provider_id}/verify-whitelist",
-        "M8",
-    ),
+    # M8 implemented: supported, get, patch, refresh, balance, verify-whitelist.
     # --- Addresses + Ledger entries ---
     # UTXO endpoints implemented in M5.2; LedgerEntry list/get/patch land in M5.6.
     ("PATCH", "/api/v1/addresses/{address_id}", "M5"),
@@ -55,25 +44,10 @@ STUB_ROUTES: list[tuple[str, str, str]] = [
     # M6.1–M6.5 implemented. Multi-frame QR (PSBT) is the only remaining stub.
     ("GET", "/api/v1/banking/payment-requests/{request_id}/psbt.qr", "v1.1"),
     # --- Trading: sweep policies ---
-    ("GET", "/api/v1/sweep-policies", "M8"),
-    ("POST", "/api/v1/sweep-policies", "M8"),
-    ("POST", "/api/v1/sweep-policies/pause-all", "M8"),
-    ("POST", "/api/v1/sweep-policies/resume-all", "M8"),
-    ("GET", "/api/v1/sweep-policies/{policy_id}", "M8"),
-    ("PATCH", "/api/v1/sweep-policies/{policy_id}", "M8"),
-    ("DELETE", "/api/v1/sweep-policies/{policy_id}", "M8"),
-    (
-        "POST",
-        "/api/v1/sweep-policies/{policy_id}/acknowledge-warnings",
-        "M8",
-    ),
-    ("POST", "/api/v1/sweep-policies/{policy_id}/enable", "M8"),
-    ("POST", "/api/v1/sweep-policies/{policy_id}/disable", "M8"),
-    ("POST", "/api/v1/sweep-policies/{policy_id}/execute-now", "M8"),
-    ("GET", "/api/v1/sweep-policies/{policy_id}/executions", "M8"),
-    ("GET", "/api/v1/sweep-executions", "M8"),
-    ("GET", "/api/v1/sweep-executions/{execution_id}", "M8"),
-    ("POST", "/api/v1/sweep-executions/{execution_id}/confirm", "M8"),
+    # M8 implemented: list, create, pause-all, resume-all, get, patch, delete,
+    # acknowledge-warnings, enable, disable, list-executions, get-executions, confirm.
+    # execute-now lands in M8.1 (requires async SweepEngine execution worker).
+    ("POST", "/api/v1/sweep-policies/{policy_id}/execute-now", "M8.1"),
     # --- Analysis + Jobs + Export ---
     # /security and /blueprint are real as of M5.5; the per-UTXO blueprint and
     # the manual recompute trigger are still stubs (UTXO blueprint is folded

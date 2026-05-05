@@ -1,58 +1,156 @@
-"""Custodial provider endpoints — spec module 04. Stubs land in M8."""
+"""Custodial provider endpoints — spec module 07 / M8."""
 
 from __future__ import annotations
 
 from uuid import UUID
 
-from fastapi import APIRouter
-from fastapi.responses import JSONResponse
+from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy.orm import Session
 
-from tallykeep.api.v1._stubs import not_implemented_response
+from tallykeep.adapters.adapter_registry import SUPPORTED_ADAPTER_IDS
+from tallykeep.api.dependencies import get_db_session, get_secret_store
+from tallykeep.infrastructure.secrets import SecretStore
+from tallykeep.schemas.trading import (
+    BalanceOut,
+    CustodialProviderOut,
+    PatchCustodialProviderRequest,
+    WhitelistVerificationOut,
+)
+from tallykeep.services import trading_service
+from tallykeep.services.trading_service import (
+    ProviderConnectionError,
+    ProviderNotFound,
+    TradingServiceError,
+)
 
 
 router = APIRouter(tags=["custodial-providers"])
 
 
-@router.get("/custodial-providers/supported", status_code=501)
-async def supported_providers() -> JSONResponse:
-    return not_implemented_response(
-        milestone="M8", route="GET /api/v1/custodial-providers/supported"
+def _provider_to_out(p) -> CustodialProviderOut:  # type: ignore[no-untyped-def]
+    return CustodialProviderOut(
+        id=p.id,
+        holding_id=p.holding_id,
+        provider_kind=p.provider_kind,
+        display_name=p.display_name,
+        adapter_id=p.adapter_id,
+        can_read=p.permissions.can_read,
+        can_withdraw=p.permissions.can_withdraw,
+        whitelist_address=p.whitelist_address,
+        whitelist_address_descriptor_id=p.whitelist_address_descriptor_id,
+        whitelist_verified=p.whitelist_verified,
+        is_active=p.is_active,
+        last_polled_at=p.last_polled_at,
+        last_error=p.last_error,
+        last_known_balance_sats=p.last_known_balance_sats,
+        created_at=p.created_at,
+        updated_at=p.updated_at,
     )
 
 
-@router.get("/custodial-providers/{provider_id}", status_code=501)
-async def get_provider(provider_id: UUID) -> JSONResponse:
-    return not_implemented_response(
-        milestone="M8", route="GET /api/v1/custodial-providers/{id}"
-    )
+@router.get("/custodial-providers/supported")
+async def supported_providers() -> dict:  # type: ignore[type-arg]
+    return {"supported": SUPPORTED_ADAPTER_IDS}
 
 
-@router.patch("/custodial-providers/{provider_id}", status_code=501)
-async def patch_provider(provider_id: UUID) -> JSONResponse:
-    return not_implemented_response(
-        milestone="M8", route="PATCH /api/v1/custodial-providers/{id}"
-    )
+@router.get("/custodial-providers/{provider_id}", response_model=CustodialProviderOut)
+async def get_provider(
+    provider_id: UUID, session: Session = Depends(get_db_session)
+) -> CustodialProviderOut:
+    try:
+        provider = trading_service.get_provider(session, provider_id)
+    except ProviderNotFound as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    return _provider_to_out(provider)
 
 
-@router.post("/custodial-providers/{provider_id}/refresh", status_code=501)
-async def refresh_provider(provider_id: UUID) -> JSONResponse:
-    return not_implemented_response(
-        milestone="M8", route="POST /api/v1/custodial-providers/{id}/refresh"
-    )
+@router.patch("/custodial-providers/{provider_id}", response_model=CustodialProviderOut)
+async def patch_provider(
+    provider_id: UUID,
+    body: PatchCustodialProviderRequest,
+    session: Session = Depends(get_db_session),
+    secret_store: SecretStore = Depends(get_secret_store),
+) -> CustodialProviderOut:
+    try:
+        provider = trading_service.patch_provider(
+            session,
+            provider_id,
+            display_name=body.display_name,
+            api_key=body.api_key,
+            api_secret=body.api_secret,
+            api_passphrase=body.api_passphrase,
+            secret_store=secret_store if (body.api_key or body.api_secret) else None,
+        )
+        session.commit()
+    except ProviderNotFound as exc:
+        session.rollback()
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except ProviderConnectionError as exc:
+        session.rollback()
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+    except TradingServiceError as exc:
+        session.rollback()
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    return _provider_to_out(provider)
 
 
-@router.get("/custodial-providers/{provider_id}/balance", status_code=501)
-async def provider_balance(provider_id: UUID) -> JSONResponse:
-    return not_implemented_response(
-        milestone="M8", route="GET /api/v1/custodial-providers/{id}/balance"
+@router.post("/custodial-providers/{provider_id}/refresh", response_model=CustodialProviderOut)
+async def refresh_provider(
+    provider_id: UUID,
+    session: Session = Depends(get_db_session),
+    secret_store: SecretStore = Depends(get_secret_store),
+) -> CustodialProviderOut:
+    try:
+        provider = trading_service.refresh_provider_balance(
+            session, provider_id, secret_store=secret_store
+        )
+        session.commit()
+    except ProviderNotFound as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except ProviderConnectionError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+    except TradingServiceError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    return _provider_to_out(provider)
+
+
+@router.get("/custodial-providers/{provider_id}/balance", response_model=BalanceOut)
+async def provider_balance(
+    provider_id: UUID, session: Session = Depends(get_db_session)
+) -> BalanceOut:
+    try:
+        provider = trading_service.get_provider(session, provider_id)
+    except ProviderNotFound as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    return BalanceOut(
+        provider_id=provider.id,
+        balance_sats=provider.last_known_balance_sats or 0,
+        last_polled_at=provider.last_polled_at,
     )
 
 
 @router.get(
-    "/custodial-providers/{provider_id}/verify-whitelist", status_code=501
+    "/custodial-providers/{provider_id}/verify-whitelist",
+    response_model=WhitelistVerificationOut,
 )
-async def verify_whitelist(provider_id: UUID) -> JSONResponse:
-    return not_implemented_response(
-        milestone="M8",
-        route="GET /api/v1/custodial-providers/{id}/verify-whitelist",
+async def verify_whitelist(
+    provider_id: UUID,
+    session: Session = Depends(get_db_session),
+    secret_store: SecretStore = Depends(get_secret_store),
+) -> WhitelistVerificationOut:
+    try:
+        provider, is_whitelisted, error = trading_service.verify_whitelist(
+            session, provider_id, secret_store=secret_store
+        )
+        session.commit()
+    except ProviderNotFound as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except TradingServiceError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    return WhitelistVerificationOut(
+        provider_id=provider.id,
+        address=provider.whitelist_address,
+        is_whitelisted=is_whitelisted,
+        provider_label=provider.display_name,
+        error=error,
     )

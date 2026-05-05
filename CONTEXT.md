@@ -969,3 +969,75 @@ balance polling, SweepPolicy CRUD + safety validator, SweepEngine
 execution against Kraken/Bitstamp).
 
 ---
+
+## 2026-05-05 — M8 (Trading layer)
+
+Full implementation of spec module 07 (CustodialProvider adapters,
+Account Holding creation, SweepPolicy CRUD + safety validator,
+SweepExecution worker loop).
+
+### Adapters
+
+- **`CustodialProviderAdapter` ABC** — sync-only, amounts in sats.
+  Exceptions: `ProviderAuthError`, `ProviderPermissionError`,
+  `ProviderRateLimitError`, `ProviderError`.
+- **`KrakenAdapter`** — ccxt.kraken sync; `get_permissions()` detects
+  trade flag; `verify_whitelist()` via `privateGetWithdrawAddresses`.
+- **`BitstampAdapter`** — ccxt.bitstamp sync; `verify_whitelist()`
+  always returns `is_whitelisted=False` (no programmatic whitelist API).
+- **`adapter_registry`** — `build_adapter(id, *, key, secret, pass)`;
+  `SUPPORTED_ADAPTER_IDS`; `UnsupportedAdapterError`.
+
+### DB changes (migration `8f2a1c3d4e5b`)
+
+- `custodial_provider.whitelist_verified BOOLEAN NOT NULL DEFAULT FALSE`
+- `sweep_policy.is_dry_run BOOLEAN NOT NULL DEFAULT FALSE`
+
+### Repositories
+
+New: `repositories/custodial_provider.py`, `repositories/sweep_policy.py`,
+`repositories/sweep_execution.py`.
+
+### Service
+
+`services/trading_service.py`:
+- Safety validator: 5 rules with acknowledgement carryover.
+- `create_account_holding()` — validates adapter, rejects trade perms,
+  verifies whitelist, stores credentials in SecretStore.
+- Full CRUD for SweepPolicy + SweepExecution management.
+- `confirm_sweep_execution()` — only for AWAITING_USER_CONFIRMATION.
+
+### API
+
+- `POST /holdings/account` — real implementation (was 501 stub).
+- All 6 custodial-provider endpoints wired.
+- All sweep-policy + sweep-execution endpoints wired.
+- `POST /sweep-policies/{id}/execute-now` stays 501 (lands in M8.1).
+
+### Workers
+
+- **`CustodialPoller`** (scheduler thread, interval=300s): polls active
+  providers, updates balance, publishes `custodial_provider.balance_updated`.
+- **`SweepEngine`** (subscriber): handles `balance_updated`; creates
+  `SweepExecution` when THRESHOLD policies trigger.
+
+### Tests
+
+- `tests/unit/test_trading_service.py` — 10 unit tests for safety
+  validator + account creation error paths.
+- `tests/integration/test_trading.py` — 14 integration tests covering
+  full sweep-policy CRUD, pause/resume, enable/disable, delete,
+  execution listing, and custodial-provider endpoints.
+
+### Smoke test
+
+Section **15** (`sweep-policies`): creates vault holding, creates/lists/
+patches a sweep policy, acknowledges warnings, enables/disables,
+pause-all/resume-all, deletes, lists executions, checks supported adapters.
+
+Section **16** stubs: only lightning routes remain.
+
+NRT: test count increased (M8 adds +24 tests total).
+
+**M8 is complete.** Remaining: M8.1 (`execute-now` + SweepEngine
+withdrawal logic against live exchanges).

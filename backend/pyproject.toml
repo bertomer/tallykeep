@@ -36,6 +36,8 @@ dependencies = [
   "pyzmq==26.2.0",
   # M6.4 — QR-code rendering for Invoice BIP21 URIs
   "qrcode[pil]==8.0",
+  # M8 — exchange adapters for CustodialProvider integration
+  "ccxt==4.4.57",
 ]
 
 [project.optional-dependencies]

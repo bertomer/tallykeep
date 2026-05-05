@@ -60,6 +60,9 @@ class CustodialProviderRow(Base):
     whitelist_address_descriptor_id: Mapped[UUID] = mapped_column(
         ForeignKey("descriptor.id", ondelete="RESTRICT"), nullable=False
     )
+    whitelist_verified: Mapped[bool] = mapped_column(
+        nullable=False, server_default=text("FALSE")
+    )
     is_active: Mapped[bool] = mapped_column(
         nullable=False, server_default=text("TRUE"), index=True
     )

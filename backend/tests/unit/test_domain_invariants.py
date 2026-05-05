@@ -382,6 +382,7 @@ class TestCustodialProvider:
                 ),
                 whitelist_address="bc1qexample",
                 whitelist_address_descriptor_id=uuid4(),
+                whitelist_verified=False,
                 is_active=True,
                 last_polled_at=None,
                 last_error=None,

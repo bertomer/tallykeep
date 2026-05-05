@@ -328,12 +328,20 @@ def create_vault(
 
 
 def get_holding(session: Session, holding_id: UUID) -> Holding | None:
+    from sqlalchemy import select as _sa_select
+    from tallykeep.models.custodial_provider import CustodialProviderRow
+
     descriptor_ids = descriptor_repo.descriptor_ids_for_holding(session, holding_id)
+    custodial_provider_id: UUID | None = session.execute(
+        _sa_select(CustodialProviderRow.id).where(
+            CustodialProviderRow.holding_id == holding_id
+        )
+    ).scalar_one_or_none()
     return holding_repo.get(
         session,
         holding_id,
         descriptor_ids=descriptor_ids,
-        custodial_provider_id=None,  # M8 wires this
+        custodial_provider_id=custodial_provider_id,
     )
 
 

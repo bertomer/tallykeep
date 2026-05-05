@@ -444,22 +444,121 @@ if (-not $bankingSkipped) {
 }
 
 
-# --- 15. Stubs (sanity-check the OpenAPI surface for routes not yet landed) ----
+# --- 15. Sweep policies (M8) --------------------------------------------------
 
-Section "15. Stubs return 501 with milestone tag"
+Section "15. Sweep policies (M8)"
+
+# Need two separate holdings for source + destination.
+# Re-use the $purseId from section 7 as source.
+# Create a second purse as the cold-storage destination.
+$vaultBody = @{
+    name = "Smoke test vault"
+    description = "Cold storage destination for sweep smoke test"
+    purpose = "reserve"
+    declared_security = @{
+        custody_model = "self_multi"
+        signing_model = "multi_sig"
+        geographic_distribution = $false
+        inheritance_configured = $false
+    }
+    display_color = "#6366f1"
+    display_order = 99
+    descriptors = @(
+        @{
+            name = "vault-external"
+            expression = "wpkh(xpub6BosfCnifzxcFwrSzQiqu2DBVTshkCXacvNsWGYJVVhhawA7d4R5WSWGFNbi8Aw6ZRc1brxMyWMzG3DSSSSoekkudhUd9yLb6qx39T9nMdj/1/*)"
+            network = "mainnet"
+            gap_limit = 5
+        }
+    )
+} | ConvertTo-Json -Depth 5 -Compress
+$vaultHolding = Invoke-RestMethod -Method Post -Uri "$BaseUrl/api/v1/holdings/vault" `
+    -ContentType 'application/json' -Body $vaultBody
+$vaultId = $vaultHolding.id
+Show "vault holding id" $vaultId
+
+# 15.1 Create sweep policy (purse → vault)
+$spBody = @{
+    name = "Smoke sweep"
+    source_holding_id = $purseId
+    destination_holding_id = $vaultId
+    trigger_type = "threshold"
+    trigger_configuration = @{ threshold_sats = 500000; cooldown_hours = 24 }
+    minimum_balance_sats = 100000
+    maximum_per_period_sats = 2000000
+    requires_user_confirmation = $true
+    is_dry_run = $false
+} | ConvertTo-Json -Compress
+$sp = Invoke-RestMethod -Method Post -Uri "$BaseUrl/api/v1/sweep-policies" `
+    -ContentType 'application/json' -Body $spBody
+$spId = $sp.id
+Show "policy.id"         $spId
+Show "policy.is_enabled" $sp.is_enabled
+Show "warnings"          $sp.safety_warnings.Count
+
+# 15.2 List sweep policies
+$spList = Invoke-RestMethod -Uri "$BaseUrl/api/v1/sweep-policies"
+Show "total policies"   $spList.Count
+
+# 15.3 Get sweep policy
+$spGet = Invoke-RestMethod -Uri "$BaseUrl/api/v1/sweep-policies/$spId"
+Show "get.name"          $spGet.name
+
+# 15.4 Patch sweep policy
+$spPatch = Invoke-RestMethod -Method Patch -Uri "$BaseUrl/api/v1/sweep-policies/$spId" `
+    -ContentType 'application/json' `
+    -Body (@{ name = "Smoke sweep (patched)"; maximum_per_period_sats = 3000000 } | ConvertTo-Json -Compress)
+Show "patched.name"              $spPatch.name
+Show "patched.max_per_period"    $spPatch.maximum_per_period_sats
+
+# 15.5 Attempt enable before acknowledging — must 409
+try {
+    Invoke-RestMethod -Method Post -Uri "$BaseUrl/api/v1/sweep-policies/$spId/enable" | Out-Null
+    Show "enable before ack" "(unexpected 200!)"
+} catch {
+    $sc = $_.Exception.Response.StatusCode.value__
+    Show "enable before ack" "409=$($sc -eq 409)"
+}
+
+# 15.6 Acknowledge warnings
+$acked = Invoke-RestMethod -Method Post -Uri "$BaseUrl/api/v1/sweep-policies/$spId/acknowledge-warnings"
+$allAcked = ($acked.safety_warnings | Where-Object { -not $_.user_acknowledged }).Count -eq 0
+Show "all warnings acked" $allAcked
+
+# 15.7 Enable
+$enabled = Invoke-RestMethod -Method Post -Uri "$BaseUrl/api/v1/sweep-policies/$spId/enable"
+Show "enabled.is_enabled"  $enabled.is_enabled
+
+# 15.8 Pause-all / resume-all
+$paused = Invoke-RestMethod -Method Post -Uri "$BaseUrl/api/v1/sweep-policies/pause-all"
+Show "pause-all.paused"   $paused.paused
+$resumed = Invoke-RestMethod -Method Post -Uri "$BaseUrl/api/v1/sweep-policies/resume-all"
+Show "resume-all.resumed" $resumed.resumed
+
+# 15.9 Disable then delete
+Invoke-RestMethod -Method Post -Uri "$BaseUrl/api/v1/sweep-policies/$spId/disable" | Out-Null
+$del = Invoke-WebRequest -Method Delete -Uri "$BaseUrl/api/v1/sweep-policies/$spId"
+Show "delete policy status" $del.StatusCode
+
+# 15.10 Sweep executions list (empty)
+$execs = Invoke-RestMethod -Uri "$BaseUrl/api/v1/sweep-executions"
+Show "executions count" $execs.Count
+
+# 15.11 Supported custodial adapters
+$supported = Invoke-RestMethod -Uri "$BaseUrl/api/v1/custodial-providers/supported"
+Show "supported adapters" ($supported.supported -join ", ")
+
+
+# --- 16. Stubs (sanity-check the OpenAPI surface for routes not yet landed) ----
+
+Section "16. Stubs return 501 with milestone tag"
 foreach ($pair in @(
-    @("GET",  "/api/v1/lightning/status"),
-    @("GET",  "/api/v1/sweep-policies"),
-    @("POST", "/api/v1/holdings/account")
+    @("GET",  "/api/v1/lightning/status")
 )) {
     $method = $pair[0]
     $path = $pair[1]
     try {
-        if ($method -eq "POST") {
-            Invoke-RestMethod -Method Post -Uri "$BaseUrl$path" -ContentType 'application/json' -Body '{}' | Out-Null
-        } else {
-            Invoke-RestMethod -Method $method -Uri "$BaseUrl$path" | Out-Null
-        }
+        Invoke-RestMethod -Method $method -Uri "$BaseUrl$path" | Out-Null
         Show ("$method $path") "(unexpected 200!)"
     } catch {
         $resp = $_.Exception.Response
@@ -473,13 +572,15 @@ foreach ($pair in @(
 }
 
 
-# --- 16. Archive & cleanup ----------------------------------------------------
+# --- 17. Archive & cleanup ----------------------------------------------------
 
-Section "16. Archive the smoke-test holding"
+Section "17. Archive the smoke-test holdings"
 $resp = Invoke-WebRequest -Method Post -Uri "$BaseUrl/api/v1/holdings/$purseId/archive"
-Show "status" $resp.StatusCode
+Show "purse status" $resp.StatusCode
+$resp2 = Invoke-WebRequest -Method Post -Uri "$BaseUrl/api/v1/holdings/$vaultId/archive"
+Show "vault status" $resp2.StatusCode
 
-Section "17. Verify archived holding is hidden by default, visible with include_archived"
+Section "18. Verify archived holdings are hidden by default, visible with include_archived"
 $default = Invoke-RestMethod -Uri "$BaseUrl/api/v1/holdings"
 $archived = Invoke-RestMethod -Uri "$BaseUrl/api/v1/holdings?include_archived=true"
 Show "without archived" $default.Count

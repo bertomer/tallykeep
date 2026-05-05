@@ -241,7 +241,7 @@ class TestCreateVault:
 
 
 class TestCreateAccount:
-    def test_create_account_returns_501_pending_m8(self, app_with_db) -> None:
+    def test_create_account_missing_custodial_provider_returns_422(self, app_with_db) -> None:
         client, _ = app_with_db
         body = {
             "name": "Kraken main",
@@ -252,8 +252,7 @@ class TestCreateAccount:
             },
         }
         response = client.post("/api/v1/holdings/account", json=body)
-        assert response.status_code == 501
-        assert response.json()["milestone"] == "M8"
+        assert response.status_code == 422
 
 
 # --- list / get / patch / archive / change-type --------------------------------

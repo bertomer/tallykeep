@@ -17,6 +17,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from tallykeep.schemas.trading import CustodialProviderInput
 from tallykeep.domain.enums import (
     AddressType,
     CustodyModel,
@@ -95,11 +96,8 @@ class VaultCreate(_HoldingCreateBase):
     recovery_setup_notes: str | None = Field(default=None, max_length=2000)
 
 
-# AccountCreate exists for OpenAPI completeness but the endpoint returns 501
-# in M4 (CustodialProvider integration is M8). When M8 lands, the body will
-# also include a `custodial_provider` sub-object.
 class AccountCreate(_HoldingCreateBase):
-    pass
+    custodial_provider: CustodialProviderInput
 
 
 # --- inputs: management ------------------------------------------------------

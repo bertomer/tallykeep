@@ -22,8 +22,11 @@ from tallykeep.configuration import get_settings
 from tallykeep.infrastructure.database import get_session_factory
 from tallykeep.infrastructure.event_bus import EventBus, RedisEventBus
 from tallykeep.infrastructure.event_emission import AuditReconciler
+from tallykeep.infrastructure.secrets import EncryptedDatabaseSecretStore
 from tallykeep.workers.listeners.chain_listener import ChainListener
+from tallykeep.workers.schedulers.custodial_poller import CustodialPoller
 from tallykeep.workers.subscribers.categorizer_suggester import CategorizerSuggester
+from tallykeep.workers.subscribers.sweep_engine import SweepEngine
 
 
 logging.basicConfig(
@@ -52,6 +55,8 @@ def main() -> int:
     reconciler: AuditReconciler | None = None
     chain_listener: ChainListener | None = None
     categorizer: CategorizerSuggester | None = None
+    sweep_engine: SweepEngine | None = None
+    custodial_poller: CustodialPoller | None = None
     node: NodeAdapter | None = None
     reconciler_interval_seconds = 30  # how often to scan for unacked events
 
@@ -90,6 +95,30 @@ def main() -> int:
             logger.exception("worker: failed to start CategorizerSuggester")
             categorizer = None
 
+    if bus is not None and settings.database_url:
+        try:
+            sweep_engine = SweepEngine(bus=bus, session_factory=get_session_factory())
+            sweep_engine.start()
+            logger.info("worker: SweepEngine registered")
+        except Exception:  # noqa: BLE001
+            logger.exception("worker: failed to start SweepEngine")
+            sweep_engine = None
+
+    if bus is not None and settings.database_url:
+        try:
+            secret_store = EncryptedDatabaseSecretStore(get_session_factory())
+            custodial_poller = CustodialPoller(
+                session_factory=get_session_factory(),
+                secret_store=secret_store,
+                bus=bus,
+                interval_seconds=300,
+            )
+            custodial_poller.start()
+            logger.info("worker: CustodialPoller started (interval=300s)")
+        except Exception:  # noqa: BLE001
+            logger.exception("worker: failed to start CustodialPoller")
+            custodial_poller = None
+
     if (
         bus is not None
         and settings.database_url
@@ -115,11 +144,14 @@ def main() -> int:
 
     last_reconcile = 0.0
     logger.info(
-        "worker: started (bus=%s, reconciler=%s, chain_listener=%s, categorizer=%s)",
+        "worker: started (bus=%s, reconciler=%s, chain_listener=%s, categorizer=%s, "
+        "sweep_engine=%s, custodial_poller=%s)",
         "redis" if bus else "none",
         "on" if reconciler else "off",
         "on" if chain_listener else "off",
         "on" if categorizer else "off",
+        "on" if sweep_engine else "off",
+        "on" if custodial_poller else "off",
     )
 
     while _running:
@@ -137,6 +169,18 @@ def main() -> int:
     if categorizer is not None:
         try:
             categorizer.stop()
+        except Exception:  # noqa: BLE001
+            pass
+
+    if sweep_engine is not None:
+        try:
+            sweep_engine.stop()
+        except Exception:  # noqa: BLE001
+            pass
+
+    if custodial_poller is not None:
+        try:
+            custodial_poller.stop()
         except Exception:  # noqa: BLE001
             pass
 

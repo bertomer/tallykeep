@@ -55,6 +55,7 @@ class SweepPolicy:
     minimum_balance_sats: int  # leave this much on the source
     maximum_per_period_sats: int | None  # safety cap; None = no cap (warn-worthy)
     requires_user_confirmation: bool
+    is_dry_run: bool = False
     safety_warnings: list[SafetyWarning] = field(default_factory=list)
     last_executed_at: datetime | None = None
     last_result_summary: dict[str, Any] | None = None

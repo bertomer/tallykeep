@@ -50,6 +50,7 @@ class CustodialProvider:
     permissions: ProviderPermissions
     whitelist_address: str  # only address funds can be withdrawn to
     whitelist_address_descriptor_id: UUID  # the Descriptor that owns the whitelist
+    whitelist_verified: bool  # True if verify_whitelist() confirmed the address
     is_active: bool
     last_polled_at: datetime | None
     last_error: str | None

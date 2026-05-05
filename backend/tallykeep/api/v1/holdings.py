@@ -14,16 +14,16 @@ from __future__ import annotations
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Response
-from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 
 from tallykeep.adapters.descriptor_adapter import DescriptorAdapter
-from tallykeep.api.dependencies import get_db_session
-from tallykeep.api.v1._stubs import not_implemented_response
+from tallykeep.api.dependencies import get_db_session, get_secret_store
 from tallykeep.domain.enums import HoldingType, Purpose
 from tallykeep.domain.holding import Holding, SecurityClaim
+from tallykeep.infrastructure.secrets import SecretStore
 from tallykeep.repositories.descriptor import DescriptorAlreadyExists
 from tallykeep.schemas.holding import (
+    AccountCreate,
     ChangeTypeRequest,
     HoldingResponse,
     HoldingUpdate,
@@ -32,8 +32,13 @@ from tallykeep.schemas.holding import (
     StrongboxCreate,
     VaultCreate,
 )
-from tallykeep.services import holding_service
+from tallykeep.services import holding_service, trading_service
 from tallykeep.services.holding_service import HoldingServiceError
+from tallykeep.services.trading_service import (
+    ProviderConnectionError,
+    TradingServiceError,
+    TradePermissionsDetected,
+)
 
 
 router = APIRouter(tags=["holdings"])
@@ -180,15 +185,43 @@ async def create_vault(
     return _to_response(holding)
 
 
-# Account creation requires a CustodialProvider — that lands in M8.
-@router.post("/holdings/account", status_code=501)
-async def create_account_holding() -> JSONResponse:
-    # Body schema (AccountCreate) intentionally not declared here so the stub
-    # returns 501 even on empty payloads. M8 will swap in
-    # `body: AccountCreate` along with the CustodialProvider integration.
-    return not_implemented_response(
-        milestone="M8", route="POST /api/v1/holdings/account"
-    )
+@router.post("/holdings/account", response_model=HoldingResponse, status_code=201)
+async def create_account_holding(
+    body: AccountCreate,
+    session: Session = Depends(get_db_session),
+    secret_store: SecretStore = Depends(get_secret_store),
+) -> HoldingResponse:
+    cp = body.custodial_provider
+    try:
+        holding, _ = trading_service.create_account_holding(
+            session,
+            name=body.name,
+            description=body.description,
+            purpose=body.purpose,
+            declared_security=_claim_from_input(body.declared_security),
+            display_color=body.display_color,
+            display_order=body.display_order,
+            provider_kind=cp.provider_kind,
+            display_name=cp.display_name,
+            adapter_id=cp.adapter_id,
+            api_key=cp.api_key,
+            api_secret=cp.api_secret,
+            api_passphrase=cp.api_passphrase,
+            whitelist_address=cp.whitelist_address,
+            whitelist_address_descriptor_id=cp.whitelist_address_descriptor_id,
+            secret_store=secret_store,
+        )
+        session.commit()
+    except TradePermissionsDetected as exc:
+        session.rollback()
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    except ProviderConnectionError as exc:
+        session.rollback()
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+    except TradingServiceError as exc:
+        session.rollback()
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    return _to_response(holding)
 
 
 # --- cross-type list / get / patch / archive / change-type -------------------

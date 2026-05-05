@@ -64,6 +64,9 @@ class SweepPolicyRow(Base):
     requires_user_confirmation: Mapped[bool] = mapped_column(
         nullable=False, server_default=text("TRUE")
     )
+    is_dry_run: Mapped[bool] = mapped_column(
+        nullable=False, server_default=text("FALSE")
+    )
     safety_warnings: Mapped[Any] = mapped_column(
         JSONB, nullable=False, server_default=text("'[]'::jsonb")
     )
