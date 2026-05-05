@@ -241,32 +241,27 @@ def bitcoind_rpc_url() -> str:
     return url
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture()
 def bitcoind_clean_chain(bitcoind_rpc_url: str) -> None:
-    """Roll the regtest chain back near genesis if it has accumulated past
-    a depth where halvings make spending tests unreliable.
+    """Roll the regtest chain back to height 1 before each test.
 
-    Regtest's block subsidy halves every 150 blocks. Past ~10 halvings
-    (height ~1500) the per-block reward is so small that newly-created
-    wallets struggle to send 1000-3000 sats from a 150-block faucet
-    fixture. This fixture invalidates the chain back to height 1 once
-    per test session when needed; subsequent sessions on a fresh chain
-    skip the rollback.
+    Regtest's block subsidy halves every 150 blocks. After enough test
+    funding (~10 halvings = height 1500) the per-block reward shrinks
+    below what `_make_funding_wallet` needs to send the test-typical
+    1000-3000 sats; M5 + M6 together easily push past that in one
+    session if we let blocks accumulate. Resetting per-test costs ~50ms
+    of RPC and keeps every test starting from a near-genesis chain
+    (so each fresh faucet wallet earns full subsidies).
 
-    Tests that need a faucet should depend on this fixture by listing it
-    in their signature (it's session-scoped so the cost is paid once
-    per test session).
+    Tests that need a faucet should depend on this fixture by listing
+    it in their signature.
     """
     from tallykeep.adapters.node_adapter import NodeAdapter
 
-    DEPTH_LIMIT = 1500
-
     with NodeAdapter(bitcoind_rpc_url, timeout_seconds=60.0) as node:
         info = node.get_blockchain_info()
-        if info.blocks <= DEPTH_LIMIT:
+        if info.blocks <= 1:
             return
-        # Invalidate the block at height 2 to roll the tip back to height 1
-        # (regtest only — `invalidateblock` is allowed there).
         block_at_2 = node._call("getblockhash", [2])
         node._call("invalidateblock", [block_at_2])
         new_info = node.get_blockchain_info()

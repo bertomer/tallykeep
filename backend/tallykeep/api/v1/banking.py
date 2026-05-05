@@ -285,30 +285,164 @@ async def get_payment_psbt(
     )
 
 
-# --- still stubbed for M6.2..M6.4 ------------------------------------------
+# --- M6.2: submit-signed + broadcast + fee-estimate ------------------------
+
+
+class SubmitSignedRequest(BaseModel):
+    psbt_base64: str | None = None
+    signed_transaction_hex: str | None = None
+
+
+class FeeEstimateRequest(BaseModel):
+    target_blocks: int | None = None
+    strategy: str | None = None  # economy | normal | priority
+
+
+@router.post(
+    "/payment-requests/{request_id}/submit-signed",
+    response_model=PaymentRequestOut,
+)
+async def submit_signed_payment(
+    request_id: UUID,
+    body: SubmitSignedRequest,
+    request: Request,
+    session: Session = Depends(get_db_session),
+) -> PaymentRequestOut:
+    """Accept a signed PSBT or a finalized tx hex.
+
+    The PaymentRequest must be in AWAITING_SIGNATURE. On success, status
+    flips to AWAITING_BROADCAST and `signed_transaction_hex` is stored.
+    """
+    if body.psbt_base64 is None and body.signed_transaction_hex is None:
+        raise HTTPException(
+            status_code=400,
+            detail="Provide psbt_base64 or signed_transaction_hex",
+        )
+    try:
+        updated = banking_service.submit_signed_payment_request(
+            session,
+            request_id=request_id,
+            psbt_base64=body.psbt_base64,
+            signed_transaction_hex=body.signed_transaction_hex,
+        )
+    except banking_service.PaymentRequestNotFound as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except banking_service.WrongStatusForOperation as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    except banking_service.PsbtMismatch as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except banking_service.SignedTransactionInvalid as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except banking_service.BankingError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    session.commit()
+
+    bus = get_event_bus(request)
+    if bus is not None:
+        bus.publish(
+            "banking.payment_request.signed",
+            {"id": str(request_id)},
+        )
+    return _to_out(updated)
+
+
+@router.post(
+    "/payment-requests/{request_id}/broadcast",
+    response_model=PaymentRequestOut,
+)
+async def broadcast_payment(
+    request_id: UUID,
+    request: Request,
+    session: Session = Depends(get_db_session),
+    node: NodeAdapter = Depends(get_node_adapter),
+) -> PaymentRequestOut:
+    """Submit the signed transaction to bitcoind.
+
+    Records a `broadcast_attempt` (status=submitted) BEFORE the RPC call
+    so the audit trail captures the attempt even if bitcoind crashes
+    mid-RPC.
+    """
+    try:
+        updated = banking_service.broadcast_payment_request(
+            session, request_id=request_id, node=node
+        )
+    except banking_service.PaymentRequestNotFound as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except banking_service.WrongStatusForOperation as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    except banking_service.BroadcastRejected as exc:
+        # Persist the rejected attempt before bubbling up.
+        session.commit()
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except banking_service.BankingError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    session.commit()
+
+    bus = get_event_bus(request)
+    if bus is not None:
+        bus.publish(
+            "banking.payment_request.broadcast",
+            {
+                "id": str(request_id),
+                "txid": updated.broadcast_txid,
+            },
+        )
+    return _to_out(updated)
+
+
+@router.post("/fee-estimate")
+async def fee_estimate(
+    body: FeeEstimateRequest,
+    node: NodeAdapter = Depends(get_node_adapter),
+):  # type: ignore[no-untyped-def]
+    """Return the current sat/vB rate for one of the named tiers.
+
+    Pass `strategy` (`economy` | `normal` | `priority`) for the named
+    tiers, or `target_blocks` for a custom horizon. Returns
+    `{"sat_per_vbyte": float, "target_blocks": int}` plus a flag
+    indicating whether bitcoind's estimator returned a real value or we
+    fell back to the static default.
+    """
+    target_map = {"economy": 24, "normal": 6, "priority": 2}
+    if body.target_blocks is not None:
+        target = body.target_blocks
+    elif body.strategy in target_map:
+        target = target_map[body.strategy]
+    else:
+        target = 6
+    from tallykeep.adapters.node_adapter import NodeError
+
+    fallback = 10.0
+    try:
+        result = node.estimate_smart_fee(target)
+    except NodeError:
+        return {
+            "sat_per_vbyte": fallback,
+            "target_blocks": target,
+            "is_fallback": True,
+        }
+    feerate = result.get("feerate")
+    if feerate is None or float(feerate) <= 0:
+        return {
+            "sat_per_vbyte": fallback,
+            "target_blocks": target,
+            "is_fallback": True,
+        }
+    return {
+        "sat_per_vbyte": float(feerate) * 100_000,
+        "target_blocks": target,
+        "is_fallback": False,
+    }
+
+
+# --- still stubbed for M6.4 / M6.5 -----------------------------------------
 
 
 @router.get("/payment-requests/{request_id}/psbt.qr", status_code=501)
 async def get_payment_psbt_qr(request_id: UUID) -> JSONResponse:
     return not_implemented_response(
-        milestone="M6.2",
+        milestone="v1.1",
         route="GET /api/v1/banking/payment-requests/{id}/psbt.qr",
-    )
-
-
-@router.post("/payment-requests/{request_id}/submit-signed", status_code=501)
-async def submit_signed_payment(request_id: UUID) -> JSONResponse:
-    return not_implemented_response(
-        milestone="M6.2",
-        route="POST /api/v1/banking/payment-requests/{id}/submit-signed",
-    )
-
-
-@router.post("/payment-requests/{request_id}/broadcast", status_code=501)
-async def broadcast_payment(request_id: UUID) -> JSONResponse:
-    return not_implemented_response(
-        milestone="M6.2",
-        route="POST /api/v1/banking/payment-requests/{id}/broadcast",
     )
 
 
@@ -317,13 +451,6 @@ async def cancel_payment_request(request_id: UUID) -> JSONResponse:
     return not_implemented_response(
         milestone="M6.5",
         route="POST /api/v1/banking/payment-requests/{id}/cancel",
-    )
-
-
-@router.post("/fee-estimate", status_code=501)
-async def fee_estimate() -> JSONResponse:
-    return not_implemented_response(
-        milestone="M6.2", route="POST /api/v1/banking/fee-estimate"
     )
 
 

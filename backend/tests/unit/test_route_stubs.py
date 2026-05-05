@@ -52,17 +52,9 @@ STUB_ROUTES: list[tuple[str, str, str]] = [
     # UTXO endpoints implemented in M5.2; LedgerEntry list/get/patch land in M5.6.
     ("PATCH", "/api/v1/addresses/{address_id}", "M5"),
     # --- Banking ---
-    # M6.1 implemented: payment-requests POST/GET list/GET single/GET psbt.
-    # Remaining sub-stages keep their own milestone tag.
-    ("GET", "/api/v1/banking/payment-requests/{request_id}/psbt.qr", "M6.2"),
-    (
-        "POST",
-        "/api/v1/banking/payment-requests/{request_id}/submit-signed",
-        "M6.2",
-    ),
-    ("POST", "/api/v1/banking/payment-requests/{request_id}/broadcast", "M6.2"),
+    # M6.1 + M6.2 implemented. Multi-frame QR and cancel still stubbed.
+    ("GET", "/api/v1/banking/payment-requests/{request_id}/psbt.qr", "v1.1"),
     ("POST", "/api/v1/banking/payment-requests/{request_id}/cancel", "M6.5"),
-    ("POST", "/api/v1/banking/fee-estimate", "M6.2"),
     ("GET", "/api/v1/banking/invoices", "M6.4"),
     ("POST", "/api/v1/banking/invoices", "M6.4"),
     ("GET", "/api/v1/banking/invoices/{invoice_id}", "M6.4"),

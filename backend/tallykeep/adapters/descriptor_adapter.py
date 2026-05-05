@@ -265,6 +265,11 @@ class DescriptorAdapter:
         recipient_script = recipient.script_pubkey()
 
         builder = bdk.TxBuilder()
+        # Embed the global xpub map so the resulting PSBT carries enough
+        # context for any signer (and our own merge+finalise path) to
+        # derive pubkeys for each input. Without this, finalisation
+        # fails with "Missing pubkey for a pkh/wpkh" on the merged PSBT.
+        builder = builder.add_global_xpubs()
         if amount_sats is None:
             # Drain — single recipient output, fee deducted from balance.
             builder = builder.drain_to(recipient_script).drain_wallet()

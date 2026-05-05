@@ -245,6 +245,25 @@ def insert_broadcast_attempt(
     session.add(row)
 
 
+def update_broadcast_attempt(
+    session: Session,
+    *,
+    attempt_id: UUID,
+    status: str,
+    rejection_reason: str | None = None,
+) -> None:
+    """Flip an existing attempt from `submitted` to `accepted` / `rejected`,
+    stamping `completed_at`. Used by the broadcast service after bitcoind
+    returns."""
+    row = session.get(BroadcastAttemptRow, attempt_id)
+    if row is None:
+        return
+    row.status = status
+    if rejection_reason is not None:
+        row.rejection_reason = rejection_reason
+    row.completed_at = datetime.now(UTC)
+
+
 __all__ = [
     "cancel",
     "get",

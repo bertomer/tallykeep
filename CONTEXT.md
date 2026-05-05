@@ -720,3 +720,70 @@ Remaining M6 sub-stages:
   - **M6.6** — docs + smoke test extension
 
 ---
+
+## 2026-05-05 — M6.2 (submit-signed + broadcast + broadcast_attempt)
+
+`services/banking_service`:
+  - `submit_signed_payment_request` accepts a signed PSBT (preferred) or
+    a fully-finalized tx hex. Validates state (must be
+    AWAITING_SIGNATURE), parses the submission, and either short-circuits
+    (when the user's PSBT is already finalized — BDK does this in `sign`)
+    or combines+finalizes against the original PSBT. On success flips
+    status to AWAITING_BROADCAST and stores `signed_transaction_hex`.
+  - `broadcast_payment_request` records a `broadcast_attempt` row with
+    status=submitted BEFORE calling `sendrawtransaction`, then updates
+    that same row to accepted/rejected based on the bitcoind response.
+    bitcoind unreachability leaves the attempt as "submitted" so retry
+    logic can pick it up later.
+
+Endpoints (all real now):
+  - `POST /api/v1/banking/payment-requests/{id}/submit-signed`
+  - `POST /api/v1/banking/payment-requests/{id}/broadcast`
+  - `POST /api/v1/banking/fee-estimate`
+        Returns sat/vB for `economy`/`normal`/`priority` named tiers
+        (or an explicit `target_blocks`); falls back to 10 sat/vB when
+        bitcoind's estimator returns nothing useful.
+
+Three implementation gotchas worth recording:
+
+- **bdkpython 2.3.1's `Psbt.finalize()` does not raise** on
+  insufficient signatures; it returns a `FinalizedPsbtResult` with a
+  `could_finalize` flag and an `errors` list. Callers must check
+  `could_finalize`.
+- **`Wallet.sign()` finalizes the PSBT in place** when it has enough
+  signatures. The resulting PSBT has `final_script_witness` populated
+  and `bip32_derivation` stripped — combining it with the unsigned
+  original then calling `finalize()` fails with "Missing pubkey for a
+  pkh/wpkh". The submit-signed service detects already-finalized PSBTs
+  and short-circuits (extract_tx directly).
+- **PSBT inputs need `bip32_derivation` for finalization** even on the
+  watch-only side. The build path now calls
+  `TxBuilder.add_global_xpubs()`; the test fixtures use
+  origin-annotated descriptors (`wpkh([fp]tpub.../n/*)`) so the
+  fingerprint propagates into the PSBT.
+
+Test isolation note: the per-test `bitcoind_clean_chain` fixture
+(formerly session-scoped) now resets the regtest chain to height 1
+before every test that needs a faucet. M5 + M6 together create ~30
+funding wallets per session, mining 150 blocks each; without the
+per-test reset chain depth runs past the halving cliff (~height 1500)
+and the per-block subsidy shrinks below what tests need to send their
+typical 1000–3000 sat amounts. Per-test reset adds ~50ms × N to suite
+runtime; suite is now ~8min instead of ~3min, accepted for
+reliability.
+
+Tests: 8 new integration tests covering happy-path submit+broadcast
+(BDK signs, finalizes, broadcasts, mempool entry verified), finalized
+tx hex submission, unsigned-PSBT rejection, 404, missing body,
+broadcast 409, named-tier and explicit fee estimate.
+
+NRT: 432 → 433 (296 unit + 137 integration + 1 skip). Suite ~480s with
+infra up.
+
+Remaining M6 sub-stages:
+  - **M6.3** — Confirmation tracking (link broadcast_txid → LedgerEntry)
+  - **M6.4** — Invoice flow
+  - **M6.5** — Cancellation, edge cases, mismatch validation
+  - **M6.6** — docs + smoke test extension
+
+---
