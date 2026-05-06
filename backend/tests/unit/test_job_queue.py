@@ -90,3 +90,51 @@ class TestCancel:
         job_id = queue.enqueue(_add, 1, 2)
         assert queue.cancel(job_id) is False
         assert queue.get(job_id).status == JobStatus.SUCCESS
+
+
+class TestMetadata:
+    def test_job_type_and_label_stored(self, queue: InMemoryJobQueue) -> None:
+        job_id = queue.enqueue(_add, 1, 2, job_type="test_job", label="my label")
+        info = queue.get(job_id)
+        assert info.job_type == "test_job"
+        assert info.label == "my label"
+
+    def test_missing_metadata_defaults_to_none(self, queue: InMemoryJobQueue) -> None:
+        job_id = queue.enqueue(_add, 1, 2)
+        info = queue.get(job_id)
+        assert info.job_type is None
+        assert info.label is None
+
+
+class TestListRecent:
+    def test_returns_all_jobs(self, queue: InMemoryJobQueue) -> None:
+        queue.enqueue(_add, 1, 2)
+        queue.enqueue(_add, 3, 4)
+        assert len(queue.list_recent()) == 2
+
+    def test_filter_by_status(self, queue: InMemoryJobQueue) -> None:
+        queue.enqueue(_add, 1, 2)
+        queue.enqueue(_explode)
+        successes = queue.list_recent(status=JobStatus.SUCCESS)
+        failures = queue.list_recent(status=JobStatus.FAILED)
+        assert len(successes) == 1
+        assert len(failures) == 1
+
+    def test_filter_by_job_type(self, queue: InMemoryJobQueue) -> None:
+        queue.enqueue(_add, 1, 2, job_type="alpha")
+        queue.enqueue(_add, 3, 4, job_type="beta")
+        alpha = queue.list_recent(job_type="alpha")
+        assert len(alpha) == 1
+        assert alpha[0].job_type == "alpha"
+
+    def test_limit(self, queue: InMemoryJobQueue) -> None:
+        for _ in range(5):
+            queue.enqueue(_add, 1, 1)
+        assert len(queue.list_recent(limit=3)) == 3
+
+    def test_ordered_most_recent_first(self, queue: InMemoryJobQueue) -> None:
+        id1 = queue.enqueue(_add, 1, 1)
+        id2 = queue.enqueue(_add, 2, 2)
+        jobs = queue.list_recent()
+        assert jobs[0].id == id2
+        assert jobs[1].id == id1

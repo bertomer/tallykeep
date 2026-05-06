@@ -5,11 +5,14 @@ from __future__ import annotations
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Response
+from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
-from tallykeep.api.dependencies import get_db_session
+from tallykeep.api.dependencies import get_db_session, get_job_queue, get_secret_store
 from tallykeep.api.v1._stubs import not_implemented_response
 from tallykeep.domain.enums import SweepExecutionStatus
+from tallykeep.infrastructure.job_queue import JobQueue
+from tallykeep.infrastructure.secrets import SecretStore
 from tallykeep.schemas.trading import (
     SafetyWarningOut,
     SweepExecutionOut,
@@ -233,12 +236,61 @@ async def disable_sweep_policy(
     return _policy_to_out(policy)
 
 
-@router.post("/sweep-policies/{policy_id}/execute-now", status_code=501)
-async def execute_sweep_policy_now(policy_id: UUID):  # type: ignore[no-untyped-def]
-    # Manual execution endpoint lands in M8.1 (requires SweepEngine worker to be
-    # running and able to process the execution). Wired in post-M8 milestone.
-    return not_implemented_response(
-        milestone="M8.1", route="POST /api/v1/sweep-policies/{id}/execute-now"
+class ExecuteNowBody(BaseModel):
+    amount_sats: int | None = None
+
+
+class ExecuteNowOut(BaseModel):
+    execution_id: UUID
+    job_id: UUID
+    status: SweepExecutionStatus
+
+
+def _do_execute(policy_id: UUID, amount_sats: int | None, session_factory, secret_store) -> None:  # type: ignore[no-untyped-def]
+    """Background job function: runs the withdrawal and updates the execution."""
+    from tallykeep.infrastructure.database import get_session_factory as _gsf
+
+    factory = session_factory or _gsf()
+    with factory() as session:
+        trading_service.execute_sweep_now(
+            session,
+            policy_id,
+            secret_store=secret_store,
+            amount_sats=amount_sats,
+        )
+        session.commit()
+
+
+@router.post("/sweep-policies/{policy_id}/execute-now", status_code=202, response_model=ExecuteNowOut)
+async def execute_sweep_policy_now(
+    policy_id: UUID,
+    body: ExecuteNowBody = ExecuteNowBody(),
+    session: Session = Depends(get_db_session),
+    secret_store: SecretStore = Depends(get_secret_store),
+    job_queue: JobQueue = Depends(get_job_queue),
+) -> ExecuteNowOut:
+    try:
+        execution = trading_service.execute_sweep_now(
+            session,
+            policy_id,
+            secret_store=secret_store,
+            amount_sats=body.amount_sats,
+        )
+        session.commit()
+    except PolicyNotFound as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except TradingServiceError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    job_id = job_queue.enqueue(
+        lambda: None,  # execution already ran synchronously; job records it
+        job_type="sweep_execution",
+        label=f"sweep_execution:{execution.id}",
+    )
+    return ExecuteNowOut(
+        execution_id=execution.id,
+        job_id=job_id,
+        status=execution.status,
     )
 
 

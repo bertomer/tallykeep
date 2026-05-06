@@ -37,6 +37,7 @@ from tallykeep.api.v1 import (
 from tallykeep.configuration import get_settings
 from tallykeep.infrastructure.database import get_session_factory
 from tallykeep.infrastructure.event_bus import EventBus, RedisEventBus
+from tallykeep.infrastructure.job_queue import InMemoryJobQueue, JobQueue, RedisQueueJobQueue
 from tallykeep.infrastructure.secrets import (
     EncryptedDatabaseSecretStore,
     SecretStore,
@@ -83,6 +84,17 @@ async def _lifespan(app: FastAPI):
             bus = None
         app.state.event_bus = bus
 
+    if not hasattr(app.state, "job_queue"):
+        if settings.redis_url:
+            try:
+                job_queue: JobQueue = RedisQueueJobQueue(settings.redis_url)
+            except Exception:  # noqa: BLE001
+                logger.exception("RedisQueueJobQueue failed to start; falling back to in-memory")
+                job_queue = InMemoryJobQueue()
+        else:
+            job_queue = InMemoryJobQueue()
+        app.state.job_queue = job_queue
+
     if not hasattr(app.state, "node_adapter"):
         if settings.bitcoind_rpc_url:
             from tallykeep.adapters.node_adapter import NodeAdapter
@@ -117,6 +129,13 @@ async def _lifespan(app: FastAPI):
     if node is not None:
         try:
             node.close()
+        except Exception:  # pragma: no cover — best-effort cleanup
+            pass
+
+    jq = getattr(app.state, "job_queue", None)
+    if jq is not None:
+        try:
+            jq.close()
         except Exception:  # pragma: no cover — best-effort cleanup
             pass
 

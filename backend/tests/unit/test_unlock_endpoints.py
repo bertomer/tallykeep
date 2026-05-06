@@ -153,14 +153,11 @@ class TestLockMiddleware:
         self, client_with_store: TestClient, store: InMemorySecretStore
     ) -> None:
         store.initialize("p")
-        # POST execute-now is an M8.1 stub that returns 501 without touching
+        # GET /lightning/status is a v1.5 stub that returns 501 without touching
         # the database — perfect probe here, since this fixture has no DB wired.
         # Any non-423 response proves the lock middleware passed the request
         # through to the handler.
-        from uuid import uuid4
-        response = client_with_store.post(
-            f"/api/v1/sweep-policies/{uuid4()}/execute-now"
-        )
+        response = client_with_store.get("/api/v1/lightning/status")
         assert response.status_code != 423
 
     def test_no_store_configured_returns_423(self) -> None:

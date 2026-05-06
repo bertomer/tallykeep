@@ -12,6 +12,7 @@ from fastapi import Request
 from sqlalchemy.orm import Session, sessionmaker
 
 from tallykeep.infrastructure.event_bus import EventBus
+from tallykeep.infrastructure.job_queue import JobQueue
 from tallykeep.infrastructure.secrets import SecretStore
 
 
@@ -44,6 +45,15 @@ def get_db_session(request: Request) -> Iterator[Session]:
 def get_event_bus(request: Request) -> EventBus | None:
     """Returns the bus or None when not configured (e.g. in unit tests)."""
     return getattr(request.app.state, "event_bus", None)
+
+
+def get_job_queue(request: Request) -> JobQueue:
+    from fastapi import HTTPException
+
+    queue = getattr(request.app.state, "job_queue", None)
+    if queue is None:
+        raise HTTPException(status_code=503, detail="Job queue not available")
+    return queue
 
 
 def get_node_adapter(request: Request):  # type: ignore[no-untyped-def]

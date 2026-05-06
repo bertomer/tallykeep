@@ -456,8 +456,8 @@ $vaultBody = @{
     description = "Cold storage destination for sweep smoke test"
     purpose = "reserve"
     declared_security = @{
-        custody_model = "self_multi"
-        signing_model = "multi_sig"
+        custody_model = "self_multisig"
+        signing_model = "hardware_offline"
         geographic_distribution = $false
         inheritance_configured = $false
     }
@@ -549,9 +549,36 @@ $supported = Invoke-RestMethod -Uri "$BaseUrl/api/v1/custodial-providers/support
 Show "supported adapters" ($supported.supported -join ", ")
 
 
-# --- 16. Stubs (sanity-check the OpenAPI surface for routes not yet landed) ----
+# --- 16. Jobs endpoints (M8.1) -----------------------------------------------
 
-Section "16. Stubs return 501 with milestone tag"
+Section "16. Jobs endpoints"
+
+# GET /jobs — empty list at start
+$jobsList = Invoke-RestMethod -Uri "$BaseUrl/api/v1/jobs"
+Show "initial jobs count" $jobsList.Count
+
+# GET /jobs/{unknown} — 404
+try {
+    Invoke-RestMethod -Uri "$BaseUrl/api/v1/jobs/00000000-0000-0000-0000-000000000001" | Out-Null
+    Show "unknown job" "(unexpected 200!)"
+} catch {
+    $sc = $_.Exception.Response.StatusCode.value__
+    Show "unknown job 404" ($sc -eq 404)
+}
+
+# DELETE /jobs/{unknown} — 404
+try {
+    Invoke-WebRequest -Method Delete -Uri "$BaseUrl/api/v1/jobs/00000000-0000-0000-0000-000000000001" | Out-Null
+    Show "delete unknown" "(unexpected 200!)"
+} catch {
+    $sc = $_.Exception.Response.StatusCode.value__
+    Show "delete unknown 404" ($sc -eq 404)
+}
+
+
+# --- 17. Stubs (sanity-check the OpenAPI surface for routes not yet landed) ----
+
+Section "17. Stubs return 501 with milestone tag"
 foreach ($pair in @(
     @("GET",  "/api/v1/lightning/status")
 )) {
@@ -572,15 +599,15 @@ foreach ($pair in @(
 }
 
 
-# --- 17. Archive & cleanup ----------------------------------------------------
+# --- 18. Archive & cleanup ----------------------------------------------------
 
-Section "17. Archive the smoke-test holdings"
+Section "18. Archive the smoke-test holdings"
 $resp = Invoke-WebRequest -Method Post -Uri "$BaseUrl/api/v1/holdings/$purseId/archive"
 Show "purse status" $resp.StatusCode
 $resp2 = Invoke-WebRequest -Method Post -Uri "$BaseUrl/api/v1/holdings/$vaultId/archive"
 Show "vault status" $resp2.StatusCode
 
-Section "18. Verify archived holdings are hidden by default, visible with include_archived"
+Section "19. Verify archived holdings are hidden by default, visible with include_archived"
 $default = Invoke-RestMethod -Uri "$BaseUrl/api/v1/holdings"
 $archived = Invoke-RestMethod -Uri "$BaseUrl/api/v1/holdings?include_archived=true"
 Show "without archived" $default.Count

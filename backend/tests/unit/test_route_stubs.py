@@ -46,17 +46,14 @@ STUB_ROUTES: list[tuple[str, str, str]] = [
     # --- Trading: sweep policies ---
     # M8 implemented: list, create, pause-all, resume-all, get, patch, delete,
     # acknowledge-warnings, enable, disable, list-executions, get-executions, confirm.
-    # execute-now lands in M8.1 (requires async SweepEngine execution worker).
-    ("POST", "/api/v1/sweep-policies/{policy_id}/execute-now", "M8.1"),
+    # M8.1 implemented: execute-now (synchronous withdrawal + job record).
     # --- Analysis + Jobs + Export ---
     # /security and /blueprint are real as of M5.5; the per-UTXO blueprint and
     # the manual recompute trigger are still stubs (UTXO blueprint is folded
     # into /utxos/{id}/hygiene; recompute will land alongside the M9 scheduler).
+    # Jobs endpoints are real as of M8.1.
     ("GET", "/api/v1/analysis/utxo/{utxo_id}", "v2"),
     ("POST", "/api/v1/analysis/recompute", "M9"),
-    ("GET", "/api/v1/jobs", "M5"),
-    ("GET", "/api/v1/jobs/{job_id}", "M5"),
-    ("DELETE", "/api/v1/jobs/{job_id}", "M5"),
     ("GET", "/api/v1/export/configuration", "M14"),
     # --- Lightning (spec module 08): all stubs land in v1.5 ---
     ("GET", "/api/v1/lightning/status", "v1.5"),

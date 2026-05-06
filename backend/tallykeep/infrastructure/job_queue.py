@@ -36,6 +36,8 @@ class JobInfo:
 
     id: UUID
     status: JobStatus
+    job_type: str | None = None
+    label: str | None = None
     result: Any = None
     error_message: str | None = None
     created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
@@ -50,6 +52,8 @@ class JobQueue(ABC):
         func: Callable[..., Any],
         *args: Any,
         timeout: int | None = None,
+        job_type: str | None = None,
+        label: str | None = None,
         **kwargs: Any,
     ) -> UUID:
         """Schedule `func(*args, **kwargs)` and return a job id."""
@@ -57,6 +61,16 @@ class JobQueue(ABC):
     @abstractmethod
     def get(self, job_id: UUID) -> JobInfo:
         """Look up a job. Raises KeyError if the job is unknown."""
+
+    @abstractmethod
+    def list_recent(
+        self,
+        *,
+        status: JobStatus | None = None,
+        job_type: str | None = None,
+        limit: int = 100,
+    ) -> list[JobInfo]:
+        """Return recent jobs, optionally filtered by status or job_type."""
 
     @abstractmethod
     def cancel(self, job_id: UUID) -> bool:
@@ -86,13 +100,15 @@ class InMemoryJobQueue(JobQueue):
         func: Callable[..., Any],
         *args: Any,
         timeout: int | None = None,  # accepted for parity; ignored in-memory
+        job_type: str | None = None,
+        label: str | None = None,
         **kwargs: Any,
     ) -> UUID:
         if self._closed:
             raise RuntimeError("InMemoryJobQueue is closed")
 
         job_id = uuid4()
-        info = JobInfo(id=job_id, status=JobStatus.RUNNING)
+        info = JobInfo(id=job_id, status=JobStatus.RUNNING, job_type=job_type, label=label)
         info.started_at = datetime.now(UTC)
         with self._lock:
             self._jobs[job_id] = info
@@ -114,6 +130,22 @@ class InMemoryJobQueue(JobQueue):
         if info is None:
             raise KeyError(job_id)
         return info
+
+    def list_recent(
+        self,
+        *,
+        status: JobStatus | None = None,
+        job_type: str | None = None,
+        limit: int = 100,
+    ) -> list[JobInfo]:
+        with self._lock:
+            jobs = list(self._jobs.values())
+        if status is not None:
+            jobs = [j for j in jobs if j.status == status]
+        if job_type is not None:
+            jobs = [j for j in jobs if j.job_type == job_type]
+        jobs.sort(key=lambda j: j.created_at, reverse=True)
+        return jobs[:limit]
 
     def cancel(self, job_id: UUID) -> bool:
         # In-memory jobs always run inline, so by the time `cancel` is called the
@@ -164,15 +196,23 @@ class RedisQueueJobQueue(JobQueue):
         func: Callable[..., Any],
         *args: Any,
         timeout: int | None = None,
+        job_type: str | None = None,
+        label: str | None = None,
         **kwargs: Any,
     ) -> UUID:
         job_id = uuid4()
+        meta = {}
+        if job_type is not None:
+            meta["job_type"] = job_type
+        if label is not None:
+            meta["label"] = label
         self._queue.enqueue_call(
             func=func,
             args=args,
             kwargs=kwargs,
             job_id=str(job_id),
             timeout=timeout,
+            meta=meta if meta else None,
         )
         return job_id
 
@@ -197,9 +237,12 @@ class RedisQueueJobQueue(JobQueue):
         elif status == JobStatus.FAILED and latest is not None:
             error_message = latest.exc_string
 
+        meta = job.meta or {}
         info = JobInfo(
             id=job_id,
             status=status,
+            job_type=meta.get("job_type"),
+            label=meta.get("label"),
             result=result_value,
             error_message=error_message,
             created_at=job.created_at or datetime.now(UTC),
@@ -207,6 +250,54 @@ class RedisQueueJobQueue(JobQueue):
             finished_at=job.ended_at,
         )
         return info
+
+    def list_recent(
+        self,
+        *,
+        status: JobStatus | None = None,
+        job_type: str | None = None,
+        limit: int = 100,
+    ) -> list[JobInfo]:
+        from rq.job import Job
+        from rq.registry import (
+            FailedJobRegistry,
+            FinishedJobRegistry,
+            StartedJobRegistry,
+        )
+
+        job_ids: list[str] = []
+        if status is None or status == JobStatus.QUEUED:
+            job_ids += self._queue.job_ids
+        if status is None or status == JobStatus.RUNNING:
+            job_ids += StartedJobRegistry(queue=self._queue).get_job_ids()
+        if status is None or status == JobStatus.SUCCESS:
+            job_ids += FinishedJobRegistry(queue=self._queue).get_job_ids()
+        if status is None or status == JobStatus.FAILED:
+            job_ids += FailedJobRegistry(queue=self._queue).get_job_ids()
+
+        jobs_raw = Job.fetch_many(job_ids, connection=self._redis)
+        infos: list[JobInfo] = []
+        for job in jobs_raw:
+            if job is None:
+                continue
+            rq_status = job.get_status(refresh=False)
+            jstatus = _RQ_STATUS_MAP.get(rq_status, JobStatus.QUEUED)
+            meta = job.meta or {}
+            jtype = meta.get("job_type")
+            if job_type is not None and jtype != job_type:
+                continue
+            infos.append(JobInfo(
+                id=UUID(job.id),
+                status=jstatus,
+                job_type=jtype,
+                label=meta.get("label"),
+                created_at=job.created_at or datetime.now(UTC),
+                started_at=job.started_at,
+                finished_at=job.ended_at,
+            ))
+
+        infos.sort(key=lambda j: j.created_at, reverse=True)
+        return infos[:limit]
 
     def cancel(self, job_id: UUID) -> bool:
         from rq.exceptions import NoSuchJobError

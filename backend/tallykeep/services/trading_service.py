@@ -630,6 +630,127 @@ def confirm_sweep_execution(session: Session, execution_id: UUID) -> SweepExecut
     return updated or execution
 
 
+def execute_sweep_now(
+    session: Session,
+    policy_id: UUID,
+    *,
+    secret_store: SecretStore,
+    amount_sats: int | None = None,
+) -> SweepExecution:
+    """Create a manual SweepExecution and attempt the withdrawal immediately.
+
+    For Account → self-custody policies: calls the custodial provider's withdraw
+    method using the destination holding's next unused receive address.
+
+    Returns the SweepExecution (status REQUESTED or FAILED if the withdrawal call
+    itself raised immediately).
+    """
+    from tallykeep.repositories import descriptor as descriptor_repo
+
+    policy = get_sweep_policy(session, policy_id)
+    if not policy.is_enabled:
+        raise TradingServiceError("Policy must be enabled before manual execution")
+
+    source = holding_service.get_holding(session, policy.source_holding_id)
+    if source is None:
+        raise TradingServiceError(f"Source holding {policy.source_holding_id} not found")
+
+    if source.holding_type != HoldingType.ACCOUNT or not source.custodial_provider_id:
+        raise TradingServiceError(
+            "Manual execute-now is only supported for Account → self-custody policies"
+        )
+
+    provider = cp_repo.get(session, source.custodial_provider_id)
+    if provider is None:
+        raise TradingServiceError("CustodialProvider not found for source holding")
+
+    # Resolve destination address from the first descriptor of the destination holding.
+    dest_descriptors = descriptor_repo.list_descriptors_for_holding(
+        session, policy.destination_holding_id
+    )
+    if not dest_descriptors:
+        raise TradingServiceError(
+            "Destination holding has no descriptors — cannot derive a receive address"
+        )
+    address_row = descriptor_repo.next_unused_address(
+        session, dest_descriptors[0].id, is_change=False
+    )
+    if address_row is None:
+        raise TradingServiceError(
+            "No unused receive address available on destination holding's descriptor"
+        )
+
+    # Resolve credentials.
+    try:
+        api_key = secret_store.get_secret(provider.api_credential_reference).decode()
+        api_secret = secret_store.get_secret(provider.api_secret_reference).decode()
+        api_passphrase = (
+            secret_store.get_secret(provider.api_passphrase_reference).decode()
+            if provider.api_passphrase_reference else None
+        )
+    except (KeyError, LockedError) as exc:
+        raise TradingServiceError(f"Cannot read provider credentials: {exc}") from exc
+
+    # Calculate sweep amount.
+    current_balance = provider.last_known_balance_sats or 0
+    if amount_sats is None:
+        sweep_amount = current_balance - policy.minimum_balance_sats
+        if policy.maximum_per_period_sats is not None:
+            sweep_amount = min(sweep_amount, policy.maximum_per_period_sats)
+    else:
+        sweep_amount = amount_sats
+
+    if sweep_amount <= 0:
+        raise TradingServiceError(
+            "Calculated sweep amount is zero or negative — "
+            "check the balance and minimum_balance_sats"
+        )
+
+    now = datetime.now(UTC)
+    execution = SweepExecution(
+        id=uuid4(),
+        sweep_policy_id=policy.id,
+        triggered_at=now,
+        trigger_source=SweepTriggerType.MANUAL,
+        pre_balance_sats=current_balance,
+        intended_amount_sats=sweep_amount,
+        status=SweepExecutionStatus.REQUESTED,
+        provider_withdrawal_id=None,
+        expected_txid=None,
+        confirmed_txid=None,
+        error_message=None,
+        completed_at=None,
+    )
+    se_repo.create(session, execution)
+    session.flush()
+
+    # Attempt the withdrawal immediately.
+    try:
+        adapter = build_adapter(
+            provider.adapter_id,
+            api_key=api_key,
+            api_secret=api_secret,
+            api_passphrase=api_passphrase,
+        )
+        result = adapter.withdraw(sweep_amount, address_row.address)
+        updated = se_repo.update_status(
+            session,
+            execution.id,
+            status=SweepExecutionStatus.REQUESTED,
+            provider_withdrawal_id=result.withdrawal_id,
+        )
+        return updated or execution
+    except (ProviderAuthError, ProviderError) as exc:
+        failed = se_repo.update_status(
+            session,
+            execution.id,
+            status=SweepExecutionStatus.FAILED,
+            error_message=str(exc),
+            completed_at=datetime.now(UTC),
+        )
+        return failed or execution
+
+
 __all__ = [
     "TradingServiceError",
     "TradePermissionsDetected",
@@ -645,6 +766,7 @@ __all__ = [
     "patch_provider",
     "refresh_provider_balance",
     "verify_whitelist",
+    "execute_sweep_now",
     "create_sweep_policy",
     "get_sweep_policy",
     "list_sweep_policies",
