@@ -1,8 +1,9 @@
-"""CustodialPoller — spec module 07 / M8.
+"""CustodialPoller — spec module 07 / M8 + M9.
 
-Polls all active CustodialProviders on a fixed interval, updates balance rows
-in the database, and publishes `custodial_provider.balance_updated` events so
-the SweepEngine can react to threshold crossings.
+Polls all active CustodialProviders on a fixed interval:
+  1. Updates balance rows and publishes `custodial_provider.balance_updated`.
+  2. Checks recent withdrawals for pending SweepExecutions and promotes them
+     to ONCHAIN_PENDING once the provider supplies a txid.
 """
 
 from __future__ import annotations
@@ -15,9 +16,11 @@ from uuid import UUID
 
 from sqlalchemy.orm import Session, sessionmaker
 
+from tallykeep.domain.enums import SweepExecutionStatus
 from tallykeep.infrastructure.event_bus import EventBus
 from tallykeep.infrastructure.secrets import LockedError, SecretStore
 from tallykeep.repositories import custodial_provider as cp_repo
+from tallykeep.repositories import sweep_execution as se_repo
 
 
 logger = logging.getLogger(__name__)
@@ -133,6 +136,54 @@ class CustodialPoller:
             logger.debug(
                 "CustodialPoller: updated provider %s balance=%d sats", provider.id, balance_sats
             )
+
+            # Check if any REQUESTED executions now have a txid from the exchange.
+            self._check_withdrawal_txids(provider.id, adapter)
+
+
+    def _check_withdrawal_txids(self, provider_id: UUID, adapter) -> None:  # type: ignore[no-untyped-def]
+        """For REQUESTED executions on this provider, try to find the on-chain txid."""
+        from datetime import timedelta
+        from tallykeep.adapters.custodial_provider_adapter import ProviderError
+
+        since = datetime.now(UTC) - timedelta(days=7)
+        try:
+            withdrawals = adapter.get_recent_withdrawals(since)
+        except ProviderError as exc:
+            logger.debug("CustodialPoller: get_recent_withdrawals failed for %s: %s", provider_id, exc)
+            return
+
+        txid_by_withdrawal_id = {
+            w.id: w.txid for w in withdrawals if w.txid
+        }
+        if not txid_by_withdrawal_id:
+            return
+
+        with self._session_factory() as session:
+            executions = se_repo.list_executions(
+                session,
+                status=SweepExecutionStatus.REQUESTED,
+                limit=100,
+            )
+            updated_count = 0
+            for execution in executions:
+                if execution.provider_withdrawal_id is None:
+                    continue
+                txid = txid_by_withdrawal_id.get(execution.provider_withdrawal_id)
+                if txid:
+                    se_repo.update_status(
+                        session,
+                        execution.id,
+                        status=SweepExecutionStatus.ONCHAIN_PENDING,
+                        expected_txid=txid,
+                    )
+                    updated_count += 1
+            if updated_count:
+                session.commit()
+                logger.info(
+                    "CustodialPoller: promoted %d execution(s) to ONCHAIN_PENDING for provider %s",
+                    updated_count, provider_id,
+                )
 
 
 __all__ = ["CustodialPoller"]

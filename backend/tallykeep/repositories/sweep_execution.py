@@ -35,6 +35,14 @@ def get(session: Session, execution_id: UUID) -> SweepExecution | None:
     return _row_to_domain(row) if row is not None else None
 
 
+def get_by_expected_txid(session: Session, txid: str) -> SweepExecution | None:
+    from sqlalchemy import select
+    row = session.execute(
+        select(SweepExecutionRow).where(SweepExecutionRow.expected_txid == txid)
+    ).scalar_one_or_none()
+    return _row_to_domain(row) if row is not None else None
+
+
 def list_executions(
     session: Session,
     *,

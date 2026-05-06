@@ -39,6 +39,10 @@ class PaymentRequest:
     # txid lands in a block. Spec module 06.
     resulting_ledger_entry_id: UUID | None = None
 
+    # Back-link to the SweepExecution that originated this payment (inter-holding
+    # sweeps only). Populated by the SweepEngine when it auto-creates a PaymentRequest.
+    sweep_execution_id: UUID | None = None
+
     def __post_init__(self) -> None:
         if self.amount_sats is not None and self.amount_sats <= 0:
             raise ValueError("PaymentRequest.amount_sats must be > 0 when provided")

@@ -60,6 +60,9 @@ class PaymentRequestRow(Base):
     resulting_ledger_entry_id: Mapped[UUID | None] = mapped_column(
         ForeignKey("ledger_entry.id", ondelete="RESTRICT"), nullable=True
     )
+    sweep_execution_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("sweep_execution.id", ondelete="SET NULL"), nullable=True, index=True
+    )
 
     created_at: Mapped[datetime] = mapped_column(
         TIMESTAMP(timezone=True), nullable=False, server_default=text("NOW()")

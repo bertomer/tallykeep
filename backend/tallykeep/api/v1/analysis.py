@@ -14,8 +14,9 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
-from tallykeep.api.dependencies import get_db_session
+from tallykeep.api.dependencies import get_db_session, get_job_queue
 from tallykeep.api.v1._stubs import not_implemented_response
+from tallykeep.infrastructure.job_queue import JobQueue
 
 
 router = APIRouter(prefix="/analysis", tags=["analysis"])
@@ -224,14 +225,64 @@ async def utxo_blueprint(utxo_id: UUID) -> JSONResponse:
     )
 
 
-@router.post("/recompute", status_code=501)
-async def recompute_analysis() -> JSONResponse:
-    """Trigger a background recompute job.
+class RecomputeBody(BaseModel):
+    holding_id: UUID | None = None
 
-    Recomputation is currently fully on-demand (every /security or
-    /blueprint request runs fresh), so the explicit recompute endpoint is
-    redundant in v1. M9 wires the periodic 24h scheduler.
-    """
-    return not_implemented_response(
-        milestone="M9", route="POST /api/v1/analysis/recompute"
+
+class RecomputeOut(BaseModel):
+    job_id: UUID
+    holding_count: int
+
+
+def _run_recompute(holding_id: UUID | None, database_url: str) -> int:
+    """Job function: re-runs analyze_holding for one or all holdings."""
+    import sqlalchemy as _sa
+    from sqlalchemy.orm import sessionmaker as _sm
+
+    from tallykeep.repositories import holding as _hr
+    from tallykeep.services.analysis_service import analyze_holding as _ah
+
+    engine = _sa.create_engine(database_url, future=True)
+    factory = _sm(bind=engine, autoflush=False, expire_on_commit=False)
+    with factory() as session:
+        if holding_id is not None:
+            _ah(session, holding_id)
+            count = 1
+        else:
+            rows = _hr.list_holdings(session, include_archived=False)
+            for row in rows:
+                _ah(session, row.id)
+            count = len(rows)
+    engine.dispose()
+    return count
+
+
+@router.post("/recompute", status_code=202, response_model=RecomputeOut)
+async def recompute_analysis(
+    body: RecomputeBody = RecomputeBody(),
+    session: Session = Depends(get_db_session),
+    job_queue: JobQueue = Depends(get_job_queue),
+) -> RecomputeOut:
+    from tallykeep.configuration import get_settings
+
+    settings = get_settings()
+    if not settings.database_url:
+        raise HTTPException(status_code=503, detail="Database not configured")
+
+    if body.holding_id is not None:
+        from tallykeep.models import HoldingRow
+        if session.get(HoldingRow, body.holding_id) is None:
+            raise HTTPException(status_code=404, detail="Holding not found")
+        count = 1
+    else:
+        from tallykeep.repositories import holding as holding_repo
+        count = len(holding_repo.list_holdings(session, include_archived=False))
+
+    job_id = job_queue.enqueue(
+        _run_recompute,
+        body.holding_id,
+        settings.database_url,
+        job_type="analysis_recompute",
+        label=f"recompute:{body.holding_id or 'all'}",
     )
+    return RecomputeOut(job_id=job_id, holding_count=count)

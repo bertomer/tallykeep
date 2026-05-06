@@ -42,6 +42,7 @@ def _row_to_domain(row: PaymentRequestRow) -> PaymentRequest:
         lightning_invoice=row.lightning_invoice,
         lightning_payment_hash=row.lightning_payment_hash,
         resulting_ledger_entry_id=row.resulting_ledger_entry_id,
+        sweep_execution_id=row.sweep_execution_id,
     )
 
 
@@ -143,6 +144,7 @@ def insert(session: Session, request: PaymentRequest) -> None:
         lightning_invoice=request.lightning_invoice,
         lightning_payment_hash=request.lightning_payment_hash,
         resulting_ledger_entry_id=request.resulting_ledger_entry_id,
+        sweep_execution_id=request.sweep_execution_id,
     )
     session.add(row)
 

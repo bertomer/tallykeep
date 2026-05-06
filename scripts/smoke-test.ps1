@@ -166,8 +166,22 @@ Show "gap_limit"     $descriptor.gap_limit
 
 $addresses = Invoke-RestMethod -Uri "$BaseUrl/api/v1/descriptors/$descriptorId/addresses?limit=200"
 Show "address count" $addresses.addresses.Count
-Show "first external" ($addresses.addresses | Where-Object { -not $_.is_change } | Select-Object -First 1).address
+$firstAddrObj = $addresses.addresses | Where-Object { -not $_.is_change } | Select-Object -First 1
+Show "first external" $firstAddrObj.address
 Show "first change   " ($addresses.addresses | Where-Object { $_.is_change } | Select-Object -First 1).address
+
+# 10b Address labelling (M9)
+$addrId = $firstAddrObj.id
+$labelResp = Invoke-RestMethod -Method Patch `
+    -Uri "$BaseUrl/api/v1/addresses/$addrId" `
+    -ContentType "application/json" `
+    -Body '{"label":"smoke-test-label"}'
+Show "address label set" $labelResp.label
+$clearResp = Invoke-RestMethod -Method Patch `
+    -Uri "$BaseUrl/api/v1/addresses/$addrId" `
+    -ContentType "application/json" `
+    -Body '{"label":null}'
+Show "address label cleared" ($null -eq $clearResp.label)
 
 Section "11. Next receiving address (lowest-index unused on external chain)"
 $next = Invoke-RestMethod -Method Post `
@@ -574,6 +588,24 @@ try {
     $sc = $_.Exception.Response.StatusCode.value__
     Show "delete unknown 404" ($sc -eq 404)
 }
+
+
+# --- 16b. Analysis recompute (M9) --------------------------------------------
+
+Section "16b. Analysis recompute"
+
+$recompAll = Invoke-RestMethod -Method Post `
+    -Uri "$BaseUrl/api/v1/analysis/recompute" `
+    -ContentType "application/json" `
+    -Body '{}'
+Show "recompute job_id"       $recompAll.job_id
+Show "recompute holding_count" $recompAll.holding_count
+
+$recompOne = Invoke-RestMethod -Method Post `
+    -Uri "$BaseUrl/api/v1/analysis/recompute" `
+    -ContentType "application/json" `
+    -Body "{`"holding_id`":`"$purseId`"}"
+Show "single recompute count" $recompOne.holding_count
 
 
 # --- 17. Stubs (sanity-check the OpenAPI surface for routes not yet landed) ----

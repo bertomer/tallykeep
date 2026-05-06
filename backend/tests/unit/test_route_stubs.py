@@ -39,7 +39,7 @@ STUB_ROUTES: list[tuple[str, str, str]] = [
     # M8 implemented: supported, get, patch, refresh, balance, verify-whitelist.
     # --- Addresses + Ledger entries ---
     # UTXO endpoints implemented in M5.2; LedgerEntry list/get/patch land in M5.6.
-    ("PATCH", "/api/v1/addresses/{address_id}", "M5"),
+    # PATCH /addresses/{id} implemented in M9.
     # --- Banking ---
     # M6.1–M6.5 implemented. Multi-frame QR (PSBT) is the only remaining stub.
     ("GET", "/api/v1/banking/payment-requests/{request_id}/psbt.qr", "v1.1"),
@@ -53,7 +53,7 @@ STUB_ROUTES: list[tuple[str, str, str]] = [
     # into /utxos/{id}/hygiene; recompute will land alongside the M9 scheduler).
     # Jobs endpoints are real as of M8.1.
     ("GET", "/api/v1/analysis/utxo/{utxo_id}", "v2"),
-    ("POST", "/api/v1/analysis/recompute", "M9"),
+    # POST /analysis/recompute implemented in M9.
     ("GET", "/api/v1/export/configuration", "M14"),
     # --- Lightning (spec module 08): all stubs land in v1.5 ---
     ("GET", "/api/v1/lightning/status", "v1.5"),

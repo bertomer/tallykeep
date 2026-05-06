@@ -172,6 +172,7 @@ class ChainListener:
                 session, result
             )
             invoice_paid = self._link_invoice_if_any(session, result, decoded)
+            sweep_confirmed = self._link_sweep_execution_if_any(session, result)
             session.commit()
 
         # Emit events outside the session so a slow Redis publish never holds
@@ -184,6 +185,8 @@ class ChainListener:
             )
         if invoice_paid is not None:
             self._bus.publish("banking.invoice.paid", invoice_paid)
+        if sweep_confirmed is not None:
+            self._bus.publish("trading.sweep_execution.completed", sweep_confirmed)
 
     def _handle_block(self, block_hash: str) -> None:
         """A new block tip arrived. Emit chain.block.new and drive any
@@ -359,11 +362,75 @@ class ChainListener:
         )
         if updated is None:  # pragma: no cover
             return None
+
+        # If this PaymentRequest was created by the SweepEngine, complete
+        # the linked SweepExecution now.
+        if pr.sweep_execution_id is not None:
+            from datetime import UTC, datetime as _dt
+
+            from tallykeep.domain.enums import SweepExecutionStatus
+            from tallykeep.repositories import sweep_execution as se_repo
+
+            execution = se_repo.get(session, pr.sweep_execution_id)
+            if execution is not None and execution.status not in (
+                SweepExecutionStatus.COMPLETED,
+                SweepExecutionStatus.FAILED,
+                SweepExecutionStatus.CANCELLED,
+            ):
+                se_repo.update_status(
+                    session,
+                    execution.id,
+                    status=SweepExecutionStatus.COMPLETED,
+                    confirmed_txid=result.txid,
+                    completed_at=_dt.now(UTC),
+                )
+                logger.info(
+                    "ChainListener: sweep execution %s completed via PaymentRequest %s",
+                    execution.id, pr.id,
+                )
+
         return {
             "id": str(updated.id),
             "txid": result.txid,
             "height": result.confirmation_height,
             "ledger_entry_id": str(ledger_entry_id),
+        }
+
+    def _link_sweep_execution_if_any(
+        self, session: Session, result: TxProcessingResult
+    ) -> dict | None:
+        """When a confirmed tx matches a SweepExecution's expected_txid,
+        mark the execution COMPLETED."""
+        if result.confirmation_height is None:
+            return None
+
+        from datetime import UTC, datetime
+
+        from tallykeep.domain.enums import SweepExecutionStatus
+        from tallykeep.repositories import sweep_execution as se_repo
+
+        execution = se_repo.get_by_expected_txid(session, result.txid)
+        if execution is None:
+            return None
+        if execution.status != SweepExecutionStatus.ONCHAIN_PENDING:
+            return None
+
+        now = datetime.now(UTC)
+        se_repo.update_status(
+            session,
+            execution.id,
+            status=SweepExecutionStatus.COMPLETED,
+            confirmed_txid=result.txid,
+            completed_at=now,
+        )
+        logger.info(
+            "ChainListener: sweep execution %s completed via txid %s at height %d",
+            execution.id, result.txid, result.confirmation_height,
+        )
+        return {
+            "execution_id": str(execution.id),
+            "txid": result.txid,
+            "height": result.confirmation_height,
         }
 
     def _link_invoice_if_any(

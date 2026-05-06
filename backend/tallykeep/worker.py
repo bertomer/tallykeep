@@ -25,6 +25,7 @@ from tallykeep.infrastructure.event_emission import AuditReconciler
 from tallykeep.infrastructure.secrets import EncryptedDatabaseSecretStore
 from tallykeep.workers.listeners.chain_listener import ChainListener
 from tallykeep.workers.schedulers.custodial_poller import CustodialPoller
+from tallykeep.workers.schedulers.self_custody_poller import SelfCustodyPoller
 from tallykeep.workers.subscribers.categorizer_suggester import CategorizerSuggester
 from tallykeep.workers.subscribers.sweep_engine import SweepEngine
 
@@ -57,6 +58,7 @@ def main() -> int:
     categorizer: CategorizerSuggester | None = None
     sweep_engine: SweepEngine | None = None
     custodial_poller: CustodialPoller | None = None
+    self_custody_poller: SelfCustodyPoller | None = None
     node: NodeAdapter | None = None
     reconciler_interval_seconds = 30  # how often to scan for unacked events
 
@@ -122,11 +124,31 @@ def main() -> int:
     if (
         bus is not None
         and settings.database_url
-        and settings.bitcoind_zmq_endpoint
         and settings.bitcoind_rpc_url
     ):
         try:
             node = NodeAdapter(settings.bitcoind_rpc_url, timeout_seconds=30.0)
+            self_custody_poller = SelfCustodyPoller(
+                session_factory=get_session_factory(),
+                node=node,
+                bus=bus,
+                interval_seconds=900,
+            )
+            self_custody_poller.start()
+            logger.info("worker: SelfCustodyPoller started (interval=900s)")
+        except Exception:  # noqa: BLE001
+            logger.exception("worker: failed to start SelfCustodyPoller")
+            self_custody_poller = None
+
+    if (
+        bus is not None
+        and settings.database_url
+        and settings.bitcoind_zmq_endpoint
+        and settings.bitcoind_rpc_url
+    ):
+        try:
+            if node is None:
+                node = NodeAdapter(settings.bitcoind_rpc_url, timeout_seconds=30.0)
             session_factory = get_session_factory()
             chain_listener = ChainListener(
                 zmq_endpoint=settings.bitcoind_zmq_endpoint,
@@ -145,13 +167,14 @@ def main() -> int:
     last_reconcile = 0.0
     logger.info(
         "worker: started (bus=%s, reconciler=%s, chain_listener=%s, categorizer=%s, "
-        "sweep_engine=%s, custodial_poller=%s)",
+        "sweep_engine=%s, custodial_poller=%s, self_custody_poller=%s)",
         "redis" if bus else "none",
         "on" if reconciler else "off",
         "on" if chain_listener else "off",
         "on" if categorizer else "off",
         "on" if sweep_engine else "off",
         "on" if custodial_poller else "off",
+        "on" if self_custody_poller else "off",
     )
 
     while _running:
@@ -181,6 +204,12 @@ def main() -> int:
     if custodial_poller is not None:
         try:
             custodial_poller.stop()
+        except Exception:  # noqa: BLE001
+            pass
+
+    if self_custody_poller is not None:
+        try:
+            self_custody_poller.stop()
         except Exception:  # noqa: BLE001
             pass
 
