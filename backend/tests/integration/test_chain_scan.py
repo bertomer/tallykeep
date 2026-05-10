@@ -34,6 +34,7 @@ def _purse_body(*, descriptor_name: str = "main", gap_limit: int = 10) -> dict:
     return {
         "name": f"Smoke wallet {secrets.token_hex(2)}",
         "purpose": "spending",
+        "seed_origin": "external_watch_only",
         "declared_security": {
             "custody_model": "self_single",
             "signing_model": "software_hot",

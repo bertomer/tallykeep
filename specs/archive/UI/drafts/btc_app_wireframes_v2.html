@@ -1,0 +1,685 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>BTC App UI Wireframes — v2</title>
+<style>
+  body { background: #f3f4f6; margin: 0; padding: 32px; font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; color: #1f2937; }
+  h1 { font-size: 22px; margin: 0 0 4px; }
+  .sub { color: #6b7280; font-size: 14px; margin-bottom: 24px; max-width: 720px; }
+  .group-title { font-size: 13px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; color: #6b7280; margin: 32px 0 12px 4px; border-top: 1px solid #e5e7eb; padding-top: 24px; }
+  .group-title:first-of-type { border-top: none; padding-top: 0; }
+  .row { display: flex; flex-wrap: wrap; gap: 20px; }
+  .frame { width: 230px; flex-shrink: 0; }
+  .phone { background: #ffffff; border: 1.5px solid #1f2937; border-radius: 28px; padding: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.06); }
+  .notch { width: 60px; height: 5px; background: #1f2937; border-radius: 3px; margin: 4px auto 8px; }
+  .screen { background: #f9fafb; border-radius: 18px; padding: 12px; min-height: 420px; display: flex; flex-direction: column; gap: 8px; font-size: 10px; }
+  .label { font-size: 12px; font-weight: 600; color: #111827; margin-top: 10px; padding-left: 4px; }
+  .note { font-size: 11px; color: #4b5563; margin-top: 4px; padding-left: 4px; line-height: 1.45; }
+  .note strong { color: #111827; }
+  .block { background: #e5e7eb; border-radius: 6px; }
+  .pill { background: #d1d5db; border-radius: 999px; padding: 2px 8px; font-size: 9px; }
+  .pill.active { background: #1f2937; color: #fff; }
+  .pill.amber { background: #fef3c7; color: #92400e; }
+  .pill.indigo { background: #e0e7ff; color: #3730a3; }
+  .pill.green { background: #d1fae5; color: #065f46; }
+  .card { background: #ffffff; border: 1px solid #e5e7eb; border-radius: 10px; padding: 8px; }
+  .row-h { display: flex; gap: 6px; align-items: center; }
+  .row-h.between { justify-content: space-between; }
+  .col { display: flex; flex-direction: column; gap: 6px; }
+  .accent { background: #f97316; color: #fff; }
+  .accent-soft { background: #fef3c7; }
+  .accent-dark { background: #1f2937; color: #fff; }
+  .x-small { font-size: 9px; color: #6b7280; }
+  .tabs { display: flex; justify-content: space-around; background: #fff; border-top: 1px solid #e5e7eb; padding: 6px 0; margin: auto -12px -12px; border-radius: 0 0 18px 18px; }
+  .tab { display: flex; flex-direction: column; align-items: center; gap: 2px; font-size: 8px; color: #9ca3af; }
+  .tab .dot { width: 14px; height: 14px; border-radius: 4px; background: #d1d5db; }
+  .tab.active { color: #1f2937; }
+  .tab.active .dot { background: #f97316; }
+  .tx { display: flex; align-items: center; gap: 8px; padding: 6px 0; border-bottom: 1px dashed #e5e7eb; }
+  .tx:last-child { border-bottom: none; }
+  .tx .ico { width: 20px; height: 20px; border-radius: 50%; background: #d1d5db; flex-shrink: 0; display:flex; align-items:center; justify-content:center; font-size:10px; }
+  .tx .name { flex: 1; font-size: 9px; color: #374151; }
+  .tx .amt { font-size: 9px; font-weight: 600; }
+  .sh { font-size: 9px; font-weight: 600; color: #6b7280; text-transform: uppercase; letter-spacing: 0.05em; margin-top: 4px; }
+  .bar { height: 4px; background: #e5e7eb; border-radius: 2px; overflow: hidden; }
+  .bar > div { height: 100%; background: #f97316; }
+  .big { font-size: 22px; font-weight: 700; color: #111827; }
+  .med { font-size: 14px; font-weight: 600; color: #111827; }
+  .keypad { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; margin-top: auto; }
+  .key { background: #fff; border: 1px solid #e5e7eb; border-radius: 6px; padding: 6px 0; text-align: center; font-size: 11px; font-weight: 500; }
+  .check { width: 40px; height: 40px; border-radius: 50%; background: #d1fae5; color: #065f46; display: flex; align-items: center; justify-content: center; font-size: 22px; margin: 16px auto; font-weight: bold; }
+  .toggle { width: 24px; height: 14px; border-radius: 999px; background: #f97316; position: relative; flex-shrink: 0; }
+  .toggle::after { content: ''; position: absolute; right: 1px; top: 1px; width: 12px; height: 12px; border-radius: 50%; background: #fff; }
+  .toggle.off { background: #d1d5db; }
+  .toggle.off::after { left: 1px; right: auto; }
+  .qr { width: 100px; height: 100px; background: repeating-conic-gradient(#1f2937 0% 25%, #fff 0% 50%) 0/16px 16px; border: 6px solid #fff; border-radius: 8px; margin: 8px auto; box-shadow: 0 0 0 1px #1f2937; }
+  /* unit toggle */
+  .unit-toggle { display: inline-flex; background: #e5e7eb; border-radius: 999px; padding: 2px; gap: 2px; }
+  .unit-toggle .u { font-size: 9px; padding: 2px 8px; border-radius: 999px; color: #6b7280; }
+  .unit-toggle .u.active { background: #fff; color: #111827; font-weight: 600; }
+  /* network badge */
+  .net { font-size: 8px; padding: 1px 5px; border-radius: 3px; font-weight: 600; }
+  .net.ln { background: #fef3c7; color: #92400e; }
+  .net.oc { background: #e0e7ff; color: #3730a3; }
+  /* chart placeholder */
+  .chart { height: 60px; background: linear-gradient(180deg, rgba(249,115,22,0.15), transparent); position: relative; border-bottom: 1px dashed #e5e7eb; margin: 8px 0; }
+  .chart::after { content: ''; position: absolute; left: 0; right: 0; bottom: 0; height: 28px; background: url("data:image/svg+xml,%3Csvg viewBox='0 0 100 30' xmlns='http://www.w3.org/2000/svg' preserveAspectRatio='none'%3E%3Cpath d='M0,20 Q15,18 25,15 T50,10 T75,12 T100,5' stroke='%23f97316' stroke-width='1.5' fill='none'/%3E%3C/svg%3E") no-repeat; background-size: 100% 100%; }
+  /* sats display helper */
+  .sats { color: #f97316; font-weight: 700; }
+</style>
+</head>
+<body>
+
+<h1>BTC-native app wireframes — v2</h1>
+<div class="sub">
+Tailored for a BTC-only payment + savings + retirement app. Fiat appears only as a conversion rail. Conventions borrowed from Strike, Swan, River, Wallet of Satoshi, Muun. Orange (#f97316) used as the BTC accent — swap for your brand.
+</div>
+
+<div class="group-title">Core dashboard & balance</div>
+<div class="row">
+
+  <!-- 1. Home -->
+  <div class="frame">
+    <div class="phone"><div class="notch"></div>
+      <div class="screen">
+        <div class="row-h between">
+          <div class="block" style="width:24px;height:24px;border-radius:50%;"></div>
+          <div class="unit-toggle">
+            <div class="u">BTC</div>
+            <div class="u active">sats</div>
+            <div class="u">EUR</div>
+          </div>
+        </div>
+        <div class="x-small">Total balance</div>
+        <div class="big"><span class="sats">4,210,000</span> sats</div>
+        <div class="x-small">≈ €2,526.00 · <span style="color:#065f46;">+1.8% today</span></div>
+        <div class="row-h" style="gap:8px;margin:8px 0;">
+          <div class="card" style="flex:1;text-align:center;padding:8px 4px;"><div class="block" style="width:18px;height:18px;border-radius:50%;margin:0 auto 4px;"></div><div class="x-small">Send</div></div>
+          <div class="card" style="flex:1;text-align:center;padding:8px 4px;"><div class="block" style="width:18px;height:18px;border-radius:50%;margin:0 auto 4px;"></div><div class="x-small">Receive</div></div>
+          <div class="card accent" style="flex:1;text-align:center;padding:8px 4px;"><div class="block" style="width:18px;height:18px;border-radius:50%;margin:0 auto 4px;background:rgba(255,255,255,0.3);"></div><div class="x-small" style="color:#fff;">Buy BTC</div></div>
+          <div class="card" style="flex:1;text-align:center;padding:8px 4px;"><div class="block" style="width:18px;height:18px;border-radius:50%;margin:0 auto 4px;"></div><div class="x-small">Scan</div></div>
+        </div>
+        <div class="card" style="padding:8px;background:#fef3c7;border-color:#fde68a;">
+          <div class="row-h between"><div class="x-small"><strong>↻ DCA active</strong></div><div class="x-small">Next: Mon</div></div>
+          <div class="x-small">€100/week → ~166k sats</div>
+        </div>
+        <div class="sh">Recent</div>
+        <div class="card" style="padding:4px 8px;">
+          <div class="tx"><div class="ico">⚡</div><div class="name">Marc B. <span class="net ln">LN</span></div><div class="amt">−21,000</div></div>
+          <div class="tx"><div class="ico">↻</div><div class="name">DCA buy</div><div class="amt" style="color:#065f46;">+166,300</div></div>
+          <div class="tx"><div class="ico">⛓</div><div class="name">Cold wallet <span class="net oc">on-chain</span></div><div class="amt">−500,000</div></div>
+        </div>
+        <div class="tabs">
+          <div class="tab active"><div class="dot"></div>Home</div>
+          <div class="tab"><div class="dot"></div>Stack</div>
+          <div class="tab"><div class="dot"></div>Retire</div>
+          <div class="tab"><div class="dot"></div>Pay</div>
+          <div class="tab"><div class="dot"></div>Me</div>
+        </div>
+      </div>
+    </div>
+    <div class="label">1. Home / Dashboard</div>
+    <div class="note"><strong>Sats / BTC / EUR triple toggle</strong> top-right. Big balance in selected unit. Quick actions, <strong>DCA strip</strong>, recent transactions with network badges.</div>
+  </div>
+
+  <!-- 2. Multi-bucket home -->
+  <div class="frame">
+    <div class="phone"><div class="notch"></div>
+      <div class="screen">
+        <div class="row-h between"><div class="med">Hi, Léa</div><div class="block" style="width:18px;height:18px;border-radius:50%;"></div></div>
+        <div class="x-small">Total stack</div>
+        <div class="med"><span class="sats">8,420,000</span> sats <span class="x-small">· €5,052</span></div>
+        <div class="card" style="padding:10px;">
+          <div class="row-h between"><div class="x-small">⚡ <strong>Spending</strong></div><div class="x-small">‹›</div></div>
+          <div class="x-small"><span class="sats">320,000</span> sats · €192</div>
+          <div class="x-small" style="color:#9ca3af;">Lightning · for daily payments</div>
+        </div>
+        <div class="card" style="padding:10px;">
+          <div class="row-h between"><div class="x-small">🏦 <strong>Savings</strong></div><div class="x-small">‹›</div></div>
+          <div class="x-small"><span class="sats">3,890,000</span> sats · €2,334</div>
+          <div class="x-small" style="color:#9ca3af;">On-chain · medium term</div>
+        </div>
+        <div class="card" style="padding:10px;border-color:#fde68a;background:#fef3c7;">
+          <div class="row-h between"><div class="x-small">🏖 <strong>Retirement</strong></div><div class="x-small">‹›</div></div>
+          <div class="x-small"><span class="sats">4,210,000</span> sats · €2,526</div>
+          <div class="x-small" style="color:#92400e;">Locked until 2055 · cold storage</div>
+        </div>
+        <div class="x-small" style="margin-top:auto;">↕ Drag to reorder</div>
+        <div class="tabs">
+          <div class="tab active"><div class="dot"></div>Home</div>
+          <div class="tab"><div class="dot"></div>Stack</div>
+          <div class="tab"><div class="dot"></div>Retire</div>
+          <div class="tab"><div class="dot"></div>Pay</div>
+          <div class="tab"><div class="dot"></div>Me</div>
+        </div>
+      </div>
+    </div>
+    <div class="label">2. Buckets (Spending / Savings / Retirement)</div>
+    <div class="note">Replaces multi-account view. Each bucket has different <strong>liquidity + custody profile</strong> shown clearly.</div>
+  </div>
+
+  <!-- 3. Balance detail with chart -->
+  <div class="frame">
+    <div class="phone"><div class="notch"></div>
+      <div class="screen">
+        <div class="row-h"><div class="x-small">‹ Back</div></div>
+        <div class="x-small">Spending</div>
+        <div class="big"><span class="sats">320,000</span> sats</div>
+        <div class="x-small">≈ €192.00</div>
+        <div class="row-h" style="gap:4px;">
+          <div class="pill">1D</div>
+          <div class="pill active">1W</div>
+          <div class="pill">1M</div>
+          <div class="pill">1Y</div>
+          <div class="pill">All</div>
+        </div>
+        <div class="chart"></div>
+        <div class="card" style="padding:8px;">
+          <div class="row-h between"><div class="x-small">Cost basis</div><div class="x-small"><strong>€175</strong></div></div>
+        </div>
+        <div class="card" style="padding:8px;">
+          <div class="row-h between"><div class="x-small">Unrealized P/L</div><div class="x-small" style="color:#065f46;"><strong>+€17 (+9.7%)</strong></div></div>
+        </div>
+        <div class="card" style="padding:8px;">
+          <div class="row-h between"><div class="x-small">Avg buy price</div><div class="x-small"><strong>€54,687</strong></div></div>
+        </div>
+        <div class="row-h" style="gap:6px;margin-top:auto;">
+          <div class="card" style="flex:1;text-align:center;padding:8px;border:1px solid #1f2937;"><div class="x-small">Send</div></div>
+          <div class="card accent" style="flex:1;text-align:center;padding:8px;"><div class="x-small" style="color:#fff;">Buy more</div></div>
+        </div>
+      </div>
+    </div>
+    <div class="label">3. Bucket detail w/ chart</div>
+    <div class="note"><strong>Cost basis + P/L</strong> matter for BTC. Time toggles, value chart. Volatility transparency = trust.</div>
+  </div>
+
+  <!-- 4. Transaction detail -->
+  <div class="frame">
+    <div class="phone"><div class="notch"></div>
+      <div class="screen">
+        <div class="row-h"><div class="x-small">‹ Close</div></div>
+        <div style="text-align:center;margin-top:8px;">
+          <div class="block" style="width:48px;height:48px;border-radius:50%;margin:0 auto 8px;display:flex;align-items:center;justify-content:center;font-size:22px;">⚡</div>
+          <div class="med">Marc Bernard</div>
+          <div class="big">−21,000 sats</div>
+          <div class="x-small">≈ €12.60 · Today, 14:23</div>
+        </div>
+        <div class="card" style="padding:8px;"><div class="row-h between"><div class="x-small">Network</div><div class="x-small"><span class="net ln">⚡ Lightning</span></div></div></div>
+        <div class="card" style="padding:8px;"><div class="row-h between"><div class="x-small">Fee</div><div class="x-small"><strong>3 sats</strong> (~€0.002)</div></div></div>
+        <div class="card" style="padding:8px;"><div class="row-h between"><div class="x-small">To</div><div class="x-small">marc@yourapp.com</div></div></div>
+        <div class="card" style="padding:8px;"><div class="row-h between"><div class="x-small">Note</div><div class="x-small">Pizza 🍕</div></div></div>
+        <div class="card" style="padding:8px;"><div class="row-h between"><div class="x-small">📎 Add receipt</div><div class="x-small">›</div></div></div>
+        <div class="card" style="padding:8px;"><div class="row-h between"><div class="x-small">🔁 Send again</div><div class="x-small">›</div></div></div>
+      </div>
+    </div>
+    <div class="label">4. Transaction detail</div>
+    <div class="note"><strong>Network badge</strong> (Lightning vs on-chain), fee in sats AND fiat. Lightning Address shown like email.</div>
+  </div>
+
+</div>
+
+<div class="group-title">Send & receive</div>
+<div class="row">
+
+  <!-- 5. Send entry -->
+  <div class="frame">
+    <div class="phone"><div class="notch"></div>
+      <div class="screen">
+        <div class="row-h"><div class="x-small">‹ Cancel</div></div>
+        <div class="med">Send Bitcoin</div>
+        <div class="card" style="padding:14px;text-align:center;background:#1f2937;color:#fff;border-color:#1f2937;">
+          <div class="block" style="width:32px;height:32px;border-radius:50%;margin:0 auto 6px;background:rgba(255,255,255,0.2);"></div>
+          <div class="x-small" style="color:#fff;">📷 Scan QR code</div>
+        </div>
+        <div class="card" style="padding:8px;"><div class="x-small">📋 Paste address or invoice</div></div>
+        <div class="x-small" style="text-align:center;color:#9ca3af;">— or pay a contact —</div>
+        <div class="row-h" style="gap:6px;flex-wrap:wrap;">
+          <div style="text-align:center;width:44px;"><div class="block" style="width:36px;height:36px;border-radius:50%;margin:0 auto;"></div><div class="x-small">Marc</div></div>
+          <div style="text-align:center;width:44px;"><div class="block" style="width:36px;height:36px;border-radius:50%;margin:0 auto;"></div><div class="x-small">Sofia</div></div>
+          <div style="text-align:center;width:44px;"><div class="block" style="width:36px;height:36px;border-radius:50%;margin:0 auto;"></div><div class="x-small">Tom</div></div>
+          <div style="text-align:center;width:44px;"><div class="block" style="width:36px;height:36px;border-radius:50%;margin:0 auto;"></div><div class="x-small">Léna</div></div>
+        </div>
+        <div class="card" style="padding:8px;"><div class="x-small">🔍 Lightning Address (lea@…)</div></div>
+        <div class="card" style="padding:8px;background:#f3f4f6;">
+          <div class="x-small">💡 We'll detect Lightning vs on-chain automatically</div>
+        </div>
+      </div>
+    </div>
+    <div class="label">5. Send → entry</div>
+    <div class="note"><strong>Scan QR</strong> as primary action (BTC addresses too long to type). Paste, contacts, Lightning Address. <strong>Network auto-detected.</strong></div>
+  </div>
+
+  <!-- 6. Send amount -->
+  <div class="frame">
+    <div class="phone"><div class="notch"></div>
+      <div class="screen">
+        <div class="row-h"><div class="x-small">‹ Back</div></div>
+        <div style="text-align:center;">
+          <div class="block" style="width:36px;height:36px;border-radius:50%;margin:4px auto;"></div>
+          <div class="x-small">marc@yourapp.com</div>
+          <div class="pill amber" style="display:inline-block;margin-top:4px;">⚡ Lightning · instant · ~3 sats fee</div>
+        </div>
+        <div style="text-align:center;margin:12px 0 4px;">
+          <div class="big" style="font-size:28px;"><span class="sats">21,000</span></div>
+          <div class="x-small">sats · ≈ €12.60</div>
+        </div>
+        <div class="unit-toggle" style="align-self:center;">
+          <div class="u">BTC</div>
+          <div class="u active">sats</div>
+          <div class="u">EUR</div>
+        </div>
+        <div class="card" style="padding:6px 8px;"><div class="x-small">💬 Pizza 🍕</div></div>
+        <div class="keypad">
+          <div class="key">1</div><div class="key">2</div><div class="key">3</div>
+          <div class="key">4</div><div class="key">5</div><div class="key">6</div>
+          <div class="key">7</div><div class="key">8</div><div class="key">9</div>
+          <div class="key">,</div><div class="key">0</div><div class="key">⌫</div>
+        </div>
+        <div class="card accent" style="text-align:center;padding:10px;"><div class="x-small" style="color:#fff;font-size:11px;">Continue →</div></div>
+      </div>
+    </div>
+    <div class="label">6. Send → amount</div>
+    <div class="note">Auto-detected network shown as pill ("⚡ instant · ~3 sats fee"). User can <strong>type in any unit</strong>; others convert live.</div>
+  </div>
+
+  <!-- 7. Send confirm -->
+  <div class="frame">
+    <div class="phone"><div class="notch"></div>
+      <div class="screen">
+        <div class="row-h"><div class="x-small">‹ Back</div></div>
+        <div class="med">Review</div>
+        <div class="card" style="padding:12px;text-align:center;">
+          <div class="big"><span class="sats">21,000</span> sats</div>
+          <div class="x-small">≈ €12.60</div>
+          <div class="x-small">to <strong>Marc Bernard</strong></div>
+        </div>
+        <div class="card" style="padding:8px;"><div class="row-h between"><div class="x-small">Network</div><div class="x-small"><span class="net ln">⚡ Lightning</span></div></div></div>
+        <div class="card" style="padding:8px;"><div class="row-h between"><div class="x-small">Fee</div><div class="x-small"><strong>~3 sats</strong> (€0.002)</div></div></div>
+        <div class="card" style="padding:8px;"><div class="row-h between"><div class="x-small">Arrives</div><div class="x-small"><strong>Instantly</strong></div></div></div>
+        <div class="card" style="padding:8px;"><div class="row-h between"><div class="x-small">Total</div><div class="x-small"><strong>21,003 sats</strong></div></div></div>
+        <div class="card" style="padding:6px 8px;text-align:center;background:#fef2f2;border-color:#fecaca;">
+          <div class="x-small" style="color:#991b1b;">⚠ Bitcoin transactions are irreversible</div>
+        </div>
+        <div class="card accent" style="text-align:center;padding:12px;margin-top:auto;"><div class="x-small" style="color:#fff;font-size:11px;">👆 Hold to send</div></div>
+      </div>
+    </div>
+    <div class="label">7. Send → confirm</div>
+    <div class="note">Network, fee, ETA, total — Wise-style transparency. <strong>Irreversibility warning</strong> always. Hold-to-send.</div>
+  </div>
+
+  <!-- 8. Receive -->
+  <div class="frame">
+    <div class="phone"><div class="notch"></div>
+      <div class="screen">
+        <div class="row-h"><div class="x-small">‹ Close</div></div>
+        <div class="med">Receive</div>
+        <div class="row-h" style="gap:4px;">
+          <div class="pill active">⚡ Lightning</div>
+          <div class="pill">⛓ on-chain</div>
+        </div>
+        <div class="qr"></div>
+        <div style="text-align:center;">
+          <div class="x-small"><strong>lea@yourapp.com</strong></div>
+          <div class="x-small">Your Lightning Address</div>
+        </div>
+        <div class="row-h" style="gap:6px;">
+          <div class="card" style="flex:1;text-align:center;padding:8px;"><div class="x-small">📋 Copy</div></div>
+          <div class="card" style="flex:1;text-align:center;padding:8px;"><div class="x-small">📤 Share</div></div>
+        </div>
+        <div class="card" style="padding:8px;background:#f3f4f6;">
+          <div class="x-small"><strong>Set amount?</strong></div>
+          <div class="x-small">Generate invoice for specific amount ›</div>
+        </div>
+        <div class="card" style="padding:8px;background:#fef3c7;border-color:#fde68a;margin-top:auto;">
+          <div class="x-small">💡 <strong>Lightning</strong> is best for &lt;€100. For larger amounts use on-chain.</div>
+        </div>
+      </div>
+    </div>
+    <div class="label">8. Receive (Lightning / on-chain tabs)</div>
+    <div class="note">Lightning Address as default — <strong>email-like, sharable</strong>. On-chain tab for larger amounts. Educational nudge included.</div>
+  </div>
+</div>
+
+<div class="group-title">Stack BTC (buy + DCA)</div>
+<div class="row">
+
+  <!-- 9. Buy now -->
+  <div class="frame">
+    <div class="phone"><div class="notch"></div>
+      <div class="screen">
+        <div class="row-h"><div class="x-small">‹ Cancel</div></div>
+        <div class="med">Buy Bitcoin</div>
+        <div class="card" style="padding:10px;">
+          <div class="x-small">Spend</div>
+          <div class="big" style="font-size:20px;">€100<span style="color:#9ca3af;">.00</span></div>
+        </div>
+        <div style="text-align:center;color:#9ca3af;font-size:14px;">↓</div>
+        <div class="card" style="padding:10px;background:#fef3c7;border-color:#fde68a;">
+          <div class="x-small">You get</div>
+          <div class="big" style="font-size:20px;color:#92400e;"><span class="sats">166,300</span> sats</div>
+        </div>
+        <div class="card" style="padding:8px;background:#f3f4f6;">
+          <div class="row-h between"><div class="x-small">BTC price</div><div class="x-small">€60,123</div></div>
+          <div class="row-h between"><div class="x-small">Spread</div><div class="x-small">0.15%</div></div>
+          <div class="row-h between"><div class="x-small">Fee</div><div class="x-small" style="color:#065f46;"><strong>Free</strong></div></div>
+        </div>
+        <div class="card" style="padding:8px;"><div class="row-h between"><div class="x-small">Pay with</div><div class="x-small"><strong>SEPA · ••4521 ›</strong></div></div></div>
+        <div class="card" style="padding:8px;"><div class="row-h between"><div class="x-small">Goes to</div><div class="x-small"><strong>Spending bucket ›</strong></div></div></div>
+        <div class="card accent" style="text-align:center;padding:12px;margin-top:auto;"><div class="x-small" style="color:#fff;">Buy €100 of BTC</div></div>
+      </div>
+    </div>
+    <div class="label">9. Buy now (one-shot)</div>
+    <div class="note"><strong>Two stacked panels: spend / get</strong>. Wise-style fee breakdown. Choose source bank + destination bucket.</div>
+  </div>
+
+  <!-- 10. DCA setup -->
+  <div class="frame">
+    <div class="phone"><div class="notch"></div>
+      <div class="screen">
+        <div class="row-h"><div class="x-small">‹ Back</div></div>
+        <div class="med">Auto-stack (DCA)</div>
+        <div class="x-small">Buy a fixed amount on schedule. Smooths volatility.</div>
+        <div class="card" style="padding:10px;">
+          <div class="x-small">Amount per buy</div>
+          <div class="med">€100</div>
+        </div>
+        <div class="card" style="padding:10px;">
+          <div class="x-small">Frequency</div>
+          <div class="row-h" style="gap:4px;margin-top:4px;">
+            <div class="pill">Daily</div>
+            <div class="pill active">Weekly</div>
+            <div class="pill">Monthly</div>
+          </div>
+          <div class="x-small" style="margin-top:4px;">Every Monday, 09:00</div>
+        </div>
+        <div class="card" style="padding:10px;">
+          <div class="x-small">Pay from</div>
+          <div class="x-small"><strong>SEPA · ••4521</strong></div>
+        </div>
+        <div class="card" style="padding:10px;">
+          <div class="x-small">Goes to</div>
+          <div class="x-small"><strong>🏖 Retirement bucket</strong></div>
+        </div>
+        <div class="card" style="padding:8px;background:#fef3c7;border-color:#fde68a;">
+          <div class="x-small"><strong>📈 Projected:</strong> ~5,200,000 sats / yr</div>
+          <div class="x-small">≈ €5,200 stacked annually</div>
+        </div>
+        <div class="card accent" style="text-align:center;padding:12px;margin-top:auto;"><div class="x-small" style="color:#fff;">Start DCA</div></div>
+      </div>
+    </div>
+    <div class="label">10. DCA setup</div>
+    <div class="note">Amount + frequency + source + destination. <strong>Show projected annual stack</strong> — motivates commitment.</div>
+  </div>
+
+  <!-- 11. DCA active -->
+  <div class="frame">
+    <div class="phone"><div class="notch"></div>
+      <div class="screen">
+        <div class="row-h between">
+          <div class="med">Auto-stack</div>
+          <div class="pill green">Active</div>
+        </div>
+        <div class="card" style="padding:10px;background:#fef3c7;border-color:#fde68a;">
+          <div class="x-small">Stacked so far</div>
+          <div class="big"><span class="sats">2,148,000</span> sats</div>
+          <div class="x-small">≈ €1,289 over 13 weeks</div>
+        </div>
+        <div class="sh">Schedule</div>
+        <div class="card" style="padding:8px;"><div class="row-h between"><div class="x-small"><strong>Next buy</strong></div><div class="x-small">Mon, 09:00</div></div><div class="row-h between"><div class="x-small">€100</div><div class="x-small">~166k sats</div></div></div>
+        <div class="sh">Last buys</div>
+        <div class="card" style="padding:4px 8px;">
+          <div class="tx"><div class="ico">↻</div><div class="name">Mon · Avg €60,123</div><div class="amt" style="color:#065f46;">+166,300</div></div>
+          <div class="tx"><div class="ico">↻</div><div class="name">Mon · Avg €58,890</div><div class="amt" style="color:#065f46;">+169,800</div></div>
+          <div class="tx"><div class="ico">↻</div><div class="name">Mon · Avg €61,200</div><div class="amt" style="color:#065f46;">+163,400</div></div>
+        </div>
+        <div class="row-h" style="gap:6px;margin-top:auto;">
+          <div class="card" style="flex:1;text-align:center;padding:8px;border:1px solid #1f2937;"><div class="x-small">Pause</div></div>
+          <div class="card" style="flex:1;text-align:center;padding:8px;border:1px solid #1f2937;"><div class="x-small">Edit</div></div>
+        </div>
+      </div>
+    </div>
+    <div class="label">11. DCA active state</div>
+    <div class="note"><strong>Cumulative stacked + history of buys with avg price</strong>. Pause/edit always available.</div>
+  </div>
+</div>
+
+<div class="group-title">Retirement plan (the differentiator)</div>
+<div class="row">
+
+  <!-- 12. Retirement dashboard -->
+  <div class="frame">
+    <div class="phone"><div class="notch"></div>
+      <div class="screen">
+        <div class="med">Retirement</div>
+        <div class="x-small">Goal: 1 BTC by 2055 (age 65)</div>
+        <div style="text-align:center;margin:8px 0;">
+          <div class="big" style="font-size:24px;"><span class="sats">4,210,000</span></div>
+          <div class="x-small">of 100,000,000 sats</div>
+          <div class="x-small">≈ 4.2% to goal</div>
+        </div>
+        <div class="bar" style="height:6px;"><div style="width:4.2%"></div></div>
+        <div class="chart" style="margin-top:12px;"></div>
+        <div class="x-small" style="text-align:center;">Projection · 30 yr horizon</div>
+        <div class="card" style="padding:8px;background:#fef3c7;border-color:#fde68a;">
+          <div class="row-h between"><div class="x-small">At current pace</div><div class="x-small"><strong>0.78 BTC by 2055</strong></div></div>
+          <div class="row-h between"><div class="x-small">To hit goal</div><div class="x-small"><strong>+€28/wk</strong></div></div>
+        </div>
+        <div class="card" style="padding:8px;"><div class="row-h between"><div class="x-small">Contribution</div><div class="x-small"><strong>€100/wk ›</strong></div></div></div>
+        <div class="card" style="padding:8px;"><div class="row-h between"><div class="x-small">🔒 Locked until</div><div class="x-small"><strong>Apr 2055</strong></div></div></div>
+        <div class="card" style="padding:8px;"><div class="row-h between"><div class="x-small">Custody</div><div class="x-small"><strong>Cold storage ›</strong></div></div></div>
+      </div>
+    </div>
+    <div class="label">12. Retirement dashboard</div>
+    <div class="note"><strong>Goal in BTC, progress %, projection chart, gap analysis</strong>. Lock + cold storage shown as trust signals.</div>
+  </div>
+
+  <!-- 13. Retirement contribute -->
+  <div class="frame">
+    <div class="phone"><div class="notch"></div>
+      <div class="screen">
+        <div class="row-h"><div class="x-small">‹ Back</div></div>
+        <div class="med">Adjust contribution</div>
+        <div class="x-small">Each tweak updates your projection live.</div>
+        <div class="card" style="padding:12px;text-align:center;">
+          <div class="big" style="font-size:24px;">€100<span style="color:#9ca3af;">/wk</span></div>
+          <div class="x-small">Drag to adjust</div>
+          <div class="bar" style="height:4px;margin-top:8px;"><div style="width:33%"></div></div>
+          <div class="row-h between" style="margin-top:4px;"><div class="x-small">€0</div><div class="x-small">€300</div></div>
+        </div>
+        <div class="card" style="padding:8px;background:#fef3c7;border-color:#fde68a;">
+          <div class="row-h between"><div class="x-small">Projected by 2055</div><div class="x-small"><strong>0.78 BTC</strong></div></div>
+          <div class="x-small" style="color:#92400e;">Need €128/wk for 1 BTC goal</div>
+        </div>
+        <div class="card" style="padding:8px;">
+          <div class="x-small"><strong>Smart suggestions</strong></div>
+          <div class="row-h" style="gap:4px;margin-top:4px;flex-wrap:wrap;">
+            <div class="pill">€50/wk</div>
+            <div class="pill">€100/wk</div>
+            <div class="pill active">€128/wk</div>
+            <div class="pill">€200/wk</div>
+          </div>
+        </div>
+        <div class="card" style="padding:8px;">
+          <div class="row-h between"><div class="x-small">Frequency</div><div class="x-small"><strong>Weekly ›</strong></div></div>
+        </div>
+        <div class="card accent" style="text-align:center;padding:12px;margin-top:auto;"><div class="x-small" style="color:#fff;">Save changes</div></div>
+      </div>
+    </div>
+    <div class="label">13. Retirement contribution slider</div>
+    <div class="note"><strong>Live projection on slider</strong> — instantly shows what €X more would do. Suggested amount = "exactly hit goal".</div>
+  </div>
+
+  <!-- 14. Retirement projection chart full -->
+  <div class="frame">
+    <div class="phone"><div class="notch"></div>
+      <div class="screen">
+        <div class="row-h"><div class="x-small">‹ Back</div></div>
+        <div class="med">Projection</div>
+        <div class="row-h" style="gap:4px;">
+          <div class="pill">Pessimistic</div>
+          <div class="pill active">Base case</div>
+          <div class="pill">Optimistic</div>
+        </div>
+        <div style="height:140px;background:linear-gradient(180deg,rgba(249,115,22,0.2),transparent);border-bottom:1px dashed #d1d5db;position:relative;border-radius:6px;margin-top:8px;">
+          <svg viewBox="0 0 100 50" preserveAspectRatio="none" style="width:100%;height:100%;">
+            <path d="M0,48 Q25,42 50,30 T100,5" stroke="#f97316" stroke-width="1.5" fill="none"/>
+            <path d="M0,48 Q25,40 50,25 T100,0" stroke="#f97316" stroke-width="0.8" fill="none" stroke-dasharray="2,1"/>
+            <path d="M0,48 Q25,45 50,38 T100,18" stroke="#f97316" stroke-width="0.8" fill="none" stroke-dasharray="2,1"/>
+          </svg>
+        </div>
+        <div class="row-h between"><div class="x-small">2026</div><div class="x-small">2055</div></div>
+        <div class="card" style="padding:8px;"><div class="row-h between"><div class="x-small">2030</div><div class="x-small">~0.18 BTC</div></div></div>
+        <div class="card" style="padding:8px;"><div class="row-h between"><div class="x-small">2040</div><div class="x-small">~0.41 BTC</div></div></div>
+        <div class="card" style="padding:8px;background:#fef3c7;border-color:#fde68a;"><div class="row-h between"><div class="x-small"><strong>2055 (goal)</strong></div><div class="x-small"><strong>~0.78 BTC</strong></div></div></div>
+        <div class="x-small" style="margin-top:auto;color:#9ca3af;">Projections are estimates only and not financial advice.</div>
+      </div>
+    </div>
+    <div class="label">14. Long-term projection</div>
+    <div class="note">Three scenarios. Milestone years called out. <strong>Disclaimer mandatory</strong> — projections are not advice.</div>
+  </div>
+
+</div>
+
+<div class="group-title">Trust & self-custody</div>
+<div class="row">
+
+  <!-- 15. Auto-withdraw -->
+  <div class="frame">
+    <div class="phone"><div class="notch"></div>
+      <div class="screen">
+        <div class="row-h"><div class="x-small">‹ Back</div></div>
+        <div class="med">Auto-withdraw</div>
+        <div class="x-small">Move sats to your own wallet automatically. Not your keys, not your coins.</div>
+        <div class="card" style="padding:10px;"><div class="row-h between"><div class="x-small"><strong>Auto-withdraw</strong></div><div class="toggle"></div></div></div>
+        <div class="card" style="padding:10px;">
+          <div class="x-small">Destination</div>
+          <div class="x-small" style="font-family:monospace;font-size:8px;color:#374151;">bc1qxy2k...wlh4gd</div>
+          <div class="x-small" style="color:#9ca3af;">My Coldcard</div>
+        </div>
+        <div class="card" style="padding:10px;">
+          <div class="x-small">Trigger</div>
+          <div class="row-h" style="gap:4px;margin-top:4px;flex-wrap:wrap;">
+            <div class="pill active">Threshold</div>
+            <div class="pill">Schedule</div>
+          </div>
+          <div class="x-small" style="margin-top:4px;">When balance &gt; <strong>1,000,000 sats</strong></div>
+        </div>
+        <div class="card" style="padding:10px;">
+          <div class="x-small">Network fee strategy</div>
+          <div class="row-h" style="gap:4px;margin-top:4px;">
+            <div class="pill">Slow</div>
+            <div class="pill active">Eco</div>
+            <div class="pill">Fast</div>
+          </div>
+        </div>
+        <div class="card" style="padding:8px;background:#fef3c7;border-color:#fde68a;margin-top:auto;">
+          <div class="x-small">💡 Recommended: leave only Spending sats on-app. Send savings + retirement to cold storage.</div>
+        </div>
+      </div>
+    </div>
+    <div class="label">15. Auto-withdraw to self-custody</div>
+    <div class="note">Power feature. Threshold OR schedule. Fee strategy. <strong>Educational copy makes it normal.</strong></div>
+  </div>
+
+  <!-- 16. Backup -->
+  <div class="frame">
+    <div class="phone"><div class="notch"></div>
+      <div class="screen">
+        <div class="row-h between"><div class="x-small">Step 4 of 6</div><div class="x-small"></div></div>
+        <div class="bar" style="height:3px;"><div style="width:67%"></div></div>
+        <div style="margin-top:12px;">
+          <div class="med">Back up your wallet</div>
+          <div class="x-small" style="margin-top:4px;">Write these 12 words down. Anyone with them can access your BTC.</div>
+        </div>
+        <div class="card" style="padding:10px;">
+          <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:4px;">
+            <div class="x-small"><span style="color:#9ca3af;">1.</span> ocean</div>
+            <div class="x-small"><span style="color:#9ca3af;">2.</span> pencil</div>
+            <div class="x-small"><span style="color:#9ca3af;">3.</span> ••••••</div>
+            <div class="x-small"><span style="color:#9ca3af;">4.</span> ••••••</div>
+            <div class="x-small"><span style="color:#9ca3af;">5.</span> ••••••</div>
+            <div class="x-small"><span style="color:#9ca3af;">6.</span> ••••••</div>
+            <div class="x-small"><span style="color:#9ca3af;">7.</span> ••••••</div>
+            <div class="x-small"><span style="color:#9ca3af;">8.</span> ••••••</div>
+            <div class="x-small"><span style="color:#9ca3af;">9.</span> ••••••</div>
+            <div class="x-small"><span style="color:#9ca3af;">10.</span> ••••••</div>
+            <div class="x-small"><span style="color:#9ca3af;">11.</span> ••••••</div>
+            <div class="x-small"><span style="color:#9ca3af;">12.</span> ••••••</div>
+          </div>
+          <div class="card" style="padding:6px;text-align:center;margin-top:8px;background:#f3f4f6;">
+            <div class="x-small">👁 Tap and hold to reveal</div>
+          </div>
+        </div>
+        <div class="card" style="padding:8px;background:#fef2f2;border-color:#fecaca;">
+          <div class="x-small" style="color:#991b1b;">⚠ Never share, screenshot, or store digitally.</div>
+        </div>
+        <div class="card accent" style="text-align:center;padding:12px;margin-top:auto;"><div class="x-small" style="color:#fff;">I've written them down</div></div>
+      </div>
+    </div>
+    <div class="label">16. Backup / recovery setup</div>
+    <div class="note">12 words hidden by default. <strong>Hold-to-reveal.</strong> Strong warnings. Only at onboarding + on-demand.</div>
+  </div>
+
+  <!-- 17. Education tooltip -->
+  <div class="frame">
+    <div class="phone"><div class="notch"></div>
+      <div class="screen">
+        <div class="row-h between">
+          <div class="block" style="width:24px;height:24px;border-radius:50%;"></div>
+          <div class="unit-toggle">
+            <div class="u">BTC</div>
+            <div class="u active">sats</div>
+            <div class="u">EUR</div>
+          </div>
+        </div>
+        <div class="x-small">Total balance</div>
+        <div class="big"><span class="sats">4,210,000</span> sats</div>
+        <div class="x-small">≈ €2,526.00</div>
+        <div class="card" style="padding:10px;background:#1f2937;color:#fff;border-color:#1f2937;position:relative;margin-top:8px;">
+          <div style="position:absolute;top:-6px;right:24px;width:0;height:0;border-left:6px solid transparent;border-right:6px solid transparent;border-bottom:6px solid #1f2937;"></div>
+          <div class="x-small" style="color:#fff;"><strong>What's a sat?</strong></div>
+          <div class="x-small" style="color:#d1d5db;margin-top:4px;">A satoshi (sat) is the smallest unit of BTC. 100M sats = 1 BTC. Sats make small amounts feel real.</div>
+          <div class="row-h between" style="margin-top:6px;">
+            <div class="x-small" style="color:#fef3c7;">Learn more →</div>
+            <div class="x-small" style="color:#9ca3af;">✕</div>
+          </div>
+        </div>
+        <div style="opacity:0.4;">
+          <div class="row-h" style="gap:8px;margin:8px 0;">
+            <div class="card" style="flex:1;text-align:center;padding:8px 4px;"><div class="block" style="width:18px;height:18px;border-radius:50%;margin:0 auto 4px;"></div><div class="x-small">Send</div></div>
+            <div class="card" style="flex:1;text-align:center;padding:8px 4px;"><div class="block" style="width:18px;height:18px;border-radius:50%;margin:0 auto 4px;"></div><div class="x-small">Receive</div></div>
+            <div class="card accent" style="flex:1;text-align:center;padding:8px 4px;"><div class="x-small" style="color:#fff;">Buy</div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="label">17. Inline education pattern</div>
+    <div class="note">Contextual tooltips for jargon (sats, Lightning, on-chain). <strong>Dismissible</strong> with "Learn more" deep link.</div>
+  </div>
+
+  <!-- 18. Biometric login -->
+  <div class="frame">
+    <div class="phone"><div class="notch"></div>
+      <div class="screen" style="justify-content:space-between;">
+        <div></div>
+        <div style="text-align:center;">
+          <div class="block accent" style="width:60px;height:60px;border-radius:16px;margin:0 auto 16px;display:flex;align-items:center;justify-content:center;color:#fff;font-size:28px;font-weight:700;">₿</div>
+          <div class="med">Welcome back</div>
+          <div class="x-small">Léa</div>
+          <div style="margin:32px 0;">
+            <div style="width:56px;height:56px;border-radius:50%;margin:0 auto;background:#1f2937;color:#fff;font-size:28px;line-height:56px;text-align:center;">⊙</div>
+            <div class="x-small" style="margin-top:8px;">Tap to use Face ID</div>
+          </div>
+        </div>
+        <div class="x-small" style="text-align:center;padding-bottom:8px;">Use PIN instead</div>
+      </div>
+    </div>
+    <div class="label">18. Biometric login</div>
+    <div class="note">Same as banking standard. Face ID default, PIN fallback.</div>
+  </div>
+
+</div>
+
+</body>
+</html>

@@ -22,5 +22,5 @@ async def get_feature_flags(
     session: Session = Depends(get_db_session),
 ) -> FeatureFlagsResponse:
     profile = profile_repo.get_or_create(session)
-    flags = resolve_feature_flags(profile.preset, profile.feature_flags)
+    flags = resolve_feature_flags(profile.feature_flags)
     return FeatureFlagsResponse(flags=flags)

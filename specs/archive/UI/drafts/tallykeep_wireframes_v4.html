@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>TallyKeep — UI wireframes v4 (onboarding update)</title>
+<style>
+  :root {
+    --bg: #f8fafc; --surface: #ffffff; --border: #e2e8f0; --border-strong: #cbd5e1;
+    --text: #0f172a; --text-muted: #64748b; --text-dim: #94a3b8; --sidebar: #f1f5f9;
+    --btc: #f59e0b; --btc-soft: #fef3c7;
+    --green: #16a34a; --green-soft: #dcfce7;
+    --amber: #ca8a04; --amber-soft: #fef9c3;
+    --red: #dc2626; --red-soft: #fee2e2;
+    --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  }
+  * { box-sizing: border-box; }
+  body { background: #e2e8f0; margin: 0; padding: 32px; font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; color: var(--text); font-size: 14px; line-height: 1.5; }
+  h1 { font-size: 24px; margin: 0 0 4px; }
+  .lede { color: var(--text-muted); margin-bottom: 24px; max-width: 820px; }
+  .changelog { background: #fef9c3; border: 1px solid #facc15; border-radius: 8px; padding: 12px 16px; margin-bottom: 24px; max-width: 820px; font-size: 13px; }
+  .changelog strong { color: #713f12; }
+  .group-title { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; color: var(--text-muted); margin: 40px 0 12px; }
+  .group-title:first-of-type { margin-top: 0; }
+  .window { width: 880px; max-width: 100%; background: var(--surface); border: 1px solid var(--border-strong); border-radius: 8px; box-shadow: 0 8px 24px rgba(15,23,42,0.08); margin-bottom: 28px; overflow: hidden; }
+  .titlebar { background: #f1f5f9; padding: 8px 12px; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 8px; }
+  .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--border-strong); }
+  .titlebar .url { flex: 1; text-align: center; font-size: 11px; color: var(--text-muted); font-family: var(--mono); }
+  .body { display: grid; grid-template-columns: 180px 1fr; min-height: 460px; }
+  .body.no-sidebar { grid-template-columns: 1fr; }
+  .sidebar { background: var(--sidebar); border-right: 1px solid var(--border); padding: 16px 8px; display: flex; flex-direction: column; gap: 2px; }
+  .sidebar .brand { font-weight: 700; font-size: 13px; padding: 6px 8px 16px; }
+  .nav-item { display: flex; align-items: center; gap: 8px; padding: 7px 10px; font-size: 12px; color: var(--text-muted); border-radius: 5px; }
+  .nav-item.active { background: var(--surface); color: var(--text); font-weight: 600; box-shadow: 0 1px 2px rgba(15,23,42,0.04); }
+  .nav-icon { width: 14px; height: 14px; border-radius: 3px; background: var(--border-strong); }
+  .nav-item.active .nav-icon { background: var(--btc); }
+  .sidebar .profile-chip { margin-top: auto; padding: 8px 10px; background: var(--surface); border: 1px solid var(--border); border-radius: 5px; font-size: 11px; }
+  .sidebar .profile-chip .lab { color: var(--text-dim); font-size: 10px; }
+  .main { padding: 20px 24px; }
+  .h-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+  .h-row h2 { margin: 0; font-size: 18px; font-weight: 600; }
+  .btn { padding: 6px 12px; font-size: 12px; border-radius: 5px; border: 1px solid var(--border-strong); background: var(--surface); color: var(--text); font-weight: 500; }
+  .btn.primary { background: var(--text); color: var(--surface); border-color: var(--text); }
+  .btn.ghost { border-color: transparent; background: transparent; color: var(--text-muted); }
+  .badge { display: inline-block; font-size: 10px; padding: 1px 6px; border-radius: 3px; font-weight: 600; vertical-align: middle; }
+  .badge.green { background: var(--green-soft); color: var(--green); }
+  .badge.amber { background: var(--amber-soft); color: var(--amber); }
+  .badge.gray { background: var(--border); color: var(--text-muted); }
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 14px 16px; }
+  .card h3 { margin: 0 0 12px; font-size: 13px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); }
+  .field { margin-bottom: 12px; }
+  .field label { display: block; font-size: 11px; color: var(--text-muted); margin-bottom: 4px; font-weight: 500; }
+  .input { display: block; width: 100%; padding: 7px 10px; font-size: 12px; border: 1px solid var(--border-strong); border-radius: 4px; background: var(--surface); font-family: inherit; }
+  .check-card { padding: 12px 14px; border: 1px solid var(--border-strong); border-radius: 6px; margin-bottom: 8px; display: flex; gap: 12px; align-items: flex-start; }
+  .check-card.selected { border-color: var(--text); background: #f8fafc; }
+  .check-card .checkbox { width: 18px; height: 18px; border: 1.5px solid var(--border-strong); border-radius: 4px; flex-shrink: 0; margin-top: 1px; }
+  .check-card.selected .checkbox { background: var(--text); border-color: var(--text); position: relative; }
+  .check-card.selected .checkbox::after { content: '✓'; color: white; position: absolute; top: -2px; left: 3px; font-size: 13px; font-weight: 700; }
+  .check-card .radio { width: 16px; height: 16px; border: 1.5px solid var(--border-strong); border-radius: 50%; flex-shrink: 0; margin-top: 2px; }
+  .check-card.selected .radio { border-color: var(--text); position: relative; }
+  .check-card.selected .radio::after { content: ''; position: absolute; top: 2px; left: 2px; width: 8px; height: 8px; border-radius: 50%; background: var(--text); }
+  .check-card .body-text { flex: 1; }
+  .check-card .title { font-weight: 600; font-size: 13px; }
+  .check-card .desc { color: var(--text-muted); font-size: 11px; margin-top: 2px; line-height: 1.4; }
+  .steps { display: flex; gap: 0; align-items: center; margin-bottom: 16px; font-size: 11px; color: var(--text-muted); flex-wrap: wrap; }
+  .step { padding: 4px 8px; }
+  .step.active { color: var(--text); font-weight: 600; }
+  .step.done { color: var(--green); }
+  .step-sep { color: var(--text-dim); }
+  .label { font-size: 13px; font-weight: 600; padding: 8px 4px 0; color: var(--text); }
+  .note { font-size: 12px; color: var(--text-muted); line-height: 1.55; padding-left: 4px; padding-top: 8px; max-width: 880px; }
+  .note strong { color: var(--text); }
+  .row { display: flex; align-items: center; gap: 8px; }
+  .between { display: flex; align-items: center; justify-content: space-between; }
+  hr { border: none; border-top: 1px solid var(--border); margin: 12px 0; }
+  .toggle { width: 32px; height: 18px; border-radius: 999px; background: var(--text); position: relative; flex-shrink: 0; }
+  .toggle::after { content: ''; position: absolute; right: 1px; top: 1px; width: 16px; height: 16px; border-radius: 50%; background: #fff; }
+  .toggle.off { background: var(--border-strong); }
+  .toggle.off::after { left: 1px; right: auto; }
+  .small { font-size: 11px; color: var(--text-muted); }
+</style>
+</head>
+<body>
+
+<h1>TallyKeep wireframes — v4</h1>
+<div class="lede">Iteration on the v3 set. This file shows the <strong>new onboarding flow</strong> replacing v3's single "Profile selection" screen. Other screens (Home, Holdings, Send, Receive, Trading, Sweep, Blueprint) are unchanged from v3 and not redrawn here — refer to v3.</div>
+
+<div class="changelog">
+<strong>Changelog vs v3:</strong>
+<ul style="margin:6px 0 0 0; padding-left:20px;">
+  <li>Replaced "Profile selection" screen with a 2-question onboarding (+ optional 3rd) and a setup-review screen</li>
+  <li>Dropped <code>Beginner / Intermediate / Sovereign</code> naming. The configuration emerges from answers; no preset identity.</li>
+  <li>Sidebar profile chip now reads "Custom setup" instead of "Intermediate"</li>
+</ul>
+See <code>spec_amendments.md</code> for the rationale and flag-derivation tables.
+</div>
+
+<div class="group-title">Onboarding (replaces v3 screen 1)</div>
+
+<!-- Question 1 — Where is your BTC -->
+<div class="window">
+  <div class="titlebar"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="url">localhost:8080 · TallyKeep · Setup</span></div>
+  <div class="body no-sidebar">
+    <div class="main" style="max-width: 660px; margin: 0 auto; padding: 36px 24px;">
+      <div class="steps">
+        <span class="step done">✓ Welcome</span><span class="step-sep">›</span>
+        <span class="step done">✓ Encryption</span><span class="step-sep">›</span>
+        <span class="step active">Setup · 1 of 3</span><span class="step-sep">›</span>
+        <span class="step">Node</span><span class="step-sep">›</span>
+        <span class="step">First Holding</span>
+      </div>
+      <h2 style="font-size: 22px; margin: 0 0 4px;">Where is your Bitcoin currently?</h2>
+      <div class="small" style="margin-bottom: 18px;">Pick everything that applies. Skip what doesn't. We'll show you only the parts of TallyKeep you actually need.</div>
+
+      <div class="check-card selected">
+        <div class="checkbox"></div>
+        <div class="body-text">
+          <div class="title">A custodial exchange <span class="small" style="font-weight:400;">— Kraken, Bitstamp, Coinbase, Swissquote…</span></div>
+          <div class="desc">We'll connect to it via API to read your balance and trigger withdrawals to your own wallets. Your keys stay on the exchange; we just orchestrate the moves.</div>
+        </div>
+      </div>
+
+      <div class="check-card selected">
+        <div class="checkbox"></div>
+        <div class="body-text">
+          <div class="title">A software wallet on my phone or laptop</div>
+          <div class="desc">A daily-use wallet you sign with. We'll import the watch-only descriptor (or xpub) — the keys never leave your device.</div>
+        </div>
+      </div>
+
+      <div class="check-card selected">
+        <div class="checkbox"></div>
+        <div class="body-text">
+          <div class="title">A hardware wallet <span class="small" style="font-weight:400;">— Coldcard, Trezor, Ledger, Jade…</span></div>
+          <div class="desc">We'll import the watch-only descriptor and generate PSBTs for you to sign on the device.</div>
+        </div>
+      </div>
+
+      <div class="check-card">
+        <div class="checkbox"></div>
+        <div class="body-text">
+          <div class="title">A multisig setup</div>
+          <div class="desc">Multi-key wallet, possibly with timelocks or geographic separation. <span class="small">Note: v1 stores Vault metadata but only single-key descriptors are accepted on-chain. Full multisig support arrives in v2.</span></div>
+        </div>
+      </div>
+
+      <div class="check-card">
+        <div class="checkbox"></div>
+        <div class="body-text">
+          <div class="title">I don't have any Bitcoin yet</div>
+          <div class="desc">We'll show you how to acquire some via a connected exchange. TallyKeep manages Bitcoin you have — it doesn't broker the buy itself.</div>
+        </div>
+      </div>
+
+      <div style="display:flex; justify-content:space-between; margin-top:24px;">
+        <button class="btn ghost">Back</button>
+        <button class="btn primary">Continue →</button>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="label">Onboarding 1 — "Where is your Bitcoin?"</div>
+<div class="note">Multi-select. Each checkbox derives one or more feature flags (see spec_amendments.md table). Three checked here would enable Account, Purse, Strongbox, Trading, and Trading→Sweep policy. The user only sees Holding types they actually have. Multisig has its v1-limitation footnote inline.</div>
+
+<!-- Question 2 — Detail level -->
+<div class="window">
+  <div class="titlebar"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="url">localhost:8080 · TallyKeep · Setup</span></div>
+  <div class="body no-sidebar">
+    <div class="main" style="max-width: 660px; margin: 0 auto; padding: 36px 24px;">
+      <div class="steps">
+        <span class="step done">✓ Welcome</span><span class="step-sep">›</span>
+        <span class="step done">✓ Encryption</span><span class="step-sep">›</span>
+        <span class="step active">Setup · 2 of 3</span><span class="step-sep">›</span>
+        <span class="step">Node</span><span class="step-sep">›</span>
+        <span class="step">First Holding</span>
+      </div>
+      <h2 style="font-size: 22px; margin: 0 0 4px;">How much detail do you want to see?</h2>
+      <div class="small" style="margin-bottom: 18px;">This is about the UI, not your skill. You can change it anytime.</div>
+
+      <div class="check-card">
+        <div class="radio"></div>
+        <div class="body-text">
+          <div class="title">Just the essentials</div>
+          <div class="desc">Balances, send, receive, transactions. Hide UTXOs, derivation paths, raw transaction data, and the technical bits.</div>
+        </div>
+      </div>
+
+      <div class="check-card selected">
+        <div class="radio"></div>
+        <div class="body-text">
+          <div class="title">Standard view <span class="badge gray" style="font-weight:500;">recommended</span></div>
+          <div class="desc">Everything in Essentials, plus UTXO listing, hygiene flags, descriptor expressions, and the security analyzer.</div>
+        </div>
+      </div>
+
+      <div class="check-card">
+        <div class="radio"></div>
+        <div class="body-text">
+          <div class="title">Show me everything</div>
+          <div class="desc">Everything in Standard, plus coin control on send, custom fee rates (sat/vB), raw transaction hex, replace-by-fee, dry-run sweep policies, and the API documentation link.</div>
+        </div>
+      </div>
+
+      <div style="display:flex; justify-content:space-between; margin-top:24px;">
+        <button class="btn ghost">Back</button>
+        <button class="btn primary">Continue →</button>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="label">Onboarding 2 — "How much detail?"</div>
+<div class="note">Single-select, default <strong>Standard</strong>. The labels describe the UI ("how much you see"), not the user. Each option lists what it adds vs. the previous tier — so the user understands the trade-off concretely. This question alone derives the verbosity flags (UTXO views, raw tx, descriptor, coin control, custom fee rate, RBF, etc.).</div>
+
+<!-- Question 3 — Privacy preference (optional) -->
+<div class="window">
+  <div class="titlebar"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="url">localhost:8080 · TallyKeep · Setup</span></div>
+  <div class="body no-sidebar">
+    <div class="main" style="max-width: 660px; margin: 0 auto; padding: 36px 24px;">
+      <div class="steps">
+        <span class="step done">✓ Welcome</span><span class="step-sep">›</span>
+        <span class="step done">✓ Encryption</span><span class="step-sep">›</span>
+        <span class="step active">Setup · 3 of 3</span><span class="step-sep">›</span>
+        <span class="step">Node</span><span class="step-sep">›</span>
+        <span class="step">First Holding</span>
+      </div>
+      <h2 style="font-size: 22px; margin: 0 0 4px;">Chain-analysis privacy</h2>
+      <div class="small" style="margin-bottom: 18px;">TallyKeep can warn you about transactions that leak privacy (address reuse, dust UTXOs, round-number outputs). How proactive should it be? Skip if you're not sure.</div>
+
+      <div class="check-card">
+        <div class="radio"></div>
+        <div class="body-text">
+          <div class="title">Yes, flag privacy issues actively</div>
+          <div class="desc">Blueprint section in nav, hygiene warnings shown inline on every Holding. Recommended if you care about not being clustered by chain analysis.</div>
+        </div>
+      </div>
+
+      <div class="check-card selected">
+        <div class="radio"></div>
+        <div class="body-text">
+          <div class="title">Show me if I ask <span class="badge gray" style="font-weight:500;">default</span></div>
+          <div class="desc">Blueprint available in nav but not foregrounded. Hygiene info shown when you open a UTXO detail.</div>
+        </div>
+      </div>
+
+      <div class="check-card">
+        <div class="radio"></div>
+        <div class="body-text">
+          <div class="title">Don't bother me about it</div>
+          <div class="desc">Hide the Blueprint section entirely. You can re-enable in Settings if you change your mind.</div>
+        </div>
+      </div>
+
+      <div style="display:flex; justify-content:space-between; margin-top:24px;">
+        <button class="btn ghost">Skip</button>
+        <button class="btn primary">Continue →</button>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="label">Onboarding 3 — Privacy preference (optional)</div>
+<div class="note">Skippable. Defaults to "Show me if I ask" — sensible middle. Drives <code>analysis.blueprint.shown</code> in nav prominence and inline hygiene warnings.</div>
+
+<!-- Setup review -->
+<div class="window">
+  <div class="titlebar"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="url">localhost:8080 · TallyKeep · Setup · Review</span></div>
+  <div class="body no-sidebar">
+    <div class="main" style="max-width: 660px; margin: 0 auto; padding: 32px 24px;">
+      <div class="steps">
+        <span class="step done">✓ Welcome</span><span class="step-sep">›</span>
+        <span class="step done">✓ Encryption</span><span class="step-sep">›</span>
+        <span class="step done">✓ Setup</span><span class="step-sep">›</span>
+        <span class="step active">Review</span>
+      </div>
+      <h2 style="font-size: 22px; margin: 0 0 4px;">Here's your setup</h2>
+      <div class="small" style="margin-bottom: 18px;">Based on your answers. Toggle anything you want to change — these settings live in Settings later too.</div>
+
+      <div class="card">
+        <h3>Holding types</h3>
+        <div class="between" style="margin-bottom: 8px;"><div><strong>Account</strong> <span class="small">— exchange-held funds</span></div><div class="toggle"></div></div>
+        <div class="between" style="margin-bottom: 8px;"><div><strong>Purse</strong> <span class="small">— online software wallet</span></div><div class="toggle"></div></div>
+        <div class="between" style="margin-bottom: 8px;"><div><strong>Strongbox</strong> <span class="small">— hardware wallet</span></div><div class="toggle"></div></div>
+        <div class="between"><div><strong>Vault</strong> <span class="small">— multisig / ceremonial</span></div><div class="toggle off"></div></div>
+      </div>
+
+      <div class="card" style="margin-top: 12px;">
+        <h3>UI detail</h3>
+        <div class="between" style="margin-bottom: 8px;"><div><strong>UTXO list</strong> <span class="small">on Holding pages</span></div><div class="toggle"></div></div>
+        <div class="between" style="margin-bottom: 8px;"><div><strong>Hygiene flags</strong> <span class="small">on UTXOs</span></div><div class="toggle"></div></div>
+        <div class="between" style="margin-bottom: 8px;"><div><strong>Descriptor expressions</strong> <span class="small">in Settings</span></div><div class="toggle"></div></div>
+        <div class="between" style="margin-bottom: 8px;"><div><strong>Coin control</strong> <span class="small">manual UTXO selection on send</span></div><div class="toggle off"></div></div>
+        <div class="between" style="margin-bottom: 8px;"><div><strong>Custom fee rate</strong> <span class="small">sat/vB input</span></div><div class="toggle off"></div></div>
+        <div class="between"><div><strong>Raw transaction hex</strong> <span class="small">in transaction detail</span></div><div class="toggle off"></div></div>
+      </div>
+
+      <div class="card" style="margin-top: 12px;">
+        <h3>Trading & sweeps</h3>
+        <div class="between" style="margin-bottom: 8px;"><div><strong>Trading section</strong></div><div class="toggle"></div></div>
+        <div class="between" style="margin-bottom: 8px;"><div><strong>Sweep policies</strong></div><div class="toggle"></div></div>
+        <div class="between"><div><strong>Require confirmation before each sweep</strong></div><div class="toggle"></div></div>
+      </div>
+
+      <div class="card" style="margin-top: 12px;">
+        <h3>Privacy</h3>
+        <div class="between" style="margin-bottom: 8px;"><div><strong>Blueprint section in nav</strong></div><div class="toggle"></div></div>
+        <div class="between"><div><strong>Inline hygiene warnings</strong></div><div class="toggle off"></div></div>
+      </div>
+
+      <div style="display:flex; justify-content:space-between; margin-top:20px;">
+        <button class="btn ghost">Back</button>
+        <button class="btn primary">Looks good — continue →</button>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="label">Onboarding 4 — Setup review</div>
+<div class="note">Every flag derived from the answers, grouped by category, with toggles. The user can override anything before continuing. Default state matches the answers given. <strong>No preset name appears anywhere</strong> — there's no "you are an Intermediate user" label. The configuration just is what it is.</div>
+
+<div class="group-title">Side note: how the sidebar reflects this</div>
+
+<div class="window">
+  <div class="titlebar"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="url">localhost:8080 · TallyKeep · Home</span></div>
+  <div class="body">
+    <nav class="sidebar">
+      <div class="brand">TallyKeep</div>
+      <div class="nav-item active"><span class="nav-icon"></span>Home</div>
+      <div class="nav-item"><span class="nav-icon"></span>Holdings</div>
+      <div class="nav-item"><span class="nav-icon"></span>Send</div>
+      <div class="nav-item"><span class="nav-icon"></span>Receive</div>
+      <div class="nav-item"><span class="nav-icon"></span>Trading</div>
+      <div class="nav-item"><span class="nav-icon"></span>Blueprint</div>
+      <div class="nav-item"><span class="nav-icon"></span>Settings</div>
+      <div class="profile-chip">
+        <div class="lab">Setup</div>
+        <div>Custom <span class="small">· edit</span></div>
+      </div>
+    </nav>
+    <div class="main" style="display:flex; align-items:center; justify-content:center; color: var(--text-muted); font-size: 13px;">
+      <div style="text-align:center;">
+        Home content as in v3 — only the profile chip changed.<br>
+        <span class="small">"Custom" instead of "Intermediate" since presets are gone.</span>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="label">Sidebar profile chip — refreshed</div>
+<div class="note">No preset names anywhere in the chrome. The chip just says "Custom" with an edit affordance back to the question screens.</div>
+
+</body>
+</html>

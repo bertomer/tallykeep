@@ -1,6 +1,6 @@
-# 06 — Banking Layer (On-Chain, v1)
+# 06 — Banking Layer (On-Chain)
 
-Scope: **send and receive Bitcoin on-chain** for non-Account Holdings. PSBTs are signed on the user's external device; we never sign. Lightning is deferred to v1.5 and defined behind the `LightningProvider` interface (module 08).
+Scope: **send and receive Bitcoin on-chain** for non-Account Holdings. PSBTs are signed on the user's external device; we never sign. Lightning is deferred to a later iteration and defined behind the `LightningProvider` interface (module 08).
 
 ## Responsibilities
 
@@ -37,10 +37,10 @@ The frontend posts to `POST /api/v1/banking/payment-requests`.
 `BankingService.build_payment_request`:
 
 1. Loads the source Holding and its Descriptors.
-2. **Vault guardrail**: if the Holding is a Vault with `purpose=long_term`, returns a 200 response with `requires_confirmation=true` and a warning message instead of immediately creating the PaymentRequest. Frontend re-submits with `?confirmed=true` after the user explicitly acknowledges.
+2. **Vault guardrail**: applied per the description in module 05 §"Vault outgoing-payment guardrail" — that module is the canonical home for the rule. The endpoint behavior is the one described there (returns 200 with `requires_confirmation=true` and explanation; frontend re-submits with explicit acknowledgement). The behavior is gated by the `banking.vault_outgoing_warns` feature flag.
 3. Loads current unspent UTXOs for the Descriptor(s), excluding frozen ones.
 4. Asks BDK to build a transaction:
-   - Coin selection algorithm: configurable per-installation. Default is **BranchAndBound** (privacy-preferring, minimizes change-output identifiability). Sovereign profile allows the user to override per-payment.
+   - Coin selection algorithm: configurable per-installation. Default is **BranchAndBound** (privacy-preferring, minimizes change-output identifiability). Per-payment override is gated by the `banking.coin_selection_per_payment_override` feature flag.
    - Change address: next unused address on the change branch of the source Descriptor.
    - Fee rate: from the named strategy (resolved using bitcoind's `estimatesmartfee`) or the explicit input.
 5. BDK returns the unsigned PSBT.
@@ -62,21 +62,21 @@ The PaymentRequest exposes the PSBT through:
 - **Single QR code** — for PSBTs under approximately 1000 bytes, returned by the `.qr` endpoint as a PNG. Available when `banking.psbt_qr.enabled` is on.
 - **Base64 string** — for clipboard transfer, returned in the JSON response of the GET endpoint.
 
-**v1 implements** file download and single QR. **v1.1 adds** animated multi-frame QR using BBQr or UR2 specifications, for PSBTs that exceed the single-QR size limit.
+**Currently implemented:** file download and single QR. **Deferred (see `future_iterations.md` "PSBT-by-QR roundtrip on mobile"):** animated multi-frame QR using BBQr or UR2 specifications, for PSBTs that exceed the single-QR size limit.
 
 ### Step 4: User signs externally
 
 This happens outside our app. Compatible signers include:
 
-- ColdCard Mk4 (USB, SD card, single QR; multi-frame QR in v1.1)
+- ColdCard Mk4 (USB, SD card, single QR; multi-frame QR deferred)
 - Trezor Model T (USB)
 - Ledger Nano S/X (USB)
-- Jade (USB; multi-frame QR in v1.1)
+- Jade (USB; multi-frame QR deferred)
 - Sparrow as a software signer
 - Electrum as a software signer
 - Airgapped Bitcoin Core via file transfer
 
-For v1, file export covers all of them.
+Currently, file export covers all of them.
 
 ### Step 5: User submits the signed PSBT
 
@@ -115,14 +115,14 @@ The link from PaymentRequest to LedgerEntry is now persistent. The user can clic
 `POST /api/v1/banking/payment-requests/{id}/cancel`:
 - Allowed when status is in `{DRAFT, AWAITING_SIGNATURE, AWAITING_BROADCAST}`.
 - Sets status to `CANCELLED`.
-- Cancellation after broadcast is not possible on-chain. The UI offers Replace-By-Fee in v1.x for this case.
+- Cancellation after broadcast is not possible on-chain. Replace-By-Fee handles this case once that iteration ships — see `future_iterations.md` "Replace-By-Fee (RBF) support".
 
 ## Fee user experience (honest abstraction)
 
 The fiat-banking vocabulary mapping:
 
 - **Standard** = on-chain, user picks one of three tiers
-- **Instant** = Lightning (deferred to v1.5; visible but disabled in v1)
+- **Instant** = Lightning (deferred; visible but disabled until the Lightning iteration ships)
 
 Within Standard, three named tiers from bitcoind's `estimatesmartfee`:
 
@@ -179,14 +179,14 @@ Bitcoin does not enforce invoice semantics, so subsequent payments to the same a
 
 ## PSBT format compatibility
 
-- **BIP 174 v0** for maximum compatibility. BIP 370 (PSBT v2) considered for v1.1 once hardware support is broader.
+- **BIP 174 v0** for maximum compatibility. BIP 370 (PSBT v2) considered later once hardware support is broader.
 - Non-witness UTXO data embedded for legacy signer compatibility.
 - BIP 32 derivation info on all inputs (required by most hardware signers).
 - BIP 32 derivation info on change outputs so signers can verify the change path matches the source wallet (prevents change-output confusion attacks).
 
-## Hardware signer compatibility targets for v1
+## Hardware signer compatibility targets
 
-| Signer | v1 |
+| Signer | Supported via |
 |---|---|
 | ColdCard Mk4 | File over USB or SD; single QR if small |
 | Trezor Model T | File over USB |
@@ -196,7 +196,7 @@ Bitcoin does not enforce invoice semantics, so subsequent payments to the same a
 | Electrum (as signer) | File |
 | Airgapped Bitcoin Core | File transfer |
 
-v1's common denominator is file export. v1.1 broadens to multi-frame QR for the QR-friendly signers.
+The current common denominator is file export. Multi-frame QR for the QR-friendly signers is captured in `future_iterations.md` ("PSBT-by-QR roundtrip on mobile").
 
 ## Edge cases and error handling
 
@@ -209,7 +209,7 @@ v1's common denominator is file export. v1.1 broadens to multi-frame QR for the 
 | User re-derives PSBT after one was already signed | New PSBT replaces old; old marked CANCELLED |
 | bitcoind unreachable at broadcast time | 503; job retried by worker with backoff; user notified via SSE |
 | User attempts outgoing from Account | 400, `/errors/account-cannot-send`, suggests using sweep |
-| User attempts outgoing from long-term Vault | First call returns 200 with `requires_confirmation=true`; second call with explicit confirmation proceeds |
+| User attempts outgoing from long-term Vault | First call returns 200 with `requires_confirmation=true`; second call with explicit confirmation proceeds. Behavior canonically defined in module 05 §"Vault outgoing-payment guardrail". |
 
 ## Concurrency
 

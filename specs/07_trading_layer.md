@@ -1,6 +1,6 @@
-# 07 — Trading Layer (v1: read-only and policy-driven sweeps)
+# 07 — Trading Layer (read-only and policy-driven sweeps)
 
-Scope: aggregate **read-only views** across CustodialProviders and execute **withdrawal-only operations** driven by SweepPolicies. Order placement is explicitly out of scope for v1.
+Scope: aggregate **read-only views** across CustodialProviders and execute **withdrawal-only operations** driven by SweepPolicies. Order placement is explicitly out of scope (locked principle: see "Regulatory distance posture" below).
 
 ## Product principle: minimum-exposure trading
 
@@ -8,7 +8,7 @@ The CustodialProvider is **pass-through liquidity, not storage**. The design ass
 
 This is the insight of the Trading layer. It is what distinguishes the product from a portfolio tracker.
 
-## Responsibilities (v1)
+## Responsibilities
 
 1. Connect to supported CustodialProviders via ccxt using user-provided API credentials with read and withdrawal permissions only (trade permissions are rejected at registration).
 2. Poll provider balances and surface them through Account Holdings.
@@ -17,26 +17,26 @@ This is the insight of the Trading layer. It is what distinguishes the product f
 5. Persist every sweep attempt to `sweep_execution` for audit.
 6. Reconcile provider-reported withdrawals with the resulting on-chain LedgerEntries.
 
-## Non-responsibilities (v1)
+## Non-responsibilities
 
-- **No order placement.** ccxt's `create_order` and all trade endpoints are never called. This keeps v1 out of any "trading bot" regulatory framing.
+- **No order placement.** ccxt's `create_order` and all trade endpoints are never called. This keeps the app out of any "trading bot" regulatory framing. Order placement is captured in `future_iterations.md` ("Order placement on custodial providers") and requires fresh regulatory evaluation before commit.
 - **No stablecoin or non-BTC asset tracking.** Other-asset balances may be displayed read-only but are not actionable.
 - **No fiat deposit or withdrawal automation.**
 
-## Supported CustodialProviders (v1)
+## Supported CustodialProviders
 
 | Provider | Adapter id | Whitelist API support | Tier |
 |---|---|---|---|
 | Kraken | `kraken` | Yes (WithdrawAddresses) | First-class |
 | Bitstamp | `bitstamp` | Whitelist set via web UI; API consumes whitelisted address names | First-class |
 
-Future v1.x: Bitfinex, Coinbase Advanced. Future v1.x: a custom Swissquote adapter (outside ccxt). The adapter abstraction makes adding providers a localized change — see module 01's three-layer separation.
+Deferred adapter expansion is captured in `future_iterations.md` ("Additional CustodialProvider adapters" — Bitfinex, Coinbase Advanced, LatAm-native venues; "Custom adapter for non-ccxt venues" — Swissquote). The adapter abstraction makes adding providers a localized change — see module 01's three-layer separation.
 
 ## API credential constraints
 
 ### Registration flow
 
-The user provides API credentials when creating an Account Holding (see module 04, `POST /api/v1/holdings/account`).
+The user provides API credentials when creating an Account Holding (the request shape lives in `api/openapi.yaml` under `POST /api/v1/holdings/account`; cross-cutting conventions in `04_api_conventions.md`).
 
 Backend:
 1. Calls the provider's "get key permissions" endpoint via the appropriate adapter.
@@ -101,7 +101,7 @@ The SweepEngine subscriber listens for `trading.custodial.balance_changed` event
 
 When a SweepPolicy is created or modified, the validator runs and computes `safety_warnings`. The policy cannot be enabled until all warnings are acknowledged. The user can acknowledge them via `POST /api/v1/sweep-policies/{id}/acknowledge-warnings`.
 
-Validator rules in v1:
+Validator rules:
 
 | Warning | Severity | Condition |
 |---|---|---|
@@ -201,7 +201,7 @@ The mechanics differ from Account-source sweeps: the SweepEngine constructs a Pa
 - **`maximum_per_period_sats`**: enforced. The accumulated total of completed sweeps in the rolling 24h window is checked before each execution.
 - **Dry-run flag** per policy (`is_dry_run` field): when true, the sweep evaluates and persists `sweep_execution` rows but does not dispatch. Useful for testing setup.
 - **Global pause**: `POST /api/v1/sweep-policies/pause-all` sets a runtime-configuration flag. While paused, the SweepEngine consumes events but does not execute. UI surfaces this prominently.
-- **Per-policy `requires_user_confirmation`**: when true, every execution prompts. Default for Beginner and Intermediate profiles. Sovereign profile defaults this to false.
+- **Per-policy `requires_user_confirmation`**: when true, every execution prompts. Default `true` (the global flag `trading.sweep_confirmation.required` controls the default for newly-created policies; users can change it per policy thereafter).
 
 ## What the user sees
 
@@ -256,4 +256,4 @@ The architecture keeps the app on the right side of these lines:
 - We do NOT match buyers and sellers → no exchange role.
 - The user's relationship with each CustodialProvider is direct; we are a client to their API, on the user's behalf, from the user's own machine, with the user's own credentials.
 
-This is why v1 is read-only plus withdrawal-only. Adding order placement in v2 is a deliberate step up the regulatory ladder and will require fresh evaluation.
+This is why the current scope is read-only plus withdrawal-only. Adding order placement is a deliberate step up the regulatory ladder and will require fresh evaluation — it is captured in `future_iterations.md` and explicitly not in the dev or personal-use phase.

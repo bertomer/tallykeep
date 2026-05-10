@@ -19,6 +19,7 @@ def _purse_body(name: str = "wallet") -> dict:
     return {
         "name": name,
         "purpose": "spending",
+        "seed_origin": "external_watch_only",
         "declared_security": {
             "custody_model": "self_single",
             "signing_model": "software_hot",

@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 380 120" aria-label="tallykeep">
+  <title>TallyKeep — plain wordmark (display tier, 92 px)</title>
+  <desc>Wordmark in Manrope 600, lowercase, letter-spacing -2. Display-tier sizing. Default fill is #1A1A1A; for dark surfaces, override fill to the appropriate cream value.</desc>
+  <text x="0" y="92"
+        font-family="Manrope, system-ui, sans-serif"
+        font-weight="600"
+        font-size="92"
+        letter-spacing="-2"
+        fill="#1A1A1A">tallykeep</text>
+</svg>

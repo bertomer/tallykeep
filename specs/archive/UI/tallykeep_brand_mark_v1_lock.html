@@ -1,0 +1,764 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>TallyKeep — brand mark v1.0 · lock & handoff</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+    background: #FAFAF7;
+    color: #2A2A2A;
+    margin: 0;
+    padding: 0;
+    line-height: 1.6;
+    font-size: 15px;
+  }
+  .doc { max-width: 880px; margin: 0 auto; padding: 64px 40px 120px; }
+
+  /* Header */
+  .meta {
+    font-family: ui-monospace, "SF Mono", monospace;
+    font-size: 11px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: #B0915E;
+    margin-bottom: 12px;
+  }
+  h1 {
+    font-size: 42px;
+    font-weight: 700;
+    margin: 0 0 12px;
+    letter-spacing: -0.025em;
+    color: #1A1A1A;
+  }
+  .lead {
+    font-size: 17px;
+    color: #555;
+    margin: 0 0 16px;
+    max-width: 640px;
+    line-height: 1.55;
+  }
+  .stamp {
+    font-family: ui-monospace, monospace;
+    font-size: 11px;
+    color: #999;
+    letter-spacing: 0.05em;
+  }
+
+  /* Sections */
+  section { margin-top: 72px; }
+  h2 {
+    font-size: 22px;
+    font-weight: 700;
+    margin: 0 0 24px;
+    letter-spacing: -0.015em;
+    color: #1A1A1A;
+    padding-bottom: 8px;
+    border-bottom: 1px solid #E8E2D2;
+  }
+  h3 {
+    font-size: 14px;
+    font-weight: 600;
+    margin: 28px 0 10px;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+    color: #444;
+  }
+  p { margin: 0 0 14px; }
+  ul, ol { margin: 0 0 14px; padding-left: 22px; }
+  li { margin-bottom: 6px; }
+  ul ul { margin-top: 6px; }
+  code {
+    font-family: ui-monospace, "SF Mono", monospace;
+    font-size: 0.88em;
+    background: #F1ECDD;
+    padding: 1px 6px;
+    border-radius: 3px;
+    color: #6A4F2A;
+  }
+  pre {
+    font-family: ui-monospace, "SF Mono", monospace;
+    font-size: 12px;
+    background: #F1ECDD;
+    padding: 18px 20px;
+    border-radius: 8px;
+    color: #4A3A1F;
+    overflow-x: auto;
+    line-height: 1.55;
+    margin: 12px 0;
+  }
+  strong { color: #1A1A1A; }
+
+  /* The canonical mark hero */
+  .hero-mark {
+    background: #F4EAD5;
+    border-radius: 56px;
+    width: 280px;
+    height: 280px;
+    margin: 0 auto 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 16px 48px rgba(0,0,0,0.08);
+  }
+  .hero-mark svg { width: 84%; height: 84%; }
+
+  /* Quick-take card */
+  .quick-take {
+    background: white;
+    border: 1px solid #E8E2D2;
+    border-radius: 14px;
+    padding: 22px 26px;
+    font-size: 14px;
+  }
+  .quick-take ul { margin: 0; padding-left: 20px; }
+  .quick-take li { margin-bottom: 4px; color: #555; }
+  .quick-take li strong { color: #1A1A1A; }
+
+  /* Size system row */
+  .size-row {
+    display: flex;
+    gap: 28px;
+    align-items: flex-end;
+    flex-wrap: wrap;
+    margin: 18px 0 8px;
+  }
+  .size-cell { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+  .size-cell .label { font-size: 11px; color: #999; font-family: ui-monospace, monospace; }
+  .icon-box {
+    background: #F4EAD5;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .icon-box svg { width: 84%; height: 84%; }
+  .b16  { width:  16px; height:  16px; border-radius:  4px; }
+  .b32  { width:  32px; height:  32px; border-radius:  7px; }
+  .b60  { width:  60px; height:  60px; border-radius: 14px; }
+  .b100 { width: 100px; height: 100px; border-radius: 22px; }
+  .b160 { width: 160px; height: 160px; border-radius: 32px; }
+
+  /* Color tokens */
+  .swatch-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+    margin: 16px 0;
+  }
+  .swatch {
+    background: white;
+    border: 1px solid #E8E2D2;
+    border-radius: 12px;
+    padding: 16px;
+  }
+  .swatch .chip {
+    width: 100%;
+    height: 64px;
+    border-radius: 8px;
+    margin-bottom: 12px;
+    border: 1px solid rgba(0,0,0,0.06);
+  }
+  .swatch .name { font-weight: 600; font-size: 13px; }
+  .swatch .hex { font-family: ui-monospace, monospace; font-size: 12px; color: #888; margin-top: 2px; }
+  .swatch .role { font-size: 12px; color: #666; margin-top: 6px; line-height: 1.45; }
+
+  .rejected-list { font-size: 13px; color: #666; }
+  .rejected-list li strong { color: #444; font-family: ui-monospace, monospace; font-size: 0.92em; }
+
+  /* Anatomy */
+  .anatomy {
+    display: grid;
+    grid-template-columns: 280px 1fr;
+    gap: 32px;
+    align-items: start;
+    margin: 16px 0;
+  }
+  .anatomy .num {
+    display: inline-flex;
+    width: 18px; height: 18px;
+    background: #B0915E;
+    color: white;
+    border-radius: 50%;
+    align-items: center;
+    justify-content: center;
+    font-size: 10px;
+    font-weight: 700;
+    font-family: ui-monospace, monospace;
+    margin-right: 8px;
+    vertical-align: middle;
+  }
+  .anatomy .label-list { font-size: 13px; color: #555; line-height: 1.6; }
+  .anatomy .label-list dt { font-weight: 600; color: #1A1A1A; margin-top: 12px; }
+  .anatomy .label-list dt:first-child { margin-top: 0; }
+  .anatomy .label-list dd { margin: 2px 0 0 26px; }
+
+  /* Interaction demo */
+  .demo-frame {
+    background: white;
+    border: 1px solid #E8E2D2;
+    border-radius: 16px;
+    padding: 28px;
+    text-align: center;
+    margin: 16px 0;
+  }
+  .demo-icon {
+    width: 200px;
+    height: 200px;
+    background: #F4EAD5;
+    border-radius: 40px;
+    margin: 0 auto 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    user-select: none;
+    transition: transform 0.15s ease;
+    box-shadow: 0 12px 32px rgba(0,0,0,0.06);
+  }
+  .demo-icon:hover { transform: translateY(-2px); }
+  .demo-icon:active { transform: translateY(1px); }
+  .demo-icon svg { width: 84%; height: 84%; }
+  #stockGrainDemo line, #foilGrainDemo line { transition: opacity 0.18s ease; }
+  .demo-hint { font-size: 11px; color: #B0915E; letter-spacing: 0.06em; text-transform: uppercase; font-weight: 600; }
+  .demo-seed { font-family: ui-monospace, monospace; font-size: 10px; color: #B89968; margin-top: 4px; }
+
+  /* Open items */
+  .open-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 12px;
+    margin-top: 12px;
+  }
+  .open-item {
+    background: white;
+    border: 1px solid #E8E2D2;
+    border-radius: 10px;
+    padding: 14px 18px;
+    font-size: 13px;
+  }
+  .open-item .title {
+    font-weight: 600;
+    color: #1A1A1A;
+    font-size: 14px;
+    margin-bottom: 4px;
+  }
+  .open-item .body { color: #666; line-height: 1.55; }
+
+  footer {
+    margin-top: 96px;
+    padding-top: 32px;
+    border-top: 1px solid #E8E2D2;
+    font-size: 12px;
+    color: #999;
+    text-align: center;
+  }
+
+  /* TOC */
+  .toc {
+    background: white;
+    border: 1px solid #E8E2D2;
+    border-radius: 12px;
+    padding: 18px 24px;
+    margin: 28px 0 0;
+    font-size: 13px;
+  }
+  .toc-title { font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; color: #888; margin-bottom: 8px; }
+  .toc ol { margin: 0; padding-left: 18px; counter-reset: section; list-style: none; }
+  .toc li { counter-increment: section; padding: 3px 0; color: #666; }
+  .toc li::before { content: counter(section, decimal-leading-zero) " · "; color: #B0915E; font-family: ui-monospace, monospace; font-size: 11px; }
+  .toc a { color: #444; text-decoration: none; }
+  .toc a:hover { color: #1A1A1A; text-decoration: underline; }
+</style>
+</head>
+<body>
+<div class="doc">
+
+  <header>
+    <div class="meta">Brand mark · v1.0 · lock & handoff</div>
+    <h1>TallyKeep</h1>
+    <p class="lead">
+      Consolidated decisions and assets from the icon design session.
+      Supersedes prior iterations (<code>tallykeep_Y_v1</code> through <code>v5</code>,
+      color tests, weathered tests, and interaction prototypes).
+    </p>
+    <div class="stamp">May 2026 · solo design session · ready for wordmark phase</div>
+
+    <div class="toc">
+      <div class="toc-title">Contents</div>
+      <ol>
+        <li><a href="#mark">The mark</a></li>
+        <li><a href="#sizes">Size system</a></li>
+        <li><a href="#colors">Color tokens</a></li>
+        <li><a href="#anatomy">Anatomy</a></li>
+        <li><a href="#interaction">Landing-page interaction</a></li>
+        <li><a href="#decisions">Decisions log</a></li>
+        <li><a href="#geometry">Geometry reference</a></li>
+        <li><a href="#open">Open items</a></li>
+      </ol>
+    </div>
+  </header>
+
+  <!-- 1. THE MARK -->
+  <section id="mark">
+    <h2>1 · The mark</h2>
+
+    <div class="hero-mark">
+      <svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <clipPath id="stockClipHero">
+            <path d="M 168.33 42.19 L 54.27 174.22 L 36.43 139.77 L 54.47 118.86 L 65.07 128.02 L 151.67 27.81 Z"/>
+          </clipPath>
+          <clipPath id="foilClipHero">
+            <polygon points="40.68,42.21 79.68,87.21 96.32,72.79 57.32,27.79"/>
+          </clipPath>
+        </defs>
+        <path d="M 168.33 42.19 L 54.27 174.22 L 36.43 139.77 L 54.47 118.86 L 65.07 128.02 L 151.67 27.81 Z" fill="#A88554"/>
+        <polygon points="40.68,42.21 79.68,87.21 96.32,72.79 57.32,27.79" fill="#A88554"/>
+        <g stroke="#6F5638" stroke-width="1.4" stroke-linecap="butt" opacity="0.6">
+          <line x1="163.79" y1="38.27" x2="46.07" y2="174.53" clip-path="url(#stockClipHero)"/>
+          <line x1="156.22" y1="31.73" x2="38.50" y2="167.99" clip-path="url(#stockClipHero)"/>
+          <line x1="45.22" y1="38.27" x2="84.52" y2="83.64" clip-path="url(#foilClipHero)"/>
+          <line x1="52.78" y1="31.73" x2="92.08" y2="77.09" clip-path="url(#foilClipHero)"/>
+        </g>
+        <circle cx="53.76" cy="147.31" r="2.8" fill="#F4EAD5"/>
+        <polygon points="-3,12 3,12 2,5 -2,5" fill="#F4EAD5" transform="translate(147 50) rotate(130.82)"/>
+        <polygon points="-4,12 4,12 2,4 -2,4" fill="#F4EAD5" transform="translate(140 58) rotate(130.82)"/>
+        <polygon points="-3,12 3,12 2,5 -2,5" fill="#F4EAD5" transform="translate(133 66) rotate(130.82)"/>
+        <polygon points="-3,-12 3,-12 2,-5 -2,-5" fill="#F4EAD5" transform="translate(62 50) rotate(49.18)"/>
+        <polygon points="-4,-12 4,-12 2,-4 -2,-4" fill="#F4EAD5" transform="translate(69 58) rotate(49.18)"/>
+        <polygon points="-3,-12 3,-12 2,-5 -2,-5" fill="#F4EAD5" transform="translate(76 66) rotate(49.18)"/>
+      </svg>
+    </div>
+
+    <div class="quick-take">
+      <ul>
+        <li><strong>Form:</strong> medieval split tally stick — stock + foil, arranged as a Y (the "Y" of TallY)</li>
+        <li><strong>Wood:</strong> Aged Oak <code>#A88554</code></li>
+        <li><strong>Texture:</strong> 2 grain stripes per stick (canonical) · solid (favicon ≤16px)</li>
+        <li><strong>Background:</strong> Cream <code>#F4EAD5</code></li>
+        <li><strong>Container:</strong> rounded square, radius 14% of width (28/200)</li>
+        <li><strong>Tip cuts:</strong> perpendicular straight (3 of 4) · biais at handle (signature)</li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- 2. SIZE SYSTEM -->
+  <section id="sizes">
+    <h2>2 · Size system</h2>
+    <p>
+      Two SVG variants. Switch threshold is <strong>16 px</strong> — at and below that, grain stripes
+      blur into noise and the solid version maintains silhouette legibility.
+    </p>
+
+    <h3>Canonical · with grain · 32 px and up</h3>
+    <div class="size-row">
+      <div class="size-cell"><div class="icon-box b160"><svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg"><defs><clipPath id="sc160"><path d="M 168.33 42.19 L 54.27 174.22 L 36.43 139.77 L 54.47 118.86 L 65.07 128.02 L 151.67 27.81 Z"/></clipPath><clipPath id="fc160"><polygon points="40.68,42.21 79.68,87.21 96.32,72.79 57.32,27.79"/></clipPath></defs><path d="M 168.33 42.19 L 54.27 174.22 L 36.43 139.77 L 54.47 118.86 L 65.07 128.02 L 151.67 27.81 Z" fill="#A88554"/><polygon points="40.68,42.21 79.68,87.21 96.32,72.79 57.32,27.79" fill="#A88554"/><g stroke="#6F5638" stroke-width="1.4" stroke-linecap="butt" opacity="0.6"><line x1="163.79" y1="38.27" x2="46.07" y2="174.53" clip-path="url(#sc160)"/><line x1="156.22" y1="31.73" x2="38.50" y2="167.99" clip-path="url(#sc160)"/><line x1="45.22" y1="38.27" x2="84.52" y2="83.64" clip-path="url(#fc160)"/><line x1="52.78" y1="31.73" x2="92.08" y2="77.09" clip-path="url(#fc160)"/></g><circle cx="53.76" cy="147.31" r="2.8" fill="#F4EAD5"/><polygon points="-3,12 3,12 2,5 -2,5" fill="#F4EAD5" transform="translate(147 50) rotate(130.82)"/><polygon points="-4,12 4,12 2,4 -2,4" fill="#F4EAD5" transform="translate(140 58) rotate(130.82)"/><polygon points="-3,12 3,12 2,5 -2,5" fill="#F4EAD5" transform="translate(133 66) rotate(130.82)"/><polygon points="-3,-12 3,-12 2,-5 -2,-5" fill="#F4EAD5" transform="translate(62 50) rotate(49.18)"/><polygon points="-4,-12 4,-12 2,-4 -2,-4" fill="#F4EAD5" transform="translate(69 58) rotate(49.18)"/><polygon points="-3,-12 3,-12 2,-5 -2,-5" fill="#F4EAD5" transform="translate(76 66) rotate(49.18)"/></svg></div><div class="label">160 px</div></div>
+      <div class="size-cell"><div class="icon-box b100"><svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg"><defs><clipPath id="sc100"><path d="M 168.33 42.19 L 54.27 174.22 L 36.43 139.77 L 54.47 118.86 L 65.07 128.02 L 151.67 27.81 Z"/></clipPath><clipPath id="fc100"><polygon points="40.68,42.21 79.68,87.21 96.32,72.79 57.32,27.79"/></clipPath></defs><path d="M 168.33 42.19 L 54.27 174.22 L 36.43 139.77 L 54.47 118.86 L 65.07 128.02 L 151.67 27.81 Z" fill="#A88554"/><polygon points="40.68,42.21 79.68,87.21 96.32,72.79 57.32,27.79" fill="#A88554"/><g stroke="#6F5638" stroke-width="1.4" stroke-linecap="butt" opacity="0.6"><line x1="163.79" y1="38.27" x2="46.07" y2="174.53" clip-path="url(#sc100)"/><line x1="156.22" y1="31.73" x2="38.50" y2="167.99" clip-path="url(#sc100)"/><line x1="45.22" y1="38.27" x2="84.52" y2="83.64" clip-path="url(#fc100)"/><line x1="52.78" y1="31.73" x2="92.08" y2="77.09" clip-path="url(#fc100)"/></g><circle cx="53.76" cy="147.31" r="2.8" fill="#F4EAD5"/><polygon points="-3,12 3,12 2,5 -2,5" fill="#F4EAD5" transform="translate(147 50) rotate(130.82)"/><polygon points="-4,12 4,12 2,4 -2,4" fill="#F4EAD5" transform="translate(140 58) rotate(130.82)"/><polygon points="-3,12 3,12 2,5 -2,5" fill="#F4EAD5" transform="translate(133 66) rotate(130.82)"/><polygon points="-3,-12 3,-12 2,-5 -2,-5" fill="#F4EAD5" transform="translate(62 50) rotate(49.18)"/><polygon points="-4,-12 4,-12 2,-4 -2,-4" fill="#F4EAD5" transform="translate(69 58) rotate(49.18)"/><polygon points="-3,-12 3,-12 2,-5 -2,-5" fill="#F4EAD5" transform="translate(76 66) rotate(49.18)"/></svg></div><div class="label">100 px</div></div>
+      <div class="size-cell"><div class="icon-box b60"><svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg"><defs><clipPath id="sc60"><path d="M 168.33 42.19 L 54.27 174.22 L 36.43 139.77 L 54.47 118.86 L 65.07 128.02 L 151.67 27.81 Z"/></clipPath><clipPath id="fc60"><polygon points="40.68,42.21 79.68,87.21 96.32,72.79 57.32,27.79"/></clipPath></defs><path d="M 168.33 42.19 L 54.27 174.22 L 36.43 139.77 L 54.47 118.86 L 65.07 128.02 L 151.67 27.81 Z" fill="#A88554"/><polygon points="40.68,42.21 79.68,87.21 96.32,72.79 57.32,27.79" fill="#A88554"/><g stroke="#6F5638" stroke-width="1.4" stroke-linecap="butt" opacity="0.6"><line x1="163.79" y1="38.27" x2="46.07" y2="174.53" clip-path="url(#sc60)"/><line x1="156.22" y1="31.73" x2="38.50" y2="167.99" clip-path="url(#sc60)"/><line x1="45.22" y1="38.27" x2="84.52" y2="83.64" clip-path="url(#fc60)"/><line x1="52.78" y1="31.73" x2="92.08" y2="77.09" clip-path="url(#fc60)"/></g><circle cx="53.76" cy="147.31" r="2.8" fill="#F4EAD5"/><polygon points="-3,12 3,12 2,5 -2,5" fill="#F4EAD5" transform="translate(147 50) rotate(130.82)"/><polygon points="-4,12 4,12 2,4 -2,4" fill="#F4EAD5" transform="translate(140 58) rotate(130.82)"/><polygon points="-3,12 3,12 2,5 -2,5" fill="#F4EAD5" transform="translate(133 66) rotate(130.82)"/><polygon points="-3,-12 3,-12 2,-5 -2,-5" fill="#F4EAD5" transform="translate(62 50) rotate(49.18)"/><polygon points="-4,-12 4,-12 2,-4 -2,-4" fill="#F4EAD5" transform="translate(69 58) rotate(49.18)"/><polygon points="-3,-12 3,-12 2,-5 -2,-5" fill="#F4EAD5" transform="translate(76 66) rotate(49.18)"/></svg></div><div class="label">60 px</div></div>
+      <div class="size-cell"><div class="icon-box b32"><svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg"><defs><clipPath id="sc32"><path d="M 168.33 42.19 L 54.27 174.22 L 36.43 139.77 L 54.47 118.86 L 65.07 128.02 L 151.67 27.81 Z"/></clipPath><clipPath id="fc32"><polygon points="40.68,42.21 79.68,87.21 96.32,72.79 57.32,27.79"/></clipPath></defs><path d="M 168.33 42.19 L 54.27 174.22 L 36.43 139.77 L 54.47 118.86 L 65.07 128.02 L 151.67 27.81 Z" fill="#A88554"/><polygon points="40.68,42.21 79.68,87.21 96.32,72.79 57.32,27.79" fill="#A88554"/><g stroke="#6F5638" stroke-width="1.4" stroke-linecap="butt" opacity="0.6"><line x1="163.79" y1="38.27" x2="46.07" y2="174.53" clip-path="url(#sc32)"/><line x1="156.22" y1="31.73" x2="38.50" y2="167.99" clip-path="url(#sc32)"/><line x1="45.22" y1="38.27" x2="84.52" y2="83.64" clip-path="url(#fc32)"/><line x1="52.78" y1="31.73" x2="92.08" y2="77.09" clip-path="url(#fc32)"/></g><circle cx="53.76" cy="147.31" r="2.8" fill="#F4EAD5"/><polygon points="-3,12 3,12 2,5 -2,5" fill="#F4EAD5" transform="translate(147 50) rotate(130.82)"/><polygon points="-4,12 4,12 2,4 -2,4" fill="#F4EAD5" transform="translate(140 58) rotate(130.82)"/><polygon points="-3,12 3,12 2,5 -2,5" fill="#F4EAD5" transform="translate(133 66) rotate(130.82)"/><polygon points="-3,-12 3,-12 2,-5 -2,-5" fill="#F4EAD5" transform="translate(62 50) rotate(49.18)"/><polygon points="-4,-12 4,-12 2,-4 -2,-4" fill="#F4EAD5" transform="translate(69 58) rotate(49.18)"/><polygon points="-3,-12 3,-12 2,-5 -2,-5" fill="#F4EAD5" transform="translate(76 66) rotate(49.18)"/></svg></div><div class="label">32 px</div></div>
+    </div>
+
+    <h3>Favicon · solid · 16 px</h3>
+    <div class="size-row">
+      <div class="size-cell"><div class="icon-box b32"><svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg"><path d="M 168.33 42.19 L 54.27 174.22 L 36.43 139.77 L 54.47 118.86 L 65.07 128.02 L 151.67 27.81 Z" fill="#A88554"/><polygon points="40.68,42.21 79.68,87.21 96.32,72.79 57.32,27.79" fill="#A88554"/><circle cx="53.76" cy="147.31" r="2.8" fill="#F4EAD5"/><polygon points="-3,12 3,12 2,5 -2,5" fill="#F4EAD5" transform="translate(147 50) rotate(130.82)"/><polygon points="-4,12 4,12 2,4 -2,4" fill="#F4EAD5" transform="translate(140 58) rotate(130.82)"/><polygon points="-3,12 3,12 2,5 -2,5" fill="#F4EAD5" transform="translate(133 66) rotate(130.82)"/><polygon points="-3,-12 3,-12 2,-5 -2,-5" fill="#F4EAD5" transform="translate(62 50) rotate(49.18)"/><polygon points="-4,-12 4,-12 2,-4 -2,-4" fill="#F4EAD5" transform="translate(69 58) rotate(49.18)"/><polygon points="-3,-12 3,-12 2,-5 -2,-5" fill="#F4EAD5" transform="translate(76 66) rotate(49.18)"/></svg></div><div class="label">32 px (compare)</div></div>
+      <div class="size-cell"><div class="icon-box b16"><svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg"><path d="M 168.33 42.19 L 54.27 174.22 L 36.43 139.77 L 54.47 118.86 L 65.07 128.02 L 151.67 27.81 Z" fill="#A88554"/><polygon points="40.68,42.21 79.68,87.21 96.32,72.79 57.32,27.79" fill="#A88554"/><circle cx="53.76" cy="147.31" r="2.8" fill="#F4EAD5"/><polygon points="-3,12 3,12 2,5 -2,5" fill="#F4EAD5" transform="translate(147 50) rotate(130.82)"/><polygon points="-4,12 4,12 2,4 -2,4" fill="#F4EAD5" transform="translate(140 58) rotate(130.82)"/><polygon points="-3,12 3,12 2,5 -2,5" fill="#F4EAD5" transform="translate(133 66) rotate(130.82)"/><polygon points="-3,-12 3,-12 2,-5 -2,-5" fill="#F4EAD5" transform="translate(62 50) rotate(49.18)"/><polygon points="-4,-12 4,-12 2,-4 -2,-4" fill="#F4EAD5" transform="translate(69 58) rotate(49.18)"/><polygon points="-3,-12 3,-12 2,-5 -2,-5" fill="#F4EAD5" transform="translate(76 66) rotate(49.18)"/></svg></div><div class="label">16 px</div></div>
+    </div>
+  </section>
+
+  <!-- 3. COLORS -->
+  <section id="colors">
+    <h2>3 · Color tokens</h2>
+
+    <div class="swatch-grid">
+      <div class="swatch">
+        <div class="chip" style="background: #A88554;"></div>
+        <div class="name">Aged Oak</div>
+        <div class="hex">#A88554</div>
+        <div class="role">Wood. Both stock and foil. Single-tone fill.</div>
+      </div>
+      <div class="swatch">
+        <div class="chip" style="background: #6F5638;"></div>
+        <div class="name">Grain</div>
+        <div class="hex">#6F5638</div>
+        <div class="role">Stripe lines along each stick. Stroke 1.4, opacity 0.6.</div>
+      </div>
+      <div class="swatch">
+        <div class="chip" style="background: #F4EAD5; border-color: #E8E2D2;"></div>
+        <div class="name">Cream</div>
+        <div class="hex">#F4EAD5</div>
+        <div class="role">Background. Also fills the carvings (notches and hanging hole) — they read as cut-throughs to the surface behind.</div>
+      </div>
+    </div>
+
+    <h3>Rejected colors</h3>
+    <ul class="rejected-list">
+      <li><strong>#B07645</strong> — Saddle Brown. Generic, lives in crowded "artisan / coffee / bourbon" zone.</li>
+      <li><strong>#BD9E60</strong> — Aged Honey. Was the lean before user feedback; too light, didn't read as wood with history.</li>
+      <li><strong>#8B6E45</strong> — Weathered Oak. Too gothic / monastery archive; lost the "in-pocket precision instrument" register.</li>
+      <li><strong>#C9B897</strong> — Whitewashed. Insufficient contrast against cream at 60 px and below.</li>
+    </ul>
+
+    <h3>Rejected texture approaches</h3>
+    <ul class="rejected-list">
+      <li><strong>Turbulence noise filter</strong> (<code>feTurbulence</code>) — rasterizes on most SVG-to-PDF exports, browser-inconsistent rendering, breaks in icon-export pipelines.</li>
+      <li><strong>Knots (ellipses)</strong> — pedagogically punchier (matches more visually obvious) but starts to read as "illustration of wood" rather than designed mark; competes visually with notches. Archived for potential "how it works" page.</li>
+    </ul>
+  </section>
+
+  <!-- 4. ANATOMY -->
+  <section id="anatomy">
+    <h2>4 · Anatomy</h2>
+
+    <div class="anatomy">
+      <div>
+        <div class="hero-mark" style="width: 240px; height: 240px; margin: 0; box-shadow: none; border: 1px solid #E8E2D2;">
+          <svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+              <clipPath id="stockClipAnat"><path d="M 168.33 42.19 L 54.27 174.22 L 36.43 139.77 L 54.47 118.86 L 65.07 128.02 L 151.67 27.81 Z"/></clipPath>
+              <clipPath id="foilClipAnat"><polygon points="40.68,42.21 79.68,87.21 96.32,72.79 57.32,27.79"/></clipPath>
+            </defs>
+            <path d="M 168.33 42.19 L 54.27 174.22 L 36.43 139.77 L 54.47 118.86 L 65.07 128.02 L 151.67 27.81 Z" fill="#A88554"/>
+            <polygon points="40.68,42.21 79.68,87.21 96.32,72.79 57.32,27.79" fill="#A88554"/>
+            <g stroke="#6F5638" stroke-width="1.4" stroke-linecap="butt" opacity="0.6">
+              <line x1="163.79" y1="38.27" x2="46.07" y2="174.53" clip-path="url(#stockClipAnat)"/>
+              <line x1="156.22" y1="31.73" x2="38.50" y2="167.99" clip-path="url(#stockClipAnat)"/>
+              <line x1="45.22" y1="38.27" x2="84.52" y2="83.64" clip-path="url(#foilClipAnat)"/>
+              <line x1="52.78" y1="31.73" x2="92.08" y2="77.09" clip-path="url(#foilClipAnat)"/>
+            </g>
+            <circle cx="53.76" cy="147.31" r="2.8" fill="#F4EAD5"/>
+            <polygon points="-3,12 3,12 2,5 -2,5" fill="#F4EAD5" transform="translate(147 50) rotate(130.82)"/>
+            <polygon points="-4,12 4,12 2,4 -2,4" fill="#F4EAD5" transform="translate(140 58) rotate(130.82)"/>
+            <polygon points="-3,12 3,12 2,5 -2,5" fill="#F4EAD5" transform="translate(133 66) rotate(130.82)"/>
+            <polygon points="-3,-12 3,-12 2,-5 -2,-5" fill="#F4EAD5" transform="translate(62 50) rotate(49.18)"/>
+            <polygon points="-4,-12 4,-12 2,-4 -2,-4" fill="#F4EAD5" transform="translate(69 58) rotate(49.18)"/>
+            <polygon points="-3,-12 3,-12 2,-5 -2,-5" fill="#F4EAD5" transform="translate(76 66) rotate(49.18)"/>
+          </svg>
+        </div>
+      </div>
+
+      <div class="label-list">
+        <dl style="margin: 0;">
+          <dt>Stock</dt>
+          <dd>Longer half. Goes from upper-right (un-handle tip) to lower-left (handle). Historically the creditor's half — the bank kept this.</dd>
+
+          <dt>Foil</dt>
+          <dd>Shorter half. Upper-left tip down to broken end. Historically the debtor's piece — a payee carried this. "Got the short end of the stick" = received the foil.</dd>
+
+          <dt>Handle</dt>
+          <dd>Rectangular block. <em>Asymmetric, protrudes only on the inner (split-cut) face.</em> The outer face is flush — that's the original outer surface of the unsplit stick. The handle's extra thickness only appears on the side where the cut went through.</dd>
+
+          <dt>Biais cut</dt>
+          <dd>Diagonal at the handle tip. The only non-orthogonal cut on the silhouette — it's the visual signature of the mark.</dd>
+
+          <dt>Tips</dt>
+          <dd>Stock upper-right, foil upper-left, foil broken end: all perpendicular straight cuts. No rounded line caps anywhere.</dd>
+
+          <dt>Notches</dt>
+          <dd>Three V-shaped per stick, on inner edges, at <em>matched positions across the gap</em>. Middle notch slightly wider (medieval denomination convention). They're the tally's actual record-keeping mechanism — the verification metaphor.</dd>
+
+          <dt>Hanging hole</dt>
+          <dd>Small circle at the handle's geometric center. Practical detail (sticks hung in archive racks) and adds craft authenticity.</dd>
+        </dl>
+      </div>
+    </div>
+  </section>
+
+  <!-- 5. INTERACTION -->
+  <section id="interaction">
+    <h2>5 · Landing-page interaction</h2>
+    <p>
+      Tap the mark below. Both halves regenerate with new but matching grain.
+      Pedagogical demonstration of the verification metaphor, deployed on the landing-page hero only.
+      <strong>Not the canonical icon</strong> — the canonical mark uses one locked seed everywhere else.
+    </p>
+
+    <div class="demo-frame">
+      <div class="demo-icon" id="iconDemo" tabindex="0" role="button" aria-label="Verify a new pair">
+        <svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <clipPath id="stockClipDemo"><path d="M 168.33 42.19 L 54.27 174.22 L 36.43 139.77 L 54.47 118.86 L 65.07 128.02 L 151.67 27.81 Z"/></clipPath>
+            <clipPath id="foilClipDemo"><polygon points="40.68,42.21 79.68,87.21 96.32,72.79 57.32,27.79"/></clipPath>
+          </defs>
+          <path d="M 168.33 42.19 L 54.27 174.22 L 36.43 139.77 L 54.47 118.86 L 65.07 128.02 L 151.67 27.81 Z" fill="#A88554"/>
+          <polygon points="40.68,42.21 79.68,87.21 96.32,72.79 57.32,27.79" fill="#A88554"/>
+          <g id="stockGrainDemo" stroke="#6F5638" stroke-linecap="butt" clip-path="url(#stockClipDemo)"></g>
+          <g id="foilGrainDemo" stroke="#6F5638" stroke-linecap="butt" clip-path="url(#foilClipDemo)"></g>
+          <circle cx="53.76" cy="147.31" r="2.8" fill="#F4EAD5"/>
+          <polygon points="-3,12 3,12 2,5 -2,5" fill="#F4EAD5" transform="translate(147 50) rotate(130.82)"/>
+          <polygon points="-4,12 4,12 2,4 -2,4" fill="#F4EAD5" transform="translate(140 58) rotate(130.82)"/>
+          <polygon points="-3,12 3,12 2,5 -2,5" fill="#F4EAD5" transform="translate(133 66) rotate(130.82)"/>
+          <polygon points="-3,-12 3,-12 2,-5 -2,-5" fill="#F4EAD5" transform="translate(62 50) rotate(49.18)"/>
+          <polygon points="-4,-12 4,-12 2,-4 -2,-4" fill="#F4EAD5" transform="translate(69 58) rotate(49.18)"/>
+          <polygon points="-3,-12 3,-12 2,-5 -2,-5" fill="#F4EAD5" transform="translate(76 66) rotate(49.18)"/>
+        </svg>
+      </div>
+      <div class="demo-hint">Tap to verify a new pair</div>
+      <div class="demo-seed" id="seedDemo">— · —</div>
+    </div>
+
+    <h3>How it works</h3>
+    <p>
+      Seeded PRNG (xorshift32) generates a deterministic offset array from a seed. Each stripe has
+      <code>{offset, opacity, width}</code>. Both sticks render the <em>same</em> offset on each
+      stripe — each stick computes its own screen-space endpoints in its own local coordinate
+      frame. Same seed → matching grain. New seed → new but still-matching grain.
+    </p>
+
+    <pre>// Implementation outline (~80 LOC total)
+function makeRng(seed) {
+  let s = seed | 0; if (s === 0) s = 1;
+  return () => {
+    s ^= s &lt;&lt; 13; s ^= s &gt;&gt;&gt; 17; s ^= s &lt;&lt; 5;
+    return ((s &gt;&gt;&gt; 0) / 4294967296);
+  };
+}
+
+function generateStripes(seed) {
+  const rng = makeRng(seed);
+  return Array.from({length: 3 + Math.floor(rng() * 2)}, () =&gt; ({
+    offset:  -8 + rng() * 16,        // perpendicular position
+    opacity: 0.45 + rng() * 0.35,
+    width:   0.9 + rng() * 1.4,
+  }));
+}
+
+function stockLine(O) {
+  return {
+    x1: 163.27 - 0.757 * O, y1: 31.22 - 0.654 * O,
+    x2: 42.28  - 0.757 * O, y2: 171.26 - 0.654 * O,
+  };
+}
+function foilLine(O) {
+  return {
+    x1: 45.73 + 0.756 * O, y1: 31.22 - 0.655 * O,
+    x2: 91.28 + 0.756 * O, y2: 83.79 - 0.655 * O,
+  };
+}
+
+// On tap: regenerate seed, draw stripes on both sticks.
+// The clipPath on each &lt;g&gt; ensures lines never extend past the wood.</pre>
+  </section>
+
+  <!-- 6. DECISIONS -->
+  <section id="decisions">
+    <h2>6 · Decisions log</h2>
+
+    <h3>Form</h3>
+    <ul>
+      <li>Y arrangement (stock as the long bent piece going from upper-right to lower-left, foil as the upper-left branch).</li>
+      <li>Foil intentionally much shorter than stock — a known simplification of real split tallies (which were near-equal halves), traded for the Y silhouette and the "Y of TallY" reading.</li>
+      <li>Consequence: the verification metaphor only fully applies to the shared length range. v1 grain accepts this quietly; knots variant made it conspicuous (rejected, see §3).</li>
+    </ul>
+
+    <h3>Tip cuts</h3>
+    <ul>
+      <li>Stock upper-right, foil upper-left, foil broken end: perpendicular straight cuts.</li>
+      <li>Handle tip: biais (diagonal). The only non-orthogonal cut — visual signature.</li>
+      <li>Square tip variant was the alternative; biais won on geometric coherence with the V-notches and "hand-tooled" register.</li>
+    </ul>
+
+    <h3>Handle</h3>
+    <ul>
+      <li>Rectangular block, not a bulb (early "bulb" handle was scrapped — wrong register).</li>
+      <li>Asymmetric — protrudes on inner face only. v4 had it on the outer face, which was anatomically wrong (the cut removes wood from the inner face, so the unsplit handle naturally extends on that side).</li>
+      <li>Hanging hole at handle's geometric center.</li>
+    </ul>
+
+    <h3>Color</h3>
+    <ul>
+      <li>Picked: <strong>Aged Oak</strong> <code>#A88554</code> — clearly aged, still distinct from cream at 60px, doesn't read as gothic.</li>
+      <li>See §3 for rejected color list and reasoning.</li>
+    </ul>
+
+    <h3>Texture</h3>
+    <ul>
+      <li>Picked: 2 grain stripes per stick at perpendicular offsets ±5, stroke 1.4, color <code>#6F5638</code>, opacity 0.6.</li>
+      <li>Solid version (no grain) used for favicon ≤16px where grain becomes sub-pixel noise.</li>
+      <li>See §3 for rejected texture approaches.</li>
+    </ul>
+
+    <h3>Notches</h3>
+    <ul>
+      <li>Three V-shaped per stick, on the inner edge of each.</li>
+      <li>Middle notch slightly wider — medieval denomination convention (different notch widths represented different amounts: pence, shillings, pounds).</li>
+      <li>Three was the chosen number; fewer reads as accidental, more clutters.</li>
+    </ul>
+
+    <h3>Landing-page interaction</h3>
+    <ul>
+      <li>Tap the mark → both halves regenerate matching grain.</li>
+      <li>Used only on the marketing site hero, not in-app.</li>
+      <li>Caption tested: "The grain matches. A tally stick is split from a single piece of wood. The pattern on both halves is the proof — that's how you knew it was real."</li>
+      <li>Constraint: don't overuse. Once on the landing hero, optionally once again on a "How it works" callback — not as a constant fidget across the site.</li>
+    </ul>
+  </section>
+
+  <!-- 7. GEOMETRY -->
+  <section id="geometry">
+    <h2>7 · Geometry reference</h2>
+    <p>All in 200 × 200 viewBox space. For implementation in any framework.</p>
+
+    <h3>Stock</h3>
+    <pre>Path:        M 168.33 42.19 L 54.27 174.22 L 36.43 139.77
+             L 54.47 118.86 L 65.07 128.02 L 151.67 27.81 Z
+
+Centerline:  (160, 35) → (46, 167)
+Direction:   (-0.654, 0.757)
+Inner perp:  (-0.757, -0.654)         // toward foil
+Length:      174.41
+Body width:  22 (offset ±11 from centerline)
+Handle:      starts at s = 134.41 (77% of length), inner extension +14
+             so handle inner edge at offset −25 from centerline
+Biais cut:   (54.27, 174.22) → (36.43, 139.77)
+Hanging hole: cx = 53.76, cy = 147.31, r = 2.8
+Notches:     translate(147,50)·rotate(130.82) — width 6
+             translate(140,58)·rotate(130.82) — width 8 (denomination)
+             translate(133,66)·rotate(130.82) — width 6
+             notch shape (local): -w/2,12 → w/2,12 → 2,5 → -2,5 → close</pre>
+
+    <h3>Foil</h3>
+    <pre>Polygon:     40.68,42.21  79.68,87.21  96.32,72.79  57.32,27.79
+
+Centerline:  (49, 35) → (88, 80)
+Direction:   (0.655, 0.756)
+Inner perp:  (0.756, -0.655)          // toward stock
+Length:      59.55
+Body width:  22 (offset ±11 from centerline)
+Notches:     translate(62,50)·rotate(49.18) — width 6
+             translate(69,58)·rotate(49.18) — width 8 (denomination)
+             translate(76,66)·rotate(49.18) — width 6
+             notch shape (local): -w/2,-12 → w/2,-12 → 2,-5 → -2,-5 → close
+             (negative y because foil notches open toward stock = local -y)</pre>
+
+    <h3>Grain stripes (canonical static)</h3>
+    <pre>Stock — 2 lines at perpendicular offsets -5, +5 (in inner direction):
+   line(O):  (163.27 - 0.757·O, 31.22 - 0.654·O)
+          →  (42.28  - 0.757·O, 171.26 - 0.654·O)
+
+Foil — 2 lines at perpendicular offsets -5, +5:
+   line(O):  (45.73 + 0.756·O, 31.22 - 0.655·O)
+          →  (91.28 + 0.756·O, 83.79 - 0.655·O)
+
+Stroke:     #6F5638, width 1.4, opacity 0.6, linecap butt
+Clipped:    yes — to stock polygon and foil polygon respectively</pre>
+
+    <h3>Container</h3>
+    <pre>Background:  #F4EAD5
+Shape:       rounded square
+Radius:      14% of width (e.g. 28 on 200, 8.4 on 60, 2.24 on 16)
+Padding:     icon scaled to 84% of container width</pre>
+  </section>
+
+  <!-- 8. OPEN -->
+  <section id="open">
+    <h2>8 · Open items</h2>
+    <div class="open-grid">
+      <div class="open-item">
+        <div class="title">Wordmark / typography</div>
+        <div class="body">
+          Pending. The "<strong>LL</strong>" form (replacing "ll" in "TaLLyKeep" — two parallel verticals echoing the icon) was sketched in v2 wordmark exploration but not pursued. Next session candidate.
+        </div>
+      </div>
+      <div class="open-item">
+        <div class="title">Trademark search</div>
+        <div class="body">
+          EUIPO classes 9 (software) and 36 (financial services) for the EU; Argentine INPI for primary target market. Parked at user's request during this session — should run before announcing the name publicly.
+        </div>
+      </div>
+      <div class="open-item">
+        <div class="title">Container shape</div>
+        <div class="body">
+          Currently rounded square (radius 14%). Could explore squircle (iOS native shape), or testing the mark without container at all (purely on transparent / cream backgrounds).
+        </div>
+      </div>
+      <div class="open-item">
+        <div class="title">Dark mode</div>
+        <div class="body">
+          Only tested on cream <code>#F4EAD5</code>. Need to design the inverted treatment — likely a darker wood backdrop with the carving color shifted accordingly. Carvings can't stay <code>#F4EAD5</code> on dark.
+        </div>
+      </div>
+      <div class="open-item">
+        <div class="title">App store icon variants</div>
+        <div class="body">
+          iOS rounded mask (Apple applies its own mask), Android adaptive icon (foreground + background layers), Play Store hero. Once canonical SVG is final.
+        </div>
+      </div>
+      <div class="open-item">
+        <div class="title">Knots prototype (archived)</div>
+        <div class="body">
+          File: <code>tallykeep_knots_peeped.html</code>. Rejected for canonical use. May be useful if a "How it works" deep-dive page is ever built where realism becomes an asset.
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    <div>End of v1.0 lock · brand mark phase complete</div>
+    <div style="margin-top: 6px;">Next: wordmark / typography exploration</div>
+  </footer>
+
+</div>
+
+<script>
+  // Live demo for §5
+  function makeRng(seed) {
+    let s = seed | 0; if (s === 0) s = 1;
+    return () => {
+      s ^= s << 13; s ^= s >>> 17; s ^= s << 5;
+      return ((s >>> 0) / 4294967296);
+    };
+  }
+  function generateStripes(seed) {
+    const rng = makeRng(seed);
+    const n = 3 + Math.floor(rng() * 2);
+    const out = [];
+    for (let i = 0; i < n; i++) out.push({
+      offset: -8 + rng() * 16,
+      opacity: 0.45 + rng() * 0.35,
+      width: 0.9 + rng() * 1.4,
+    });
+    return out;
+  }
+  function stockLine(O) { return { x1: 163.27-0.757*O, y1: 31.22-0.654*O, x2: 42.28-0.757*O, y2: 171.26-0.654*O }; }
+  function foilLine(O)  { return { x1: 45.73+0.756*O,  y1: 31.22-0.655*O, x2: 91.28+0.756*O, y2: 83.79-0.655*O  }; }
+  const NS = 'http://www.w3.org/2000/svg';
+  function makeLine(g, op, w) {
+    const el = document.createElementNS(NS, 'line');
+    el.setAttribute('x1', g.x1); el.setAttribute('y1', g.y1);
+    el.setAttribute('x2', g.x2); el.setAttribute('y2', g.y2);
+    el.setAttribute('stroke-width', w);
+    el.setAttribute('opacity', '0');
+    requestAnimationFrame(() => el.setAttribute('opacity', op));
+    return el;
+  }
+  let demoSeed = 7777;
+  function renderDemo(seed) {
+    const stripes = generateStripes(seed);
+    const sg = document.getElementById('stockGrainDemo');
+    const fg = document.getElementById('foilGrainDemo');
+    [...sg.children, ...fg.children].forEach(el => el.setAttribute('opacity', '0'));
+    setTimeout(() => {
+      sg.innerHTML = ''; fg.innerHTML = '';
+      stripes.forEach(({offset, opacity, width}) => {
+        sg.appendChild(makeLine(stockLine(offset), opacity, width));
+        fg.appendChild(makeLine(foilLine(offset),  opacity, width));
+      });
+    }, 180);
+    document.getElementById('seedDemo').textContent = `seed · ${seed.toString(16).padStart(6,'0').slice(0,6)}`;
+  }
+  renderDemo(demoSeed);
+  document.getElementById('iconDemo').addEventListener('click', () => {
+    demoSeed = Math.floor(Math.random() * 0xffffff);
+    renderDemo(demoSeed);
+  });
+  document.getElementById('iconDemo').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      demoSeed = Math.floor(Math.random() * 0xffffff);
+      renderDemo(demoSeed);
+    }
+  });
+</script>
+</body>
+</html>

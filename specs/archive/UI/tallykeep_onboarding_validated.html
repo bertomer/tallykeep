@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>TallyKeep — Onboarding (validated)</title>
+<style>
+  :root {
+    --bg: #f8fafc; --surface: #ffffff; --border: #e2e8f0; --border-strong: #cbd5e1;
+    --text: #0f172a; --text-muted: #64748b; --text-dim: #94a3b8; --sidebar: #f1f5f9;
+    --btc: #f59e0b; --btc-soft: #fef3c7;
+    --green: #16a34a; --green-soft: #dcfce7;
+    --amber: #ca8a04; --amber-soft: #fef9c3;
+    --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  }
+  * { box-sizing: border-box; }
+  body { background: #e2e8f0; margin: 0; padding: 32px; font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; color: var(--text); font-size: 14px; line-height: 1.5; }
+  h1 { font-size: 24px; margin: 0 0 4px; }
+  .lede { color: var(--text-muted); margin-bottom: 24px; max-width: 820px; }
+  .frozen { background: var(--green-soft); border: 1px solid var(--green); border-radius: 8px; padding: 12px 16px; margin-bottom: 24px; max-width: 820px; font-size: 13px; }
+  .frozen strong { color: var(--green); }
+  .group-title { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; color: var(--text-muted); margin: 40px 0 12px; }
+  .group-title:first-of-type { margin-top: 0; }
+  .window { width: 880px; max-width: 100%; background: var(--surface); border: 1px solid var(--border-strong); border-radius: 8px; box-shadow: 0 8px 24px rgba(15,23,42,0.08); margin-bottom: 28px; overflow: hidden; }
+  .titlebar { background: #f1f5f9; padding: 8px 12px; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 8px; }
+  .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--border-strong); }
+  .titlebar .url { flex: 1; text-align: center; font-size: 11px; color: var(--text-muted); font-family: var(--mono); }
+  .body { display: grid; grid-template-columns: 1fr; min-height: 460px; }
+  .main { padding: 20px 24px; }
+  .btn { padding: 6px 12px; font-size: 12px; border-radius: 5px; border: 1px solid var(--border-strong); background: var(--surface); color: var(--text); font-weight: 500; }
+  .btn.primary { background: var(--text); color: var(--surface); border-color: var(--text); }
+  .btn.ghost { border-color: transparent; background: transparent; color: var(--text-muted); }
+  .btn.lg { padding: 10px 18px; font-size: 13px; }
+  .badge { display: inline-block; font-size: 10px; padding: 1px 6px; border-radius: 3px; font-weight: 600; vertical-align: middle; }
+  .badge.gray { background: var(--border); color: var(--text-muted); }
+  .badge.amber { background: var(--amber-soft); color: var(--amber); }
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 14px 16px; }
+  .field { margin-bottom: 12px; }
+  .field label { display: block; font-size: 11px; color: var(--text-muted); margin-bottom: 4px; font-weight: 500; }
+  .input { display: block; width: 100%; padding: 7px 10px; font-size: 12px; border: 1px solid var(--border-strong); border-radius: 4px; background: var(--surface); }
+  .steps { display: flex; gap: 0; align-items: center; margin-bottom: 16px; font-size: 11px; color: var(--text-muted); flex-wrap: wrap; }
+  .step { padding: 4px 8px; }
+  .step.active { color: var(--text); font-weight: 600; }
+  .step.done { color: var(--green); }
+  .step-sep { color: var(--text-dim); }
+  .label { font-size: 13px; font-weight: 600; padding: 8px 4px 0; color: var(--text); }
+  .note { font-size: 12px; color: var(--text-muted); line-height: 1.55; padding-left: 4px; padding-top: 8px; max-width: 880px; }
+  .note strong { color: var(--text); }
+  .small { font-size: 11px; color: var(--text-muted); }
+  .row { display: flex; align-items: center; gap: 8px; }
+  .between { display: flex; align-items: center; justify-content: space-between; }
+  hr { border: none; border-top: 1px solid var(--border); margin: 12px 0; }
+  .choice-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .choice { padding: 0; border: 1.5px solid var(--border-strong); border-radius: 8px; overflow: hidden; }
+  .choice.recommended { border-color: var(--text); }
+  .choice .head { padding: 16px 18px; border-bottom: 1px solid var(--border); }
+  .choice .head .title { font-size: 16px; font-weight: 600; margin-bottom: 2px; }
+  .choice .head .tag { font-size: 11px; color: var(--text-muted); }
+  .choice .body-pad { padding: 14px 18px; }
+  .choice .row-fact { display: grid; grid-template-columns: 80px 1fr; gap: 10px; padding: 6px 0; font-size: 12px; }
+  .choice .row-fact:not(:last-child) { border-bottom: 1px dashed var(--border); }
+  .choice .row-fact .k { color: var(--text-muted); font-weight: 500; }
+  .choice .row-fact .v { color: var(--text); }
+  .choice .footer-pad { padding: 12px 18px; border-top: 1px solid var(--border); background: #f8fafc; }
+  .choice.disabled { opacity: 0.6; }
+  .choice.disabled .head .title { color: var(--text-muted); }
+  .toggle { width: 32px; height: 18px; border-radius: 999px; background: var(--text); position: relative; flex-shrink: 0; }
+  .toggle::after { content: ''; position: absolute; right: 1px; top: 1px; width: 16px; height: 16px; border-radius: 50%; background: #fff; }
+  .toggle.off { background: var(--border-strong); }
+  .toggle.off::after { left: 1px; right: auto; }
+</style>
+</head>
+<body>
+
+<h1>TallyKeep — Onboarding (validated)</h1>
+<div class="lede">The five onboarding screens, frozen for now. Order: Welcome → Passphrase → Hosting → Connection (self-hosted variant or hosted-welcome variant) → exit to home page. We'll iterate on the Welcome screen later when we have a brand voice.</div>
+
+<div class="frozen">
+<strong>STATUS — VALIDATED.</strong> Active iteration moves to the home page (in <code>tallykeep_home.html</code>). Onboarding is parked. Re-open this only when we have a reason to.
+</div>
+
+<div class="group-title">Step 1 — Welcome</div>
+
+<div class="window">
+  <div class="titlebar"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="url">localhost:8080 · TallyKeep</span></div>
+  <div class="body">
+    <div class="main" style="max-width: 540px; margin: 0 auto; padding: 80px 24px; text-align: center;">
+      <div style="width: 56px; height: 56px; background: var(--btc); border-radius: 12px; margin: 0 auto 20px; display: flex; align-items: center; justify-content: center; color: white; font-size: 28px; font-weight: 700;">₿</div>
+      <h2 style="font-size: 28px; margin: 0 0 8px; font-weight: 600;">Welcome to TallyKeep</h2>
+      <div class="small" style="font-size: 14px; line-height: 1.6; margin-bottom: 32px;">
+        Banking ergonomics for your Bitcoin. No accounts. No custody. Your keys, your coins.
+      </div>
+      <button class="btn primary lg">Let's set up →</button>
+    </div>
+  </div>
+</div>
+<div class="label">Step 1 — Welcome</div>
+<div class="note">Placeholder copy. Will evolve when we have a brand voice and positioning document.</div>
+
+<div class="group-title">Step 2 — Passphrase</div>
+
+<div class="window">
+  <div class="titlebar"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="url">localhost:8080 · TallyKeep · Encryption</span></div>
+  <div class="body">
+    <div class="main" style="max-width: 540px; margin: 0 auto; padding: 36px 24px;">
+      <div class="steps">
+        <span class="step done">✓ Welcome</span><span class="step-sep">›</span>
+        <span class="step active">Passphrase</span><span class="step-sep">›</span>
+        <span class="step">Hosting</span><span class="step-sep">›</span>
+        <span class="step">Connection</span>
+      </div>
+      <h2 style="font-size: 22px; margin: 0 0 4px;">Set a passphrase</h2>
+      <div class="small" style="margin-bottom: 18px;">Used to encrypt the credentials TallyKeep stores locally — your exchange API keys, RPC password, future Lightning credentials. <strong>Never your Bitcoin keys.</strong> Required at setup; recovery mechanism if biometrics ever fail.</div>
+
+      <div class="field">
+        <label>Passphrase</label>
+        <input class="input" type="password" value="••••••••••••">
+      </div>
+      <div class="field">
+        <label>Confirm</label>
+        <input class="input" type="password" value="••••••••••••">
+      </div>
+      <div class="small" style="color: var(--green);">Strength: strong</div>
+
+      <hr style="margin: 20px 0;">
+
+      <div class="between">
+        <div>
+          <strong style="font-size: 13px;">Use Touch ID for daily unlock</strong>
+          <div class="small">After setup, unlock TallyKeep with your fingerprint or face. Passphrase still required for recovery.</div>
+        </div>
+        <div class="toggle"></div>
+      </div>
+
+      <div style="display: flex; justify-content: space-between; margin-top: 28px;">
+        <button class="btn ghost">Back</button>
+        <button class="btn primary">Initialize →</button>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="label">Step 2 — Passphrase + biometric toggle</div>
+<div class="note">Passphrase is the cryptographic anchor. Biometric is an optional convenience for daily unlock thereafter, on by default if available. The OS-stored encryption key is what biometric unlocks; Bitcoin keys remain untouched.</div>
+
+<div class="group-title">Step 3 — Hosting choice</div>
+
+<div class="window">
+  <div class="titlebar"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="url">localhost:8080 · TallyKeep · Setup</span></div>
+  <div class="body">
+    <div class="main" style="max-width: 760px; margin: 0 auto; padding: 36px 24px;">
+      <div class="steps">
+        <span class="step done">✓ Welcome</span><span class="step-sep">›</span>
+        <span class="step done">✓ Passphrase</span><span class="step-sep">›</span>
+        <span class="step active">Hosting</span><span class="step-sep">›</span>
+        <span class="step">Connection</span>
+      </div>
+      <h2 style="font-size: 22px; margin: 0 0 4px;">How do you want to run TallyKeep?</h2>
+      <div class="small" style="margin-bottom: 18px;">This sets your privacy story, your setup difficulty, and how you'll pay for the service. You can switch later, but it requires migration.</div>
+
+      <div class="choice-grid">
+        <div class="choice recommended">
+          <div class="head">
+            <div class="row" style="justify-content: space-between;">
+              <div class="title">Self-hosted</div>
+              <span class="badge gray">Recommended for sovereignty</span>
+            </div>
+            <div class="tag">You run everything on your own machine</div>
+          </div>
+          <div class="body-pad">
+            <div class="row-fact"><div class="k">Cost</div><div class="v">Free forever, open source</div></div>
+            <div class="row-fact"><div class="k">Setup</div><div class="v">~30 min · Docker, bitcoind, node config</div></div>
+            <div class="row-fact"><div class="k">Privacy</div><div class="v" style="color: var(--green);">Perfect — nothing leaves your machine</div></div>
+            <div class="row-fact"><div class="k">Lightning</div><div class="v">You run your own LN node (CLN, LND)</div></div>
+            <div class="row-fact"><div class="k">Best for</div><div class="v">Users with a home lab, privacy maximalists, sovereignty-conscious users</div></div>
+          </div>
+          <div class="footer-pad">
+            <button class="btn primary lg" style="width:100%;">Choose self-hosted</button>
+          </div>
+        </div>
+
+        <div class="choice disabled">
+          <div class="head">
+            <div class="row" style="justify-content: space-between;">
+              <div class="title">Hosted by us</div>
+              <span class="badge amber">Coming soon</span>
+            </div>
+            <div class="tag">We run the backend, you just sign in</div>
+          </div>
+          <div class="body-pad">
+            <div class="row-fact"><div class="k">Cost</div><div class="v">30-day free trial, then $7-12/mo</div></div>
+            <div class="row-fact"><div class="k">Setup</div><div class="v">2 min · sign in, done</div></div>
+            <div class="row-fact"><div class="k">Privacy</div><div class="v" style="color: var(--amber);">We see descriptors, balances, labels. <strong>Never your keys.</strong></div></div>
+            <div class="row-fact"><div class="k">Lightning</div><div class="v">We run the LSP, your keys stay on your phone</div></div>
+            <div class="row-fact"><div class="k">Best for</div><div class="v">Mobile-first users in any market, users without a home lab</div></div>
+          </div>
+          <div class="footer-pad">
+            <button class="btn lg" style="width:100%;" disabled>Join waitlist</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="small" style="margin-top: 16px; text-align: center;">Hosted tier is in development. Available in v1.5. Sign up for the waitlist and we'll let you know when trials open.</div>
+    </div>
+  </div>
+</div>
+<div class="label">Step 3 — Hosting choice (with hosted greyed-out for v1)</div>
+<div class="note">The pivotal question. Side-by-side identical structure for honest comparison. Trade-offs surfaced explicitly. Hosted is greyed-out in v1 with "Coming soon" — see status table in spec_amendments.md.</div>
+
+<div class="group-title">Step 4a — Connection (self-hosted)</div>
+
+<div class="window">
+  <div class="titlebar"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="url">localhost:8080 · TallyKeep · Node</span></div>
+  <div class="body">
+    <div class="main" style="max-width: 600px; margin: 0 auto; padding: 36px 24px;">
+      <div class="steps">
+        <span class="step done">✓ Welcome</span><span class="step-sep">›</span>
+        <span class="step done">✓ Passphrase</span><span class="step-sep">›</span>
+        <span class="step done">✓ Hosting · self-hosted</span><span class="step-sep">›</span>
+        <span class="step active">Connection</span>
+      </div>
+      <h2 style="font-size: 22px; margin: 0 0 4px;">Connect to your Bitcoin node</h2>
+      <div class="small" style="margin-bottom: 18px;">TallyKeep reads chain state from your own bitcoind. No third party.</div>
+
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+        <div class="field"><label>RPC host</label><input class="input" value="localhost"></div>
+        <div class="field"><label>RPC port</label><input class="input" value="8332"></div>
+        <div class="field"><label>RPC user</label><input class="input" value=""></div>
+        <div class="field"><label>RPC password</label><input class="input" type="password" value=""></div>
+      </div>
+      <div class="field"><label>ZMQ block endpoint</label><input class="input" value="tcp://localhost:28332"></div>
+      <div class="field"><label>ZMQ tx endpoint</label><input class="input" value="tcp://localhost:28333"></div>
+
+      <div style="display: flex; gap: 8px; margin-top: 8px;">
+        <button class="btn">Test connection</button>
+        <span class="small" style="color: var(--green); align-self: center;">✓ Connected to mainnet, height 832,501 — ZMQ subscriptions OK</span>
+      </div>
+
+      <div style="display: flex; justify-content: space-between; margin-top: 24px;">
+        <button class="btn ghost">Back</button>
+        <button class="btn primary">Continue → my home</button>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="label">Step 4a — Self-hosted: connect to your bitcoind</div>
+<div class="note">Spec module 11 verbatim. RPC + ZMQ. Test connection inline. Continue button labelled honestly ("→ my home").</div>
+
+<div class="group-title">Step 4b — Hosted welcome (alternative path)</div>
+
+<div class="window">
+  <div class="titlebar"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="url">tallykeep.app · Setup</span></div>
+  <div class="body">
+    <div class="main" style="max-width: 580px; margin: 0 auto; padding: 36px 24px;">
+      <div class="steps">
+        <span class="step done">✓ Welcome</span><span class="step-sep">›</span>
+        <span class="step done">✓ Passphrase</span><span class="step-sep">›</span>
+        <span class="step done">✓ Hosting · hosted</span><span class="step-sep">›</span>
+        <span class="step active">Confirm</span>
+      </div>
+      <h2 style="font-size: 22px; margin: 0 0 4px;">Your hosted instance is ready</h2>
+      <div class="small" style="margin-bottom: 18px;">No node setup needed. We've connected you to our hosted infrastructure. Trial period: <strong>30 days</strong>, no card required.</div>
+
+      <div class="card" style="background: var(--amber-soft); border-color: #fde68a;">
+        <div style="font-weight: 600; margin-bottom: 6px;">Privacy notice — read this</div>
+        <div style="font-size: 13px; line-height: 1.55;">
+          Because we run the backend, we see things you'd otherwise keep on your machine: your wallet descriptors (xpubs), the addresses TallyKeep watches, your transaction labels and categorizations, and your balance over time.
+          <br><br>
+          We <strong>never</strong> see your Bitcoin keys, signing material, or anything that lets us spend your funds. That stays on your hardware wallet (or your phone, for Lightning). Our threat model is in the docs — read it before you commit money.
+        </div>
+      </div>
+
+      <div class="card" style="margin-top: 12px;">
+        <div class="between">
+          <div><strong style="font-size:13px;">I understand the privacy trade-off</strong></div>
+          <div class="toggle off"></div>
+        </div>
+      </div>
+
+      <div style="display: flex; justify-content: space-between; margin-top: 28px;">
+        <button class="btn ghost">← Switch to self-hosted</button>
+        <button class="btn primary">Continue → my home</button>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="label">Step 4b — Hosted: privacy notice + acknowledgment</div>
+<div class="note">Replaces the node-connection step for hosted users. Privacy notice is loud and explicit — not buried. Acknowledgment toggle confirms active understanding before continuing. Greyed out in v1 because hosted itself is greyed.</div>
+
+</body>
+</html>

@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>TallyKeep — Y v3 (rectangular handle)</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+    background: #FAFAF7;
+    color: #2A2A2A;
+    padding: 48px 32px;
+    margin: 0;
+    line-height: 1.5;
+  }
+  .container { max-width: 980px; margin: 0 auto; }
+  h1 { font-size: 22px; font-weight: 600; margin: 0 0 8px; letter-spacing: -0.01em; }
+  .sub { color: #777; font-size: 14px; margin-bottom: 40px; max-width: 720px; }
+
+  .hero {
+    background: white;
+    border: 1px solid #E8E2D2;
+    border-radius: 16px;
+    padding: 32px;
+    margin-bottom: 40px;
+  }
+  .icon-large {
+    background: #F4EAD5;
+    aspect-ratio: 1;
+    border-radius: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    max-width: 380px;
+    margin: 0 auto 20px;
+  }
+  .icon-large svg { width: 84%; height: 84%; }
+  .label { font-weight: 600; font-size: 16px; margin-bottom: 8px; letter-spacing: -0.005em; text-align: center; }
+  .desc { font-size: 13px; color: #666; line-height: 1.6; max-width: 520px; margin: 0 auto; text-align: center; }
+
+  .annotation-row {
+    display: flex;
+    gap: 24px;
+    margin-top: 32px;
+    padding-top: 24px;
+    border-top: 1px solid #E8E2D2;
+  }
+  .annotation { flex: 1; font-size: 13px; color: #555; line-height: 1.55; }
+  .annotation strong { color: #2A2A2A; display: block; margin-bottom: 6px; font-size: 12px; letter-spacing: 0.04em; text-transform: uppercase; }
+
+  .section-title { font-size: 12px; font-weight: 600; color: #555; margin: 0 0 20px; text-align: center; letter-spacing: 0.08em; text-transform: uppercase; }
+  .row { display: flex; gap: 28px; align-items: center; justify-content: center; }
+  .small-icon { width: 60px; height: 60px; background: #F4EAD5; border-radius: 14px; display: flex; align-items: center; justify-content: center; }
+  .small-icon svg { width: 84%; height: 84%; }
+  .med-icon { width: 100px; height: 100px; background: #F4EAD5; border-radius: 22px; display: flex; align-items: center; justify-content: center; box-shadow: 0 6px 20px rgba(0,0,0,0.06); }
+  .med-icon svg { width: 84%; height: 84%; }
+  .divider { height: 1px; background: #E8E2D2; margin: 48px 0; border: 0; }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <h1>Y v3 — straight, rectangular handle</h1>
+  <div class="sub">
+    No bend. Stock is one straight diagonal carrying right-branch + stem. Handle is a rectangular block at the stem tip with a hanging hole — matches the medieval exchequer tally form. Foil is the left branch with three notches at matching y-positions.
+  </div>
+
+  <div class="hero">
+    <div class="icon-large">
+      <svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+        <!-- STOCK body (straight stick from upper-right tip toward handle) -->
+        <line x1="160" y1="35" x2="73.40" y2="135.21"
+              stroke="#B07645" stroke-width="22"
+              stroke-linecap="round"/>
+
+        <!-- STOCK handle (rectangular block) -->
+        <rect x="-21" y="-18" width="42" height="36"
+              transform="translate(59.69 151.12) rotate(130.82)"
+              fill="#B07645"/>
+
+        <!-- Hanging hole through handle -->
+        <circle cx="450.88" cy="162.48" r="2.8" fill="#F4EAD5"/>
+
+        <!-- Stock notches on inner edge facing foil -->
+        <polygon points="-3,12 3,12 2,5 -2,5" fill="#F4EAD5"
+                 transform="translate(147 50) rotate(130.82)"/>
+        <polygon points="-4,12 4,12 2,4 -2,4" fill="#F4EAD5"
+                 transform="translate(140 58) rotate(130.82)"/>
+        <polygon points="-3,12 3,12 2,5 -2,5" fill="#F4EAD5"
+                 transform="translate(133 66) rotate(130.82)"/>
+
+        <!-- FOIL body (straight, no handle) -->
+        <line x1="49" y1="35" x2="88" y2="80"
+              stroke="#B07645" stroke-width="22"
+              stroke-linecap="round"/>
+
+        <!-- Foil notches matching stock at y = 50, 58, 66 -->
+        <polygon points="-3,-12 3,-12 2,-5 -2,-5" fill="#F4EAD5"
+                 transform="translate(62 50) rotate(49.18)"/>
+        <polygon points="-4,-12 4,-12 2,-4 -2,-4" fill="#F4EAD5"
+                 transform="translate(69 58) rotate(49.18)"/>
+        <polygon points="-3,-12 3,-12 2,-5 -2,-5" fill="#F4EAD5"
+                 transform="translate(76 66) rotate(49.18)"/>
+      </svg>
+    </div>
+    <div class="label">TallyKeep — Y v3</div>
+    <div class="desc">Straight stock, rectangular handle with hanging hole, foil with matching notches.</div>
+
+    <div class="annotation-row">
+      <div class="annotation">
+        <strong>Handle</strong>
+        Rectangular block, ~28% of stock length, ~1.6× the body width. Hanging hole near the tip — common feature on medieval exchequer tallies, used to thread them on rods for archival storage.
+      </div>
+      <div class="annotation">
+        <strong>Shoulder</strong>
+        Visible step where the wider handle meets the narrower notched body. The shoulder is the visual cue that says "this is a worked piece, not just a stick."
+      </div>
+      <div class="annotation">
+        <strong>Match</strong>
+        Three notch pairs at y=50, 58, 66 — read horizontally across the gap, each pair sits at the same height. Strong V-cuts, middle one wider.
+      </div>
+    </div>
+  </div>
+
+  <div class="section-title">At app sizes</div>
+  <div class="row" style="margin-bottom: 12px;">
+    <div class="med-icon">
+      <svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+        <line x1="160" y1="35" x2="73.40" y2="135.21" stroke="#B07645" stroke-width="22" stroke-linecap="round"/>
+        <rect x="-21" y="-18" width="42" height="36" transform="translate(59.69 151.12) rotate(130.82)" fill="#B07645"/>
+        <circle cx="49.88" cy="162.48" r="2.8" fill="#F4EAD5"/>
+        <polygon points="-3,12 3,12 2,5 -2,5" fill="#F4EAD5" transform="translate(147 50) rotate(130.82)"/>
+        <polygon points="-4,12 4,12 2,4 -2,4" fill="#F4EAD5" transform="translate(140 58) rotate(130.82)"/>
+        <polygon points="-3,12 3,12 2,5 -2,5" fill="#F4EAD5" transform="translate(133 66) rotate(130.82)"/>
+        <line x1="49" y1="35" x2="88" y2="80" stroke="#B07645" stroke-width="22" stroke-linecap="round"/>
+        <polygon points="-3,-12 3,-12 2,-5 -2,-5" fill="#F4EAD5" transform="translate(62 50) rotate(49.18)"/>
+        <polygon points="-4,-12 4,-12 2,-4 -2,-4" fill="#F4EAD5" transform="translate(69 58) rotate(49.18)"/>
+        <polygon points="-3,-12 3,-12 2,-5 -2,-5" fill="#F4EAD5" transform="translate(76 66) rotate(49.18)"/>
+      </svg>
+    </div>
+    <div class="small-icon">
+      <svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+        <line x1="160" y1="35" x2="73.40" y2="135.21" stroke="#B07645" stroke-width="22" stroke-linecap="round"/>
+        <rect x="-21" y="-18" width="42" height="36" transform="translate(59.69 151.12) rotate(130.82)" fill="#B07645"/>
+        <circle cx="49.88" cy="162.48" r="2.8" fill="#F4EAD5"/>
+        <polygon points="-3,12 3,12 2,5 -2,5" fill="#F4EAD5" transform="translate(147 50) rotate(130.82)"/>
+        <polygon points="-4,12 4,12 2,4 -2,4" fill="#F4EAD5" transform="translate(140 58) rotate(130.82)"/>
+        <polygon points="-3,12 3,12 2,5 -2,5" fill="#F4EAD5" transform="translate(133 66) rotate(130.82)"/>
+        <line x1="49" y1="35" x2="88" y2="80" stroke="#B07645" stroke-width="22" stroke-linecap="round"/>
+        <polygon points="-3,-12 3,-12 2,-5 -2,-5" fill="#F4EAD5" transform="translate(62 50) rotate(49.18)"/>
+        <polygon points="-4,-12 4,-12 2,-4 -2,-4" fill="#F4EAD5" transform="translate(69 58) rotate(49.18)"/>
+        <polygon points="-3,-12 3,-12 2,-5 -2,-5" fill="#F4EAD5" transform="translate(76 66) rotate(49.18)"/>
+      </svg>
+    </div>
+  </div>
+  <div style="text-align: center; font-size: 12px; color: #888; margin-bottom: 32px;">
+    100 px and 60 px. The handle's rectangular shape and the shoulder step both survive at icon size — that's the readable signal.
+  </div>
+
+  <hr class="divider"/>
+
+  <div style="font-size: 13px; color: #666; line-height: 1.6;">
+    <strong style="color: #2A2A2A;">Geometry</strong><br>
+    Stock straight from (160, 35) to (46, 167). Length 174.<br>
+    Stock body: width 22, from (160, 35) to (73.40, 135.21) — length 134.<br>
+    Stock handle: 42 × 36 rectangle, centered at (59.69, 151.12), rotated 130.82°. Handle is 28% of total stock length, 1.64× the body width. Hanging hole r=2.8 near handle tip.<br>
+    Foil: (49, 35) to (88, 80). Length 60. Mirrors stock direction across vertical through implied fork.<br>
+    Implied fork: (104.6, 99.2). Stock passes through; foil's broken-end is ~30 units short along its direction.<br>
+    Notch pairs at y = 50, 58, 66. Middle notch wider (denomination convention).
+  </div>
+
+</div>
+</body>
+</html>

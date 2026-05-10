@@ -32,6 +32,7 @@ def _purse_body(*, expression: str = WPKH_REGTEST) -> dict:
     return {
         "name": f"Hygiene test {secrets.token_hex(2)}",
         "purpose": "spending",
+        "seed_origin": "external_watch_only",
         "declared_security": {
             "custody_model": "self_single",
             "signing_model": "software_hot",

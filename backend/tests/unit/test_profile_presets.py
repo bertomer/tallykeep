@@ -1,13 +1,12 @@
-"""Pure-function tests for the feature-flag preset table and resolver."""
+"""Pure-function tests for the feature-flag resolver and defaults table."""
 
 from __future__ import annotations
 
 import pytest
 
-from tallykeep.domain.enums import ProfilePreset
 from tallykeep.services.profile_presets import (
     ALL_FEATURE_FLAGS,
-    PROFILE_PRESETS,
+    DEFAULT_FLAG_VALUES,
     is_known_flag,
     resolve_feature_flags,
 )
@@ -16,102 +15,63 @@ from tallykeep.services.profile_presets import (
 pytestmark = pytest.mark.unit
 
 
-# --- preset table sanity --------------------------------------------------------
+# --- defaults table sanity -------------------------------------------------------
 
 
-class TestPresetTable:
-    @pytest.mark.parametrize(
-        "preset",
-        [
-            ProfilePreset.BEGINNER,
-            ProfilePreset.INTERMEDIATE,
-            ProfilePreset.SOVEREIGN,
-        ],
-    )
-    def test_each_preset_defines_every_flag(
-        self, preset: ProfilePreset
-    ) -> None:
-        """Every named preset must enumerate every flag — no implicit defaults.
+class TestDefaultFlagValues:
+    def test_defaults_cover_every_known_flag(self) -> None:
+        assert set(DEFAULT_FLAG_VALUES.keys()) == set(ALL_FEATURE_FLAGS)
 
-        Spec module 09: 'each flag has a one-line description in a central
-        registry; adding a flag in a future version: defaults to false in
-        Beginner, true in Intermediate and Sovereign.' We enforce the central
-        registry by comparing key sets here."""
-        assert set(PROFILE_PRESETS[preset].keys()) == set(ALL_FEATURE_FLAGS)
+    def test_all_values_are_bool(self) -> None:
+        for flag, value in DEFAULT_FLAG_VALUES.items():
+            assert isinstance(value, bool), f"{flag} is not bool"
 
-    def test_custom_preset_not_in_table(self) -> None:
-        # CUSTOM is not a defaults source — the resolver builds from overrides.
-        assert ProfilePreset.CUSTOM not in PROFILE_PRESETS
+    def test_self_custody_holdings_enabled_by_default(self) -> None:
+        assert DEFAULT_FLAG_VALUES["holding.purse.enabled"] is True
+        assert DEFAULT_FLAG_VALUES["holding.strongbox.enabled"] is True
+        assert DEFAULT_FLAG_VALUES["holding.vault.enabled"] is True
+        assert DEFAULT_FLAG_VALUES["holding.account.enabled"] is True
 
-    def test_beginner_hides_strongbox_and_vault(self) -> None:
-        # Spec module 09 / 11: beginner profile is "one Account, one Purse".
-        beginner = PROFILE_PRESETS[ProfilePreset.BEGINNER]
-        assert beginner["holding.strongbox.enabled"] is False
-        assert beginner["holding.vault.enabled"] is False
-        assert beginner["holding.account.enabled"] is True
-        assert beginner["holding.purse.enabled"] is True
+    def test_coin_control_off_by_default(self) -> None:
+        assert DEFAULT_FLAG_VALUES["utxo.coin_control.enabled"] is False
 
-    def test_sovereign_unlocks_advanced_options(self) -> None:
-        sovereign = PROFILE_PRESETS[ProfilePreset.SOVEREIGN]
-        assert sovereign["banking.custom_fee_rate.enabled"] is True
-        assert sovereign["utxo.coin_control.enabled"] is True
-        assert sovereign["banking.rbf.enabled"] is True
-        assert sovereign["advanced.api_docs_link"] is True
+    def test_coin_selection_override_off_by_default(self) -> None:
+        assert DEFAULT_FLAG_VALUES["banking.coin_selection_per_payment_override"] is False
 
-    def test_intermediate_default_for_sweep_confirmation(self) -> None:
-        # CONTEXT.md Q1: confirmed default for INTERMEDIATE.
-        intermediate = PROFILE_PRESETS[ProfilePreset.INTERMEDIATE]
-        assert intermediate["trading.sweep_confirmation.required"] is True
-
-    def test_sovereign_disables_sweep_confirmation_default(self) -> None:
-        sovereign = PROFILE_PRESETS[ProfilePreset.SOVEREIGN]
-        assert sovereign["trading.sweep_confirmation.required"] is False
+    def test_sweep_confirmation_required_by_default(self) -> None:
+        assert DEFAULT_FLAG_VALUES["trading.sweep_confirmation.required"] is True
 
 
 # --- resolver -------------------------------------------------------------------
 
 
 class TestResolveFeatureFlags:
-    def test_named_preset_with_no_overrides_returns_preset_defaults(self) -> None:
-        flags = resolve_feature_flags(ProfilePreset.BEGINNER, {})
-        assert flags == PROFILE_PRESETS[ProfilePreset.BEGINNER]
+    def test_no_overrides_returns_defaults(self) -> None:
+        flags = resolve_feature_flags({})
+        assert flags == DEFAULT_FLAG_VALUES
 
-    def test_named_preset_with_override_takes_precedence(self) -> None:
-        # Beginner has banking.psbt_qr.enabled = False; override to True.
-        flags = resolve_feature_flags(
-            ProfilePreset.BEGINNER, {"banking.psbt_qr.enabled": True}
-        )
-        assert flags["banking.psbt_qr.enabled"] is True
-        # Other flags untouched.
-        assert flags["holding.strongbox.enabled"] is False
+    def test_override_takes_precedence_over_default(self) -> None:
+        flags = resolve_feature_flags({"banking.psbt_qr.enabled": False})
+        assert flags["banking.psbt_qr.enabled"] is False
+        assert flags["holding.strongbox.enabled"] is True
 
     def test_unknown_override_keys_are_ignored(self) -> None:
-        flags = resolve_feature_flags(
-            ProfilePreset.BEGINNER, {"not.a.real.flag": True}
-        )
-        # Result still contains exactly the known flag set.
+        flags = resolve_feature_flags({"not.a.real.flag": True})
         assert set(flags.keys()) == set(ALL_FEATURE_FLAGS)
         assert "not.a.real.flag" not in flags
 
-    def test_custom_preset_only_uses_overrides(self) -> None:
-        flags = resolve_feature_flags(
-            ProfilePreset.CUSTOM, {"banking.psbt_file.enabled": True}
-        )
-        # The single override is True; everything else defaults to False.
-        assert flags["banking.psbt_file.enabled"] is True
-        assert flags["holding.account.enabled"] is False
-        # Still includes every known flag.
-        assert set(flags.keys()) == set(ALL_FEATURE_FLAGS)
+    def test_result_always_contains_every_known_flag(self) -> None:
+        assert set(resolve_feature_flags({}).keys()) == set(ALL_FEATURE_FLAGS)
 
-    def test_resolved_set_contains_every_known_flag(self) -> None:
-        for preset in (
-            ProfilePreset.BEGINNER,
-            ProfilePreset.INTERMEDIATE,
-            ProfilePreset.SOVEREIGN,
-            ProfilePreset.CUSTOM,
-        ):
-            flags = resolve_feature_flags(preset, {})
-            assert set(flags.keys()) == set(ALL_FEATURE_FLAGS)
+    def test_multiple_overrides(self) -> None:
+        overrides = {
+            "utxo.coin_control.enabled": True,
+            "banking.rbf.enabled": True,
+        }
+        flags = resolve_feature_flags(overrides)
+        assert flags["utxo.coin_control.enabled"] is True
+        assert flags["banking.rbf.enabled"] is True
+        assert flags["trading.enabled"] is DEFAULT_FLAG_VALUES["trading.enabled"]
 
 
 class TestIsKnownFlag:

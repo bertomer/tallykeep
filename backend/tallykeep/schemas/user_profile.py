@@ -7,14 +7,11 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from tallykeep.domain.enums import ProfilePreset
-
 
 class UserProfileResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: UUID
-    preset: ProfilePreset
     feature_flags: dict[str, bool] = Field(default_factory=dict)
     base_currency: str
     locale: str
@@ -23,7 +20,8 @@ class UserProfileResponse(BaseModel):
 
 
 class UserProfileUpdate(BaseModel):
-    preset: ProfilePreset | None = None
+    model_config = ConfigDict(extra="forbid")
+
     feature_flags: dict[str, bool] | None = None
     base_currency: str | None = Field(default=None, min_length=3, max_length=3)
     locale: str | None = Field(default=None, min_length=2, max_length=10)

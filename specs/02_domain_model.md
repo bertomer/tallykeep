@@ -8,12 +8,12 @@ The user-facing words are chosen deliberately. They are used consistently throug
 
 - **Holding** — the abstract container concept. A purpose-bound bucket of value the user wants to see, manage, and reason about as a unit. Has four concrete subtypes: Account, Purse, Strongbox, Vault.
 - **Account** — a Holding backed by a custodial provider. The provider holds the keys; we read balances and trigger withdrawals via API.
-- **Purse** — a Holding backed by a wallet whose private keys are on a connected day-to-day device. User holds the keys; signing is light.
+- **Purse** — a Holding backed by a wallet whose private keys are on a connected day-to-day device. User holds the keys; signing is light. Has two seed origins (see "Purse seed origin" below): **external-watch-only** (TallyKeep observes a descriptor whose seed lives in another hot wallet — Phoenix, BlueWallet, Mutiny, Sparrow's hot mode, etc.) and **TallyKeep-managed** (TallyKeep generated the seed; the seed itself lives in some client device's secure local storage, not on the backend).
 - **Strongbox** — a Holding backed by a wallet whose private keys are on an offline or hardware signing device. User holds the keys; signing requires the external device.
 - **Vault** — a Holding backed by a wallet under additional structural protection (multisig, timelocks, geographic separation, inheritance setup). User holds the keys; access requires ceremony.
 - **Descriptor** — the technical primitive (BIP 380) that defines how a wallet derives its addresses. A Holding of type Purse, Strongbox, or Vault references one or more Descriptors. Account does not have a Descriptor.
 - **CustodialProvider** — the technical primitive that defines a connection to a third party that holds custody (Kraken, Bitstamp, Swissquote, future P2P venues). An Account references exactly one CustodialProvider.
-- **LedgerEntry** — a recorded movement of value affecting one or more Holdings. May be backed by an OnChainTransaction, a Lightning payment (v1.5), or a CustodialProvider event (deposit, withdrawal).
+- **LedgerEntry** — a recorded movement of value affecting one or more Holdings. May be backed by an OnChainTransaction, a Lightning payment (when that iteration ships), or a CustodialProvider event (deposit, withdrawal).
 - **OnChainTransaction** — a Bitcoin blockchain transaction record, identified by txid.
 - **PaymentRequest** — a user-initiated outgoing payment, in lifecycle from draft to confirmed.
 - **Invoice** — a user-generated request for an incoming payment.
@@ -87,6 +87,11 @@ class Account(Holding):
 @dataclass
 class Purse(Holding):
     descriptor_ids: list[UUID]          # one or more Descriptors
+    seed_origin: PurseSeedOrigin        # see "Purse seed origin" below
+
+class PurseSeedOrigin(Enum):
+    EXTERNAL_WATCH_ONLY = "external_watch_only"  # imported xpub/descriptor; seed lives in another hot wallet
+    TALLYKEEP_MANAGED   = "tallykeep_managed"    # TallyKeep generated the seed; seed lives in a client device's secure local storage
 
 @dataclass
 class Strongbox(Holding):
@@ -102,6 +107,81 @@ class Vault(Holding):
     recovery_setup_notes: str | None
 ```
 
+### Purse seed origin
+
+`seed_origin` records **what kind of wallet this Purse is** in a way
+that is stable across devices and meaningful to all of them. It is
+the resolution of arbitration item `purse-flavors` in
+`pre-implementation.md`. The split is structural because the spending
+UX differs materially.
+
+`seed_origin` does **not** record where the seed physically lives.
+That is a per-client, runtime concern (see "Signing capability is
+per-client" below) — and the locked principle "no signing keys to
+backend" forbids the backend from holding a seed reference at all.
+
+- **External-watch-only Purse** (`PurseSeedOrigin.EXTERNAL_WATCH_ONLY`).
+  Onboarded by importing an xpub or descriptor. The seed lives in
+  another hot wallet (Phoenix, BlueWallet, Mutiny, Sparrow's hot
+  mode, etc.). TallyKeep observes activity and aggregates balances;
+  spending always points the user back to the source wallet. Single-
+  address import is **not** supported (a wallet's activity rotates
+  across many addresses; observing one address shows a misleading
+  slice).
+
+- **TallyKeep-managed Purse** (`PurseSeedOrigin.TALLYKEEP_MANAGED`).
+  TallyKeep generated a fresh seed into a client device's secure
+  local storage (iOS Keychain / Android Keystore, biometric-gated)
+  during the Add-Holding flow. The descriptor (public part) is
+  registered with the backend so the chain scanner observes balances;
+  the seed itself never crosses to the backend. From the *device that
+  generated and holds the seed*, native signing is available
+  (biometric prompt, sign in-app, broadcast). From any other device,
+  the same Purse appears as view-only with a "go sign on the device
+  that holds the seed" gate.
+
+A user may have both kinds of Purse simultaneously (for example, an
+external-watch-only Purse mirroring their Phoenix balance, plus a
+TallyKeep-managed Purse for fresh receipts directly into TallyKeep).
+
+### Signing capability is per-client, not per-Holding
+
+Whether a *given client right now* can sign for a Purse is a runtime
+question, not a domain field. The check is local: does this client's
+secure-storage backend contain a seed reference keyed by this
+Holding's `id`?
+
+- **Capacitor app on the phone where the seed was generated:**
+  Keychain/Keystore has the entry. Send is enabled. Biometric prompts
+  unlock; signing happens in-app; broadcast goes through the backend.
+- **Capacitor app on a different phone** (e.g., a new device, or one
+  that hasn't restored from a seed backup yet): no entry. Send shows
+  the "go sign on the device that holds the seed" gate.
+- **Browser PWA on desktop or mobile:** no Keychain access at all.
+  Same gate.
+- **Any external-watch-only Purse, any client:** Send always points
+  to the source wallet (Phoenix, BlueWallet, etc.), regardless of
+  client. There is no scenario in which TallyKeep signs an
+  external-watch-only Purse.
+
+The "Create a TallyKeep wallet" affordance during Add-Holding is
+gated **client-side** based on the client's capability to generate
+and securely store a seed. Capacitor on phone: shown. PWA in any
+browser: hidden (with a "this requires the TallyKeep app" message).
+The backend does not enforce or detect build type; it accepts any
+Purse-creation request and stores the asserted `seed_origin`.
+
+This keeps the locked principle clean: the backend never holds
+signing material in any form, encrypted or otherwise. The trade-off
+is that an attacker calling the API directly could create a
+`seed_origin=TALLYKEEP_MANAGED` Purse for which no client actually
+holds a seed; the result is a Holding nobody can spend from, which
+is a UX nuisance, not a security risk.
+
+This model is reflected in the threat model
+(`10_threat_model.md` §Mobile addendum) and the UX specifications in
+`UI/README.md` (Add-Holding, Send, Receive sections).
+
 ### Mutability rules
 
 - **Type** (Account vs Purse vs Strongbox vs Vault) is **mutable but requires deliberate confirmation**. A user may migrate a Holding from Purse to Strongbox after moving keys to a hardware wallet. The transition is recorded in an audit log.
@@ -115,6 +195,8 @@ class Vault(Holding):
 - Purse, Strongbox, and Vault have at least one Descriptor and no CustodialProvider.
 - Vault may have multisig parameters (`required_signers`, `total_signers`); Purse and Strongbox should not.
 - Holdings are soft-deleted (archived). No hard delete, to preserve LedgerEntry integrity.
+- Every Purse has a `seed_origin` value. The field is required at creation and immutable thereafter.
+- The backend never stores any reference to the seed itself. For `seed_origin=TALLYKEEP_MANAGED`, the seed lives only in a client device's secure local storage; the backend has no field, encrypted or otherwise, that points at it.
 
 ### Descriptor
 
@@ -131,7 +213,7 @@ class Descriptor:
     network: Network
     address_type: AddressType
     gap_limit: int                      # default 20
-    is_watch_only: bool                 # always True in v1
+    is_watch_only: bool                 # always True (locked principle: app holds no signing keys)
     last_scanned_height: int            # height of last full scan
     created_at: datetime
 ```
@@ -152,7 +234,7 @@ class AddressType(Enum):
 
 Rules:
 - `expression` is canonical input. xpub or similar legacy formats are converted to descriptor form at import.
-- `is_watch_only` is always `True` in v1. The app never holds private keys.
+- `is_watch_only` is always `True` on Descriptors. The app never holds Bitcoin private keys via descriptors. (For TallyKeep-managed Purses, the seed lives in the secure local storage of *whichever client device generated it*, never on the backend — see §"Purse seed origin" and §"Signing capability is per-client" above. Seeds never become Descriptor private keys.)
 - A Descriptor belongs to exactly one Holding.
 
 ### Address
@@ -236,12 +318,12 @@ class ProviderKind(Enum):
 @dataclass
 class ProviderPermissions:
     can_read: bool                      # always True
-    can_trade: bool                     # must be False in v1
+    can_trade: bool                     # locked invariant: must be False (no order placement)
     can_withdraw: bool
 ```
 
 Rules:
-- v1 refuses to register a CustodialProvider whose API credential has trade permissions enabled. The check is done against the provider's API at registration time.
+- The app refuses to register a CustodialProvider whose API credential has trade permissions enabled. The check is done against the provider's API at registration time. This is locked by the "no order placement" principle (see module 07 §"Regulatory distance posture").
 - `whitelist_address` must be derivable from a Descriptor whose Holding is **not** an Account (you cannot whitelist to another custodial Account; that would defeat the point).
 - The validator strongly recommends the whitelist destination be an offline-signed Holding (Strongbox or Vault); see SweepPolicy section for the sweep-destination rule.
 
@@ -275,7 +357,7 @@ class Direction(Enum):
 
 class LedgerEntrySource(Enum):
     ONCHAIN_TRANSACTION = "onchain_transaction"
-    LIGHTNING_PAYMENT = "lightning_payment"          # v1.5
+    LIGHTNING_PAYMENT = "lightning_payment"          # populated once the Lightning iteration ships
     CUSTODIAL_EVENT = "custodial_event"              # withdrawal, deposit on a CustodialProvider
 
 class LedgerCategory(Enum):
@@ -352,7 +434,7 @@ class PaymentRequest:
     destination_address: str | None
     bip21_uri: str | None
 
-    # Lightning destination (v1.5)
+    # Lightning destination (populated once the Lightning iteration ships)
     lightning_invoice: str | None
     lightning_payment_hash: str | None
 ```
@@ -360,7 +442,7 @@ class PaymentRequest:
 ```python
 class PaymentType(Enum):
     ONCHAIN = "onchain"
-    LIGHTNING = "lightning"             # v1.5
+    LIGHTNING = "lightning"             # used once the Lightning iteration ships
 
 class PaymentStatus(Enum):
     DRAFT = "draft"
@@ -387,7 +469,7 @@ The user-generated request for an incoming payment.
 class Invoice:
     id: UUID
     holding_id: UUID                    # destination Holding
-    invoice_type: PaymentType           # ONCHAIN or LIGHTNING (v1.5)
+    invoice_type: PaymentType           # ONCHAIN or LIGHTNING (LIGHTNING used once the Lightning iteration ships)
     amount_sats: int | None             # None = amountless
     description: str | None
     status: InvoiceStatus
@@ -397,7 +479,7 @@ class Invoice:
     receiving_address_id: UUID | None
     bip21_uri: str | None
 
-    # Lightning (v1.5)
+    # Lightning (populated once the Lightning iteration ships)
     bolt11: str | None
     payment_hash: str | None
 
@@ -432,6 +514,7 @@ class SweepPolicy:
     minimum_balance_sats: int           # leave this much on the source
     maximum_per_period_sats: int | None # safety cap
     requires_user_confirmation: bool    # if True, sweep creates a confirmation prompt
+    is_dry_run: bool                    # if True, evaluate and persist sweep_execution rows but do not dispatch
     safety_warnings: list[SafetyWarning]  # set by the policy validator
     last_executed_at: datetime | None
     last_result_summary: dict | None
@@ -476,7 +559,7 @@ class SafetyWarning:
 
 The policy validator runs at policy creation and modification, computes warnings, and stores them on the policy. Warnings do **not** block; they require user acknowledgement before the policy can be enabled. The user can override any warning by acknowledging it.
 
-Validator rules in v1 (warn, do not block):
+Validator rules (warn, do not block):
 - If destination Holding is a Purse (keys on host or connected device), warn `DESTINATION_KEYS_ON_HOST` — sweep into something an attacker on the same host could drain.
 - If destination Holding is an Account, warn `DESTINATION_IS_CUSTODIAL` — moving from one custodian to another defeats minimum-exposure.
 - If source and destination have the same `signing_model`, warn `SAME_SECURITY_TIER` — this is unusual and may indicate the user did not understand the model.
@@ -552,7 +635,6 @@ Singleton per installation.
 @dataclass
 class UserProfile:
     id: UUID                            # always the same singleton id
-    preset: ProfilePreset
     feature_flags: dict[str, bool]      # see module 09
     base_currency: str                  # display only
     locale: str
@@ -560,13 +642,11 @@ class UserProfile:
     updated_at: datetime
 ```
 
-```python
-class ProfilePreset(Enum):
-    BEGINNER = "beginner"
-    INTERMEDIATE = "intermediate"
-    SOVEREIGN = "sovereign"
-    CUSTOM = "custom"                   # once user toggles individual flags
-```
+There is **no** preset / tier / named-identity concept on
+`UserProfile`. Initial flag values are seeded by onboarding answers
+(see `09_feature_flags.md`); after onboarding the user toggles
+individual flags from Settings. The configuration is just the
+configuration.
 
 ### Declared vs observable security
 
@@ -627,7 +707,9 @@ Job (standalone, linked to whatever triggered it via parameters)
 3. A LedgerEntry with `direction=INTERNAL` must link to at least two user-owned Holdings.
 4. A SweepPolicy's source and destination must both be active Holdings.
 5. A SweepPolicy's safety warnings must all be acknowledged before the policy can be enabled.
-6. A CustodialProvider cannot be registered with `permissions.can_trade=True` in v1.
+6. A CustodialProvider cannot be registered with `permissions.can_trade=True` (locked: no order placement).
 7. The whitelist address of a CustodialProvider must be owned by a non-Account Holding.
 8. No domain entity exposes a private key, seed, or signing material in any field. The type system forbids it.
 9. PaymentRequest from a Holding whose `signing_model == NOT_APPLICABLE` is rejected at construction.
+10. A Purse's `seed_origin` is immutable after creation. Migrating between origins requires creating a new Purse and moving funds; the original is archived.
+11. The backend never validates client build type. The "create a TallyKeep wallet" affordance is gated client-side on the client's capability to generate and securely store a seed. The backend accepts any Purse-creation request that satisfies the schema.

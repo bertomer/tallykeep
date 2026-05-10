@@ -1,0 +1,467 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Banking App UI Pattern Wireframes</title>
+<style>
+  body { background: #f3f4f6; margin: 0; padding: 32px; font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; color: #1f2937; }
+  h1 { font-size: 22px; margin: 0 0 4px; }
+  .sub { color: #6b7280; font-size: 14px; margin-bottom: 24px; }
+  .group-title { font-size: 13px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; color: #6b7280; margin: 32px 0 12px 4px; border-top: 1px solid #e5e7eb; padding-top: 24px; }
+  .group-title:first-of-type { border-top: none; padding-top: 0; }
+  .row { display: flex; flex-wrap: wrap; gap: 20px; }
+  .frame { width: 230px; flex-shrink: 0; }
+  .phone { background: #ffffff; border: 1.5px solid #1f2937; border-radius: 28px; padding: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.06); }
+  .notch { width: 60px; height: 5px; background: #1f2937; border-radius: 3px; margin: 4px auto 8px; }
+  .screen { background: #f9fafb; border-radius: 18px; padding: 12px; min-height: 400px; display: flex; flex-direction: column; gap: 8px; font-size: 10px; }
+  .label { font-size: 12px; font-weight: 600; color: #111827; margin-top: 10px; padding-left: 4px; }
+  .note { font-size: 11px; color: #4b5563; margin-top: 4px; padding-left: 4px; line-height: 1.45; }
+  .note strong { color: #111827; }
+  .block { background: #e5e7eb; border-radius: 6px; }
+  .pill { background: #d1d5db; border-radius: 999px; }
+  .card { background: #ffffff; border: 1px solid #e5e7eb; border-radius: 10px; padding: 8px; }
+  .row-h { display: flex; gap: 6px; align-items: center; }
+  .row-h.between { justify-content: space-between; }
+  .col { display: flex; flex-direction: column; gap: 6px; }
+  .accent { background: #1f2937; color: #fff; }
+  .accent-soft { background: #fef3c7; }
+  .x-small { font-size: 9px; color: #6b7280; }
+  .tabs { display: flex; justify-content: space-around; background: #fff; border-top: 1px solid #e5e7eb; padding: 6px 0; margin: auto -12px -12px; border-radius: 0 0 18px 18px; }
+  .tab { display: flex; flex-direction: column; align-items: center; gap: 2px; font-size: 8px; color: #9ca3af; }
+  .tab .dot { width: 14px; height: 14px; border-radius: 4px; background: #d1d5db; }
+  .tab.active { color: #1f2937; }
+  .tab.active .dot { background: #1f2937; }
+  .tx { display: flex; align-items: center; gap: 8px; padding: 6px 0; border-bottom: 1px dashed #e5e7eb; }
+  .tx:last-child { border-bottom: none; }
+  .tx .ico { width: 20px; height: 20px; border-radius: 50%; background: #d1d5db; flex-shrink: 0; }
+  .tx .name { flex: 1; font-size: 9px; color: #374151; }
+  .tx .amt { font-size: 9px; font-weight: 600; }
+  .sh { font-size: 9px; font-weight: 600; color: #6b7280; text-transform: uppercase; letter-spacing: 0.05em; margin-top: 4px; }
+  .ccard { background: linear-gradient(135deg, #1f2937, #4b5563); color: #fff; border-radius: 10px; padding: 12px; height: 80px; display: flex; flex-direction: column; justify-content: space-between; }
+  .bar { height: 4px; background: #e5e7eb; border-radius: 2px; overflow: hidden; }
+  .bar > div { height: 100%; background: #1f2937; }
+  .big { font-size: 22px; font-weight: 700; color: #111827; }
+  .med { font-size: 14px; font-weight: 600; color: #111827; }
+  .keypad { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; margin-top: auto; }
+  .key { background: #fff; border: 1px solid #e5e7eb; border-radius: 6px; padding: 6px 0; text-align: center; font-size: 11px; font-weight: 500; }
+  .check { width: 40px; height: 40px; border-radius: 50%; background: #d1fae5; color: #065f46; display: flex; align-items: center; justify-content: center; font-size: 22px; margin: 16px auto; font-weight: bold; }
+  .toggle { width: 24px; height: 14px; border-radius: 999px; background: #1f2937; position: relative; flex-shrink: 0; }
+  .toggle::after { content: ''; position: absolute; right: 1px; top: 1px; width: 12px; height: 12px; border-radius: 50%; background: #fff; }
+  .toggle.off { background: #d1d5db; }
+  .toggle.off::after { left: 1px; right: auto; }
+  .ring { width: 60px; height: 60px; border-radius: 50%; border: 6px solid #e5e7eb; border-top-color: #1f2937; border-right-color: #1f2937; margin: 0 auto; }
+</style>
+</head>
+<body>
+
+<h1>Banking app UI patterns — wireframes</h1>
+<div class="sub">Reference layouts following the dominant conventions across Monzo, Revolut, N26, Chase, Wise, Starling, Chime. Hooks for crypto-specific screens noted at the end.</div>
+
+<div class="group-title">Core: Home dashboard</div>
+<div class="row">
+
+  <div class="frame">
+    <div class="phone"><div class="notch"></div>
+      <div class="screen">
+        <div class="row-h between">
+          <div class="block" style="width:24px;height:24px;border-radius:50%;"></div>
+          <div class="block" style="width:18px;height:18px;border-radius:50%;"></div>
+        </div>
+        <div class="x-small">Available balance</div>
+        <div class="big">€4,283.50</div>
+        <div class="row-h" style="gap:8px;margin:4px 0 8px;">
+          <div class="card" style="flex:1;text-align:center;padding:8px 4px;"><div class="block" style="width:18px;height:18px;border-radius:50%;margin:0 auto 4px;"></div><div class="x-small">Send</div></div>
+          <div class="card" style="flex:1;text-align:center;padding:8px 4px;"><div class="block" style="width:18px;height:18px;border-radius:50%;margin:0 auto 4px;"></div><div class="x-small">Request</div></div>
+          <div class="card" style="flex:1;text-align:center;padding:8px 4px;"><div class="block" style="width:18px;height:18px;border-radius:50%;margin:0 auto 4px;"></div><div class="x-small">Pay</div></div>
+          <div class="card" style="flex:1;text-align:center;padding:8px 4px;"><div class="block" style="width:18px;height:18px;border-radius:50%;margin:0 auto 4px;"></div><div class="x-small">More</div></div>
+        </div>
+        <div class="sh">Today</div>
+        <div class="card" style="padding:4px 8px;">
+          <div class="tx"><div class="ico"></div><div class="name">Carrefour</div><div class="amt">−€42.10</div></div>
+          <div class="tx"><div class="ico"></div><div class="name">Spotify</div><div class="amt">−€9.99</div></div>
+          <div class="tx"><div class="ico"></div><div class="name">Salary · ACME</div><div class="amt" style="color:#065f46;">+€2,400</div></div>
+        </div>
+        <div class="tabs">
+          <div class="tab active"><div class="dot"></div>Home</div>
+          <div class="tab"><div class="dot"></div>Pay</div>
+          <div class="tab"><div class="dot"></div>Cards</div>
+          <div class="tab"><div class="dot"></div>Stats</div>
+          <div class="tab"><div class="dot"></div>Me</div>
+        </div>
+      </div>
+    </div>
+    <div class="label">1. Home / Dashboard</div>
+    <div class="note">Balance front and center, <strong>4 quick-action tiles</strong>, recent transactions feed, <strong>bottom tab bar</strong> (3–5 tabs).</div>
+  </div>
+
+  <div class="frame">
+    <div class="phone"><div class="notch"></div>
+      <div class="screen">
+        <div class="row-h between"><div class="med">Hi, Léa</div><div class="block" style="width:18px;height:18px;border-radius:50%;"></div></div>
+        <div class="x-small">Total across accounts</div>
+        <div class="med">€7,128.40</div>
+        <div class="card" style="padding:8px;"><div class="row-h between"><div class="x-small">Main · €4,283</div><div class="x-small">⋮⋮</div></div></div>
+        <div class="card" style="padding:8px;"><div class="row-h between"><div class="x-small">Savings · €2,400</div><div class="x-small">⋮⋮</div></div></div>
+        <div class="card" style="padding:8px;"><div class="row-h between"><div class="x-small">Joint · €445</div><div class="x-small">⋮⋮</div></div></div>
+        <div class="card" style="padding:8px;background:#fef3c7;border-color:#fde68a;"><div class="row-h between"><div class="x-small"><strong>+ Crypto · €1,283</strong></div><div class="x-small">⋮⋮</div></div></div>
+        <div class="x-small" style="margin-top:auto;">↕ Drag to reorder</div>
+        <div class="tabs">
+          <div class="tab active"><div class="dot"></div>Home</div>
+          <div class="tab"><div class="dot"></div>Pay</div>
+          <div class="tab"><div class="dot"></div>Cards</div>
+          <div class="tab"><div class="dot"></div>Stats</div>
+          <div class="tab"><div class="dot"></div>Me</div>
+        </div>
+      </div>
+    </div>
+    <div class="label">2. Multi-account home (Chase pattern)</div>
+    <div class="note">Stacked account cards, name + balance only. <strong>Drag-to-reorder</strong>. Crypto fits as just another card.</div>
+  </div>
+
+  <div class="frame">
+    <div class="phone"><div class="notch"></div>
+      <div class="screen">
+        <div class="row-h"><div class="x-small">‹ Back</div></div>
+        <div class="x-small">Main account</div>
+        <div class="big">€4,283.50</div>
+        <div class="x-small">+ €128 this month</div>
+        <div class="card" style="padding:6px 8px;"><div class="x-small">🔍 Search transactions</div></div>
+        <div class="row-h" style="gap:4px;">
+          <div class="pill" style="padding:2px 8px;font-size:9px;">All</div>
+          <div class="pill" style="padding:2px 8px;font-size:9px;">Out</div>
+          <div class="pill" style="padding:2px 8px;font-size:9px;">In</div>
+        </div>
+        <div class="sh">Yesterday</div>
+        <div class="tx"><div class="ico"></div><div class="name">Uber</div><div class="amt">−€12.40</div></div>
+        <div class="tx"><div class="ico"></div><div class="name">SNCF</div><div class="amt">−€89.00</div></div>
+        <div class="sh">Mon 28</div>
+        <div class="tx"><div class="ico"></div><div class="name">Lidl</div><div class="amt">−€23.18</div></div>
+        <div class="tx"><div class="ico"></div><div class="name">Refund · Amazon</div><div class="amt" style="color:#065f46;">+€34.00</div></div>
+        <div class="tx"><div class="ico"></div><div class="name">EDF</div><div class="amt">−€67.20</div></div>
+      </div>
+    </div>
+    <div class="label">3. Account detail</div>
+    <div class="note">Balance + delta, <strong>search/filter</strong>, transactions <strong>grouped by day</strong>, merchant icon + name + amount.</div>
+  </div>
+
+  <div class="frame">
+    <div class="phone"><div class="notch"></div>
+      <div class="screen">
+        <div class="row-h"><div class="x-small">‹ Close</div></div>
+        <div style="text-align:center;margin-top:8px;">
+          <div class="block" style="width:48px;height:48px;border-radius:50%;margin:0 auto 8px;"></div>
+          <div class="med">Carrefour</div>
+          <div class="big">−€42.10</div>
+          <div class="x-small">Today, 14:23</div>
+        </div>
+        <div class="card" style="padding:8px;"><div class="row-h between"><div class="x-small">Category</div><div class="x-small"><strong>Groceries ›</strong></div></div></div>
+        <div class="card" style="padding:8px;"><div class="row-h between"><div class="x-small">📍 Map</div><div class="x-small">Marseille ›</div></div></div>
+        <div class="card" style="padding:8px;"><div class="row-h between"><div class="x-small">📎 Add receipt</div><div class="x-small">›</div></div></div>
+        <div class="card" style="padding:8px;"><div class="row-h between"><div class="x-small">✂ Split with friend</div><div class="x-small">›</div></div></div>
+        <div class="card" style="padding:8px;"><div class="row-h between"><div class="x-small">⚠ Report problem</div><div class="x-small">›</div></div></div>
+      </div>
+    </div>
+    <div class="label">4. Transaction detail</div>
+    <div class="note">Tap any transaction → details sheet. Re-categorize, map, receipt, <strong>split</strong>, dispute.</div>
+  </div>
+</div>
+
+<div class="group-title">Core: Payment flow (3 steps + success)</div>
+<div class="row">
+
+  <div class="frame">
+    <div class="phone"><div class="notch"></div>
+      <div class="screen">
+        <div class="row-h"><div class="x-small">‹ Cancel</div></div>
+        <div class="med">Send to</div>
+        <div class="card" style="padding:6px 8px;"><div class="x-small">🔍 Name, IBAN, phone…</div></div>
+        <div class="sh">Recent</div>
+        <div class="row-h" style="gap:6px;flex-wrap:wrap;">
+          <div style="text-align:center;width:44px;"><div class="block" style="width:36px;height:36px;border-radius:50%;margin:0 auto;"></div><div class="x-small">Marc</div></div>
+          <div style="text-align:center;width:44px;"><div class="block" style="width:36px;height:36px;border-radius:50%;margin:0 auto;"></div><div class="x-small">Sofia</div></div>
+          <div style="text-align:center;width:44px;"><div class="block" style="width:36px;height:36px;border-radius:50%;margin:0 auto;"></div><div class="x-small">Tom</div></div>
+          <div style="text-align:center;width:44px;"><div class="block" style="width:36px;height:36px;border-radius:50%;margin:0 auto;"></div><div class="x-small">Léna</div></div>
+        </div>
+        <div class="sh">All contacts</div>
+        <div class="tx"><div class="ico"></div><div class="name">Anne D.</div><div class="x-small">›</div></div>
+        <div class="tx"><div class="ico"></div><div class="name">Bertrand R.</div><div class="x-small">›</div></div>
+        <div class="tx"><div class="ico"></div><div class="name">Camille L.</div><div class="x-small">›</div></div>
+        <div class="card accent" style="text-align:center;padding:8px;margin-top:auto;"><div class="x-small" style="color:#fff;">+ New recipient</div></div>
+      </div>
+    </div>
+    <div class="label">5. Pay → Recipient</div>
+    <div class="note">Single search bar, recents on top, contacts below. <strong>One field figures out the rest</strong> — don't ask domestic vs international upfront.</div>
+  </div>
+
+  <div class="frame">
+    <div class="phone"><div class="notch"></div>
+      <div class="screen">
+        <div class="row-h"><div class="x-small">‹ Back</div></div>
+        <div style="text-align:center;">
+          <div class="block" style="width:36px;height:36px;border-radius:50%;margin:4px auto;"></div>
+          <div class="x-small">To Marc B.</div>
+        </div>
+        <div style="text-align:center;margin:16px 0 8px;">
+          <div class="big" style="font-size:32px;">€50<span style="color:#9ca3af;">.00</span></div>
+          <div class="x-small">From Main · €4,283.50</div>
+        </div>
+        <div class="card" style="padding:6px 8px;"><div class="x-small">💬 What's it for? (optional)</div></div>
+        <div class="keypad">
+          <div class="key">1</div><div class="key">2</div><div class="key">3</div>
+          <div class="key">4</div><div class="key">5</div><div class="key">6</div>
+          <div class="key">7</div><div class="key">8</div><div class="key">9</div>
+          <div class="key">,</div><div class="key">0</div><div class="key">⌫</div>
+        </div>
+        <div class="card accent" style="text-align:center;padding:10px;"><div class="x-small" style="color:#fff;font-size:11px;">Continue →</div></div>
+      </div>
+    </div>
+    <div class="label">6. Pay → Amount</div>
+    <div class="note">Big amount display, source account picker, optional note. <strong>Custom keypad</strong> beats system keyboard for this.</div>
+  </div>
+
+  <div class="frame">
+    <div class="phone"><div class="notch"></div>
+      <div class="screen">
+        <div class="row-h"><div class="x-small">‹ Back</div></div>
+        <div class="med">Review</div>
+        <div class="card" style="padding:12px;text-align:center;"><div class="big">€50.00</div><div class="x-small">to <strong>Marc Bernard</strong></div></div>
+        <div class="card" style="padding:8px;"><div class="row-h between"><div class="x-small">From</div><div class="x-small">Main · ••4521</div></div></div>
+        <div class="card" style="padding:8px;"><div class="row-h between"><div class="x-small">Fee</div><div class="x-small" style="color:#065f46;"><strong>Free</strong></div></div></div>
+        <div class="card" style="padding:8px;"><div class="row-h between"><div class="x-small">Arrives</div><div class="x-small"><strong>Instantly</strong></div></div></div>
+        <div class="card" style="padding:8px;"><div class="row-h between"><div class="x-small">Note</div><div class="x-small">Pizza 🍕</div></div></div>
+        <div class="card accent" style="text-align:center;padding:12px;margin-top:auto;"><div class="x-small" style="color:#fff;font-size:11px;">👆 Hold to send</div></div>
+      </div>
+    </div>
+    <div class="label">7. Pay → Confirm</div>
+    <div class="note"><strong>Always show fee + arrival time before confirming</strong> (Wise standard). Hold-to-send adds friction in a good way.</div>
+  </div>
+
+  <div class="frame">
+    <div class="phone"><div class="notch"></div>
+      <div class="screen">
+        <div class="check">✓</div>
+        <div style="text-align:center;">
+          <div class="med">Sent!</div>
+          <div class="x-small">€50.00 to Marc Bernard</div>
+          <div class="x-small">Reference: TX-8841092</div>
+        </div>
+        <div class="card" style="padding:8px;margin-top:12px;"><div class="row-h between"><div class="x-small">📥 Save receipt</div><div class="x-small">›</div></div></div>
+        <div class="card" style="padding:8px;"><div class="row-h between"><div class="x-small">🔁 Send again</div><div class="x-small">›</div></div></div>
+        <div class="card" style="padding:8px;"><div class="row-h between"><div class="x-small">📤 Share with Marc</div><div class="x-small">›</div></div></div>
+        <div class="card accent" style="text-align:center;padding:10px;margin-top:auto;"><div class="x-small" style="color:#fff;font-size:11px;">Done</div></div>
+      </div>
+    </div>
+    <div class="label">8. Pay → Success</div>
+    <div class="note">Big checkmark, exact figures repeated, <strong>save / repeat / share</strong> shortcuts. Always reassure after the action.</div>
+  </div>
+</div>
+
+<div class="group-title">Core: Cards, insights, savings</div>
+<div class="row">
+
+  <div class="frame">
+    <div class="phone"><div class="notch"></div>
+      <div class="screen">
+        <div class="med">My cards</div>
+        <div class="ccard"><div class="x-small" style="color:#d1d5db;">Physical · Mastercard</div><div class="med" style="color:#fff;">•••• 4521</div></div>
+        <div class="card" style="padding:8px;"><div class="row-h between"><div class="x-small">❄ Freeze card</div><div class="toggle off"></div></div></div>
+        <div class="card" style="padding:8px;"><div class="row-h between"><div class="x-small">🌐 Online payments</div><div class="toggle"></div></div></div>
+        <div class="card" style="padding:8px;"><div class="row-h between"><div class="x-small">📡 Contactless</div><div class="toggle"></div></div></div>
+        <div class="card" style="padding:8px;"><div class="row-h between"><div class="x-small">🏧 ATM withdrawals</div><div class="toggle"></div></div></div>
+        <div class="card" style="padding:8px;"><div class="row-h between"><div class="x-small">✈ Travel mode</div><div class="toggle off"></div></div></div>
+        <div class="card" style="padding:8px;"><div class="row-h between"><div class="x-small">🔢 View PIN</div><div class="x-small">›</div></div></div>
+        <div class="card" style="padding:8px;"><div class="row-h between"><div class="x-small">+ Add virtual card</div><div class="x-small">›</div></div></div>
+      </div>
+    </div>
+    <div class="label">9. Card management</div>
+    <div class="note">Visual card mockup on top, then <strong>granular toggles</strong>: freeze, online, contactless, ATM, travel.</div>
+  </div>
+
+  <div class="frame">
+    <div class="phone"><div class="notch"></div>
+      <div class="screen">
+        <div class="med">November</div>
+        <div class="ring"></div>
+        <div style="text-align:center;"><div class="med">€1,847</div><div class="x-small">spent of €2,500 budget</div></div>
+        <div class="sh">By category</div>
+        <div class="col">
+          <div><div class="row-h between"><div class="x-small">Groceries</div><div class="x-small">€420</div></div><div class="bar"><div style="width:70%"></div></div></div>
+          <div><div class="row-h between"><div class="x-small">Eating out</div><div class="x-small">€312</div></div><div class="bar"><div style="width:52%"></div></div></div>
+          <div><div class="row-h between"><div class="x-small">Transport</div><div class="x-small">€189</div></div><div class="bar"><div style="width:32%"></div></div></div>
+          <div><div class="row-h between"><div class="x-small">Subscriptions</div><div class="x-small">€68</div></div><div class="bar"><div style="width:12%"></div></div></div>
+        </div>
+      </div>
+    </div>
+    <div class="label">10. Spending insights</div>
+    <div class="note">Ring or pie at top showing budget %, category bars below with auto-categorized totals.</div>
+  </div>
+
+  <div class="frame">
+    <div class="phone"><div class="notch"></div>
+      <div class="screen">
+        <div class="med">Savings</div>
+        <div class="card" style="padding:10px;"><div class="row-h between"><div class="x-small"><strong>🏖 Holiday</strong></div><div class="x-small">€820 / €1,500</div></div><div class="bar" style="margin-top:6px;"><div style="width:55%"></div></div></div>
+        <div class="card" style="padding:10px;"><div class="row-h between"><div class="x-small"><strong>🏠 Apartment</strong></div><div class="x-small">€3,200 / €10,000</div></div><div class="bar" style="margin-top:6px;"><div style="width:32%"></div></div></div>
+        <div class="card" style="padding:10px;"><div class="row-h between"><div class="x-small"><strong>🚨 Emergency</strong></div><div class="x-small">€1,800 / €3,000</div></div><div class="bar" style="margin-top:6px;"><div style="width:60%"></div></div></div>
+        <div class="card" style="padding:8px;background:#fef3c7;border-color:#fde68a;"><div class="x-small"><strong>↻ Round-ups</strong> · adding €0.74 to Holiday</div></div>
+        <div class="card accent" style="text-align:center;padding:10px;margin-top:auto;"><div class="x-small" style="color:#fff;font-size:11px;">+ New pot</div></div>
+      </div>
+    </div>
+    <div class="label">11. Savings (pots / vaults)</div>
+    <div class="note">Each goal = card with progress bar. <strong>Auto round-ups</strong> as a featured nudge.</div>
+  </div>
+</div>
+
+<div class="group-title">Standout features worth copying</div>
+<div class="row">
+
+  <div class="frame">
+    <div class="phone"><div class="notch"></div>
+      <div class="screen">
+        <div class="row-h"><div class="x-small">‹ Back</div></div>
+        <div class="med">You send</div>
+        <div class="card" style="padding:10px;"><div class="row-h between"><div class="big" style="font-size:18px;">1,000.00</div><div class="x-small">EUR ▾</div></div></div>
+        <div class="card" style="padding:8px;background:#f3f4f6;">
+          <div class="row-h between"><div class="x-small">Fee</div><div class="x-small">−€4.32</div></div>
+          <div class="row-h between"><div class="x-small">Exchange rate</div><div class="x-small">1 EUR = 1.0823 USD</div></div>
+          <div class="row-h between"><div class="x-small">Conversion</div><div class="x-small">995.68 × 1.0823</div></div>
+        </div>
+        <div class="med">They get</div>
+        <div class="card" style="padding:10px;background:#d1fae5;"><div class="row-h between"><div class="big" style="font-size:18px;color:#065f46;">1,077.62</div><div class="x-small">USD</div></div></div>
+        <div class="card accent-soft" style="padding:8px;"><div class="x-small">⏱ Arrives <strong>in 12 minutes</strong></div></div>
+        <div class="card accent" style="text-align:center;padding:10px;margin-top:auto;"><div class="x-small" style="color:#fff;font-size:11px;">Continue</div></div>
+      </div>
+    </div>
+    <div class="label">12. Wise-style fee transparency</div>
+    <div class="note">Show <strong>fee, rate, conversion math, arrival ETA</strong> upfront. Huge for crypto where fees vary wildly.</div>
+  </div>
+
+  <div class="frame">
+    <div class="phone"><div class="notch"></div>
+      <div class="screen">
+        <div class="row-h between"><div class="block" style="width:24px;height:24px;border-radius:50%;"></div><div class="block" style="width:18px;height:18px;border-radius:50%;"></div></div>
+        <div class="x-small">Available</div>
+        <div class="big">€4,283.50</div>
+        <div class="card" style="padding:8px;background:#d1fae5;border-color:#a7f3d0;"><div class="x-small" style="color:#065f46;"><strong>€38/day left to spend</strong></div><div class="x-small" style="color:#065f46;">until Nov 30 · after bills</div></div>
+        <div class="row-h" style="gap:8px;">
+          <div class="card" style="flex:1;text-align:center;padding:8px 4px;"><div class="block" style="width:18px;height:18px;border-radius:50%;margin:0 auto 4px;"></div><div class="x-small">Send</div></div>
+          <div class="card" style="flex:1;text-align:center;padding:8px 4px;"><div class="block" style="width:18px;height:18px;border-radius:50%;margin:0 auto 4px;"></div><div class="x-small">Pay</div></div>
+          <div class="card" style="flex:1;text-align:center;padding:8px 4px;"><div class="block" style="width:18px;height:18px;border-radius:50%;margin:0 auto 4px;"></div><div class="x-small">More</div></div>
+        </div>
+        <div class="sh">This week</div>
+        <div class="card" style="padding:4px 8px;">
+          <div class="tx"><div class="ico"></div><div class="name">Carrefour</div><div class="amt">−€42.10</div></div>
+          <div class="tx"><div class="ico"></div><div class="name">Spotify</div><div class="amt">−€9.99</div></div>
+        </div>
+      </div>
+    </div>
+    <div class="label">13. Monzo "left to spend"</div>
+    <div class="note">Green pill under balance: <strong>balance ÷ days left, minus upcoming bills</strong>. Massively praised feature.</div>
+  </div>
+
+  <div class="frame">
+    <div class="phone"><div class="notch"></div>
+      <div class="screen" style="background:#1f2937;padding:30px 12px 12px;">
+        <div class="card" style="padding:10px;background:rgba(255,255,255,0.95);">
+          <div class="row-h between"><div class="x-small"><strong>Your bank</strong></div><div class="x-small">now</div></div>
+          <div class="x-small" style="margin-top:4px;color:#111827;font-size:10px;"><strong>−€42.10 at Carrefour</strong></div>
+          <div class="x-small" style="color:#6b7280;">Balance: €4,241.40</div>
+        </div>
+        <div class="card" style="padding:10px;background:rgba(255,255,255,0.85);margin-top:6px;">
+          <div class="row-h between"><div class="x-small"><strong>Your bank</strong></div><div class="x-small">2m</div></div>
+          <div class="x-small" style="margin-top:4px;color:#111827;font-size:10px;">📊 You're €38 over budget on eating out this week</div>
+        </div>
+        <div class="card" style="padding:10px;background:rgba(255,255,255,0.7);margin-top:6px;">
+          <div class="row-h between"><div class="x-small"><strong>Your bank</strong></div><div class="x-small">1h</div></div>
+          <div class="x-small" style="margin-top:4px;color:#111827;font-size:10px;">💡 EDF bill (€67) is due in 3 days</div>
+        </div>
+      </div>
+    </div>
+    <div class="label">14. Real-time notifications</div>
+    <div class="note"><strong>Instant</strong> on every charge. Plus contextual ones: budget alerts, upcoming bills.</div>
+  </div>
+
+  <div class="frame">
+    <div class="phone"><div class="notch"></div>
+      <div class="screen" style="justify-content:space-between;">
+        <div></div>
+        <div style="text-align:center;">
+          <div class="block" style="width:60px;height:60px;border-radius:16px;margin:0 auto 16px;background:#1f2937;"></div>
+          <div class="med">Welcome back</div>
+          <div class="x-small">Léa</div>
+          <div style="margin:32px 0;">
+            <div style="width:56px;height:56px;border-radius:50%;margin:0 auto;background:#1f2937;color:#fff;font-size:28px;line-height:56px;text-align:center;">⊙</div>
+            <div class="x-small" style="margin-top:8px;">Tap to use Face ID</div>
+          </div>
+        </div>
+        <div class="x-small" style="text-align:center;padding-bottom:8px;">Use PIN instead</div>
+      </div>
+    </div>
+    <div class="label">15. Biometric login</div>
+    <div class="note">Face ID / fingerprint as default; PIN as fallback. Anything more is friction.</div>
+  </div>
+</div>
+
+<div class="group-title">Where crypto specifics plug in cleanly</div>
+<div class="row">
+
+  <div class="frame">
+    <div class="phone"><div class="notch"></div>
+      <div class="screen">
+        <div class="row-h"><div class="x-small">‹ Back</div></div>
+        <div class="x-small">Crypto wallet</div>
+        <div class="big">€1,283.40</div>
+        <div class="x-small" style="color:#065f46;">+€48.20 (3.9%) today</div>
+        <div class="card" style="padding:10px;margin-top:8px;"><div class="row-h between"><div class="row-h" style="gap:8px;"><div class="ico" style="background:#f59e0b;"></div><div class="x-small"><strong>BTC</strong> · 0.0142</div></div><div class="x-small">€940.10</div></div></div>
+        <div class="card" style="padding:10px;"><div class="row-h between"><div class="row-h" style="gap:8px;"><div class="ico" style="background:#6366f1;"></div><div class="x-small"><strong>ETH</strong> · 0.092</div></div><div class="x-small">€280.50</div></div></div>
+        <div class="card" style="padding:10px;"><div class="row-h between"><div class="row-h" style="gap:8px;"><div class="ico" style="background:#10b981;"></div><div class="x-small"><strong>USDC</strong> · 65.20</div></div><div class="x-small">€62.80</div></div></div>
+        <div class="row-h" style="gap:6px;margin-top:auto;">
+          <div class="card accent" style="flex:1;text-align:center;padding:10px;"><div class="x-small" style="color:#fff;">Buy</div></div>
+          <div class="card" style="flex:1;text-align:center;padding:10px;border:1px solid #1f2937;"><div class="x-small">Sell</div></div>
+          <div class="card" style="flex:1;text-align:center;padding:10px;border:1px solid #1f2937;"><div class="x-small">Send</div></div>
+        </div>
+      </div>
+    </div>
+    <div class="label">16. Crypto wallet (account view pattern)</div>
+    <div class="note">Treat each coin like an account row. <strong>Same layout as fiat</strong> — total + holdings + actions.</div>
+  </div>
+
+  <div class="frame">
+    <div class="phone"><div class="notch"></div>
+      <div class="screen">
+        <div class="row-h"><div class="x-small">‹ Back</div></div>
+        <div class="med">Send BTC</div>
+        <div class="card" style="padding:8px;"><div class="x-small">To address</div><div class="x-small" style="font-family:monospace;font-size:8px;color:#374151;">bc1qxy2k...wlh4gd</div></div>
+        <div class="card" style="padding:8px;"><div class="row-h between"><div class="x-small">Network</div><div class="x-small"><strong>Bitcoin ›</strong></div></div></div>
+        <div class="card" style="padding:8px;"><div class="row-h between"><div class="x-small">Amount</div><div class="x-small"><strong>0.005 BTC</strong></div></div><div class="row-h between"><div class="x-small" style="color:#6b7280;">≈ €330.45</div></div></div>
+        <div class="card accent-soft" style="padding:8px;">
+          <div class="row-h between"><div class="x-small">Network fee</div><div class="x-small"><strong>~€2.40</strong></div></div>
+          <div class="row-h between"><div class="x-small">⏱ Arrives in</div><div class="x-small"><strong>~10 min</strong></div></div>
+          <div class="row-h between"><div class="x-small">⚙ Speed</div><div class="x-small">Standard ▾</div></div>
+        </div>
+        <div class="card" style="padding:8px;background:#fef2f2;border-color:#fecaca;"><div class="x-small" style="color:#991b1b;">⚠ Crypto transfers can't be reversed. Verify address.</div></div>
+        <div class="card accent" style="text-align:center;padding:10px;margin-top:auto;"><div class="x-small" style="color:#fff;">👆 Hold to send</div></div>
+      </div>
+    </div>
+    <div class="label">17. Crypto-specific: network + fee</div>
+    <div class="note">Same 3-step flow as fiat, but inject <strong>network selector, gas estimate, irreversibility warning</strong>.</div>
+  </div>
+
+  <div class="frame">
+    <div class="phone"><div class="notch"></div>
+      <div class="screen">
+        <div class="row-h between"><div class="x-small">Step 3 of 5</div><div class="x-small">Skip</div></div>
+        <div class="bar" style="height:3px;"><div style="width:60%"></div></div>
+        <div style="margin-top:16px;"><div class="med">Verify your identity</div><div class="x-small" style="margin-top:4px;">Required by law. Takes about 2 minutes.</div></div>
+        <div class="card" style="padding:12px;text-align:center;margin-top:16px;"><div class="block" style="width:60px;height:80px;border-radius:8px;margin:0 auto 8px;"></div><div class="x-small"><strong>1.</strong> Photo of ID</div></div>
+        <div class="card" style="padding:12px;text-align:center;"><div class="block" style="width:60px;height:60px;border-radius:50%;margin:0 auto 8px;"></div><div class="x-small"><strong>2.</strong> Quick selfie</div></div>
+        <div class="card accent" style="text-align:center;padding:10px;margin-top:auto;"><div class="x-small" style="color:#fff;">Start verification</div></div>
+      </div>
+    </div>
+    <div class="label">18. Onboarding (KYC)</div>
+    <div class="note"><strong>Progress indicator</strong>, plain-language reason, two clear steps. KYC kills more signups than anything else.</div>
+  </div>
+</div>
+
+</body>
+</html>

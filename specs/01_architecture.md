@@ -2,7 +2,7 @@
 
 ## Service topology
 
-The v1 deployment is a Docker Compose stack with the following services:
+The deployment is a Docker Compose stack with the following services:
 
 ```
 ┌──────────────────────────────────────────────────────────────────────────┐
@@ -37,7 +37,8 @@ The v1 deployment is a Docker Compose stack with the following services:
 │                                   └────────────────────────────┘         │
 │                                                                          │
 │       Network binding: ALL services on 127.0.0.1 only.                   │
-│       No service listens on a public interface in v1.                    │
+│       No service listens on a public interface in the dev or            │
+│       personal-use phase (per ADR-0003).                                 │
 └──────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -48,7 +49,7 @@ The v1 deployment is a Docker Compose stack with the following services:
 - **worker** — Same Python codebase, separate entry point. Runs three kinds of components: listeners (consume external feeds and translate to events), schedulers (emit events on a timer), and subscribers (react to events from the bus).
 - **postgres** — Persistent state. Schema managed via Alembic.
 - **redis** — Two roles: event bus (publish/subscribe) and job queue (RQ). One service, two uses; we may split if it ever becomes a bottleneck.
-- **frontend** — SvelteKit PWA served as static files by a lightweight nginx, or by the backend itself in v1.
+- **frontend** — SvelteKit PWA served as static files by a lightweight nginx, or by the backend itself in the dev phase.
 
 ## The three-layer separation: ACL, queue, bus
 
@@ -68,7 +69,7 @@ External systems and our domain are separated by three distinct layers, each wit
 │   • CustodialProviderAdapter (Kraken, Bitstamp via ccxt)     │
 │   • NodeAdapter (bitcoind RPC)                               │
 │   • ChainEventAdapter (bitcoind ZeroMQ)                      │
-│   • LightningProviderAdapter (v1.5)                          │
+│   • LightningProviderAdapter (Lightning iteration)           │
 └──────────────────────┬───────────────────────────────────────┘
                        │ wrapped by
                        ▼
@@ -95,7 +96,7 @@ The three layers protect against three different failure modes:
 
 ## Persistence-first for non-losable events
 
-Events are not durable in v1's Redis pub/sub. If a subscriber is down when an event fires, it is lost. This is acceptable for ephemeral notifications (UI live updates, "now categorize this transaction") but not for state transitions where loss would mean wrong information about reality.
+Events are not durable in Redis pub/sub. If a subscriber is down when an event fires, it is lost. This is acceptable for ephemeral notifications (UI live updates, "now categorize this transaction") but not for state transitions where loss would mean wrong information about reality.
 
 The pattern: **persist first, emit second.** Whenever a non-losable event happens, the producer:
 
@@ -104,9 +105,9 @@ The pattern: **persist first, emit second.** Whenever a non-losable event happen
 
 If step 2 fails or no one is listening, step 1 is the source of truth. A periodic reconciler scans recent audit-table rows and re-emits events for anything that has not been acknowledged. This pattern means the system tolerates restarts, transient Redis problems, and subscriber outages without losing state.
 
-## Event taxonomy (v1)
+## Event taxonomy
 
-The bus topics are defined in v1 and stable. Producers and subscribers both speak this taxonomy. v1.5 adds Lightning topics; v2 may add more, but existing topics never change shape without a version bump.
+The bus topics are stable. Producers and subscribers both speak this taxonomy. The Lightning iteration adds the `lightning.*` topics shown below; later iterations may add more, but existing topics never change shape without a version bump.
 
 ```
 # Chain events (live via bitcoind ZeroMQ)
@@ -140,7 +141,7 @@ ledger_entry.categorized                 { ledger_entry_id, category }
 # Security analysis events
 analysis.discrepancy.detected            { holding_id, declared, observed, severity }
 
-# Lightning events (v1.5 — defined now, emitted from v1.5 onwards)
+# Lightning events (defined now; emitted once the Lightning iteration ships)
 lightning.invoice.paid                   { invoice_id, payment_hash, amount_sats }
 lightning.payment.sent                   { payment_id, payment_hash }
 lightning.channel.state_changed          { channel_id, old_state, new_state }
@@ -154,12 +155,12 @@ system.custodial.auth_failed             { custodial_provider_id }
 
 ## Worker components
 
-The worker process runs the following components, each registered at startup. A single Docker container runs all of them; in larger deployments they could be split across multiple worker containers, but v1 keeps them together.
+The worker process runs the following components, each registered at startup. A single Docker container runs all of them; in larger deployments they could be split across multiple worker containers, but the current shipped layout keeps them together.
 
 ### Listeners (translate external feeds to events)
 
 - **ChainListener** — subscribes to bitcoind ZeroMQ topics (`rawblock`, `rawtx`). For each notification, looks up which Descriptors are affected and emits `chain.tx.mempool` or `chain.tx.confirmed` events.
-- **LightningListener** (v1.5) — subscribes to CLN or LND streaming gRPC for invoice and payment events.
+- **LightningListener** (Lightning iteration) — subscribes to CLN or LND streaming gRPC for invoice and payment events.
 
 ### Schedulers (emit events on a timer)
 
@@ -203,11 +204,11 @@ GET /api/v1/events/stream?topics=chain.*,holding.*,banking.*
   → events arrive as { topic, payload, timestamp }
 ```
 
-## Network security posture (v1)
+## Network security posture (dev / personal-use phase)
 
 - **All services bind to 127.0.0.1.** Docker Compose explicitly maps ports to `127.0.0.1:PORT`, never `0.0.0.0`.
-- **No TLS in v1** — everything is on localhost. Adding TLS for v2 (when remote access via WireGuard or Tailscale is added) is a configuration change, not an architectural one.
-- **No authentication layer on the API in v1.** The security boundary is the operating system user account. This is documented in the threat model.
+- **No TLS** — everything is on localhost. Adding TLS later (when remote access via WireGuard or Tailscale is added — see `future_iterations.md` "Remote access for self-hosters") is a configuration change, not an architectural one.
+- **No authentication layer on the API in the dev phase.** The security boundary is the operating system user account. The authentication layer is a private-ship requirement (per ADR-0003); the public-ship event hardens it further. Documented in the threat model.
 - **CORS** — the backend accepts requests only from the local frontend origin.
 
 ## Configuration model
@@ -255,7 +256,7 @@ btc-app/
 │   │   │   ├── node_adapter.py      # bitcoind JSON-RPC
 │   │   │   ├── chain_event_adapter.py  # bitcoind ZeroMQ
 │   │   │   ├── custodial_adapter.py # ccxt wrapper, normalizes per-provider quirks
-│   │   │   └── lightning_adapter.py # v1.5
+│   │   │   └── lightning_adapter.py # Lightning iteration
 │   │   │
 │   │   ├── services/                # Business logic
 │   │   │   ├── holding_service.py
@@ -264,7 +265,7 @@ btc-app/
 │   │   │   ├── policy_validator.py  # warns about risky sweep configurations
 │   │   │   ├── analysis_service.py  # declared-vs-observable security checks
 │   │   │   ├── blueprint_analyzer.py
-│   │   │   └── lightning_provider.py  # v1.5 interface
+│   │   │   └── lightning_provider.py  # Lightning iteration interface
 │   │   │
 │   │   ├── workers/
 │   │   │   ├── listeners/
@@ -323,19 +324,19 @@ btc-app/
 - Dependency updates reviewed manually, not auto-merged.
 - No dependency that requires an account, paid tier, or phone-home license check.
 
-## Testing strategy (v1)
+## Testing strategy
 
 - **Unit tests** for all services, the policy validator, the blueprint analyzer, and the cryptography helpers.
 - **Integration tests** for API endpoints, using a test Postgres and a `regtest` `bitcoind`.
 - **Adapter tests** with recorded fixtures for ccxt responses (Kraken, Bitstamp), so we can detect upstream changes.
 - **Event-flow tests** that publish events on a test bus and assert subscribers behave correctly.
-- **No end-to-end tests in v1** — Playwright or Cypress is added in v2.
-- **Target coverage**: 80% on backend `services/`, `domain/`, and `adapters/`. Coverage on API routes and frontend is explicitly not a v1 gate.
+- **End-to-end tests** (Playwright or Cypress) are post-shipping. Not a current gate.
+- **Target coverage**: 80% on backend `services/`, `domain/`, and `adapters/`. Coverage on API routes and frontend is not a current gate.
 
-## Observability (v1 minimum)
+## Observability (current minimum)
 
 - Structured JSON logging to stdout (captured by Docker).
 - Log levels configurable per module via configuration.
 - Sensitive data redacted at the log layer (any field name matching a denylist of `key|secret|passphrase|token|cookie` is replaced with `***`).
-- No metrics endpoint, no tracing, no external log shipping in v1.
+- No metrics endpoint, no tracing, no external log shipping. (Per `00_README.md` "Out of scope": no telemetry, ever.)
 - A `/api/v1/health` endpoint returns service health (database reachable, `bitcoind` reachable, Redis reachable, last custodial poll time, unlock state).

@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>TallyKeep — UI wireframes v5 (banking-first onboarding)</title>
+<style>
+  :root {
+    --bg: #f8fafc; --surface: #ffffff; --border: #e2e8f0; --border-strong: #cbd5e1;
+    --text: #0f172a; --text-muted: #64748b; --text-dim: #94a3b8; --sidebar: #f1f5f9;
+    --btc: #f59e0b; --btc-soft: #fef3c7;
+    --green: #16a34a; --green-soft: #dcfce7;
+    --amber: #ca8a04; --amber-soft: #fef9c3;
+    --red: #dc2626; --red-soft: #fee2e2;
+    --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  }
+  * { box-sizing: border-box; }
+  body { background: #e2e8f0; margin: 0; padding: 32px; font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; color: var(--text); font-size: 14px; line-height: 1.5; }
+  h1 { font-size: 24px; margin: 0 0 4px; }
+  .lede { color: var(--text-muted); margin-bottom: 24px; max-width: 820px; }
+  .changelog { background: #fef9c3; border: 1px solid #facc15; border-radius: 8px; padding: 12px 16px; margin-bottom: 24px; max-width: 820px; font-size: 13px; }
+  .changelog strong { color: #713f12; }
+  .group-title { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; color: var(--text-muted); margin: 40px 0 12px; }
+  .group-title:first-of-type { margin-top: 0; }
+  .window { width: 880px; max-width: 100%; background: var(--surface); border: 1px solid var(--border-strong); border-radius: 8px; box-shadow: 0 8px 24px rgba(15,23,42,0.08); margin-bottom: 28px; overflow: hidden; }
+  .titlebar { background: #f1f5f9; padding: 8px 12px; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 8px; }
+  .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--border-strong); }
+  .titlebar .url { flex: 1; text-align: center; font-size: 11px; color: var(--text-muted); font-family: var(--mono); }
+  .body { display: grid; grid-template-columns: 180px 1fr; min-height: 460px; }
+  .body.no-sidebar { grid-template-columns: 1fr; }
+  .main { padding: 20px 24px; }
+  .btn { padding: 6px 12px; font-size: 12px; border-radius: 5px; border: 1px solid var(--border-strong); background: var(--surface); color: var(--text); font-weight: 500; }
+  .btn.primary { background: var(--text); color: var(--surface); border-color: var(--text); }
+  .btn.btc { background: var(--btc); color: white; border-color: var(--btc); }
+  .btn.ghost { border-color: transparent; background: transparent; color: var(--text-muted); }
+  .badge { display: inline-block; font-size: 10px; padding: 1px 6px; border-radius: 3px; font-weight: 600; vertical-align: middle; }
+  .badge.gray { background: var(--border); color: var(--text-muted); }
+  .badge.amber { background: var(--amber-soft); color: var(--amber); }
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 14px 16px; }
+  .field { margin-bottom: 12px; }
+  .field label { display: block; font-size: 11px; color: var(--text-muted); margin-bottom: 4px; font-weight: 500; }
+  .input { display: block; width: 100%; padding: 7px 10px; font-size: 12px; border: 1px solid var(--border-strong); border-radius: 4px; background: var(--surface); }
+  .pick-card { padding: 14px 16px; border: 1px solid var(--border-strong); border-radius: 6px; margin-bottom: 8px; cursor: default; transition: border-color 0.15s; }
+  .pick-card:hover { border-color: var(--text); }
+  .pick-card.selected { border-color: var(--text); background: #f8fafc; }
+  .pick-card .header-row { display: flex; align-items: baseline; gap: 8px; margin-bottom: 4px; }
+  .pick-card .name { font-weight: 600; font-size: 14px; }
+  .pick-card .analog { font-size: 11px; color: var(--text-dim); }
+  .pick-card .desc { color: var(--text-muted); font-size: 12px; line-height: 1.45; }
+  .pick-card .stub { color: var(--amber); font-size: 11px; margin-top: 6px; font-weight: 500; }
+  .steps { display: flex; gap: 0; align-items: center; margin-bottom: 16px; font-size: 11px; color: var(--text-muted); flex-wrap: wrap; }
+  .step { padding: 4px 8px; }
+  .step.active { color: var(--text); font-weight: 600; }
+  .step.done { color: var(--green); }
+  .step-sep { color: var(--text-dim); }
+  .label { font-size: 13px; font-weight: 600; padding: 8px 4px 0; color: var(--text); }
+  .note { font-size: 12px; color: var(--text-muted); line-height: 1.55; padding-left: 4px; padding-top: 8px; max-width: 880px; }
+  .note strong { color: var(--text); }
+  .small { font-size: 11px; color: var(--text-muted); }
+  .sidebar { background: var(--sidebar); border-right: 1px solid var(--border); padding: 16px 8px; display: flex; flex-direction: column; gap: 2px; }
+  .sidebar .brand { font-weight: 700; font-size: 13px; padding: 6px 8px 16px; }
+  .nav-item { display: flex; align-items: center; gap: 8px; padding: 7px 10px; font-size: 12px; color: var(--text-muted); border-radius: 5px; }
+  .nav-item.active { background: var(--surface); color: var(--text); font-weight: 600; }
+  .nav-icon { width: 14px; height: 14px; border-radius: 3px; background: var(--border-strong); }
+  .nav-item.active .nav-icon { background: var(--btc); }
+  .row { display: flex; align-items: center; gap: 8px; }
+  hr { border: none; border-top: 1px solid var(--border); margin: 12px 0; }
+</style>
+</head>
+<body>
+
+<h1>TallyKeep wireframes — v5</h1>
+<div class="lede">Banking-first onboarding. The questionnaire from v4 is gone. Onboarding is now the minimum: passphrase, node, first Holding. Detail/privacy decisions are deferred to contextual moments or to Settings.</div>
+
+<div class="changelog">
+<strong>Changelog vs v4:</strong>
+<ul style="margin:6px 0 0 0; padding-left:20px;">
+  <li>Removed Q1 (where is your BTC), Q2 (detail level), Q3 (privacy) from onboarding</li>
+  <li>Onboarding is now: Welcome → Encryption → Node → First Holding (4 steps, not 7)</li>
+  <li>"Add Holding" picker uses banking-flavored descriptions (Vault = safety-deposit box, etc.)</li>
+  <li>Privacy/Blueprint prompt becomes contextual on first Strongbox or Vault creation</li>
+  <li>Detail-level features default to off; one Settings master toggle exposes them</li>
+  <li>"I don't have any Bitcoin yet" path included as an honest stub for v1 ("coming soon" guidance)</li>
+</ul>
+See <code>spec_amendments.md</code> for the rationale and the v1-real vs v1-stubbed status table.
+</div>
+
+<div class="group-title">Onboarding (4 steps)</div>
+
+<!-- 1. Welcome -->
+<div class="window">
+  <div class="titlebar"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="url">localhost:8080 · TallyKeep</span></div>
+  <div class="body no-sidebar">
+    <div class="main" style="max-width: 540px; margin: 0 auto; padding: 80px 24px; text-align: center;">
+      <div style="width: 56px; height: 56px; background: var(--btc); border-radius: 12px; margin: 0 auto 20px; display: flex; align-items: center; justify-content: center; color: white; font-size: 28px; font-weight: 700;">₿</div>
+      <h2 style="font-size: 28px; margin: 0 0 8px; font-weight: 600;">Welcome to TallyKeep</h2>
+      <div class="small" style="font-size: 14px; line-height: 1.6; margin-bottom: 32px;">
+        Banking ergonomics for your Bitcoin. No accounts. No custody. Your keys, your coins.
+      </div>
+      <button class="btn primary" style="padding: 10px 24px; font-size: 14px;">Let's set up →</button>
+    </div>
+  </div>
+</div>
+<div class="label">Step 1 — Welcome</div>
+<div class="note">No quiz. No "are you a beginner?" Just the product positioning, kept calm and short.</div>
+
+<!-- 2. Encryption passphrase -->
+<div class="window">
+  <div class="titlebar"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="url">localhost:8080 · TallyKeep · Encryption</span></div>
+  <div class="body no-sidebar">
+    <div class="main" style="max-width: 540px; margin: 0 auto; padding: 40px 24px;">
+      <div class="steps">
+        <span class="step done">✓ Welcome</span><span class="step-sep">›</span>
+        <span class="step active">Encryption</span><span class="step-sep">›</span>
+        <span class="step">Node</span><span class="step-sep">›</span>
+        <span class="step">First Holding</span>
+      </div>
+      <h2 style="font-size: 22px; margin: 0 0 4px;">Set a passphrase</h2>
+      <div class="small" style="margin-bottom: 18px;">Used to encrypt the credentials TallyKeep stores locally — your exchange API keys, RPC password, future Lightning credentials. <strong>Never your Bitcoin keys.</strong> Required every time the app starts. Never stored, never transmitted.</div>
+
+      <div class="field">
+        <label>Passphrase</label>
+        <input class="input" type="password" value="••••••••••••">
+      </div>
+      <div class="field">
+        <label>Confirm</label>
+        <input class="input" type="password" value="••••••••••••">
+      </div>
+      <div class="small" style="color: var(--green);">Strength: strong</div>
+
+      <div style="display: flex; justify-content: space-between; margin-top: 20px;">
+        <button class="btn ghost">Back</button>
+        <button class="btn primary">Initialize →</button>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="label">Step 2 — Encryption</div>
+<div class="note">Spec module 11 verbatim. The clarifying line "<strong>Never your Bitcoin keys</strong>" is added — this is the moment many users worry, and the honest abstraction principle says address it inline.</div>
+
+<!-- 3. Node connection -->
+<div class="window">
+  <div class="titlebar"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="url">localhost:8080 · TallyKeep · Node</span></div>
+  <div class="body no-sidebar">
+    <div class="main" style="max-width: 600px; margin: 0 auto; padding: 36px 24px;">
+      <div class="steps">
+        <span class="step done">✓ Welcome</span><span class="step-sep">›</span>
+        <span class="step done">✓ Encryption</span><span class="step-sep">›</span>
+        <span class="step active">Node</span><span class="step-sep">›</span>
+        <span class="step">First Holding</span>
+      </div>
+      <h2 style="font-size: 22px; margin: 0 0 4px;">Connect to your Bitcoin node</h2>
+      <div class="small" style="margin-bottom: 18px;">TallyKeep reads chain state from your own bitcoind. No third party.</div>
+
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+        <div class="field"><label>RPC host</label><input class="input" value="localhost"></div>
+        <div class="field"><label>RPC port</label><input class="input" value="8332"></div>
+        <div class="field"><label>RPC user</label><input class="input" value=""></div>
+        <div class="field"><label>RPC password</label><input class="input" type="password" value=""></div>
+      </div>
+      <div class="field"><label>ZMQ block endpoint</label><input class="input" value="tcp://localhost:28332"></div>
+      <div class="field"><label>ZMQ tx endpoint</label><input class="input" value="tcp://localhost:28333"></div>
+
+      <div style="display: flex; gap: 8px; margin-top: 8px;">
+        <button class="btn">Test connection</button>
+        <span class="small" style="color: var(--green); align-self: center;">✓ Connected to mainnet, height 832,501 — ZMQ subscriptions OK</span>
+      </div>
+
+      <div style="display: flex; justify-content: space-between; margin-top: 24px;">
+        <button class="btn ghost">Back</button>
+        <button class="btn primary">Continue →</button>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="label">Step 3 — Node connection</div>
+<div class="note">Spec module 11. Self-hosted users must connect to bitcoind. Hosted-tier users (when that ships) skip this; the backend pre-configures it.</div>
+
+<!-- 4. Add first Holding (banking-flavored picker) -->
+<div class="window">
+  <div class="titlebar"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="url">localhost:8080 · TallyKeep · Add Holding</span></div>
+  <div class="body no-sidebar">
+    <div class="main" style="max-width: 660px; margin: 0 auto; padding: 32px 24px;">
+      <div class="steps">
+        <span class="step done">✓ Welcome</span><span class="step-sep">›</span>
+        <span class="step done">✓ Encryption</span><span class="step-sep">›</span>
+        <span class="step done">✓ Node</span><span class="step-sep">›</span>
+        <span class="step active">First Holding</span>
+      </div>
+      <h2 style="font-size: 22px; margin: 0 0 4px;">Set up your first place to keep money</h2>
+      <div class="small" style="margin-bottom: 18px;">Pick what you already have. We'll walk you through connecting it. You can add others later.</div>
+
+      <div class="pick-card">
+        <div class="header-row">
+          <span class="name">Account</span>
+          <span class="analog">— like an exchange or brokerage</span>
+        </div>
+        <div class="desc">Money you've got at a custodial provider (Kraken, Bitstamp, Coinbase, Swissquote…). We connect via API to read your balance and trigger withdrawals to your own wallets — your funds never leave your control more than they already do.</div>
+      </div>
+
+      <div class="pick-card">
+        <div class="header-row">
+          <span class="name">Purse</span>
+          <span class="analog">— like a checking account</span>
+        </div>
+        <div class="desc">An everyday wallet for spending and small amounts, on a phone or laptop. The keys live on your device; we just import the watch-only descriptor.</div>
+      </div>
+
+      <div class="pick-card">
+        <div class="header-row">
+          <span class="name">Strongbox</span>
+          <span class="analog">— like a savings account, but you hold the key</span>
+        </div>
+        <div class="desc">A safer spot for medium-term holdings, usually on a hardware wallet (Coldcard, Trezor, Ledger, Jade). We import the watch-only descriptor and prepare PSBTs you sign on the device.</div>
+      </div>
+
+      <div class="pick-card">
+        <div class="header-row">
+          <span class="name">Vault</span>
+          <span class="analog">— like a safety-deposit box</span>
+        </div>
+        <div class="desc">A heavily-protected long-term holding. Multi-key, possibly with timelocks or geographic separation. Used rarely, with care.</div>
+        <div class="stub">⚠ v1 stores Vault metadata but only single-key descriptors are accepted. Full multisig support arrives in v2.</div>
+      </div>
+
+      <hr>
+
+      <div class="pick-card" style="background: #f8fafc;">
+        <div class="header-row">
+          <span class="name">I don't have any Bitcoin yet</span>
+          <span class="analog">— let's start from zero</span>
+        </div>
+        <div class="desc">We'll point you toward a custodial exchange where you can acquire some, then bring it under TallyKeep. <em>TallyKeep manages Bitcoin you have somewhere — it doesn't broker the buy itself.</em></div>
+      </div>
+
+      <div style="display: flex; justify-content: space-between; margin-top: 20px;">
+        <button class="btn ghost">Skip — set up later</button>
+        <button class="btn primary">Choose →</button>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="label">Step 4 — First Holding (banking-language picker)</div>
+<div class="note">The four spec types described in plain language. The "<em>like a…</em>" analogies anchor each in fiat banking, then the description explains the Bitcoin reality. Vault keeps its honest v1 limitation footnote. The "I don't have any yet" path is included as a designed-ahead stub — see spec_amendments.md, v1-status table.</div>
+
+<div class="group-title">Contextual prompts (replace the questionnaire's role)</div>
+
+<!-- Privacy prompt on Strongbox creation -->
+<div class="window">
+  <div class="titlebar"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="url">localhost:8080 · TallyKeep · Add Strongbox · Done</span></div>
+  <div class="body no-sidebar">
+    <div class="main" style="max-width: 580px; margin: 0 auto; padding: 32px 24px;">
+      <div style="text-align: center;">
+        <div style="font-size: 36px; color: var(--green); margin-bottom: 8px;">✓</div>
+        <h2 style="font-size: 20px; margin: 0 0 4px;">Strongbox "Cold reserve" added</h2>
+        <div class="small">Found 12 transactions, balance 0.30000000 BTC.</div>
+      </div>
+
+      <div class="card" style="margin-top: 20px; border-color: var(--amber); background: var(--amber-soft);">
+        <div style="font-weight: 600; margin-bottom: 6px;">One quick question</div>
+        <div style="font-size: 13px; color: var(--text); margin-bottom: 10px;">
+          Strongbox usually holds amounts worth protecting from chain analysis (address reuse, dust UTXOs, round-number outputs make wallets easy to cluster). Want TallyKeep to flag privacy issues automatically when it sees them?
+        </div>
+        <div style="display: flex; gap: 8px;">
+          <button class="btn primary">Yes, flag privacy issues</button>
+          <button class="btn">Show me only if I ask</button>
+          <button class="btn ghost">No thanks</button>
+        </div>
+      </div>
+
+      <div style="text-align: center; margin-top: 20px;">
+        <button class="btn">Configure auto-sweep now</button>
+        <button class="btn primary">Done</button>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="label">Contextual privacy prompt — first Strongbox creation</div>
+<div class="note">This replaces the onboarding privacy question. It happens at the moment the user has just created a Holding where the answer matters. The prompt is calm, explains *why* it's relevant ("Strongbox usually holds…"), and offers three honest defaults including "no thanks." Skipped entirely for users who only have Account or Purse.</div>
+
+<!-- Settings: detail toggle -->
+<div class="window">
+  <div class="titlebar"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="url">localhost:8080 · TallyKeep · Settings · Display</span></div>
+  <div class="body">
+    <nav class="sidebar">
+      <div class="brand">TallyKeep</div>
+      <div class="nav-item"><span class="nav-icon"></span>Home</div>
+      <div class="nav-item"><span class="nav-icon"></span>Holdings</div>
+      <div class="nav-item"><span class="nav-icon"></span>Send</div>
+      <div class="nav-item"><span class="nav-icon"></span>Receive</div>
+      <div class="nav-item"><span class="nav-icon"></span>Trading</div>
+      <div class="nav-item active"><span class="nav-icon"></span>Settings</div>
+    </nav>
+    <div class="main">
+      <h2 style="margin: 0 0 16px; font-size: 18px;">Settings · Display</h2>
+
+      <div class="card" style="margin-bottom: 12px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+          <div>
+            <strong>Show technical details</strong>
+            <div class="small">UTXOs, derivation paths, raw transactions, descriptor expressions, hygiene flags.</div>
+          </div>
+          <div style="width: 32px; height: 18px; border-radius: 999px; background: var(--border-strong); position: relative; flex-shrink: 0;">
+            <div style="position: absolute; left: 1px; top: 1px; width: 16px; height: 16px; border-radius: 50%; background: white;"></div>
+          </div>
+        </div>
+        <div class="small" style="border-top: 1px solid var(--border); padding-top: 8px;">When off (default), TallyKeep shows only what a banking app would: balances, transactions, send, receive. Turn on if you want to see the Bitcoin underneath.</div>
+      </div>
+
+      <div class="card" style="margin-bottom: 12px;">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+          <div>
+            <strong>Privacy / Blueprint analysis</strong>
+            <div class="small">Flag privacy issues like address reuse and dust UTXOs.</div>
+          </div>
+          <div style="width: 32px; height: 18px; border-radius: 999px; background: var(--text); position: relative; flex-shrink: 0;">
+            <div style="position: absolute; right: 1px; top: 1px; width: 16px; height: 16px; border-radius: 50%; background: white;"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card" style="margin-bottom: 12px;">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+          <div>
+            <strong>Custom fee rates and Replace-By-Fee</strong>
+            <div class="small">Manual sat/vB input on send. RBF toggle on outgoing payments.</div>
+          </div>
+          <div style="width: 32px; height: 18px; border-radius: 999px; background: var(--border-strong); position: relative; flex-shrink: 0;">
+            <div style="position: absolute; left: 1px; top: 1px; width: 16px; height: 16px; border-radius: 50%; background: white;"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+          <div>
+            <strong>Coin control</strong>
+            <div class="small">Manually pick which UTXOs to spend on each send.</div>
+          </div>
+          <div style="width: 32px; height: 18px; border-radius: 999px; background: var(--border-strong); position: relative; flex-shrink: 0;">
+            <div style="position: absolute; left: 1px; top: 1px; width: 16px; height: 16px; border-radius: 50%; background: white;"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="label">Settings · Display (replaces preset selection)</div>
+<div class="note">Master toggle "<strong>Show technical details</strong>" exposes the cluster of advanced flags (UTXO views, raw tx, descriptors, hygiene flags) in one move. Privacy is a separate toggle (its setting was set by the contextual prompt during Strongbox creation). Power features (custom fees, coin control) are individual toggles. <strong>No preset names anywhere.</strong></div>
+
+</body>
+</html>

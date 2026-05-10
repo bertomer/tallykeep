@@ -35,7 +35,6 @@ class UserProfileRow(Base):
     )
 
     id: Mapped[UUID] = mapped_column(primary_key=True)
-    preset: Mapped[str] = mapped_column(String(20), nullable=False)
     feature_flags: Mapped[dict[str, Any]] = mapped_column(
         JSONB, nullable=False, server_default=text("'{}'::jsonb")
     )

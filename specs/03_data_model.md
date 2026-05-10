@@ -2,7 +2,7 @@
 
 ## Database choice
 
-**PostgreSQL 15 or later** for Docker deployments. SQLite is acceptable for minimal single-user installations but is not the primary target. The schema is compatible with both; we use SQLAlchemy 2.x Core and ORM and avoid Postgres-specific features in v1 except where noted.
+**PostgreSQL 15 or later** for Docker deployments. SQLite is acceptable for minimal single-user installations but is not the primary target. The schema is compatible with both; we use SQLAlchemy 2.x Core and ORM and avoid Postgres-specific features except where noted.
 
 ## Conventions
 
@@ -21,13 +21,16 @@ Singleton table.
 ```sql
 CREATE TABLE user_profile (
     id UUID PRIMARY KEY CHECK (id = '00000000-0000-0000-0000-000000000001'),
-    preset VARCHAR(20) NOT NULL,
     feature_flags JSONB NOT NULL DEFAULT '{}',
     base_currency VARCHAR(3) NOT NULL DEFAULT 'EUR',
     locale VARCHAR(10) NOT NULL DEFAULT 'en',
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+-- Note: there is no `preset` column. Initial flag values come from
+-- onboarding answers (see 09_feature_flags.md); after onboarding,
+-- the user toggles individual flags in Settings. No tier / named
+-- identity is stored.
 ```
 
 ### `holding`
@@ -51,10 +54,14 @@ CREATE TABLE holding (
 
     -- Subtype-specific data
     subtype_data JSONB NOT NULL DEFAULT '{}',
-    -- For 'vault': { "required_signers": 2, "total_signers": 3, "timelock_blocks": null, "recovery_setup_notes": "..." }
+    -- For 'vault':     { "required_signers": 2, "total_signers": 3, "timelock_blocks": null, "recovery_setup_notes": "..." }
     -- For 'strongbox': { "signing_device_label": "Coldcard Mk4 in safe" }
-    -- For 'account': empty (CustodialProvider link is in custodial_provider table)
-    -- For 'purse': empty
+    -- For 'account':   empty (CustodialProvider link is in custodial_provider table)
+    -- For 'purse':     { "seed_origin": "external_watch_only" | "tallykeep_managed" }
+    --                  See 02_domain_model.md §"Purse seed origin". The backend never
+    --                  stores a reference to the seed itself; for tallykeep_managed Purses
+    --                  the seed lives in a client device's secure local storage (iOS
+    --                  Keychain / Android Keystore), keyed client-side by holding_id.
 
     display_color VARCHAR(7) NOT NULL DEFAULT '#000000',
     display_order INTEGER NOT NULL DEFAULT 0,
@@ -159,7 +166,7 @@ CREATE TABLE custodial_provider (
     api_secret_reference VARCHAR(200) NOT NULL,
     api_passphrase_reference VARCHAR(200),
     can_read BOOLEAN NOT NULL DEFAULT TRUE CHECK (can_read = TRUE),
-    can_trade BOOLEAN NOT NULL DEFAULT FALSE CHECK (can_trade = FALSE),  -- v1 invariant
+    can_trade BOOLEAN NOT NULL DEFAULT FALSE CHECK (can_trade = FALSE),  -- locked invariant: no order placement
     can_withdraw BOOLEAN NOT NULL DEFAULT FALSE,
     whitelist_address VARCHAR(100) NOT NULL,
     whitelist_address_descriptor_id UUID NOT NULL REFERENCES descriptor(id),
@@ -209,7 +216,7 @@ CREATE TABLE ledger_entry (
     source VARCHAR(30) NOT NULL CHECK (source IN ('onchain_transaction','lightning_payment','custodial_event')),
     source_reference VARCHAR(200) NOT NULL,
     -- For onchain_transaction: the txid
-    -- For lightning_payment: the payment_hash (v1.5)
+    -- For lightning_payment: the payment_hash (populated once the Lightning iteration ships)
     -- For custodial_event: the provider's event id
 
     category VARCHAR(40),
@@ -261,7 +268,7 @@ CREATE TABLE payment_request (
     signed_transaction_hex TEXT,
     broadcast_txid VARCHAR(64),
 
-    -- Lightning (v1.5)
+    -- Lightning (populated once the Lightning iteration ships)
     lightning_invoice TEXT,
     lightning_payment_hash VARCHAR(64),
 
@@ -294,7 +301,7 @@ CREATE TABLE invoice (
     receiving_address_id UUID REFERENCES address(id),
     bip21_uri TEXT,
 
-    -- Lightning (v1.5)
+    -- Lightning (populated once the Lightning iteration ships)
     bolt11 TEXT,
     payment_hash VARCHAR(64),
 
@@ -327,6 +334,7 @@ CREATE TABLE sweep_policy (
     minimum_balance_sats BIGINT NOT NULL DEFAULT 0,
     maximum_per_period_sats BIGINT,
     requires_user_confirmation BOOLEAN NOT NULL DEFAULT TRUE,
+    is_dry_run BOOLEAN NOT NULL DEFAULT FALSE,
     safety_warnings JSONB NOT NULL DEFAULT '[]',
     last_executed_at TIMESTAMPTZ,
     last_result_summary JSONB,
@@ -365,7 +373,7 @@ CREATE INDEX idx_sweep_execution_pending ON sweep_execution(status) WHERE status
 
 ### `broadcast_attempt`
 
-Audit trail for transaction broadcasts. Distinct from `payment_request` because a single payment may have multiple broadcast attempts (initial fail, retry, RBF in v1.x).
+Audit trail for transaction broadcasts. Distinct from `payment_request` because a single payment may have multiple broadcast attempts (initial fail, retry, RBF in a future iteration — see `future_iterations.md` "Replace-By-Fee (RBF) support").
 
 ```sql
 CREATE TABLE broadcast_attempt (
@@ -503,7 +511,7 @@ CREATE TABLE secret (
 Only third-party access credentials. Specifically:
 - Custodial provider API credentials (Kraken, Bitstamp, Swissquote keys and secrets)
 - bitcoind RPC password
-- Lightning node credentials in v1.5 (macaroon for LND, runefile for CLN, gRPC TLS certs)
+- Lightning node credentials, once the Lightning iteration ships (macaroon for LND, runefile for CLN, gRPC TLS certs)
 
 ### What never goes in the secret table
 

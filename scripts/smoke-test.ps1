@@ -79,20 +79,21 @@ try {
 
 Section "3. Profile (auto-creates singleton on first GET)"
 $profile = Invoke-RestMethod -Uri "$BaseUrl/api/v1/profile"
-Show "preset"        $profile.preset
 Show "base_currency" $profile.base_currency
+Show "locale"        $profile.locale
 
-Section "4. Switch preset to 'sovereign'"
-$body = @{ preset = "sovereign" } | ConvertTo-Json -Compress
+Section "4. Set a feature-flag override"
+$body = @{ feature_flags = @{ "banking.rbf.enabled" = $true } } | ConvertTo-Json -Compress -Depth 3
 $profile = Invoke-RestMethod -Method Patch -Uri "$BaseUrl/api/v1/profile" `
     -ContentType 'application/json' -Body $body
-Show "preset"  $profile.preset
+Show "rbf override stored" ($profile.feature_flags."banking.rbf.enabled" -eq $true)
 
-Section "5. Feature flags (resolved against the new preset)"
+Section "5. Feature flags (defaults + override applied)"
 $flags = Invoke-RestMethod -Uri "$BaseUrl/api/v1/feature-flags"
-Show "trading.enabled"            $flags.flags."trading.enabled"
-Show "banking.custom_fee_rate"    $flags.flags."banking.custom_fee_rate.enabled"
-Show "advanced.api_docs_link"     $flags.flags."advanced.api_docs_link"
+Show "trading.enabled"                          $flags.flags."trading.enabled"
+Show "banking.custom_fee_rate"                  $flags.flags."banking.custom_fee_rate.enabled"
+Show "banking.coin_selection_per_payment"       $flags.flags."banking.coin_selection_per_payment_override"
+Show "banking.rbf (overridden to true)"         $flags.flags."banking.rbf.enabled"
 
 Section "6. Configuration -- set bitcoind RPC host"
 $body = @{ bitcoind = @{ rpc_host = "192.168.1.42"; rpc_port = 8332 } } | ConvertTo-Json -Compress -Depth 4
@@ -109,6 +110,7 @@ $body = @{
     name = "Smoke-test phone wallet"
     description = "Created by smoke-test.ps1"
     purpose = "spending"
+    seed_origin = "external_watch_only"
     declared_security = @{
         custody_model = "self_single"
         signing_model = "software_hot"
@@ -214,6 +216,7 @@ $wpkhRegtest = "wpkh(tpubD6NzVbkrYhZ4XHndKkuB8FifXm8r5FQHwrN6oZuWCz13qb93rtgKvD4
 $regtestBody = @{
     name = "Smoke regtest wallet"
     purpose = "spending"
+    seed_origin = "external_watch_only"
     declared_security = @{
         custody_model = "self_single"
         signing_model = "software_hot"
@@ -332,6 +335,7 @@ try {
     $bankPurseBody = @{
         name = "Smoke banking wallet"
         purpose = "spending"
+        seed_origin = "external_watch_only"
         declared_security = @{
             custody_model = "self_single"
             signing_model = "software_hot"

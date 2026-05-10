@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" aria-label="TallyKeep">
+  <title>TallyKeep — solid icon (favicon variant, ≤16 px)</title>
+  <desc>Solid version of the brand mark for sub-16-px display, where grain stripes blur into noise. Silhouette and carvings preserved.</desc>
+  <!-- Wood: stock + foil -->
+  <path d="M 168.33 42.19 L 54.27 174.22 L 36.43 139.77 L 54.47 118.86 L 65.07 128.02 L 151.67 27.81 Z" fill="#A88554"/>
+  <polygon points="40.68,42.21 79.68,87.21 96.32,72.79 57.32,27.79" fill="#A88554"/>
+  <!-- Carvings -->
+  <circle cx="53.76" cy="147.31" r="2.8" fill="#F4EAD5"/>
+  <polygon points="-3,12 3,12 2,5 -2,5"     fill="#F4EAD5" transform="translate(147 50) rotate(130.82)"/>
+  <polygon points="-4,12 4,12 2,4 -2,4"     fill="#F4EAD5" transform="translate(140 58) rotate(130.82)"/>
+  <polygon points="-3,12 3,12 2,5 -2,5"     fill="#F4EAD5" transform="translate(133 66) rotate(130.82)"/>
+  <polygon points="-3,-12 3,-12 2,-5 -2,-5" fill="#F4EAD5" transform="translate(62 50)  rotate(49.18)"/>
+  <polygon points="-4,-12 4,-12 2,-4 -2,-4" fill="#F4EAD5" transform="translate(69 58)  rotate(49.18)"/>
+  <polygon points="-3,-12 3,-12 2,-5 -2,-5" fill="#F4EAD5" transform="translate(76 66)  rotate(49.18)"/>
+</svg>

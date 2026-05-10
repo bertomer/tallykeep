@@ -157,11 +157,9 @@ class JobStatus(str, Enum):
     CANCELLED = "cancelled"
 
 
-class ProfilePreset(str, Enum):
-    BEGINNER = "beginner"
-    INTERMEDIATE = "intermediate"
-    SOVEREIGN = "sovereign"
-    CUSTOM = "custom"
+class PurseSeedOrigin(str, Enum):
+    EXTERNAL_WATCH_ONLY = "external_watch_only"
+    TALLYKEEP_MANAGED = "tallykeep_managed"
 
 
 class DiscrepancyKind(str, Enum):

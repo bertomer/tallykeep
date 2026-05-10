@@ -1,14 +1,26 @@
-# BTC-Centric Self-Hosted Banking App — v1 Specification
+# BTC-Centric Self-Hosted Banking App — Specification
 
 ## Purpose
 
 A self-hosted, Bitcoin-first application that integrates three personal-finance domains under one user interface and one internal API:
 
 - **Savings** — watch-only multi-Holding view over user-controlled Bitcoin, with UTXO hygiene flags, transaction categorization, and security-claim verification (declared vs observable).
-- **Banking** — on-chain Bitcoin payments and receipts via PSBT (signed on an external device). Lightning support is deferred to v1.5 behind a defined interface.
+- **Banking** — on-chain Bitcoin payments and receipts via PSBT (signed on an external device). Lightning support is deferred to a future iteration behind a defined interface (see module 08).
 - **Trading** — read-only balance aggregation across custodial providers (centralized exchanges and brokers), plus policy-driven auto-sweep between any two Holdings ("minimum-exposure trading").
 
-The app is designed for a single self-hosted user. It does not custody keys, does not hold funds, does not create user accounts, and exposes no public network surface in v1.
+The app is designed for a single self-hosted user. It does not custody keys, does not hold funds, does not create user accounts, and exposes no public network surface in the dev or personal-use phase.
+
+## Why this exists
+
+The product targets three audience layers, in increasing depth.
+
+**Personal utility.** A tool that lets a sovereignty-minded user hold Bitcoin sovereignly while still acquiring through fiat rails, spending for real-world purchases, and planning long-term around it. None of the existing tools do this without compromising on custody, vocabulary, or trust posture.
+
+**Addressable market.** Latin America (Argentina specifically), parts of Africa (Nigeria, Kenya, Ghana, South Africa), parts of the Middle East. Markets where currency instability, capital controls, and fragile banking infrastructure make sovereignty over one's own assets a daily concern rather than an abstract ideal.
+
+**Underlying conviction.** A working hypothesis that Western financial systems are heading toward serious dysfunction and that the right response is to build the alternative rather than wait for institutions to self-correct. This is the engine, not the message of the front door.
+
+Marketing voice should foreground the first two layers — concrete utility for real problems for real people — and let the third stay available for those who want to dig deeper. The product's voice is quietly serious, not fire-breathing.
 
 ## Design principles (locked)
 
@@ -16,47 +28,62 @@ The app is designed for a single self-hosted user. It does not custody keys, doe
 2. **Holdings are first-class and typed.** Account, Purse, Strongbox, Vault are not labels — they are distinct types in the domain, each with its own creation flow, security profile, and operational rules.
 3. **Declared security versus observable security.** The user declares what each Holding is supposed to be; the analyzer continuously checks whether the on-chain reality matches the declaration. Discrepancies are surfaced.
 4. **Minimum-exposure trading.** Custodial providers are pass-through liquidity, not storage. Funds leave them as fast as policy allows.
-5. **No custody, no accounts, no signing keys held by the app.** The app is a tool the user drives; it never owns user funds or identity material. Only third-party access credentials are stored, encrypted at rest.
-6. **Internal API-first.** The frontend is one consumer of the backend API. External or public API exposure is explicitly out of scope for v1.
-7. **Event-driven where appropriate, persistent where loss is unacceptable.** Domain events flow on a bus for live UI updates and decoupled subscribers; critical state transitions are also written to audit tables so nothing is lost if a subscriber misses an event.
-8. **Non-requirement discipline.** Anything that brings regulatory or compliance surface is rejected by default.
+5. **Generalized SweepPolicy.** Not just "exchange to cold." Any Holding to any Holding, with a safety validator that warns about risky configurations but never blocks. The user is the final authority; the validator just makes sure they know what they are doing before they do it.
+6. **No custody, no accounts, no signing keys held by the app.** The app is a tool the user drives; it never owns user funds or identity material. Only third-party access credentials are stored, encrypted at rest.
+7. **Internal API-first.** The frontend is one consumer of the backend API. External or public API exposure is explicitly out of scope through the personal-use phase. The architecture stays ready for future external exposure (institutional reuse, third-party services) without designing for it now.
+8. **Event-driven where appropriate, persistent where loss is unacceptable.** Domain events flow on a bus for live UI updates and decoupled subscribers; critical state transitions are also written to audit tables so nothing is lost if a subscriber misses an event.
+9. **Non-requirement discipline.** Anything that brings regulatory or compliance surface is rejected by default.
 
 ## Scope
 
-### In scope for v1
+Phases and shipping milestones are defined in ADR-0003 (dev phase →
+private-ship event → personal-use phase → public-ship event → public
+phase). The "v1 / v1.5 / v2 / v3" framing the spec used originally
+is dropped in favor of those events. The active iteration's scope
+lives in `next_iteration.md`; the deferred backlog with milestone
+tags lives in `future_iterations.md`.
+
+### Currently in scope (dev phase)
 - Watch-only Holdings (Account, Purse, Strongbox, Vault) with descriptor-based wallets
 - Node integration via local `bitcoind` JSON-RPC plus ZeroMQ subscription for live chain events
 - PSBT construction, export (file and QR), re-import, and broadcast
 - Read-only custodial provider integration (Kraken, Bitstamp) via the ccxt library
 - Generalized sweep policies between any two Holdings, with a safety validator that warns but does not block
 - Live blockchain scanning and user-driven transaction categorization
-- UTXO hygiene flags (address reuse, dust, change larger than payment, suspected consolidation)
-- Declared-vs-observable security analysis (basic v1 set; full clustering view in v2)
-- Profile presets (Beginner / Intermediate / Sovereign) implemented as feature-flag bundles
+- UTXO hygiene flags computed in the backend (address reuse, dust, change larger than payment, suspected consolidation) — UI surface deferred per `future_iterations.md`
+- Declared-vs-observable security analysis
+- Onboarding-question-driven feature-flag defaults (no named user identities — see `09_feature_flags.md`)
 - Internal REST API (localhost-bound) plus Server-Sent Events stream for live updates
-- SvelteKit Progressive Web App frontend, mobile-first
+- SvelteKit Progressive Web App frontend, mobile-first, fine-tuned in browser at mobile viewport against the real backend (per ADR-0003 dev phase)
 - Deployment via Docker Compose
 
-### Deferred to v1.5
-- Lightning support (CoreLightning, LND, Phoenix) behind the `LightningProvider` interface defined in v1
+### Deferred
 
-### Deferred to v2 and later
-- Order placement on custodial providers (v1 is withdrawal-only)
+See `future_iterations.md` for the full backlog with `pre-shipping` /
+`post-shipping` / TBD milestone tags. Major deferred items include:
+
+- Lightning support (CoreLightning, LND, Phoenix) behind the `LightningProvider` interface
+- Capacitor mobile wrapper + native plugins (private-ship enabler)
+- Authentication layer + security-health system (private-ship gate)
+- Multisig descriptor support
+- Order placement on custodial providers
 - Additional custodial providers beyond Kraken and Bitstamp
-- Multisig descriptor support (v1 single-key only)
-- Clustering graph visualization (blueprint analysis v2)
-- Native mobile wrapper
-- Custom adapter for Swissquote and other non-ccxt venues
+- Custom adapter for non-ccxt venues (Swissquote and similar)
+- Blueprint analysis UI surface
+- Clustering graph visualization
+- Public-ship event work bundle (native signing, reproducible builds, app stores, F-Droid, brand finalization, third-party security audit)
 
 ### Explicitly out of scope (forever, unless revisited with a lawyer)
 - Custody of user funds
 - On-behalf signing of user transactions
 - User account creation in our app
+- Acting as an exchange, broker, or money transmitter on the user's behalf — the app is a tool the user drives, not a service handling money for them
 - Lending, borrowing, yield, collateralization
 - Public API or multi-tenant SaaS deployment
 - Token issuance
-- Stablecoins, Monero, non-Bitcoin chains
+- Stablecoins, Monero, non-Bitcoin chains *as custody*. (Read-only aggregation of non-BTC balances at connected providers is an open arbitration item — see `pre-implementation.md`.)
 - Inventing a new offline payment protocol
+- Telemetry, usage analytics, or crash reporting to TallyKeep / Anthropic / any third-party endpoint. The app is self-hosted; the user is the customer, not the data source. If a user wants to share a crash log, it is a manual file they choose to send.
 
 ## Module map
 
@@ -67,16 +94,22 @@ The specification is split into the following modules. Read in order.
 | 01 | `01_architecture.md` | Service topology, event-bus design, stack choices, deployment model |
 | 02 | `02_domain_model.md` | Holdings hierarchy, Descriptor, LedgerEntry, CustodialProvider, generalized SweepPolicy |
 | 03 | `03_data_model.md` | Database schema, secret storage, cryptographic parameters, migration strategy |
-| 04 | `04_api_surface.md` | Internal REST API contract and Server-Sent Events stream |
+| 04 | `04_api_conventions.md` | API cross-cutting conventions (auth, errors, pagination, SSE pattern, async-job pattern). Endpoint shapes live in `api/openapi.yaml`. |
 | 05 | `05_savings_layer.md` | Watch-only Holdings, UTXO hygiene, declared-vs-observable security analysis |
 | 06 | `06_banking_layer.md` | PSBT flow, fee user experience, on-chain send and receive |
 | 07 | `07_trading_layer.md` | Custodial provider integration, generalized sweep policy engine |
-| 08 | `08_lightning_placeholder.md` | Interface for v1.5 Lightning integration |
-| 09 | `09_profiles_and_flags.md` | Profile presets and feature-flag system |
+| 08 | `08_lightning_placeholder.md` | Interface for the deferred Lightning integration |
+| 09 | `09_feature_flags.md` | Feature-flag catalog, onboarding-driven defaults, resolution rules |
 | 10 | `10_threat_model.md` | Security scope, blast radius, what is defended and what is not |
-| 11 | `11_ux_flows.md` | Key user flows with screen-by-screen expectations |
-| 12 | `12_roadmap.md` | v1 to v1.5 to v2 to v3 staging |
-| 13 | `13_open_questions.md` | Items deliberately unresolved, for later decision |
+
+UI specs live in `UI/` (cross-platform decisions in `UI/README.md`,
+platform-specific in `UI/mobile.md` and `UI/desktop.md`, page-per-file
+HTML mockups in `UI/mockups/`). Brand identity (icon, wordmark, color
+palette, typography, voice) lives in `brand/` — currently in
+placeholder mode pending the public-ship event per ADR-0003. ADRs
+live in `decisions/`. The OpenAPI extract from the running backend
+lives in `api/openapi.yaml`. The working process and document layout
+are described in `PROCESS.md`.
 
 ## Stack (locked)
 
@@ -92,7 +125,7 @@ The specification is split into the following modules. Read in order.
 | Event bus | Redis pub/sub (abstracted behind an `EventBus` interface) |
 | Job queue | RQ (Redis Queue) |
 | Scheduling | APScheduler in the worker process |
-| Lightning (v1.5) | CoreLightning or LND over gRPC; Phoenix as alternative |
+| Lightning (deferred iteration) | CoreLightning or LND over gRPC; Phoenix as alternative |
 | Frontend | SvelteKit Progressive Web App |
 | Styling | TailwindCSS |
 | Packaging | Docker Compose |
@@ -101,17 +134,13 @@ The specification is split into the following modules. Read in order.
 
 ## How to use this spec
 
-This document is written to be handed to a coding agent. Each module is self-contained but cross-references others. The agent should implement in this order:
-
-1. Scaffolding (modules 00 to 04): project structure, domain model, database schema, API skeleton, event bus
-2. Savings layer (module 05)
-3. Banking layer on-chain (module 06)
-4. Profile presets and feature flags (module 09)
-5. Trading layer (module 07)
-6. User experience flows (module 11) — frontend build
-7. Lightning (module 08) — v1.5, follows a separate Lightning-focused session
-
-The human reviewer (the user) validates after each milestone.
+This is the canonical product description. The original
+module-by-module implementation order has shipped through module 10
+(backend layers); UI work is currently iteration-driven against the
+real backend. Working process — iteration cycle, ADR routing, mockup
+conventions, working agreement for new agents — lives in
+`PROCESS.md`. The active iteration's scope lives in
+`next_iteration.md`.
 
 ## Vocabulary primer
 
@@ -124,4 +153,4 @@ Because vocabulary matters in this spec, the four user-facing Holding types and 
 
 The technical primitive that backs Purse, Strongbox, and Vault is called a **Descriptor** (from BIP 380). A Holding may reference one or more Descriptors. Account has no Descriptor — it has a CustodialProvider connection instead.
 
-A movement of value, whether on-chain, on Lightning (v1.5), or a custodial-provider event, is recorded as a **LedgerEntry**. The on-chain transaction itself, when applicable, is the **OnChainTransaction** that the LedgerEntry references.
+A movement of value, whether on-chain, on Lightning (when that iteration ships), or a custodial-provider event, is recorded as a **LedgerEntry**. The on-chain transaction itself, when applicable, is the **OnChainTransaction** that the LedgerEntry references.

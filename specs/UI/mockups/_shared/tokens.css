@@ -1,0 +1,127 @@
+/*
+  TallyKeep — design tokens (brand v1)
+
+  Values derived from the brand v1 lock documents:
+    - brand/tallykeep_brand_mark_v1_lock.html  (palette §3, color tokens)
+    - brand/tallykeep_wordmark_v1_lock.html    (typography, dark-mode)
+
+  The lock documents are themselves rendered in the brand — page
+  chrome, surfaces, text, borders, and code-block fills are the
+  brand applied to a working surface. These tokens extract those
+  values verbatim. There were no decisions to make here; the
+  decisions were already made in the lock docs.
+
+  Token *names* are stable across brand revisions; values change
+  when a new brand version locks. UI components and mockups
+  reference token names, not raw values.
+
+  Status: brand v1 (locked working brand; public-ship event will
+          confirm or revise per ADR-0003)
+  Last touched: 2026-05
+*/
+
+:root {
+  /* ---------------- Brand (v1 — locked) ---------------- */
+  /* Source: brand mark §3 "Color tokens".                  */
+  --color-primary:           #A88554; /* Aged Oak           */
+  --color-primary-soft:      #F1ECDD; /* lighter cream — used as soft surface for the brand color (e.g. code-block fill in lock docs) */
+  --color-primary-strong:    #6F5638; /* Grain              */
+  --color-on-primary:        #F4EAD5; /* Cream — the carving color reads on Aged Oak */
+
+  /* ---------------- Surfaces ---------------- */
+  /* Source: lock-doc page chrome.                          */
+  --color-bg:                #FAFAF7; /* page background (warm off-white) */
+  --color-surface:           #FFFFFF; /* cards, swatches, demo frames    */
+  --color-surface-raised:    #FFFFFF;
+  --color-sidebar:           #F4EAD5; /* cream — the warmer surface for sidebars / icon hero */
+  --color-overlay:           rgba(26, 26, 26, 0.4); /* dark text color at 40% — modal overlay */
+
+  /* ---------------- Text ---------------- */
+  /* Source: lock-doc text colors.                          */
+  --color-text:              #1A1A1A; /* headings, primary text */
+  --color-text-muted:        #555555; /* lead, body              */
+  --color-text-dim:          #888888; /* TOC labels, captions    */
+  --color-text-inverse:      #F4EAD5; /* cream — text on dark surfaces (per wordmark dark-mode rules) */
+
+  /* ---------------- Borders ---------------- */
+  --color-border:            #E8E2D2; /* primary border — the warm-tone neutral used throughout lock docs */
+  --color-border-strong:     #D4C8AB; /* deeper warm-tone for stronger separation */
+  --color-border-focus:      #A88554; /* primary (focus rings adopt the brand color) */
+
+  /* ---------------- Semantic ---------------- */
+  /* NOT in the brand lock docs. Current values retained from the
+     pre-lock placeholder. Revisit only if a screen renders badly
+     against the warm-tone surfaces — not a session, a "fix when
+     you see it" item.                                        */
+  --color-success:           #16a34a;
+  --color-success-soft:      #dcfce7;
+  --color-warning:           #ca8a04;
+  --color-warning-soft:      #fef9c3;
+  --color-danger:            #dc2626;
+  --color-danger-soft:       #fee2e2;
+  --color-info:              #0284c7;
+  --color-info-soft:         #e0f2fe;
+
+  /* ---------------- Holding type accents ---------------- */
+  /* NOT in the brand lock docs. Current values retained from the
+     pre-lock placeholder. Same revisit-when-needed posture as
+     the semantic colors above.                                */
+  --color-holding-account:   #0284c7; /* custodial — info-blue */
+  --color-holding-purse:     #16a34a; /* online keys — green   */
+  --color-holding-strongbox: #ca8a04; /* offline keys — amber  */
+  --color-holding-vault:     #7c3aed; /* ceremonial — violet   */
+
+  /* ---------------- Type ---------------- */
+  /* Source: wordmark lock §2 "Typeface · Manrope 600".     */
+  --font-sans: "Manrope", ui-sans-serif, system-ui, -apple-system,
+               "Segoe UI", Roboto, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+
+  --font-size-xs:   11px;
+  --font-size-sm:   12px;
+  --font-size-base: 14px;
+  --font-size-md:   16px;
+  --font-size-lg:   20px;
+  --font-size-xl:   24px;
+  --font-size-2xl:  32px;
+  --font-size-hero: 40px;
+
+  --font-weight-normal:   400;
+  --font-weight-medium:   500;
+  --font-weight-semibold: 600;
+  --font-weight-bold:     700;
+
+  --line-height-tight:   1.2;
+  --line-height-default: 1.5;
+
+  /* ---------------- Spacing ---------------- */
+  --space-0:  0;
+  --space-1:  4px;
+  --space-2:  8px;
+  --space-3:  12px;
+  --space-4:  16px;
+  --space-5:  24px;
+  --space-6:  32px;
+  --space-7:  48px;
+  --space-8:  64px;
+
+  /* ---------------- Radius ---------------- */
+  --radius-sm:   4px;
+  --radius-md:   8px;
+  --radius-lg:   12px;
+  --radius-xl:   16px;
+  --radius-pill: 999px;
+
+  /* ---------------- Shadow ---------------- */
+  --shadow-sm: 0 1px 2px  rgba(26, 26, 26, 0.06);
+  --shadow-md: 0 4px 12px rgba(26, 26, 26, 0.08);
+  --shadow-lg: 0 12px 32px rgba(26, 26, 26, 0.12);
+
+  /* ---------------- Mobile shell ---------------- */
+  --mobile-viewport-width:  390px;
+  --mobile-viewport-height: 844px;
+  --mobile-safe-top:        44px;
+  --mobile-safe-bottom:     34px;
+  --mobile-bottom-nav:      64px;
+  --mobile-app-bar:         52px;
+}

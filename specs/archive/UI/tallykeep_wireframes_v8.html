@@ -1,0 +1,664 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>TallyKeep — Add Holding wizards (v8)</title>
+<style>
+  :root {
+    --bg: #f8fafc; --surface: #ffffff; --border: #e2e8f0; --border-strong: #cbd5e1;
+    --text: #0f172a; --text-muted: #64748b; --text-dim: #94a3b8; --sidebar: #f1f5f9;
+    --btc: #f59e0b;
+    --green: #16a34a; --green-soft: #dcfce7;
+    --amber: #ca8a04; --amber-soft: #fef9c3;
+    --red: #dc2626;
+    --blue: #2563eb; --blue-soft: #dbeafe;
+    --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  }
+  * { box-sizing: border-box; }
+  body { background: #e2e8f0; margin: 0; padding: 32px; font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; color: var(--text); font-size: 14px; line-height: 1.5; }
+  h1 { font-size: 22px; margin: 0 0 4px; }
+  .lede { color: var(--text-muted); margin-bottom: 28px; max-width: 920px; font-size: 13px; }
+
+  .group-title { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; color: var(--text-muted); margin: 36px 0 12px; }
+  .group-title:first-of-type { margin-top: 0; }
+
+  .window { width: 1000px; max-width: 100%; background: var(--surface); border: 1px solid var(--border-strong); border-radius: 8px; box-shadow: 0 8px 24px rgba(15,23,42,0.08); margin-bottom: 24px; overflow: hidden; position: relative; }
+  .titlebar { background: #f1f5f9; padding: 8px 12px; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 8px; }
+  .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--border-strong); }
+  .titlebar .url { flex: 1; text-align: center; font-size: 11px; color: var(--text-muted); font-family: var(--mono); }
+
+  .body { display: grid; grid-template-columns: 200px 1fr; min-height: 520px; }
+  .body.no-sidebar { grid-template-columns: 1fr; min-height: 460px; }
+
+  .sidebar { background: var(--sidebar); border-right: 1px solid var(--border); padding: 16px 8px; display: flex; flex-direction: column; gap: 2px; }
+  .sidebar .brand { font-weight: 700; font-size: 13px; padding: 6px 8px 16px; }
+  .nav-item { display: flex; align-items: center; gap: 8px; padding: 7px 10px; font-size: 12px; color: var(--text-muted); border-radius: 5px; cursor: default; }
+  .nav-item.active { background: var(--surface); color: var(--text); font-weight: 600; box-shadow: 0 1px 2px rgba(15,23,42,0.04); }
+  .nav-icon { width: 14px; height: 14px; border-radius: 3px; background: var(--border-strong); }
+  .nav-item.active .nav-icon { background: var(--btc); }
+  .sidebar .footer { margin-top: auto; padding: 8px 10px; background: var(--surface); border: 1px solid var(--border); border-radius: 5px; font-size: 11px; }
+  .sidebar .footer .lab { color: var(--text-dim); font-size: 10px; }
+
+  .main { padding: 24px 28px; overflow: hidden; }
+
+  .btn { padding: 6px 12px; font-size: 12px; border-radius: 5px; border: 1px solid var(--border-strong); background: var(--surface); color: var(--text); font-weight: 500; cursor: default; }
+  .btn.primary { background: var(--text); color: var(--surface); border-color: var(--text); }
+  .btn.lg { padding: 9px 16px; font-size: 13px; }
+  .btn.ghost { background: transparent; border-color: transparent; color: var(--text-muted); }
+  .btn:disabled, .btn.disabled { opacity: 0.45; cursor: not-allowed; }
+
+  .badge { display: inline-block; font-size: 10px; padding: 1px 6px; border-radius: 3px; font-weight: 600; vertical-align: middle; }
+  .badge.gray { background: var(--border); color: var(--text-muted); }
+  .badge.amber { background: var(--amber-soft); color: var(--amber); }
+
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 14px 16px; }
+  .card h3 { margin: 0 0 12px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); }
+  .card-empty { padding: 36px 16px; text-align: center; color: var(--text-muted); font-size: 13px; }
+
+  .small { font-size: 11px; color: var(--text-muted); }
+  .row { display: flex; align-items: center; gap: 8px; }
+
+  /* unit/currency controls */
+  .unit-controls { display: flex; align-items: center; gap: 12px; padding: 8px 12px; background: var(--surface); border: 1px solid var(--border); border-radius: 6px; margin-bottom: 16px; font-size: 12px; }
+  .unit-controls .hint { color: var(--text-dim); font-size: 11px; }
+  .currency-select { font-size: 11px; padding: 4px 24px 4px 8px; border: 1px solid var(--border-strong); border-radius: 4px; background: var(--surface) url("data:image/svg+xml,%3Csvg viewBox='0 0 12 8' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M2 2 L6 6 L10 2' stroke='%2364748b' stroke-width='1.5' fill='none'/%3E%3C/svg%3E") no-repeat right 6px center; background-size: 8px; appearance: none; cursor: default; min-width: 110px; }
+  .unit-cycle { font-family: var(--mono); font-size: 13px; cursor: default; padding: 4px 8px; border-radius: 4px; background: var(--sidebar); border: 1px solid var(--border); display: inline-flex; align-items: center; gap: 6px; }
+  .unit-cycle .arrow { color: var(--text-dim); font-size: 10px; }
+
+  .empty-hero { padding: 36px 20px 24px; text-align: center; }
+  .empty-hero .empty-msg { font-size: 16px; color: var(--text); margin-bottom: 6px; font-weight: 500; }
+  .empty-hero .empty-sub { font-size: 13px; color: var(--text-muted); }
+
+  /* MODAL */
+  .modal-overlay { position: absolute; inset: 0; background: rgba(15,23,42,0.45); display: flex; align-items: center; justify-content: center; z-index: 10; }
+  .modal { width: 520px; max-width: 90%; background: var(--surface); border-radius: 10px; box-shadow: 0 24px 64px rgba(15,23,42,0.4); overflow: hidden; }
+  .modal-header { padding: 16px 20px 12px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; }
+  .modal-header h2 { margin: 0; font-size: 15px; font-weight: 600; }
+  .modal-header .close { color: var(--text-muted); font-size: 18px; cursor: default; }
+  .modal-body { padding: 14px 18px; }
+  .modal-footer { padding: 10px 18px; border-top: 1px solid var(--border); background: var(--sidebar); display: flex; justify-content: flex-end; gap: 8px; }
+
+  .type-card { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border: 1px solid var(--border); border-radius: 6px; margin-bottom: 6px; cursor: default; }
+  .type-card:hover { border-color: var(--text); background: #f8fafc; }
+  .type-ico { width: 32px; height: 32px; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 700; flex-shrink: 0; border: 1px solid var(--border); background: var(--sidebar); }
+  .type-ico.purse { background: #dbeafe; color: #1e40af; }
+  .type-ico.strongbox { background: #f3e8ff; color: #6b21a8; }
+  .type-ico.vault { background: #fef3c7; color: #92400e; }
+  .type-card .body-pad { flex: 1; }
+  .type-card .name { font-weight: 600; font-size: 13px; }
+  .type-card .desc { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+  .type-card .arrow { color: var(--text-muted); font-size: 16px; }
+
+  /* WIZARD */
+  .wiz-header { padding: 14px 22px; border-bottom: 1px solid var(--border); background: var(--sidebar); display: flex; align-items: center; justify-content: space-between; }
+  .wiz-header .title { display: flex; align-items: center; gap: 10px; }
+  .wiz-header h2 { margin: 0; font-size: 14px; font-weight: 600; }
+  .wiz-header .close { color: var(--text-muted); font-size: 18px; cursor: default; }
+
+  .steps { display: flex; gap: 0; align-items: center; padding: 10px 22px; background: #fafbfc; border-bottom: 1px solid var(--border); font-size: 11px; color: var(--text-muted); }
+  .step { padding: 4px 8px; }
+  .step.active { color: var(--text); font-weight: 600; }
+  .step.done { color: var(--green); }
+  .step-sep { color: var(--text-dim); }
+
+  .wiz-body { padding: 22px 26px; min-height: 320px; }
+  .wiz-body h3 { margin: 0 0 4px; font-size: 17px; font-weight: 600; }
+  .wiz-body .subtitle { color: var(--text-muted); font-size: 13px; margin-bottom: 18px; }
+
+  .wiz-footer { padding: 12px 22px; border-top: 1px solid var(--border); background: var(--sidebar); display: flex; align-items: center; justify-content: space-between; }
+  .wiz-footer .step-info { font-size: 11px; color: var(--text-muted); }
+
+  .field { margin-bottom: 14px; }
+  .field-label { font-size: 12px; font-weight: 600; margin-bottom: 6px; display: block; }
+  .field-label .req { color: var(--red); margin-left: 2px; }
+  .field-help { font-size: 11px; color: var(--text-muted); margin-top: 4px; }
+  .input { width: 100%; padding: 8px 10px; font-size: 13px; border: 1px solid var(--border-strong); border-radius: 5px; background: var(--surface); font-family: inherit; }
+  .input.mono { font-family: var(--mono); font-size: 12px; }
+  .input.textarea { min-height: 70px; resize: vertical; line-height: 1.4; word-break: break-all; }
+  .input:focus { outline: none; border-color: var(--text); box-shadow: 0 0 0 3px rgba(15,23,42,0.08); }
+
+  /* expandable help */
+  .expandable { border: 1px solid var(--border); border-radius: 5px; background: var(--bg); margin-top: 6px; }
+  .expandable .ex-head { padding: 8px 12px; font-size: 12px; color: var(--text-muted); cursor: default; display: flex; align-items: center; gap: 6px; }
+  .expandable .ex-head .chev { font-size: 10px; }
+  .expandable.open .ex-head { border-bottom: 1px solid var(--border); color: var(--text); font-weight: 500; }
+  .expandable .ex-body { padding: 12px 14px; display: none; font-size: 12px; line-height: 1.5; }
+  .expandable.open .ex-body { display: block; }
+  .ex-step { display: flex; gap: 8px; margin-bottom: 8px; }
+  .ex-step:last-child { margin-bottom: 0; }
+  .ex-step .num { width: 18px; height: 18px; border-radius: 50%; background: var(--text); color: var(--surface); font-size: 10px; font-weight: 600; display: flex; align-items: center; justify-content: center; flex-shrink: 0; margin-top: 1px; }
+
+  /* device grid */
+  .device-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+  .device-card { padding: 10px 12px; border: 1px solid var(--border-strong); border-radius: 5px; font-size: 12px; font-weight: 500; cursor: default; text-align: center; }
+  .device-card.selected { border-color: var(--text); background: #f8fafc; box-shadow: 0 0 0 1px var(--text); font-weight: 600; }
+
+  /* parsed block */
+  .parsed { background: var(--green-soft); border: 1px solid var(--green); border-radius: 5px; padding: 10px 12px; }
+  .parsed .head { font-size: 12px; font-weight: 600; color: #14532d; margin-bottom: 6px; display: flex; align-items: center; gap: 6px; }
+  .parsed .head .check { width: 14px; height: 14px; border-radius: 50%; background: var(--green); color: white; display: inline-flex; align-items: center; justify-content: center; font-size: 9px; }
+  .parsed .kv { display: grid; grid-template-columns: 90px 1fr; gap: 3px 12px; font-size: 11px; }
+  .parsed .kv .k { color: #14532d; }
+  .parsed .kv .v { font-family: var(--mono); color: var(--text); word-break: break-all; }
+
+  /* perm list */
+  .perm-list { background: var(--bg); border: 1px solid var(--border); border-radius: 5px; padding: 8px 10px; }
+  .perm-row { display: flex; align-items: center; gap: 8px; padding: 2px 0; font-size: 11px; }
+  .perm-row .check { width: 12px; height: 12px; border-radius: 2px; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; font-size: 9px; }
+  .perm-row.yes .check { background: var(--green); color: white; }
+  .perm-row.no .check { background: var(--border); color: var(--text-muted); }
+
+  /* result panel */
+  .result { padding: 14px 16px; border-radius: 6px; background: var(--green-soft); border: 1px solid var(--green); }
+  .result h4 { margin: 0 0 4px; font-size: 13px; font-weight: 600; color: #14532d; }
+  .result .balances { margin-top: 10px; padding: 8px 10px; background: var(--surface); border-radius: 4px; }
+  .result .balances .row { padding: 3px 0; font-size: 12px; justify-content: space-between; }
+
+  .row.between { display: flex; align-items: center; justify-content: space-between; }
+
+  /* compact warning */
+  .warn-strip { padding: 8px 12px; font-size: 11px; color: #713f12; background: var(--amber-soft); border-left: 3px solid var(--amber); border-radius: 3px; margin-top: 10px; }
+  .warn-strip strong { font-weight: 600; }
+
+  /* v1.5 strip */
+  .v15-strip { padding: 8px 12px; font-size: 11px; color: var(--text-muted); background: var(--sidebar); border: 1px dashed var(--border-strong); border-radius: 4px; margin-top: 10px; display: flex; align-items: center; gap: 8px; }
+
+  /* review row */
+  .review { background: var(--bg); border: 1px solid var(--border); border-radius: 5px; padding: 4px 14px; }
+  .review-row { display: grid; grid-template-columns: 110px 1fr auto; gap: 12px; padding: 8px 0; border-bottom: 1px solid var(--border); align-items: center; font-size: 12px; }
+  .review-row:last-child { border-bottom: none; }
+  .review-row .k { color: var(--text-muted); text-transform: uppercase; font-size: 10px; letter-spacing: 0.04em; }
+  .review-row .edit { font-size: 11px; color: var(--blue); cursor: default; }
+
+  /* posture select inline */
+  .inline-select { display: inline-flex; align-items: center; gap: 6px; }
+  .inline-select select { padding: 4px 22px 4px 8px; font-size: 12px; border: 1px solid var(--border-strong); border-radius: 4px; background: var(--surface) url("data:image/svg+xml,%3Csvg viewBox='0 0 12 8' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M2 2 L6 6 L10 2' stroke='%2364748b' stroke-width='1.5' fill='none'/%3E%3C/svg%3E") no-repeat right 6px center; background-size: 8px; appearance: none; cursor: default; }
+</style>
+</head>
+<body>
+
+<h1>TallyKeep — Add Holding wizards (v8)</h1>
+<div class="lede">Empty home, type picker, and four wizards. Banking-ergonomic copy, screenshot guides expandable on demand, no embedded design notes.</div>
+
+
+<!-- ============ 1. Empty home + type picker ============ -->
+<div class="group-title">1 · Empty home + type picker</div>
+
+<div class="window">
+  <div class="titlebar"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="url">localhost:8080 · TallyKeep · Home</span></div>
+  <div class="body">
+    <nav class="sidebar">
+      <div class="brand">TallyKeep</div>
+      <div class="nav-item active"><span class="nav-icon"></span>Home</div>
+      <div class="nav-item"><span class="nav-icon"></span>Holdings</div>
+      <div class="nav-item"><span class="nav-icon"></span>Send</div>
+      <div class="nav-item"><span class="nav-icon"></span>Receive</div>
+      <div class="nav-item"><span class="nav-icon"></span>Trading</div>
+      <div class="nav-item"><span class="nav-icon"></span>Blueprint</div>
+      <div class="nav-item"><span class="nav-icon"></span>Settings</div>
+      <div class="footer"><div class="lab">Connected to</div><div>bitcoind · 832,501</div></div>
+    </nav>
+    <div class="main">
+      <div class="unit-controls">
+        <div class="row"><span class="hint">Unit</span><div class="unit-cycle">sats <span class="arrow">↻</span></div></div>
+        <div style="flex:1;"></div>
+        <div class="row"><span class="hint">Show fiat in</span>
+          <select class="currency-select"><option value="" selected>Off</option><option>USD</option><option>EUR</option><option>ARS</option><option>GBP</option></select>
+        </div>
+      </div>
+      <div class="empty-hero">
+        <div class="empty-msg">Your stack, all in one place.</div>
+        <div class="empty-sub">Add somewhere you keep BTC to begin.</div>
+      </div>
+      <div class="card" style="padding: 0;">
+        <div style="padding: 12px 16px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border);">
+          <h3 style="margin:0;">Holdings</h3>
+          <button class="btn primary" style="font-size: 11px;">+ Add</button>
+        </div>
+        <div class="card-empty">Click <strong>+ Add</strong> to connect your first place.</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="window">
+  <div class="titlebar"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="url">localhost:8080 · TallyKeep · Home</span></div>
+  <div class="body">
+    <nav class="sidebar" style="opacity: 0.5;">
+      <div class="brand">TallyKeep</div>
+      <div class="nav-item active"><span class="nav-icon"></span>Home</div>
+      <div class="nav-item"><span class="nav-icon"></span>Holdings</div>
+      <div class="nav-item"><span class="nav-icon"></span>Send</div>
+      <div class="nav-item"><span class="nav-icon"></span>Receive</div>
+      <div class="nav-item"><span class="nav-icon"></span>Trading</div>
+      <div class="nav-item"><span class="nav-icon"></span>Blueprint</div>
+      <div class="nav-item"><span class="nav-icon"></span>Settings</div>
+    </nav>
+    <div class="main" style="opacity: 0.4;">
+      <div class="unit-controls"><div class="row"><span class="hint">Unit</span><div class="unit-cycle">sats <span class="arrow">↻</span></div></div></div>
+      <div class="empty-hero"><div class="empty-msg">Your stack, all in one place.</div></div>
+      <div class="card" style="padding: 0;">
+        <div style="padding: 12px 16px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border);">
+          <h3 style="margin:0;">Holdings</h3>
+          <button class="btn primary" style="font-size: 11px;">+ Add</button>
+        </div>
+        <div class="card-empty">Nothing here yet.</div>
+      </div>
+    </div>
+
+    <div class="modal-overlay">
+      <div class="modal">
+        <div class="modal-header">
+          <h2>Add a Holding</h2>
+          <span class="close">×</span>
+        </div>
+        <div class="modal-body">
+          <div class="type-card">
+            <div class="type-ico">A</div>
+            <div class="body-pad">
+              <div class="name">Account</div>
+              <div class="desc">Money at an exchange — Kraken, Bitstamp, Lemon</div>
+            </div>
+            <div class="arrow">›</div>
+          </div>
+          <div class="type-card">
+            <div class="type-ico purse">P</div>
+            <div class="body-pad">
+              <div class="name">Purse</div>
+              <div class="desc">Everyday wallet you spend from</div>
+            </div>
+            <div class="arrow">›</div>
+          </div>
+          <div class="type-card">
+            <div class="type-ico strongbox">S</div>
+            <div class="body-pad">
+              <div class="name">Strongbox</div>
+              <div class="desc">Cold storage on a hardware wallet</div>
+            </div>
+            <div class="arrow">›</div>
+          </div>
+          <div class="type-card">
+            <div class="type-ico vault">V</div>
+            <div class="body-pad">
+              <div class="name">Vault</div>
+              <div class="desc">Long-term protected — watch-only</div>
+            </div>
+            <div class="arrow">›</div>
+          </div>
+        </div>
+        <div class="modal-footer"><button class="btn ghost">Cancel</button></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<!-- ============ 2. Account wizard ============ -->
+<div class="group-title">2 · Account wizard</div>
+
+<div class="window">
+  <div class="titlebar"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="url">localhost:8080 · TallyKeep · Add Account</span></div>
+  <div class="body no-sidebar">
+    <div class="wiz-header">
+      <div class="title"><div class="type-ico" style="width:24px;height:24px;font-size:11px;">A</div><h2>Add Account</h2></div>
+      <span class="close">×</span>
+    </div>
+    <div class="steps">
+      <span class="step active">1 · Connect</span><span class="step-sep">›</span>
+      <span class="step">2 · Confirm</span>
+    </div>
+    <div class="wiz-body">
+      <h3>Connect to Kraken</h3>
+      <div class="subtitle">Paste your read + withdraw API key.</div>
+
+      <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin-bottom: 18px;">
+        <div class="device-card selected">Kraken</div>
+        <div class="device-card" style="opacity:0.5;">Bitstamp <span class="badge gray">Soon</span></div>
+        <div class="device-card" style="opacity:0.5;">Lemon <span class="badge gray">Soon</span></div>
+        <div class="device-card" style="opacity:0.5;">Bitnob <span class="badge gray">Soon</span></div>
+      </div>
+
+      <div class="field">
+        <label class="field-label">API key <span class="req">*</span></label>
+        <input class="input mono" placeholder="" />
+      </div>
+      <div class="field">
+        <label class="field-label">API secret <span class="req">*</span></label>
+        <input class="input mono" type="password" placeholder="" />
+      </div>
+
+      <div class="perm-list" style="margin-bottom: 10px;">
+        <div class="perm-row yes"><span class="check">✓</span><span>Query Funds</span></div>
+        <div class="perm-row yes"><span class="check">✓</span><span>Withdraw Funds</span></div>
+        <div class="perm-row no"><span class="check">✕</span><span style="color: var(--text-muted);">Trade — not needed</span></div>
+      </div>
+
+      <div class="expandable">
+        <div class="ex-head"><span class="chev">▸</span>How do I generate this in Kraken?</div>
+      </div>
+
+      <div class="warn-strip"><strong>Whitelist your withdrawal address in Kraken first</strong> — required for sweeps to work. Done in Kraken's web UI with email confirmation.</div>
+    </div>
+    <div class="wiz-footer">
+      <span class="step-info">1 of 2</span>
+      <div class="row"><button class="btn ghost">Cancel</button><button class="btn primary">Test connection →</button></div>
+    </div>
+  </div>
+</div>
+
+<div class="window">
+  <div class="titlebar"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="url">localhost:8080 · TallyKeep · Add Account</span></div>
+  <div class="body no-sidebar">
+    <div class="wiz-header">
+      <div class="title"><div class="type-ico" style="width:24px;height:24px;font-size:11px;">A</div><h2>Add Account · Kraken</h2></div>
+      <span class="close">×</span>
+    </div>
+    <div class="steps">
+      <span class="step done">✓ Connect</span><span class="step-sep">›</span>
+      <span class="step active">2 · Confirm</span>
+    </div>
+    <div class="wiz-body">
+      <h3>Connection looks good</h3>
+
+      <div class="result">
+        <h4>✓ Connected to Kraken</h4>
+        <div class="small" style="color: #14532d;">Account <span class="mono">U7...A92F</span> · 142 ms</div>
+        <div class="balances">
+          <div class="row between"><strong>BTC</strong><span class="mono">0.01942 <span class="small">(1,942,000 sats)</span></span></div>
+          <div class="row between"><strong>EUR</strong><span class="mono">847.20</span></div>
+        </div>
+      </div>
+
+      <div class="field" style="margin-top: 18px;">
+        <label class="field-label">Name this Account</label>
+        <input class="input" value="Kraken main" />
+      </div>
+
+      <div class="field" style="margin-bottom: 0;">
+        <label class="field-label">Sweep policy</label>
+        <div class="row" style="gap: 12px;">
+          <label class="row" style="gap: 6px; font-size: 12px;"><input type="radio" name="sweep" checked /> Set up later</label>
+          <label class="row" style="gap: 6px; font-size: 12px;"><input type="radio" name="sweep" /> Set up now</label>
+        </div>
+        <div class="field-help">Auto-move BTC out of Kraken when balance crosses a threshold. Configurable later.</div>
+      </div>
+    </div>
+    <div class="wiz-footer">
+      <span class="step-info">2 of 2</span>
+      <div class="row"><button class="btn">← Back</button><button class="btn primary">Add Account</button></div>
+    </div>
+  </div>
+</div>
+
+
+<!-- ============ 3. Purse wizard ============ -->
+<div class="group-title">3 · Purse wizard</div>
+
+<div class="window">
+  <div class="titlebar"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="url">localhost:8080 · TallyKeep · Add Purse</span></div>
+  <div class="body no-sidebar">
+    <div class="wiz-header">
+      <div class="title"><div class="type-ico purse" style="width:24px;height:24px;font-size:11px;">P</div><h2>Add Purse</h2></div>
+      <span class="close">×</span>
+    </div>
+    <div class="steps">
+      <span class="step active">1 · Connect</span><span class="step-sep">›</span>
+      <span class="step">2 · Confirm</span>
+    </div>
+    <div class="wiz-body">
+      <h3>Connect your wallet</h3>
+      <div class="subtitle">Paste a descriptor or extended public key (xpub).</div>
+
+      <div class="field">
+        <label class="field-label">From</label>
+        <select class="input" style="font-size: 13px;">
+          <option>Sparrow Desktop</option>
+          <option>BlueWallet</option>
+          <option>Electrum</option>
+          <option>Phoenix (on-chain)</option>
+          <option>Other</option>
+        </select>
+      </div>
+
+      <div class="field">
+        <label class="field-label">Descriptor or xpub <span class="req">*</span></label>
+        <textarea class="input mono textarea" placeholder=""></textarea>
+        <div class="expandable" style="margin-top: 8px;">
+          <div class="ex-head"><span class="chev">▸</span>How to export from Sparrow</div>
+        </div>
+      </div>
+
+      <div class="v15-strip">⚡ <span><strong>Lightning</strong> — coming v1.5. Add an on-chain descriptor now; you'll be able to attach a Lightning backend later without re-creating this Purse.</span></div>
+    </div>
+    <div class="wiz-footer">
+      <span class="step-info">1 of 2</span>
+      <div class="row"><button class="btn ghost">Cancel</button><button class="btn primary">Continue →</button></div>
+    </div>
+  </div>
+</div>
+
+<div class="window">
+  <div class="titlebar"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="url">localhost:8080 · TallyKeep · Add Purse</span></div>
+  <div class="body no-sidebar">
+    <div class="wiz-header">
+      <div class="title"><div class="type-ico purse" style="width:24px;height:24px;font-size:11px;">P</div><h2>Add Purse</h2></div>
+      <span class="close">×</span>
+    </div>
+    <div class="steps">
+      <span class="step done">✓ Connect</span><span class="step-sep">›</span>
+      <span class="step active">2 · Confirm</span>
+    </div>
+    <div class="wiz-body">
+      <h3>Looks right?</h3>
+
+      <div class="parsed" style="margin-bottom: 16px;">
+        <div class="head"><span class="check">✓</span>Descriptor parsed</div>
+        <div class="kv">
+          <span class="k">Type</span><span class="v">Single-key, P2WPKH</span>
+          <span class="k">Fingerprint</span><span class="v">abc12345</span>
+          <span class="k">First address</span><span class="v">bc1q4w0...x9k2</span>
+        </div>
+      </div>
+
+      <div class="field">
+        <label class="field-label">Name this Purse</label>
+        <input class="input" placeholder="e.g. Daily phone, Pocket cash" />
+      </div>
+    </div>
+    <div class="wiz-footer">
+      <span class="step-info">2 of 2</span>
+      <div class="row"><button class="btn">← Back</button><button class="btn primary">Add Purse</button></div>
+    </div>
+  </div>
+</div>
+
+
+<!-- ============ 4. Strongbox wizard ============ -->
+<div class="group-title">4 · Strongbox wizard</div>
+
+<div class="window">
+  <div class="titlebar"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="url">localhost:8080 · TallyKeep · Add Strongbox</span></div>
+  <div class="body no-sidebar">
+    <div class="wiz-header">
+      <div class="title"><div class="type-ico strongbox" style="width:24px;height:24px;font-size:11px;">S</div><h2>Add Strongbox</h2></div>
+      <span class="close">×</span>
+    </div>
+    <div class="steps">
+      <span class="step active">1 · Connect</span><span class="step-sep">›</span>
+      <span class="step">2 · Confirm</span>
+    </div>
+    <div class="wiz-body">
+      <h3>Connect your hardware wallet</h3>
+      <div class="subtitle">Pick your device, paste the public descriptor it exported.</div>
+
+      <div class="field">
+        <label class="field-label">Device</label>
+        <div class="device-grid">
+          <div class="device-card selected">Coldcard</div>
+          <div class="device-card">Jade</div>
+          <div class="device-card">Trezor</div>
+          <div class="device-card">Ledger</div>
+          <div class="device-card">BitBox02</div>
+          <div class="device-card">Other</div>
+        </div>
+      </div>
+
+      <div class="field">
+        <label class="field-label">Descriptor or xpub <span class="req">*</span></label>
+        <textarea class="input mono textarea" placeholder=""></textarea>
+        <div class="expandable" style="margin-top: 8px;">
+          <div class="ex-head"><span class="chev">▸</span>How to export from Coldcard</div>
+        </div>
+      </div>
+    </div>
+    <div class="wiz-footer">
+      <span class="step-info">1 of 2</span>
+      <div class="row"><button class="btn ghost">Cancel</button><button class="btn primary">Continue →</button></div>
+    </div>
+  </div>
+</div>
+
+<div class="window">
+  <div class="titlebar"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="url">localhost:8080 · TallyKeep · Add Strongbox</span></div>
+  <div class="body no-sidebar">
+    <div class="wiz-header">
+      <div class="title"><div class="type-ico strongbox" style="width:24px;height:24px;font-size:11px;">S</div><h2>Add Strongbox · Coldcard</h2></div>
+      <span class="close">×</span>
+    </div>
+    <div class="steps">
+      <span class="step done">✓ Connect</span><span class="step-sep">›</span>
+      <span class="step active">2 · Confirm</span>
+    </div>
+    <div class="wiz-body">
+      <h3>Looks right?</h3>
+
+      <div class="parsed" style="margin-bottom: 16px;">
+        <div class="head"><span class="check">✓</span>Descriptor parsed</div>
+        <div class="kv">
+          <span class="k">Type</span><span class="v">Single-key, P2WPKH</span>
+          <span class="k">Fingerprint</span><span class="v">7a3f9c4e</span>
+          <span class="k">First address</span><span class="v">bc1qz3p...m4f8</span>
+        </div>
+        <div class="small" style="margin-top: 6px; color: #14532d;">Verify the fingerprint matches the one shown on your Coldcard.</div>
+      </div>
+
+      <div class="field">
+        <label class="field-label">Name this Strongbox</label>
+        <input class="input" placeholder="e.g. Cold reserve" />
+      </div>
+
+      <div class="field" style="margin-bottom: 0;">
+        <label class="field-label">Expected use</label>
+        <div class="inline-select">
+          <select>
+            <option>Cold reserve · occasional withdrawals</option>
+            <option>Cold + accumulating · receives sweeps</option>
+            <option>Lukewarm · monthly use</option>
+          </select>
+        </div>
+      </div>
+    </div>
+    <div class="wiz-footer">
+      <span class="step-info">2 of 2</span>
+      <div class="row"><button class="btn">← Back</button><button class="btn primary">Add Strongbox</button></div>
+    </div>
+  </div>
+</div>
+
+
+<!-- ============ 5. Vault wizard ============ -->
+<div class="group-title">5 · Vault wizard</div>
+
+<div class="window">
+  <div class="titlebar"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="url">localhost:8080 · TallyKeep · Add Vault</span></div>
+  <div class="body no-sidebar">
+    <div class="wiz-header">
+      <div class="title"><div class="type-ico vault" style="width:24px;height:24px;font-size:11px;">V</div><h2>Add Vault</h2></div>
+      <span class="close">×</span>
+    </div>
+    <div class="steps">
+      <span class="step active">1 · Connect</span><span class="step-sep">›</span>
+      <span class="step">2 · Confirm</span>
+    </div>
+    <div class="wiz-body">
+      <h3>Connect your Vault</h3>
+      <div class="subtitle">Paste the descriptor from your coordinator. Single-key or multisig — both work.</div>
+
+      <div class="field">
+        <label class="field-label">From</label>
+        <select class="input" style="font-size: 13px;">
+          <option>Sparrow Desktop</option>
+          <option>Specter Desktop</option>
+          <option>Caravan</option>
+          <option>Single hardware wallet</option>
+          <option>Other</option>
+        </select>
+      </div>
+
+      <div class="field">
+        <label class="field-label">Descriptor <span class="req">*</span></label>
+        <textarea class="input mono textarea" style="min-height: 90px;" placeholder=""></textarea>
+        <div class="expandable" style="margin-top: 8px;">
+          <div class="ex-head"><span class="chev">▸</span>How to export from Sparrow</div>
+        </div>
+      </div>
+
+      <div class="warn-strip"><strong>Watch-only.</strong> TallyKeep monitors the Vault and accepts incoming funds. Withdrawals are signed in your coordinator (Sparrow, Specter). Multi-device signing inside TallyKeep ships in v2.</div>
+    </div>
+    <div class="wiz-footer">
+      <span class="step-info">1 of 2</span>
+      <div class="row"><button class="btn ghost">Cancel</button><button class="btn primary">Continue →</button></div>
+    </div>
+  </div>
+</div>
+
+<div class="window">
+  <div class="titlebar"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="url">localhost:8080 · TallyKeep · Add Vault</span></div>
+  <div class="body no-sidebar">
+    <div class="wiz-header">
+      <div class="title"><div class="type-ico vault" style="width:24px;height:24px;font-size:11px;">V</div><h2>Add Vault · Sparrow</h2></div>
+      <span class="close">×</span>
+    </div>
+    <div class="steps">
+      <span class="step done">✓ Connect</span><span class="step-sep">›</span>
+      <span class="step active">2 · Confirm</span>
+    </div>
+    <div class="wiz-body">
+      <h3>Looks right?</h3>
+
+      <div class="parsed" style="margin-bottom: 16px;">
+        <div class="head"><span class="check">✓</span>Descriptor parsed — <strong>2-of-3 multisig</strong></div>
+        <div class="kv">
+          <span class="k">Threshold</span><span class="v">2 of 3 keys</span>
+          <span class="k">Script</span><span class="v">P2WSH</span>
+          <span class="k">Keys</span><span class="v">c1a8b2d4 · f7e9d3a1 · 5b3c8e6f</span>
+          <span class="k">First address</span><span class="v">bc1q9j8...zr4t</span>
+        </div>
+        <div class="small" style="margin-top: 6px; color: #14532d;">Verify the three fingerprints match your three hardware wallets.</div>
+      </div>
+
+      <div class="field">
+        <label class="field-label">Name this Vault</label>
+        <input class="input" placeholder="e.g. Family vault" />
+      </div>
+
+      <div class="field" style="margin-bottom: 0;">
+        <label class="field-label">No-touch horizon</label>
+        <div class="inline-select">
+          <select>
+            <option>1–3 years</option>
+            <option selected>3–10 years</option>
+            <option>10+ years (generational)</option>
+          </select>
+        </div>
+      </div>
+    </div>
+    <div class="wiz-footer">
+      <span class="step-info">2 of 2</span>
+      <div class="row"><button class="btn">← Back</button><button class="btn primary">Add Vault</button></div>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>

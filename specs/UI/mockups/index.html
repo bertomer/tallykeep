@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>TallyKeep — Mockup Index</title>
+<link rel="stylesheet" href="_shared/tokens.css">
+<style>
+  body {
+    font-family: var(--font-sans);
+    background: var(--color-bg);
+    color: var(--color-text);
+    margin: 0;
+    padding: var(--space-6);
+  }
+  h1 {
+    margin: 0 0 var(--space-2);
+    font-size: var(--font-size-xl);
+  }
+  .lede {
+    color: var(--color-text-muted);
+    margin: 0 0 var(--space-6);
+    max-width: 720px;
+  }
+  .filters {
+    display: flex;
+    gap: var(--space-3);
+    margin-bottom: var(--space-5);
+    flex-wrap: wrap;
+    align-items: center;
+  }
+  .filter-label {
+    font-size: var(--font-size-sm);
+    color: var(--color-text-muted);
+  }
+  .filter-btn {
+    padding: var(--space-1) var(--space-3);
+    border: 1px solid var(--color-border-strong);
+    background: var(--color-surface);
+    border-radius: var(--radius-pill);
+    cursor: pointer;
+    font-size: var(--font-size-sm);
+    color: var(--color-text);
+  }
+  .filter-btn.active {
+    background: var(--color-text);
+    color: var(--color-text-inverse);
+    border-color: var(--color-text);
+  }
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    gap: var(--space-5);
+  }
+  .card {
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+    text-decoration: none;
+    color: inherit;
+    display: block;
+    transition: transform 80ms, box-shadow 80ms;
+  }
+  .card:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-md);
+  }
+  .card-header {
+    padding: var(--space-3) var(--space-4);
+    border-bottom: 1px solid var(--color-border);
+  }
+  .card-title {
+    font-weight: var(--font-weight-semibold);
+    font-size: var(--font-size-base);
+    margin-bottom: var(--space-1);
+  }
+  .card-meta {
+    font-size: var(--font-size-xs);
+    color: var(--color-text-muted);
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+  }
+  .badge {
+    display: inline-block;
+    padding: 2px var(--space-2);
+    font-size: 10px;
+    border-radius: var(--radius-pill);
+    font-weight: var(--font-weight-semibold);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+  .badge-draft     { background: var(--color-warning-soft); color: var(--color-warning); }
+  .badge-review    { background: var(--color-info-soft);    color: var(--color-info); }
+  .badge-validated { background: var(--color-success-soft); color: var(--color-success); }
+  .preview {
+    width: 100%;
+    height: 340px;
+    overflow: hidden;
+    position: relative;
+    background: #cbd5e1;
+  }
+  .preview iframe {
+    width: 200%;
+    height: 200%;
+    border: 0;
+    transform: scale(0.5);
+    transform-origin: top left;
+    pointer-events: none;
+  }
+  .filename {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    color: var(--color-text-dim);
+  }
+  .empty {
+    padding: var(--space-7);
+    text-align: center;
+    color: var(--color-text-muted);
+    background: var(--color-surface);
+    border: 1px dashed var(--color-border-strong);
+    border-radius: var(--radius-lg);
+  }
+  .empty code {
+    background: var(--color-bg);
+    padding: 2px 6px;
+    border-radius: var(--radius-sm);
+    font-size: var(--font-size-sm);
+  }
+</style>
+</head>
+<body>
+<h1>TallyKeep — Mockup Index</h1>
+<p class="lede">
+  Visual contact sheet for all mobile mockups. Click a card to open
+  the full-size mockup in a new tab. Use this view to spot drift
+  across screens (colors, type, spacing, navigation, conventions).
+</p>
+
+<div class="filters">
+  <span class="filter-label">Filter:</span>
+  <button class="filter-btn active" data-filter="all">All</button>
+  <button class="filter-btn" data-filter="draft">Draft</button>
+  <button class="filter-btn" data-filter="review">Review</button>
+  <button class="filter-btn" data-filter="validated">Validated</button>
+</div>
+
+<div id="grid" class="grid"></div>
+
+<script>
+  // Mockup index — update when adding or removing files.
+  // Each entry: { file, title, status (draft|review|validated) }
+  const mockups = [
+    // Examples (kept commented as a guide; uncomment when files exist):
+    // { file: 'mobile_onboarding_01_welcome.html',
+    //   title: 'Onboarding — Welcome',
+    //   status: 'draft' },
+    // { file: 'mobile_home_empty.html',
+    //   title: 'Home — empty',
+    //   status: 'draft' },
+  ];
+
+  const grid = document.getElementById('grid');
+  const filterButtons = document.querySelectorAll('.filter-btn');
+  let currentFilter = 'all';
+
+  function render() {
+    if (mockups.length === 0) {
+      grid.outerHTML = `
+        <div class="empty">
+          No mockups yet. Add files to <code>UI/mockups/</code> and
+          list them in the <code>mockups</code> array near the top of
+          <code>index.html</code>.
+        </div>`;
+      return;
+    }
+
+    grid.innerHTML = '';
+    const filtered = currentFilter === 'all'
+      ? mockups
+      : mockups.filter(m => m.status === currentFilter);
+
+    if (filtered.length === 0) {
+      grid.innerHTML = `
+        <div class="empty" style="grid-column: 1 / -1;">
+          No mockups in status "${currentFilter}".
+        </div>`;
+      return;
+    }
+
+    for (const m of filtered) {
+      const card = document.createElement('a');
+      card.href = m.file;
+      card.target = '_blank';
+      card.className = 'card';
+      card.innerHTML = `
+        <div class="card-header">
+          <div class="card-title">${m.title}</div>
+          <div class="card-meta">
+            <span class="badge badge-${m.status}">${m.status}</span>
+            <span class="filename">${m.file}</span>
+          </div>
+        </div>
+        <div class="preview">
+          <iframe src="${m.file}" loading="lazy"></iframe>
+        </div>`;
+      grid.appendChild(card);
+    }
+  }
+
+  filterButtons.forEach(btn => {
+    btn.addEventListener('click', () => {
+      currentFilter = btn.dataset.filter;
+      filterButtons.forEach(b => b.classList.toggle('active', b === btn));
+      render();
+    });
+  });
+
+  render();
+</script>
+</body>
+</html>

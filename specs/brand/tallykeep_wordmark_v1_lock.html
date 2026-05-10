@@ -1,0 +1,1271 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>TallyKeep — wordmark v1.0 · lock</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Geist:wght@400;500;600;700;800&family=Onest:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700;800&family=DM+Sans:wght@400;500;600;700;800&family=Outfit:wght@400;500;600;700;800&family=Sora:wght@400;500;600;700;800&family=Be+Vietnam+Pro:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  * { box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+    background: #FAFAF7;
+    color: #2A2A2A;
+    margin: 0;
+    padding: 0;
+    line-height: 1.6;
+    font-size: 15px;
+  }
+  .doc { max-width: 880px; margin: 0 auto; padding: 64px 40px 120px; }
+
+  /* Header */
+  .meta {
+    font-family: ui-monospace, "SF Mono", monospace;
+    font-size: 11px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: #B0915E;
+    margin-bottom: 12px;
+  }
+  h1 {
+    font-size: 42px;
+    font-weight: 700;
+    margin: 0 0 12px;
+    letter-spacing: -0.025em;
+    color: #1A1A1A;
+  }
+  .lead {
+    font-size: 17px;
+    color: #555;
+    margin: 0 0 16px;
+    max-width: 640px;
+    line-height: 1.55;
+  }
+  .stamp {
+    font-family: ui-monospace, monospace;
+    font-size: 11px;
+    color: #999;
+    letter-spacing: 0.05em;
+  }
+
+  /* Sections */
+  section { margin-top: 72px; }
+  h2 {
+    font-size: 22px;
+    font-weight: 700;
+    margin: 0 0 24px;
+    letter-spacing: -0.015em;
+    color: #1A1A1A;
+    padding-bottom: 8px;
+    border-bottom: 1px solid #E8E2D2;
+  }
+  h3 {
+    font-size: 14px;
+    font-weight: 600;
+    margin: 28px 0 10px;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+    color: #444;
+  }
+  p { margin: 0 0 14px; }
+  ul, ol { margin: 0 0 14px; padding-left: 22px; }
+  li { margin-bottom: 6px; }
+  ul ul { margin-top: 6px; }
+  code {
+    font-family: ui-monospace, "SF Mono", monospace;
+    font-size: 0.88em;
+    background: #F1ECDD;
+    padding: 1px 6px;
+    border-radius: 3px;
+    color: #6A4F2A;
+  }
+  strong { color: #1A1A1A; }
+  em { color: #555; font-style: italic; }
+  hr { border: 0; border-top: 1px solid #E8E2D2; margin: 32px 0; }
+
+  /* TOC */
+  .toc {
+    background: white;
+    border: 1px solid #E8E2D2;
+    border-radius: 12px;
+    padding: 18px 24px;
+    margin: 28px 0 0;
+    font-size: 13px;
+  }
+  .toc-title { font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; color: #888; margin-bottom: 8px; }
+  .toc ol { margin: 0; padding-left: 18px; counter-reset: section; list-style: none; }
+  .toc li { counter-increment: section; padding: 3px 0; color: #666; }
+  .toc li::before { content: counter(section, decimal-leading-zero) " · "; color: #B0915E; font-family: ui-monospace, monospace; font-size: 11px; }
+  .toc a { color: #444; text-decoration: none; }
+  .toc a:hover { color: #1A1A1A; text-decoration: underline; }
+
+  /* Decision cards */
+  .decisions {
+    background: white;
+    border: 1px solid #E8E2D2;
+    border-radius: 12px;
+    padding: 24px 28px;
+    margin: 16px 0;
+  }
+  .decisions h4 {
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: #6A4F2A;
+    margin: 0 0 10px;
+  }
+  .decisions ul { margin: 0 0 0; padding-left: 20px; }
+  .decisions li { margin-bottom: 8px; }
+
+  /* Wordmark display stages */
+  .wordmark-stage {
+    background: #FAFAF7;
+    border: 1px solid #E8E2D2;
+    border-radius: 10px;
+    padding: 32px 24px;
+    text-align: center;
+    margin: 12px 0;
+  }
+  .wordmark-stage.cream { background: #F4EAD5; border-color: #E8D9B5; }
+  .wordmark-stage.dark { background: #1A1A1A; border-color: #1A1A1A; }
+  .wordmark-stage.compact { padding: 20px 24px; }
+
+  /* Tier config block — shows the locked numerical values */
+  .tier-config {
+    background: white;
+    border: 1px solid #E8E2D2;
+    border-radius: 10px;
+    padding: 14px 20px;
+    margin: 8px 0 24px;
+    font-family: ui-monospace, "SF Mono", monospace;
+    font-size: 12px;
+    color: #6A4F2A;
+    user-select: all;
+  }
+  .tier-config .label {
+    display: inline-block;
+    font-weight: 700;
+    margin-right: 8px;
+    color: #B0915E;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    font-size: 10px;
+  }
+
+  /* Sizing samples */
+  .size-row {
+    display: flex;
+    align-items: baseline;
+    gap: 32px;
+    flex-wrap: wrap;
+    margin: 12px 0;
+    padding: 24px;
+    background: #FAFAF7;
+    border: 1px solid #E8E2D2;
+    border-radius: 10px;
+  }
+  .size-cell { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; }
+  .size-cell .size-label {
+    font-size: 10px;
+    color: #999;
+    font-family: ui-monospace, monospace;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+
+  /* Casing examples */
+  .casing-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 12px 0;
+    background: white;
+    border: 1px solid #E8E2D2;
+    border-radius: 10px;
+    overflow: hidden;
+  }
+  .casing-table th, .casing-table td {
+    text-align: left;
+    padding: 10px 14px;
+    border-bottom: 1px solid #F1ECDD;
+    font-size: 13.5px;
+  }
+  .casing-table th {
+    background: #F4EAD5;
+    color: #6A4F2A;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    font-weight: 700;
+  }
+  .casing-table tr:last-child td { border-bottom: none; }
+  .casing-table td:last-child {
+    font-family: ui-monospace, "SF Mono", monospace;
+    font-size: 13px;
+    color: #1A1A1A;
+  }
+
+  /* Examples list (with check / cross marks) */
+  .examples-list { list-style: none; padding: 0; margin: 12px 0; }
+  .examples-list li {
+    padding: 6px 0;
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+  }
+  .examples-list .mark {
+    flex-shrink: 0;
+    font-weight: 700;
+    font-family: ui-monospace, monospace;
+    font-size: 13px;
+    width: 16px;
+  }
+  .examples-list .mark.ok { color: #5B7A4A; }
+  .examples-list .mark.no { color: #9C5B43; }
+  .examples-list em { font-style: normal; }
+
+  /* Don'ts grid */
+  .donts-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 10px;
+    margin: 12px 0;
+  }
+  .dont-item {
+    background: white;
+    border: 1px solid #E8E2D2;
+    border-left: 3px solid #9C5B43;
+    border-radius: 6px;
+    padding: 12px 16px;
+    font-size: 14px;
+    color: #444;
+    line-height: 1.5;
+  }
+
+  /* Open items */
+  .open-item {
+    background: white;
+    border: 1px solid #E8E2D2;
+    border-radius: 10px;
+    padding: 14px 18px;
+    font-size: 13.5px;
+    margin-bottom: 10px;
+  }
+  .open-item .title {
+    font-weight: 600;
+    color: #1A1A1A;
+    font-size: 14px;
+    margin-bottom: 4px;
+  }
+  .open-item .body { color: #666; line-height: 1.55; }
+
+  /* Formula table */
+  .formula-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 12px 0;
+    background: white;
+    border: 1px solid #E8E2D2;
+    border-radius: 10px;
+    overflow: hidden;
+    font-size: 13px;
+  }
+  .formula-table th, .formula-table td {
+    text-align: left;
+    padding: 10px 14px;
+    border-bottom: 1px solid #F1ECDD;
+  }
+  .formula-table th {
+    background: #F4EAD5;
+    color: #6A4F2A;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    font-weight: 700;
+  }
+  .formula-table tr:last-child td { border-bottom: none; }
+  .formula-table td.formula, .formula-table td.value {
+    font-family: ui-monospace, "SF Mono", monospace;
+    color: #1A1A1A;
+  }
+
+  /* Color palette block */
+  .color-row {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin: 12px 0 20px;
+  }
+  .color-chip {
+    flex: 1;
+    min-width: 200px;
+    background: white;
+    border: 1px solid #E8E2D2;
+    border-radius: 10px;
+    padding: 12px 14px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .color-chip .swatch {
+    width: 36px; height: 36px;
+    border-radius: 6px;
+    flex-shrink: 0;
+    border: 1px solid rgba(0,0,0,0.06);
+  }
+  .color-chip .info { display: flex; flex-direction: column; }
+  .color-chip .name { font-size: 12px; font-weight: 600; color: #1A1A1A; }
+  .color-chip .code-text {
+    font-family: ui-monospace, monospace;
+    font-size: 11px;
+    color: #888;
+    letter-spacing: 0.02em;
+  }
+
+  /* Playground form */
+  .playground-form {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 18px 22px;
+    background: #FEF7E5;
+    border: 1px solid #E8D9B5;
+    border-radius: 10px;
+    margin: 12px 0 18px;
+  }
+  .playground-form .pf-title {
+    font-weight: 700;
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: #8A6B30;
+    margin-bottom: 2px;
+  }
+  .playground-form .pf-row {
+    display: flex;
+    gap: 14px;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+  .playground-form label {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    font-weight: 600;
+    color: #6A4F2A;
+  }
+  .playground-form input[type="number"] {
+    width: 64px;
+    padding: 5px 7px;
+    border: 1px solid #D4C399;
+    border-radius: 4px;
+    font-family: ui-monospace, "SF Mono", monospace;
+    font-size: 12px;
+    color: #1A1A1A;
+    background: white;
+  }
+  .playground-form select {
+    padding: 5px 7px;
+    border: 1px solid #D4C399;
+    border-radius: 4px;
+    font-size: 12px;
+    background: white;
+    color: #1A1A1A;
+    font-family: inherit;
+  }
+  .playground-form button {
+    padding: 5px 12px;
+    background: white;
+    border: 1px solid #D4C399;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 11px;
+    font-weight: 600;
+    color: #6A4F2A;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+  .playground-form button:hover { border-color: #B0915E; }
+  .playground-form button.preset {
+    background: #F4EAD5;
+  }
+  .playground-form button.preset:hover {
+    background: #EAD9B5;
+  }
+  .playground-form .pf-help {
+    font-size: 11px;
+    color: #8A6B30;
+    margin-top: 2px;
+    font-style: italic;
+  }
+  .playground-form .pf-output {
+    font-family: ui-monospace, "SF Mono", monospace;
+    font-size: 11px;
+    color: #6A4F2A;
+    padding: 8px 10px;
+    background: white;
+    border: 1px solid #E8E2D2;
+    border-radius: 4px;
+    margin-top: 4px;
+    user-select: all;
+    word-break: break-all;
+  }
+
+  footer {
+    margin-top: 96px;
+    padding-top: 32px;
+    border-top: 1px solid #E8E2D2;
+    font-size: 12px;
+    color: #999;
+    text-align: center;
+  }
+
+  /* Wordmark text classes (for typography samples) */
+  .wm-manrope {
+    font-family: "Manrope", system-ui, sans-serif;
+    font-weight: 600;
+    letter-spacing: -0.022em;
+    color: #1A1A1A;
+    line-height: 1;
+  }
+</style>
+</head>
+<body>
+<div class="doc">
+
+  <!-- HEADER -->
+  <header>
+    <div class="meta">Brand · wordmark · v1.0 lock</div>
+    <h1>Wordmark</h1>
+    <p class="lead">
+      The TallyKeep wordmark system. Two variants share a single typeface,
+      a context-driven rule of use, and a sizing system covering display and default tiers
+      plus a typography fallback for small UI. Decisions here are intentional and locked
+      — not exploratory.
+    </p>
+    <div class="stamp">
+      May 2026 · supersedes <code>tallykeep_wordmark_v1_exploration</code> · cross-reference: <code>tallykeep_brand_mark_v1_lock</code>
+    </div>
+
+    <div class="toc">
+      <div class="toc-title">Contents</div>
+      <ol>
+        <li><a href="#decisions">Decisions, locked</a></li>
+        <li><a href="#typeface">Typeface · Manrope 600</a></li>
+        <li><a href="#plain">Variant 1 · plain wordmark</a></li>
+        <li><a href="#icon-y">Variant 2 · icon-y wordmark</a></li>
+        <li><a href="#sizing">Sizing system &amp; formulas</a></li>
+        <li><a href="#casing">Casing &amp; typographic conventions</a></li>
+        <li><a href="#color">Color</a></li>
+        <li><a href="#donts">Don'ts</a></li>
+        <li><a href="#tagline">Tagline · in consideration</a></li>
+        <li><a href="#open">Open items (deferred)</a></li>
+      </ol>
+    </div>
+  </header>
+
+  <!-- 1. DECISIONS -->
+  <section id="decisions">
+    <h2>1 · Decisions, locked</h2>
+
+    <p>
+      The wordmark exists in two variants of the same brand name, used in different contexts. The choice
+      between them is determined by context, not by user preference.
+    </p>
+
+    <div class="decisions">
+      <h4>Two variants</h4>
+      <ul>
+        <li><strong>Plain wordmark</strong> — <code>tallykeep</code> in Manrope 600 lowercase, no embedded mark.</li>
+        <li><strong>Icon-y wordmark</strong> — <code>tall</code> + carved Y form (the canonical brand mark, without its cream container) + <code>keep</code>, all in Manrope 600 lowercase.</li>
+      </ul>
+    </div>
+
+    <div class="decisions">
+      <h4>Rule of use</h4>
+      <ul>
+        <li><strong>Plain wordmark</strong> — used when an icon-on-cream is already visible on the same surface (app icon corner, favicon tab, header lockup, splash screen). Embedding the icon-y here would make the brand mark appear twice.</li>
+        <li><strong>Icon-y wordmark</strong> — used when the wordmark stands alone (footer, email signature, social bio, embedded inline references in articles, app store description, partner co-branding). The brand mark comes through the wordline itself.</li>
+      </ul>
+    </div>
+
+    <div class="decisions">
+      <h4>Casing</h4>
+      <ul>
+        <li><strong><code>tallykeep</code></strong> (lowercase) — wordmark only, in either variant.</li>
+        <li><strong><code>TallyKeep</code></strong> (Title Case) — everything else: body text, app store name, email subject, code identifiers, filenames, formal documents.</li>
+      </ul>
+    </div>
+
+    <div class="decisions">
+      <h4>Considered and dropped</h4>
+      <ul>
+        <li><strong>Heritage-warm direction</strong> (Bricolage Grotesque, characterful display sans) — too craft-coded for the banking-grade brief; reads "indie / artisanal" rather than "trustworthy financial institution."</li>
+        <li><strong>Abstracted custom <code>y</code> letterform</strong> (B2 in the exploration) — removed the matched-halves geometry that is the entire point of the brand mark; reduced to a generic "y with slanted descender" with no semantic load.</li>
+        <li><strong>Camel-case wordmark</strong> as primary — body text reads weird in lowercase ("welcome to tallykeep" vs "Welcome to TallyKeep"). The split between lowercase wordmark and Title Case body is the fintech-standard convention (Wise, Qonto, Lemon, Ualá, Mailchimp).</li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- 2. TYPEFACE -->
+  <section id="typeface">
+    <h2>2 · Typeface · Manrope 600</h2>
+
+    <p>
+      <strong>Manrope</strong> is a contemporary geometric sans designed for screen reading by Mikhail
+      Sharanda. Free under the SIL Open Font License. Loaded via Google Fonts (no self-hosting required).
+    </p>
+
+    <div class="wordmark-stage">
+      <span class="wm-manrope" style="font-size: 84px;">TallyKeep</span>
+    </div>
+
+    <h3>Specs</h3>
+    <ul>
+      <li><strong>Family</strong>: <code>Manrope</code></li>
+      <li><strong>Weight</strong>: <code>600</code> (semi-bold)</li>
+      <li><strong>Letter-spacing</strong>: <code>-0.022em</code> (≈ −2 in 1000-em units) — gentle negative tracking, modern fintech default</li>
+      <li><strong>Color</strong>: dark <code>#1A1A1A</code> on light backgrounds; cream <code>#F4EAD5</code> on dark (carries from icon spec)</li>
+      <li><strong>Loaded as</strong>: <code>"Manrope", system-ui, sans-serif</code> with system fallback</li>
+    </ul>
+
+    <h3>Why Manrope vs alternatives</h3>
+    <ul>
+      <li><strong>vs DM Sans</strong> — cleaner terminals, less humanist warmth; better fit with the banking register.</li>
+      <li><strong>vs Inter</strong> — less ubiquitous, gives the brand some category differentiation while staying in the safe modern-fintech zone.</li>
+      <li><strong>vs Geist / Onest</strong> — same screen-optimization quality, slightly more presence in semi-bold and bolder weights, which matters because the icon's stick widths are matched to typographic stem weight at this rendering.</li>
+      <li><strong>vs paid options (Söhne, Suisse, GT America)</strong> — equivalent quality, sustainable for a solo project, no license entanglement on the marketing site.</li>
+    </ul>
+
+    <p>
+      The font is rendered at <strong>weight 600</strong> because the icon's stick widths (which are
+      matched to the typographic stem weight at the locked sizing rule) only feel like part of the same
+      wordline at this weight. Lighter weights leave the icon visually heavier than the typography;
+      heavier weights leave it visually lighter.
+    </p>
+  </section>
+
+  <!-- 3. PLAIN WORDMARK -->
+  <section id="plain">
+    <h2>3 · Variant 1 · plain wordmark</h2>
+
+    <p>
+      The default wordmark variant. Used in lockup contexts where the icon-on-cream is already visible
+      on the same surface — app icon top-left of a header, favicon in the browser tab, splash screens,
+      hero lockups that pair mark + wordmark, partner co-marketing tiles.
+    </p>
+
+    <h3>Display tier — 92 px font</h3>
+    <div class="wordmark-stage">
+      <svg viewBox="0 0 380 120" width="380" height="120" xmlns="http://www.w3.org/2000/svg" aria-label="tallykeep">
+        <text x="0" y="92" font-family="Manrope, system-ui, sans-serif" font-weight="600" font-size="92" letter-spacing="-2" fill="#1A1A1A">tallykeep</text>
+      </svg>
+    </div>
+    <div class="tier-config">
+      <span class="label">Display · plain</span>Manrope 600 · font-size 92 · letter-spacing −2 · color #1A1A1A
+    </div>
+
+    <h3>Default tier — 48 px font</h3>
+    <div class="wordmark-stage compact">
+      <svg viewBox="0 0 200 70" width="200" height="70" xmlns="http://www.w3.org/2000/svg" aria-label="tallykeep">
+        <text x="0" y="48" font-family="Manrope, system-ui, sans-serif" font-weight="600" font-size="48" letter-spacing="-1" fill="#1A1A1A">tallykeep</text>
+      </svg>
+    </div>
+    <div class="tier-config">
+      <span class="label">Default · plain</span>Manrope 600 · font-size 48 · letter-spacing −1 · color #1A1A1A
+    </div>
+
+    <h3>Sizing rule</h3>
+    <ul>
+      <li>Any size from <strong>14 px to 200 px</strong> works as plain Manrope 600 lowercase.</li>
+      <li>Letter-spacing scales with font-size: roughly <code>letter-spacing ≈ −0.022 × font-size</code> in pixels (= −2 at 92 px, −1 at 48 px, etc.).</li>
+      <li>No minimum size for the plain variant — it's just type. Below ~14 px, switch to weight 700 for legibility.</li>
+    </ul>
+
+    <h3>Color modes</h3>
+    <div class="color-row">
+      <div class="color-chip">
+        <div class="swatch" style="background: #1A1A1A;"></div>
+        <div class="info">
+          <span class="name">Light mode</span>
+          <span class="code-text">#1A1A1A on cream / white</span>
+        </div>
+      </div>
+      <div class="color-chip">
+        <div class="swatch" style="background: #F4EAD5;"></div>
+        <div class="info">
+          <span class="name">Dark mode</span>
+          <span class="code-text">#F4EAD5 on dark navy / black</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 4. ICON-Y WORDMARK -->
+  <section id="icon-y">
+    <h2>4 · Variant 2 · icon-y wordmark</h2>
+
+    <p>
+      The standalone wordmark variant. Used when the wordmark stands alone and the brand mark needs to
+      come through the wordline itself — footer signatures, email signatures, social bios, embedded
+      inline text in articles, app store descriptions, partner co-branding tiles.
+    </p>
+
+    <p>
+      The icon used is the canonical icon-on-cream form (see <code>tallykeep_brand_mark_v1_lock</code>)
+      <strong>without its cream container</strong>. The carved Y sits on its own; the V-notches and
+      hanging hole are filled with the page background colour so they read as knockouts.
+    </p>
+
+    <h3>Display tier — 92 px font</h3>
+    <div class="wordmark-stage">
+      <svg viewBox="0 0 460 145" width="460" height="145" xmlns="http://www.w3.org/2000/svg" aria-label="tallykeep">
+        <text x="0" y="92" font-family="Manrope, system-ui, sans-serif" font-weight="600" font-size="92" letter-spacing="-2" fill="#1A1A1A">tall</text>
+        <svg x="143" y="42" width="76" height="84" viewBox="36.43 27.79 131.9 146.43">
+          <defs>
+            <clipPath id="sc-disp"><path d="M 168.33 42.19 L 54.27 174.22 L 36.43 139.77 L 54.47 118.86 L 65.07 128.02 L 151.67 27.81 Z"/></clipPath>
+            <clipPath id="fc-disp"><polygon points="40.68,42.21 79.68,87.21 96.32,72.79 57.32,27.79"/></clipPath>
+          </defs>
+          <path d="M 168.33 42.19 L 54.27 174.22 L 36.43 139.77 L 54.47 118.86 L 65.07 128.02 L 151.67 27.81 Z" fill="#A88554"/>
+          <polygon points="40.68,42.21 79.68,87.21 96.32,72.79 57.32,27.79" fill="#A88554"/>
+          <g stroke="#6F5638" stroke-width="1.4" stroke-linecap="butt" opacity="0.6">
+            <line x1="163.79" y1="38.27" x2="46.07" y2="174.53" clip-path="url(#sc-disp)"/>
+            <line x1="156.22" y1="31.73" x2="38.50" y2="167.99" clip-path="url(#sc-disp)"/>
+            <line x1="45.22" y1="38.27" x2="84.52" y2="83.64" clip-path="url(#fc-disp)"/>
+            <line x1="52.78" y1="31.73" x2="92.08" y2="77.09" clip-path="url(#fc-disp)"/>
+          </g>
+          <circle cx="53.76" cy="147.31" r="2.8" fill="#FAFAF7"/>
+          <polygon points="-3,12 3,12 2,5 -2,5" fill="#FAFAF7" transform="translate(147 50) rotate(130.82)"/>
+          <polygon points="-4,12 4,12 2,4 -2,4" fill="#FAFAF7" transform="translate(140 58) rotate(130.82)"/>
+          <polygon points="-3,12 3,12 2,5 -2,5" fill="#FAFAF7" transform="translate(133 66) rotate(130.82)"/>
+          <polygon points="-3,-12 3,-12 2,-5 -2,-5" fill="#FAFAF7" transform="translate(62 50) rotate(49.18)"/>
+          <polygon points="-4,-12 4,-12 2,-4 -2,-4" fill="#FAFAF7" transform="translate(69 58) rotate(49.18)"/>
+          <polygon points="-3,-12 3,-12 2,-5 -2,-5" fill="#FAFAF7" transform="translate(76 66) rotate(49.18)"/>
+        </svg>
+        <text x="228" y="92" font-family="Manrope, system-ui, sans-serif" font-weight="600" font-size="92" letter-spacing="-2" fill="#1A1A1A">keep</text>
+      </svg>
+    </div>
+    <div class="tier-config">
+      <span class="label">Display · icon-y</span>icon: x=143 y=42 size=84 (→ w=76 h=84) · keep x=228 · font-size=92 · font="Manrope" 600
+    </div>
+
+    <h3>Default tier — 48 px font</h3>
+    <div class="wordmark-stage compact">
+      <svg viewBox="0 0 250 105" width="250" height="105" xmlns="http://www.w3.org/2000/svg" aria-label="tallykeep">
+        <text x="0" y="48" font-family="Manrope, system-ui, sans-serif" font-weight="600" font-size="48" letter-spacing="-1" fill="#1A1A1A">tall</text>
+        <svg x="74" y="22" width="43" height="48" viewBox="36.43 27.79 131.9 146.43">
+          <defs>
+            <clipPath id="sc-def"><path d="M 168.33 42.19 L 54.27 174.22 L 36.43 139.77 L 54.47 118.86 L 65.07 128.02 L 151.67 27.81 Z"/></clipPath>
+            <clipPath id="fc-def"><polygon points="40.68,42.21 79.68,87.21 96.32,72.79 57.32,27.79"/></clipPath>
+          </defs>
+          <path d="M 168.33 42.19 L 54.27 174.22 L 36.43 139.77 L 54.47 118.86 L 65.07 128.02 L 151.67 27.81 Z" fill="#A88554"/>
+          <polygon points="40.68,42.21 79.68,87.21 96.32,72.79 57.32,27.79" fill="#A88554"/>
+          <g stroke="#6F5638" stroke-width="1.4" stroke-linecap="butt" opacity="0.6">
+            <line x1="163.79" y1="38.27" x2="46.07" y2="174.53" clip-path="url(#sc-def)"/>
+            <line x1="156.22" y1="31.73" x2="38.50" y2="167.99" clip-path="url(#sc-def)"/>
+            <line x1="45.22" y1="38.27" x2="84.52" y2="83.64" clip-path="url(#fc-def)"/>
+            <line x1="52.78" y1="31.73" x2="92.08" y2="77.09" clip-path="url(#fc-def)"/>
+          </g>
+          <circle cx="53.76" cy="147.31" r="2.8" fill="#FAFAF7"/>
+          <polygon points="-3,12 3,12 2,5 -2,5" fill="#FAFAF7" transform="translate(147 50) rotate(130.82)"/>
+          <polygon points="-4,12 4,12 2,4 -2,4" fill="#FAFAF7" transform="translate(140 58) rotate(130.82)"/>
+          <polygon points="-3,12 3,12 2,5 -2,5" fill="#FAFAF7" transform="translate(133 66) rotate(130.82)"/>
+          <polygon points="-3,-12 3,-12 2,-5 -2,-5" fill="#FAFAF7" transform="translate(62 50) rotate(49.18)"/>
+          <polygon points="-4,-12 4,-12 2,-4 -2,-4" fill="#FAFAF7" transform="translate(69 58) rotate(49.18)"/>
+          <polygon points="-3,-12 3,-12 2,-5 -2,-5" fill="#FAFAF7" transform="translate(76 66) rotate(49.18)"/>
+        </svg>
+        <text x="123" y="48" font-family="Manrope, system-ui, sans-serif" font-weight="600" font-size="48" letter-spacing="-1" fill="#1A1A1A">keep</text>
+      </svg>
+    </div>
+    <div class="tier-config">
+      <span class="label">Default · icon-y</span>icon: x=74 y=66 size=48 (→ w=43 h=48) · keep x=123 · font-size=48 · font="Manrope" 600
+    </div>
+
+    <h3>The icon used inside the wordmark</h3>
+    <p>
+      Same canonical icon as the brand mark spec, with two adjustments for in-wordmark use:
+    </p>
+    <ul>
+      <li><strong>No cream container</strong> — the carved Y sits on its own. The cream rounded square is reserved for square-format contexts (favicon, app icon, social avatar) where the brand mark needs to be self-contained.</li>
+      <li><strong>Notches and hanging hole knockouts</strong> are filled with the page background colour (typically <code>#FAFAF7</code> or the colour of the wordmark surface) so they punch through cleanly. Without a cream substrate, the canonical cream fills would be visible bumps; the page-bg fill makes them read as carved-through.</li>
+    </ul>
+    <p>
+      Cropping in the SVG: a nested <code>&lt;svg viewBox="36.43 27.79 131.9 146.43"&gt;</code> isolates
+      the icon's visible bounding box (excludes the empty corners of the canonical 200×200 viewBox), so
+      the y-glyph's footprint in the wordline is the actual Y, not a square containing it. <strong>Don't
+      change this inner viewBox</strong> — it's geometry, not a tweakable parameter.
+    </p>
+
+    <h3>Live playground — for hand-tuning new sizes</h3>
+
+    <form class="playground-form" onsubmit="event.preventDefault()">
+      <div class="pf-title">Tune · live · defaults to display tier</div>
+
+      <div class="pf-row">
+        <label>Icon X <input type="number" id="pl-icon-x" value="143" step="1"></label>
+        <label>Icon Y <input type="number" id="pl-icon-y" value="42" step="1"></label>
+        <label>Icon size <input type="number" id="pl-icon-size" value="84" step="1"></label>
+      </div>
+
+      <div class="pf-row">
+        <label>"keep" X <input type="number" id="pl-keep-x" value="228" step="1"></label>
+        <label>Font size <input type="number" id="pl-font-size" value="92" step="1"></label>
+        <label>Font
+          <select id="pl-font-family">
+            <option value="Manrope" selected>Manrope</option>
+            <option value="Geist">Geist</option>
+            <option value="Onest">Onest</option>
+            <option value="Plus Jakarta Sans">Plus Jakarta Sans</option>
+            <option value="Inter">Inter</option>
+            <option value="DM Sans">DM Sans</option>
+            <option value="Outfit">Outfit</option>
+            <option value="Sora">Sora</option>
+            <option value="Be Vietnam Pro">Be Vietnam Pro</option>
+          </select>
+        </label>
+      </div>
+
+      <div class="pf-row">
+        <button type="button" class="preset" id="pl-preset-display">Display tier (92)</button>
+        <button type="button" class="preset" id="pl-preset-default">Default tier (48)</button>
+        <button type="button" class="preset" id="pl-preset-formula">Apply formulas (from font-size)</button>
+        <button type="button" id="pl-reset">Reset</button>
+      </div>
+
+      <div class="pf-help">
+        <strong>Icon size</strong> sets the height in px; width auto-computed at the natural 0.901
+        aspect ratio (icon can't stretch). <strong>Apply formulas</strong> recomputes icon X / Y / size
+        and "keep" X from the current font-size using the linear rules in §5.
+      </div>
+
+      <output class="pf-output" id="pl-output"></output>
+    </form>
+
+    <div class="wordmark-stage">
+      <svg id="pl-outer-svg" viewBox="0 0 500 145" width="500" height="145" xmlns="http://www.w3.org/2000/svg" aria-label="tallykeep">
+        <text id="pl-tall-text" x="0" y="92" font-family="Manrope, system-ui, sans-serif" font-weight="600" font-size="92" letter-spacing="-2" fill="#1A1A1A">tall</text>
+        <svg id="pl-inner-svg" x="143" y="42" width="76" height="84" viewBox="36.43 27.79 131.9 146.43">
+          <defs>
+            <clipPath id="sc-pl"><path d="M 168.33 42.19 L 54.27 174.22 L 36.43 139.77 L 54.47 118.86 L 65.07 128.02 L 151.67 27.81 Z"/></clipPath>
+            <clipPath id="fc-pl"><polygon points="40.68,42.21 79.68,87.21 96.32,72.79 57.32,27.79"/></clipPath>
+          </defs>
+          <path d="M 168.33 42.19 L 54.27 174.22 L 36.43 139.77 L 54.47 118.86 L 65.07 128.02 L 151.67 27.81 Z" fill="#A88554"/>
+          <polygon points="40.68,42.21 79.68,87.21 96.32,72.79 57.32,27.79" fill="#A88554"/>
+          <g stroke="#6F5638" stroke-width="1.4" stroke-linecap="butt" opacity="0.6">
+            <line x1="163.79" y1="38.27" x2="46.07" y2="174.53" clip-path="url(#sc-pl)"/>
+            <line x1="156.22" y1="31.73" x2="38.50" y2="167.99" clip-path="url(#sc-pl)"/>
+            <line x1="45.22" y1="38.27" x2="84.52" y2="83.64" clip-path="url(#fc-pl)"/>
+            <line x1="52.78" y1="31.73" x2="92.08" y2="77.09" clip-path="url(#fc-pl)"/>
+          </g>
+          <circle cx="53.76" cy="147.31" r="2.8" fill="#FAFAF7"/>
+          <polygon points="-3,12 3,12 2,5 -2,5" fill="#FAFAF7" transform="translate(147 50) rotate(130.82)"/>
+          <polygon points="-4,12 4,12 2,4 -2,4" fill="#FAFAF7" transform="translate(140 58) rotate(130.82)"/>
+          <polygon points="-3,12 3,12 2,5 -2,5" fill="#FAFAF7" transform="translate(133 66) rotate(130.82)"/>
+          <polygon points="-3,-12 3,-12 2,-5 -2,-5" fill="#FAFAF7" transform="translate(62 50) rotate(49.18)"/>
+          <polygon points="-4,-12 4,-12 2,-4 -2,-4" fill="#FAFAF7" transform="translate(69 58) rotate(49.18)"/>
+          <polygon points="-3,-12 3,-12 2,-5 -2,-5" fill="#FAFAF7" transform="translate(76 66) rotate(49.18)"/>
+        </svg>
+        <text id="pl-keep-text" x="228" y="92" font-family="Manrope, system-ui, sans-serif" font-weight="600" font-size="92" letter-spacing="-2" fill="#1A1A1A">keep</text>
+      </svg>
+    </div>
+  </section>
+
+  <!-- 5. SIZING -->
+  <section id="sizing">
+    <h2>5 · Sizing system &amp; formulas</h2>
+
+    <p>
+      Two locked tiers cover most display contexts. For sizes between or outside the locked tiers,
+      use the linear formulas — they reproduce the locked values within ±1 px and provide a defensible
+      design rule for any font-size in the supported range.
+    </p>
+
+    <h3>Tiers</h3>
+    <table class="formula-table">
+      <thead>
+        <tr><th>Tier</th><th>Font size</th><th>Variant available</th><th>Use for</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Display</td><td>60–120 px</td><td>Both</td><td>Hero, marketing site headers, posters, splash screens</td></tr>
+        <tr><td>Default</td><td>24–48 px</td><td>Both</td><td>App headers, body inline references, navigation</td></tr>
+        <tr><td>Minimum</td><td>&lt;24 px</td><td>Plain only</td><td>Footer, dense UI, captions — icon-y can't render legibly</td></tr>
+      </tbody>
+    </table>
+
+    <h3>Linear formulas (icon-y variant)</h3>
+    <table class="formula-table">
+      <thead>
+        <tr><th>Parameter</th><th>Formula</th><th>At fs=92</th><th>At fs=48</th><th>Locked value</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>icon_x</td><td class="formula">1.57 × fs − 1.3</td><td class="value">143.14 → 143</td><td class="value">74.06 → 74</td><td class="value">143 / 74</td></tr>
+        <tr><td>icon_y</td><td class="formula">92 − 0.55 × fs</td><td class="value">41.4 → 42</td><td class="value">65.6 → 66</td><td class="value">42 / 66</td></tr>
+        <tr><td>icon_size</td><td class="formula">0.82 × fs + 8.7</td><td class="value">84.1 → 84</td><td class="value">48.1 → 48</td><td class="value">84 / 48</td></tr>
+        <tr><td>keep_x</td><td class="formula">2.39 × fs + 8.5</td><td class="value">228.4 → 228</td><td class="value">123.2 → 123</td><td class="value">228 / 123</td></tr>
+      </tbody>
+    </table>
+
+    <p style="font-size: 13px; color: #666; margin-top: 8px;">
+      Useful range: <strong>fs = 24 to 120</strong>. Outside this, hand-tune in the playground (§4) and
+      verify visually. The non-zero constants (+8.7, +8.5, −5.5) carry real design intent: at small font
+      sizes, decorative elements need slightly more relative weight than a pure proportional rule would
+      give, otherwise stick widths drop below the legibility threshold.
+    </p>
+
+    <h3>Stick-width threshold</h3>
+    <p>
+      The icon's stick width at any rendered size is <code>22 × (icon_size / 146.43)</code>. The minimum
+      legible stick width is <strong>~5 px</strong>. Below this, switch to the plain wordmark variant —
+      do not render the icon-y at smaller sizes; it produces visual noise rather than a brand mark.
+    </p>
+
+    <p>The threshold puts icon-y minimum at:</p>
+    <ul>
+      <li><code>icon_size ≥ 33</code> px to keep sticks above 5 px</li>
+      <li><code>fs ≥ 30</code> px (using the icon_size formula) to satisfy that constraint</li>
+      <li>In practice: round to <strong>fs ≥ 24</strong> (default tier minimum) for the icon-y variant.</li>
+    </ul>
+
+    <h3>Letter-spacing</h3>
+    <p>
+      Letter-spacing scales linearly with font-size: <code>letter-spacing ≈ −0.022 × fs</code> (in px).
+    </p>
+    <ul>
+      <li>fs=92 → letter-spacing −2</li>
+      <li>fs=48 → letter-spacing −1</li>
+      <li>fs=24 → letter-spacing −0.5 (or 0; sub-pixel tracking is noisy at small sizes)</li>
+    </ul>
+
+    <h3>TK monogram — for ultra-small UI</h3>
+    <p>
+      Below ~16 px height, even the plain wordmark loses readability. For circular avatars,
+      tiny status badges, and dense UI dots, a <strong>TK monogram</strong> serves as the
+      brand-mark substitute. Capital letters in Manrope 600, dark text on cream container
+      (matches the brand mark's substrate). The container is provided by the consuming context
+      (avatar circle, badge); the monogram itself is just two letters.
+    </p>
+
+    <div class="wordmark-stage" style="display: flex; align-items: center; justify-content: center; gap: 48px; padding: 36px 24px;">
+      <div style="display: flex; flex-direction: column; align-items: center; gap: 8px;">
+        <svg width="60" height="60" viewBox="0 0 60 60" xmlns="http://www.w3.org/2000/svg">
+          <circle cx="30" cy="30" r="30" fill="#F4EAD5"/>
+          <text x="30" y="40" font-family="Manrope, system-ui, sans-serif" font-weight="600" font-size="26" letter-spacing="-1" fill="#1A1A1A" text-anchor="middle">TK</text>
+        </svg>
+        <span style="font-size: 10px; color: #999; font-family: ui-monospace, monospace; letter-spacing: 0.06em; text-transform: uppercase;">Avatar · 60 px</span>
+      </div>
+      <div style="display: flex; flex-direction: column; align-items: center; gap: 8px;">
+        <svg width="32" height="32" viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg">
+          <rect width="32" height="32" rx="6" fill="#F4EAD5"/>
+          <text x="16" y="22" font-family="Manrope, system-ui, sans-serif" font-weight="600" font-size="14" letter-spacing="-0.5" fill="#1A1A1A" text-anchor="middle">TK</text>
+        </svg>
+        <span style="font-size: 10px; color: #999; font-family: ui-monospace, monospace; letter-spacing: 0.06em; text-transform: uppercase;">Favicon · 32 px</span>
+      </div>
+      <div style="display: flex; flex-direction: column; align-items: center; gap: 8px;">
+        <svg width="16" height="16" viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg">
+          <rect width="16" height="16" rx="3" fill="#F4EAD5"/>
+          <text x="8" y="11" font-family="Manrope, system-ui, sans-serif" font-weight="600" font-size="7" letter-spacing="-0.3" fill="#1A1A1A" text-anchor="middle">TK</text>
+        </svg>
+        <span style="font-size: 10px; color: #999; font-family: ui-monospace, monospace; letter-spacing: 0.06em; text-transform: uppercase;">Tiny UI · 16 px</span>
+      </div>
+    </div>
+
+    <p style="font-size: 13px; color: #666;">
+      Manrope 600, capital <code>TK</code>, tight letter-spacing (≈ −0.04em), centered. Text color
+      <code>#1A1A1A</code> on cream <code>#F4EAD5</code> container in light mode; <code>#F4EAD5</code>
+      on <code>#1A1A1A</code> in dark mode. Use only when the icon-on-cream is too detailed at the
+      rendered size — the icon-on-cream remains the canonical brand mark for any size ≥32 px.
+    </p>
+  </section>
+
+  <!-- 6. CASING -->
+  <section id="casing">
+    <h2>6 · Casing &amp; typographic conventions</h2>
+
+    <p>
+      Two forms of the brand name exist. They are not interchangeable.
+    </p>
+
+    <table class="casing-table">
+      <thead>
+        <tr><th>Context</th><th>Form</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Visual wordmark (logo, header, footer)</td><td>tallykeep</td></tr>
+        <tr><td>Body text / written copy</td><td>TallyKeep</td></tr>
+        <tr><td>App store name</td><td>TallyKeep</td></tr>
+        <tr><td>App store description</td><td>TallyKeep</td></tr>
+        <tr><td>Email subject line</td><td>TallyKeep</td></tr>
+        <tr><td>Marketing headers</td><td>TallyKeep</td></tr>
+        <tr><td>Code identifiers, class names</td><td>TallyKeep</td></tr>
+        <tr><td>Filenames, repository names</td><td>TallyKeep or tallykeep</td></tr>
+        <tr><td>Internal documents</td><td>TallyKeep</td></tr>
+        <tr><td>Press releases, formal communications</td><td>TallyKeep</td></tr>
+      </tbody>
+    </table>
+
+    <h3>Examples</h3>
+    <ul class="examples-list">
+      <li><span class="mark ok">✓</span><em>"TallyKeep is a self-hosted Bitcoin banking app for Argentina, Africa, and the EU."</em></li>
+      <li><span class="mark no">✗</span><em>"tallykeep is a self-hosted Bitcoin banking app..."</em> — reads as a typo or low-effort indie startup.</li>
+      <li><span class="mark ok">✓</span>Web header: <code>[wordmark: tallykeep]</code> visual, body copy says "TallyKeep"</li>
+      <li><span class="mark no">✗</span>Web header: body text "TallyKeep" with no visual wordmark — use the wordmark.</li>
+      <li><span class="mark ok">✓</span>Email subject: <em>"Welcome to TallyKeep"</em></li>
+      <li><span class="mark no">✗</span>Email subject: <em>"Welcome to tallykeep"</em></li>
+      <li><span class="mark ok">✓</span>Code: <code>const tk = new TallyKeep()</code></li>
+      <li><span class="mark ok">✓</span>Repo: <code>github.com/remy/tallykeep</code> (lowercase fine in URLs)</li>
+    </ul>
+
+    <p>
+      The pattern follows fintech convention: Wise, Qonto, Lemon, Ualá, Mailchimp, Stripe all reserve
+      their lowercase form for the visual wordmark and use Title Case in everything written. Lowercase
+      in body copy reads as informal / unbranded; Title Case carries the institutional register the
+      brand is positioning for.
+    </p>
+  </section>
+
+  <!-- 7. COLOR -->
+  <section id="color">
+    <h2>7 · Color</h2>
+
+    <p>
+      Wordmark colour follows the icon spec's color system (see <code>tallykeep_brand_mark_v1_lock</code>
+      § color). The wordmark text is always one of two values; the icon's wood and grain colours are
+      already locked in the icon spec.
+    </p>
+
+    <h3>Wordmark text</h3>
+    <div class="color-row">
+      <div class="color-chip">
+        <div class="swatch" style="background: #1A1A1A;"></div>
+        <div class="info">
+          <span class="name">Light mode</span>
+          <span class="code-text">#1A1A1A · near-black</span>
+        </div>
+      </div>
+      <div class="color-chip">
+        <div class="swatch" style="background: #F4EAD5; border-color: #B0915E;"></div>
+        <div class="info">
+          <span class="name">Dark mode</span>
+          <span class="code-text">#F4EAD5 · cream (matches icon's carved highlights)</span>
+        </div>
+      </div>
+    </div>
+
+    <h3>Icon colours (in icon-y variant)</h3>
+    <div class="color-row">
+      <div class="color-chip">
+        <div class="swatch" style="background: #A88554;"></div>
+        <div class="info">
+          <span class="name">Aged oak</span>
+          <span class="code-text">#A88554 · stock &amp; foil fill</span>
+        </div>
+      </div>
+      <div class="color-chip">
+        <div class="swatch" style="background: #6F5638;"></div>
+        <div class="info">
+          <span class="name">Grain accent</span>
+          <span class="code-text">#6F5638 · stripes at opacity 0.6</span>
+        </div>
+      </div>
+      <div class="color-chip">
+        <div class="swatch" style="background: #FAFAF7; border-color: #B0915E;"></div>
+        <div class="info">
+          <span class="name">Knockouts (page bg)</span>
+          <span class="code-text">page background · notches, hanging hole</span>
+        </div>
+      </div>
+    </div>
+
+    <p style="font-size: 13px; color: #666;">
+      The icon-y wordmark on dark uses the same oak/grain colors as light mode (oak passes WCAG AA on
+      dark backgrounds, no need to brighten). Only the wordmark text and the icon's knockouts switch.
+      Full color rules and rendered samples below.
+    </p>
+
+    <h3>Dark-mode samples</h3>
+
+    <p style="font-size: 14px; color: #555; margin-bottom: 12px;">
+      The plain wordmark in cream on dark. The icon-y variant uses the same wood
+      <code>#A88554</code> and grain <code>#6F5638</code> as light mode (oak has 5.9:1 contrast vs
+      <code>#1A1A1A</code>, passes WCAG AA for graphics) — only the wordmark text color flips to cream
+      and the icon's notches/hanging hole switch from light page-bg to dark page-bg knockouts.
+    </p>
+
+    <div class="wordmark-stage dark" style="text-align: center; padding: 36px 24px;">
+      <svg viewBox="0 0 380 120" width="380" height="120" xmlns="http://www.w3.org/2000/svg" aria-label="tallykeep">
+        <text x="0" y="92" font-family="Manrope, system-ui, sans-serif" font-weight="600" font-size="92" letter-spacing="-2" fill="#F4EAD5">tallykeep</text>
+      </svg>
+    </div>
+    <div class="tier-config">
+      <span class="label">Display · plain · dark</span>Manrope 600 · font-size 92 · color #F4EAD5 · bg #1A1A1A
+    </div>
+
+    <div class="wordmark-stage dark" style="text-align: center; padding: 36px 24px; margin-top: 16px;">
+      <svg viewBox="0 0 460 145" width="460" height="145" xmlns="http://www.w3.org/2000/svg" aria-label="tallykeep">
+        <text x="0" y="92" font-family="Manrope, system-ui, sans-serif" font-weight="600" font-size="92" letter-spacing="-2" fill="#F4EAD5">tall</text>
+        <svg x="143" y="42" width="76" height="84" viewBox="36.43 27.79 131.9 146.43">
+          <defs>
+            <clipPath id="sc-dark"><path d="M 168.33 42.19 L 54.27 174.22 L 36.43 139.77 L 54.47 118.86 L 65.07 128.02 L 151.67 27.81 Z"/></clipPath>
+            <clipPath id="fc-dark"><polygon points="40.68,42.21 79.68,87.21 96.32,72.79 57.32,27.79"/></clipPath>
+          </defs>
+          <path d="M 168.33 42.19 L 54.27 174.22 L 36.43 139.77 L 54.47 118.86 L 65.07 128.02 L 151.67 27.81 Z" fill="#A88554"/>
+          <polygon points="40.68,42.21 79.68,87.21 96.32,72.79 57.32,27.79" fill="#A88554"/>
+          <g stroke="#6F5638" stroke-width="1.4" stroke-linecap="butt" opacity="0.6">
+            <line x1="163.79" y1="38.27" x2="46.07" y2="174.53" clip-path="url(#sc-dark)"/>
+            <line x1="156.22" y1="31.73" x2="38.50" y2="167.99" clip-path="url(#sc-dark)"/>
+            <line x1="45.22" y1="38.27" x2="84.52" y2="83.64" clip-path="url(#fc-dark)"/>
+            <line x1="52.78" y1="31.73" x2="92.08" y2="77.09" clip-path="url(#fc-dark)"/>
+          </g>
+          <circle cx="53.76" cy="147.31" r="2.8" fill="#1A1A1A"/>
+          <polygon points="-3,12 3,12 2,5 -2,5" fill="#1A1A1A" transform="translate(147 50) rotate(130.82)"/>
+          <polygon points="-4,12 4,12 2,4 -2,4" fill="#1A1A1A" transform="translate(140 58) rotate(130.82)"/>
+          <polygon points="-3,12 3,12 2,5 -2,5" fill="#1A1A1A" transform="translate(133 66) rotate(130.82)"/>
+          <polygon points="-3,-12 3,-12 2,-5 -2,-5" fill="#1A1A1A" transform="translate(62 50) rotate(49.18)"/>
+          <polygon points="-4,-12 4,-12 2,-4 -2,-4" fill="#1A1A1A" transform="translate(69 58) rotate(49.18)"/>
+          <polygon points="-3,-12 3,-12 2,-5 -2,-5" fill="#1A1A1A" transform="translate(76 66) rotate(49.18)"/>
+        </svg>
+        <text x="228" y="92" font-family="Manrope, system-ui, sans-serif" font-weight="600" font-size="92" letter-spacing="-2" fill="#F4EAD5">keep</text>
+      </svg>
+    </div>
+    <div class="tier-config">
+      <span class="label">Display · icon-y · dark</span>text #F4EAD5 · wood #A88554 · grain #6F5638 · knockouts #1A1A1A
+    </div>
+
+    <h3>Dark-mode color rules</h3>
+    <ul>
+      <li><strong>Wordmark text</strong>: <code>#F4EAD5</code> (cream)</li>
+      <li><strong>Icon wood</strong>: <code>#A88554</code> (same oak as light mode — brand-color consistency, passes WCAG AA)</li>
+      <li><strong>Icon grain</strong>: <code>#6F5638</code> (same as light mode — darker brown reads as shadow on the wood)</li>
+      <li><strong>Notches and hanging hole</strong>: <code>#1A1A1A</code> (page bg — same knockout principle as light mode, just inverted)</li>
+      <li><strong>Page background</strong>: <code>#1A1A1A</code> standard; the surface can be darker (e.g. <code>#0E0E0E</code>) but the icon's knockouts must match whichever surface the wordmark sits on.</li>
+    </ul>
+  </section>
+
+  <!-- 8. DON'TS -->
+  <section id="donts">
+    <h2>8 · Don'ts</h2>
+
+    <div class="donts-grid">
+      <div class="dont-item"><strong>Don't use the icon-y wordmark when an icon-on-cream is also visible</strong> on the same surface. The brand mark would appear twice. Use the plain wordmark instead.</div>
+      <div class="dont-item"><strong>Don't write <code>tallykeep</code> in body text.</strong> Lowercase belongs to the visual wordmark only. Body copy uses <code>TallyKeep</code>.</div>
+      <div class="dont-item"><strong>Don't use <code>TALLYKEEP</code> all-caps anywhere.</strong> All-caps reads as shouting / corporate-from-the-90s.</div>
+      <div class="dont-item"><strong>Don't substitute a different <code>y</code> at small sizes.</strong> Below the icon-y minimum (~24 px), fall back to the plain wordmark — not a custom or stylized y.</div>
+      <div class="dont-item"><strong>Don't change Manrope's letter-spacing</strong> beyond the formula in §5. Tighter or looser tracking breaks the wordmark's tested visual rhythm.</div>
+      <div class="dont-item"><strong>Don't change the icon's geometry</strong> for any reason — cropping viewBox, biais cut, notch positions, hanging hole. The icon spec is locked.</div>
+      <div class="dont-item"><strong>Don't recolor the wordmark text.</strong> Use only the locked color values (#1A1A1A or #F4EAD5).</div>
+      <div class="dont-item"><strong>Don't stretch, skew, rotate, or otherwise distort either variant.</strong> No vertical compression to fit narrow spaces; no horizontal stretching.</div>
+      <div class="dont-item"><strong>Don't pair the icon-y wordmark with a tagline directly underneath</strong> — the visual gets crowded. If a tagline is needed, use the plain wordmark + tagline lockup.</div>
+      <div class="dont-item"><strong>Don't put the wordmark on a background that drops contrast below 4.5:1.</strong> WCAG AA minimum.</div>
+      <div class="dont-item"><strong>Don't use weights other than 600.</strong> Lighter or heavier breaks the icon-stick / typographic-stem weight balance.</div>
+    </div>
+  </section>
+
+  <!-- 9. TAGLINE -->
+  <section id="tagline">
+    <h2>9 · Tagline · in consideration</h2>
+
+    <p>
+      Not locked. Candidates explored, top picks held for real-user testing before commit. The tagline
+      lives alongside the wordmark in marketing surfaces (hero pages, app-store description, social
+      bios, conference signage); the wordmark stands alone in product UI, so the tagline isn't a hard
+      dependency — it can be added later without breaking anything else in the brand.
+    </p>
+
+    <h3>What the tagline is compressing</h3>
+    <p>
+      Every digital asset other than Bitcoin is a bet on a counterparty that can default — fiat on a
+      state's solvency, equity on a company's, stablecoins on a custodian's, even other crypto-assets
+      on a foundation's continued operation. Bitcoin's only structural failure mode is that the
+      internet stops existing. The world currently uses BTC as a leveraged trade against fiat (sell
+      when EUR-price is high), when the structurally correct use is to hold and spend it as money.
+      The tools for that use don't exist. TallyKeep is the missing tool.
+    </p>
+    <p style="font-size: 13px; color: #666;">
+      The tagline doesn't need to make this whole argument — it just needs to point at the conclusion
+      (use Bitcoin as money, not as a bet) without forcing the reader to agree with the full thesis on
+      first impression. That keeps the door open for users who haven't arrived at fiat-defaultism
+      independently.
+    </p>
+
+    <h3>Candidates</h3>
+    <table class="formula-table">
+      <thead>
+        <tr><th>Candidate</th><th>Job</th><th>Notes</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>Banking, not betting</strong></td>
+          <td>Promise + behavior contrast</td>
+          <td>Top pick. Three words. Contrasts what TallyKeep enables (use as money) vs. dominant misuse (trade for fiat). Doesn't require the reader to share the full thesis — it's a behavior shift, not a doctrinal claim.</td>
+        </tr>
+        <tr>
+          <td>Stop betting. Start banking.</td>
+          <td>Promise + assertive call</td>
+          <td>Same idea, more swagger. Risk: imposes the thesis on the user ("you've all been doing it wrong"). Founder concern that this contradicts measured personal voice.</td>
+        </tr>
+        <tr>
+          <td>Bitcoin, used as money</td>
+          <td>Descriptor</td>
+          <td>Factual, App-Store-ready. Useful as the formal category line in store listings and PSAN/DASP filings. Not the primary marketing tagline.</td>
+        </tr>
+        <tr>
+          <td>Money without a counterparty</td>
+          <td>Positioning</td>
+          <td>Captures the structural argument sharply. Risk: "counterparty" is jargon outside finance; assumes a converted audience.</td>
+        </tr>
+        <tr>
+          <td>Bitcoin, as intended</td>
+          <td>Promise + philosophical</td>
+          <td>Earlier candidate. Carries the Satoshi-vision claim without the trade-vs-money explicit framing. Works if you want the historical-philosophical angle instead of the behavior contrast.</td>
+        </tr>
+        <tr>
+          <td>Bitcoin, finally</td>
+          <td>Promise (gut version)</td>
+          <td>Founder's gut pull. Tightest, most confident, most exposed. Less anchored than "Banking, not betting" — claims confidence with no specific referent.</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h3>Strategic caution</h3>
+    <ul>
+      <li>A tagline is an INVITATION to the thesis, not the thesis itself. The fiat-defaultism argument belongs in long-form copy, the about page, conference talks — not the headline.</li>
+      <li>Founder voice asymmetry: the brand can be confident even when the founder is measured (Wise's "Money without borders" is bold; the founders are quiet engineers). A bold tagline is available even if the founder is not naturally bold.</li>
+      <li>The brand mark + product context carries part of the meaning. If "Bitcoin" is implicit through the surrounding surface (the icon-y wordmark, the about-page copy), the tagline can drop "Bitcoin" entirely and focus on the banking/intent claim — unlocks shorter forms like <em>"Banking. As intended."</em></li>
+    </ul>
+
+    <h3>Before locking</h3>
+    <p>
+      Tagline candidates require real-user testing before commit — say the candidates out loud to two
+      or three target users (Argentine non-technical BTC user, EU general consumer, African remittance
+      sender) and observe what they recognize. If reaction to <em>"Banking, not betting"</em> is "yeah,
+      that's what I want," it's the tagline. If it's "I don't get it," tune.
+    </p>
+  </section>
+
+  <!-- 10. OPEN -->
+  <section id="open">
+    <h2>10 · Open items (deferred)</h2>
+
+    <p style="margin-bottom: 16px;">
+      Items not in this lock; to be addressed in future iterations.
+    </p>
+
+    <div class="open-item">
+      <div class="title">Trademark check</div>
+      <div class="body">
+        EUIPO classes 9 (software) and 36 (financial services); INPI in Argentina. Required before public
+        announcement, regardless of distribution channel. Carried over from the icon spec's open list —
+        the wordmark and the icon are checked together as the brand combination.
+      </div>
+    </div>
+
+    <div class="open-item">
+      <div class="title">Cyrillic / non-Latin script support</div>
+      <div class="body">
+        Manrope ships with Latin Extended and Cyrillic. Current target markets (Argentina, French, English,
+        Portuguese, Swahili) are all Latin-script. Lower priority — likely post-public-shipment, only
+        re-validated if Russia, MENA, or East Asia enter scope.
+      </div>
+    </div>
+
+    <div class="open-item">
+      <div class="title">Print specifications · side note</div>
+      <div class="body">
+        Parked. CMYK + Pantone for the wood colours, paper guidance, minimum print sizes — only
+        relevant if/when business cards, conference swag, or printed pitch decks actually happen.
+        TallyKeep is digital-first; not on the v1 path.
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    <div>TallyKeep wordmark · v1.0 lock · May 2026</div>
+    <div style="margin-top: 6px;">Cross-reference: <code>tallykeep_brand_mark_v1_lock</code> (icon spec)</div>
+  </footer>
+
+</div>
+
+<script>
+(function() {
+  const $ = id => document.getElementById(id);
+  const innerSvg = $('pl-inner-svg');
+  const tallText = $('pl-tall-text');
+  const keepText = $('pl-keep-text');
+  if (!innerSvg || !tallText || !keepText) return;
+
+  const RATIO = 131.9 / 146.43; // = 0.9008
+
+  const TIERS = {
+    display: { 'pl-icon-x': 143, 'pl-icon-y': 42, 'pl-icon-size': 84, 'pl-keep-x': 228, 'pl-font-size': 92 },
+    default: { 'pl-icon-x': 74,  'pl-icon-y': 66, 'pl-icon-size': 48, 'pl-keep-x': 123, 'pl-font-size': 48 }
+  };
+  const DEFAULTS = { ...TIERS.display, 'pl-font-family': 'Manrope' };
+
+  function update() {
+    const h = parseFloat($('pl-icon-size').value);
+    const w = Math.round(h * RATIO);
+
+    innerSvg.setAttribute('x', $('pl-icon-x').value);
+    innerSvg.setAttribute('y', $('pl-icon-y').value);
+    innerSvg.setAttribute('width', w);
+    innerSvg.setAttribute('height', h);
+    keepText.setAttribute('x', $('pl-keep-x').value);
+
+    const fs = $('pl-font-size').value;
+    tallText.setAttribute('font-size', fs);
+    keepText.setAttribute('font-size', fs);
+
+    // Letter-spacing scales with font-size
+    const ls = (-0.022 * fs).toFixed(2);
+    tallText.setAttribute('letter-spacing', ls);
+    keepText.setAttribute('letter-spacing', ls);
+
+    const ff = $('pl-font-family').value;
+    const fontFamily = '"' + ff + '", system-ui, sans-serif';
+    tallText.setAttribute('font-family', fontFamily);
+    keepText.setAttribute('font-family', fontFamily);
+
+    $('pl-output').textContent =
+      'icon: x=' + $('pl-icon-x').value + ' y=' + $('pl-icon-y').value +
+      ' size=' + h + ' (→ w=' + w + ' h=' + h + ') · ' +
+      'keep x=' + $('pl-keep-x').value + ' · ' +
+      'font-size=' + fs + 'px · letter-spacing=' + ls + ' · font="' + ff + '"';
+  }
+
+  function applyValues(values) {
+    Object.entries(values).forEach(([id, val]) => {
+      const el = $(id);
+      if (el) el.value = val;
+    });
+    update();
+  }
+
+  function applyFormulas() {
+    const fs = parseFloat($('pl-font-size').value);
+    if (isNaN(fs) || fs <= 0) return;
+    applyValues({
+      'pl-icon-x':    Math.round(1.57 * fs - 1.3),
+      'pl-icon-y':    Math.round(92 - 0.55 * fs),
+      'pl-icon-size': Math.round(0.82 * fs + 8.7),
+      'pl-keep-x':    Math.round(2.39 * fs + 8.5)
+    });
+  }
+
+  ['pl-icon-x', 'pl-icon-y', 'pl-icon-size', 'pl-keep-x', 'pl-font-size'].forEach(id => {
+    $(id).addEventListener('input', update);
+  });
+  $('pl-font-family').addEventListener('change', update);
+
+  $('pl-preset-display').addEventListener('click', () => applyValues(TIERS.display));
+  $('pl-preset-default').addEventListener('click', () => applyValues(TIERS.default));
+  $('pl-preset-formula').addEventListener('click', applyFormulas);
+  $('pl-reset').addEventListener('click', () => applyValues(DEFAULTS));
+
+  update();
+})();
+</script>
+
+</body>
+</html>

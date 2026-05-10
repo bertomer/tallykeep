@@ -1,0 +1,471 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>TallyKeep — Home page (final)</title>
+<style>
+  :root {
+    --bg: #f8fafc; --surface: #ffffff; --border: #e2e8f0; --border-strong: #cbd5e1;
+    --text: #0f172a; --text-muted: #64748b; --text-dim: #94a3b8; --sidebar: #f1f5f9;
+    --btc: #f59e0b; --btc-soft: #fef3c7;
+    --green: #16a34a; --green-soft: #dcfce7;
+    --amber: #ca8a04; --amber-soft: #fef9c3;
+    --red: #dc2626; --red-soft: #fee2e2;
+    --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  }
+  * { box-sizing: border-box; }
+  body { background: #e2e8f0; margin: 0; padding: 32px; font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; color: var(--text); font-size: 14px; line-height: 1.5; }
+  h1 { font-size: 24px; margin: 0 0 4px; }
+  .lede { color: var(--text-muted); margin-bottom: 24px; max-width: 820px; }
+  .changelog { background: var(--green-soft); border: 1px solid var(--green); border-radius: 8px; padding: 12px 16px; margin-bottom: 24px; max-width: 820px; font-size: 13px; }
+  .changelog strong { color: var(--green); }
+  .group-title { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; color: var(--text-muted); margin: 40px 0 12px; }
+  .group-title:first-of-type { margin-top: 0; }
+  .window { width: 1000px; max-width: 100%; background: var(--surface); border: 1px solid var(--border-strong); border-radius: 8px; box-shadow: 0 8px 24px rgba(15,23,42,0.08); margin-bottom: 28px; overflow: hidden; }
+  .titlebar { background: #f1f5f9; padding: 8px 12px; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 8px; }
+  .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--border-strong); }
+  .titlebar .url { flex: 1; text-align: center; font-size: 11px; color: var(--text-muted); font-family: var(--mono); }
+  .body { display: grid; grid-template-columns: 200px 1fr; min-height: 580px; }
+  .sidebar { background: var(--sidebar); border-right: 1px solid var(--border); padding: 16px 8px; display: flex; flex-direction: column; gap: 2px; }
+  .sidebar .brand { font-weight: 700; font-size: 13px; padding: 6px 8px 16px; }
+  .nav-item { display: flex; align-items: center; gap: 8px; padding: 7px 10px; font-size: 12px; color: var(--text-muted); border-radius: 5px; cursor: default; }
+  .nav-item.active { background: var(--surface); color: var(--text); font-weight: 600; box-shadow: 0 1px 2px rgba(15,23,42,0.04); }
+  .nav-icon { width: 14px; height: 14px; border-radius: 3px; background: var(--border-strong); }
+  .nav-item.active .nav-icon { background: var(--btc); }
+  .sidebar .footer { margin-top: auto; padding: 8px 10px; background: var(--surface); border: 1px solid var(--border); border-radius: 5px; font-size: 11px; }
+  .sidebar .footer .lab { color: var(--text-dim); font-size: 10px; }
+  .main { padding: 24px 28px; overflow: hidden; }
+  .btn { padding: 6px 12px; font-size: 12px; border-radius: 5px; border: 1px solid var(--border-strong); background: var(--surface); color: var(--text); font-weight: 500; cursor: default; }
+  .btn.primary { background: var(--text); color: var(--surface); border-color: var(--text); }
+  .btn.lg { padding: 9px 16px; font-size: 13px; }
+  .badge { display: inline-block; font-size: 10px; padding: 1px 6px; border-radius: 3px; font-weight: 600; vertical-align: middle; }
+  .badge.gray { background: var(--border); color: var(--text-muted); }
+  .badge.amber { background: var(--amber-soft); color: var(--amber); }
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 14px 16px; }
+  .card h3 { margin: 0 0 12px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th { text-align: left; font-weight: 600; color: var(--text-muted); font-size: 10px; text-transform: uppercase; letter-spacing: 0.05em; padding: 8px 10px; border-bottom: 1px solid var(--border); }
+  td { padding: 11px 10px; border-bottom: 1px solid var(--border); }
+  tr:last-child td { border-bottom: none; }
+  .num { text-align: right; font-variant-numeric: tabular-nums; }
+  .mono { font-family: var(--mono); }
+  .small { font-size: 11px; color: var(--text-muted); }
+  .row { display: flex; align-items: center; gap: 8px; }
+  .between { display: flex; align-items: center; justify-content: space-between; }
+  .ind { display: inline-block; width: 7px; height: 7px; border-radius: 50%; }
+  .ind.green { background: var(--green); }
+  .ind.amber { background: var(--amber); }
+  .label { font-size: 13px; font-weight: 600; padding: 8px 4px 0; color: var(--text); }
+  .note { font-size: 12px; color: var(--text-muted); line-height: 1.55; padding-left: 4px; padding-top: 8px; max-width: 1000px; }
+  .note strong { color: var(--text); }
+  /* hero */
+  .hero { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 24px; gap: 24px; }
+  .hero .balance-block { flex: 1; }
+  .hero .label-line { font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 6px; }
+  .hero .amount { font-family: var(--mono); font-size: 32px; font-weight: 600; line-height: 1.1; color: var(--text); cursor: default; }
+  .hero .unit-label { font-size: 18px; color: var(--text-muted); font-weight: 500; }
+  .hero .secondary-amount { font-family: var(--mono); font-size: 14px; color: var(--text-muted); margin-top: 4px; }
+  .hero .meta { font-size: 12px; color: var(--text-muted); margin-top: 6px; }
+  .hero .source-line { font-size: 11px; color: var(--text-dim); margin-top: 2px; }
+  .hero .actions { display: flex; gap: 8px; flex-shrink: 0; }
+  /* unit + currency controls */
+  .unit-controls { display: flex; align-items: center; gap: 12px; padding: 8px 12px; background: var(--surface); border: 1px solid var(--border); border-radius: 6px; margin-bottom: 16px; font-size: 12px; }
+  .unit-controls .hint { color: var(--text-dim); font-size: 11px; }
+  .currency-select { font-size: 11px; padding: 4px 24px 4px 8px; border: 1px solid var(--border-strong); border-radius: 4px; background: var(--surface) url("data:image/svg+xml,%3Csvg viewBox='0 0 12 8' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M2 2 L6 6 L10 2' stroke='%2364748b' stroke-width='1.5' fill='none'/%3E%3C/svg%3E") no-repeat right 6px center; background-size: 8px; appearance: none; cursor: default; min-width: 110px; }
+  .unit-cycle { font-family: var(--mono); font-size: 13px; cursor: default; padding: 4px 8px; border-radius: 4px; background: var(--sidebar); border: 1px solid var(--border); display: inline-flex; align-items: center; gap: 6px; }
+  .unit-cycle .arrow { color: var(--text-dim); font-size: 10px; }
+  /* empty state hero */
+  .empty-hero { padding: 60px 20px 32px; text-align: center; }
+  .empty-hero .empty-msg { font-size: 16px; color: var(--text); margin-bottom: 6px; font-weight: 500; }
+  .empty-hero .empty-sub { font-size: 13px; color: var(--text-muted); }
+  /* add-row */
+  .add-row { display: flex; align-items: center; gap: 12px; padding: 14px 16px; border: 1px dashed var(--border-strong); border-radius: 6px; margin-bottom: 8px; cursor: default; transition: border-color 0.15s, background 0.15s; }
+  .add-row:hover { border-color: var(--text); border-style: solid; background: #f8fafc; }
+  .add-row .ico { width: 32px; height: 32px; border-radius: 6px; background: var(--sidebar); display: flex; align-items: center; justify-content: center; font-size: 14px; flex-shrink: 0; color: var(--text-muted); font-weight: 700; }
+  .add-row .body-pad { flex: 1; }
+  .add-row .name { font-size: 13px; font-weight: 600; }
+  .add-row .desc { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+  .add-row .arrow { color: var(--text-muted); font-size: 18px; }
+  hr { border: none; border-top: 1px solid var(--border); margin: 12px 0; }
+</style>
+</head>
+<body>
+
+<h1>TallyKeep — Home page (final)</h1>
+<div class="lede">Final home page reflecting all decisions from the iteration phase. Two states of the same single page: empty (first visit) and populated (regular daily view). See <code>design_decisions.md</code> §4 for the full rationale.</div>
+
+<div class="changelog">
+<strong>Changes from previous version:</strong>
+<ul style="margin:6px 0 0 0; padding-left:20px;">
+  <li><strong>Sats/BTC unit cycle:</strong> click-to-cycle pill instead of segmented toggle (less visual weight)</li>
+  <li><strong>Currency consolidation:</strong> single dropdown, empty = no consolidation. No separate on/off toggle.</li>
+  <li><strong>Performance metrics removed:</strong> no "↑ 1.2% today" — banking-first, not trading-first</li>
+  <li><strong>Empty state simplified:</strong> Getting Started checklist removed. One quiet line + four Add affordances.</li>
+</ul>
+</div>
+
+<div class="group-title">State 1 — Empty (first visit)</div>
+
+<div class="window">
+  <div class="titlebar"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="url">localhost:8080 · TallyKeep · Home</span></div>
+  <div class="body">
+    <nav class="sidebar">
+      <div class="brand">TallyKeep</div>
+      <div class="nav-item active"><span class="nav-icon"></span>Home</div>
+      <div class="nav-item"><span class="nav-icon"></span>Holdings</div>
+      <div class="nav-item"><span class="nav-icon"></span>Send</div>
+      <div class="nav-item"><span class="nav-icon"></span>Receive</div>
+      <div class="nav-item"><span class="nav-icon"></span>Trading</div>
+      <div class="nav-item"><span class="nav-icon"></span>Blueprint</div>
+      <div class="nav-item"><span class="nav-icon"></span>Settings</div>
+      <div class="footer">
+        <div class="lab">Connected to</div>
+        <div>bitcoind · 832,501</div>
+      </div>
+    </nav>
+    <div class="main">
+
+      <div class="unit-controls">
+        <div class="row">
+          <span class="hint">Unit</span>
+          <div class="unit-cycle">sats <span class="arrow">↻</span></div>
+        </div>
+        <div style="flex:1;"></div>
+        <div class="row">
+          <span class="hint">Show fiat in</span>
+          <select class="currency-select">
+            <option value="">Off</option>
+            <option>USD</option>
+            <option>EUR</option>
+            <option>ARS</option>
+            <option>GBP</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="empty-hero">
+        <div class="empty-msg">Your stack, all in one place.</div>
+        <div class="empty-sub">Add somewhere you keep BTC to begin.</div>
+      </div>
+
+      <div>
+        <div class="add-row">
+          <div class="ico">A</div>
+          <div class="body-pad">
+            <div class="name">Account · custodial exchange</div>
+            <div class="desc">Money at Kraken, Bitstamp, Coinbase…</div>
+          </div>
+          <div class="arrow">+</div>
+        </div>
+
+        <div class="add-row">
+          <div class="ico">P</div>
+          <div class="body-pad">
+            <div class="name">Purse · everyday wallet</div>
+            <div class="desc">Like a checking account.</div>
+          </div>
+          <div class="arrow">+</div>
+        </div>
+
+        <div class="add-row">
+          <div class="ico">S</div>
+          <div class="body-pad">
+            <div class="name">Strongbox · hardware wallet</div>
+            <div class="desc">Like a savings account, but you hold the key.</div>
+          </div>
+          <div class="arrow">+</div>
+        </div>
+
+        <div class="add-row">
+          <div class="ico">V</div>
+          <div class="body-pad">
+            <div class="name">Vault · long-term protected</div>
+            <div class="desc">Like a safety-deposit box. <span style="color: var(--amber);">v1: single-key only</span></div>
+          </div>
+          <div class="arrow">+</div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+<div class="label">Empty home — first visit</div>
+<div class="note">Two lines of text and four Add tiles. No checklist, no nudge graphics, no "tutorial." The page wants to be filled — that's the message. Unit and currency controls visible from start so the user knows they exist; currency is "Off" by default.</div>
+
+<div class="group-title">State 2 — Populated, fiat consolidation off (default)</div>
+
+<div class="window">
+  <div class="titlebar"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="url">localhost:8080 · TallyKeep · Home</span></div>
+  <div class="body">
+    <nav class="sidebar">
+      <div class="brand">TallyKeep</div>
+      <div class="nav-item active"><span class="nav-icon"></span>Home</div>
+      <div class="nav-item"><span class="nav-icon"></span>Holdings</div>
+      <div class="nav-item"><span class="nav-icon"></span>Send</div>
+      <div class="nav-item"><span class="nav-icon"></span>Receive</div>
+      <div class="nav-item"><span class="nav-icon"></span>Trading</div>
+      <div class="nav-item"><span class="nav-icon"></span>Blueprint</div>
+      <div class="nav-item"><span class="nav-icon"></span>Settings</div>
+      <div class="footer">
+        <div class="lab">Connected to</div>
+        <div>bitcoind · 832,501</div>
+      </div>
+    </nav>
+    <div class="main">
+
+      <div class="unit-controls">
+        <div class="row">
+          <span class="hint">Unit</span>
+          <div class="unit-cycle">sats <span class="arrow">↻</span></div>
+        </div>
+        <div style="flex:1;"></div>
+        <div class="row">
+          <span class="hint">Show fiat in</span>
+          <select class="currency-select">
+            <option value="" selected>Off</option>
+            <option>USD</option>
+            <option>EUR</option>
+            <option>ARS</option>
+            <option>GBP</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="hero">
+        <div class="balance-block">
+          <div class="label-line">Total balance</div>
+          <div class="amount">52,387,100 <span class="unit-label">sats</span></div>
+          <div class="meta">across 4 places</div>
+        </div>
+        <div class="actions">
+          <button class="btn lg">Receive</button>
+          <button class="btn primary lg">Send</button>
+        </div>
+      </div>
+
+      <div class="card" style="padding: 0; margin-bottom: 16px;">
+        <div style="padding: 12px 16px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border);">
+          <h3 style="margin:0;">Holdings</h3>
+          <button class="btn" style="font-size: 11px;">+ Add</button>
+        </div>
+        <table>
+          <thead>
+            <tr>
+              <th style="padding-left: 16px;">Type</th>
+              <th>Name</th>
+              <th class="num">Balance (sats)</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td style="padding-left: 16px;"><span class="badge gray">Account</span></td>
+              <td>Kraken main <span class="small">· last seen 3m ago</span></td>
+              <td class="num mono">1,905,000</td>
+              <td><span class="ind green"></span> Connected</td>
+            </tr>
+            <tr>
+              <td style="padding-left: 16px;"><span class="badge gray">Purse</span></td>
+              <td>Daily phone wallet</td>
+              <td class="num mono">482,100</td>
+              <td><span class="ind green"></span> OK</td>
+            </tr>
+            <tr>
+              <td style="padding-left: 16px;"><span class="badge gray">Strongbox</span></td>
+              <td>Cold reserve</td>
+              <td class="num mono">30,000,000</td>
+              <td><span class="ind green"></span> OK</td>
+            </tr>
+            <tr>
+              <td style="padding-left: 16px;"><span class="badge gray">Vault</span></td>
+              <td>Long-term holdings</td>
+              <td class="num mono">20,000,000</td>
+              <td><span class="ind amber"></span> 1 discrepancy</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+        <div class="card">
+          <h3>Pending categorization <span class="badge amber" style="margin-left:4px;">2</span></h3>
+          <div style="font-size: 12px; padding: 6px 0; border-bottom: 1px dashed var(--border);">
+            <div class="between">
+              <div>
+                <div class="mono">↓ 150,000 sats</div>
+                <div class="small">2h ago · Cold reserve · suggested: Custodial withdrawal</div>
+              </div>
+              <button class="btn" style="font-size: 11px;">Categorize</button>
+            </div>
+          </div>
+          <div style="font-size: 12px; padding: 6px 0;">
+            <div class="between">
+              <div>
+                <div class="mono">↓ 50,000 sats</div>
+                <div class="small">1d ago · Daily phone wallet</div>
+              </div>
+              <button class="btn" style="font-size: 11px;">Categorize</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h3>Recent activity</h3>
+          <div style="font-size: 12px; padding: 4px 0;">
+            <div class="between"><span class="mono">↓ 150,000</span><span class="small">Kraken withdrawal · 3d</span></div>
+          </div>
+          <div style="font-size: 12px; padding: 4px 0;">
+            <div class="between"><span class="mono">↑ 200,000</span><span class="small">Bike shop · 5d</span></div>
+          </div>
+          <div style="font-size: 12px; padding: 4px 0;">
+            <div class="between"><span class="mono">↓ 5,000,000</span><span class="small">Sweep: Kraken → Cold · 1w</span></div>
+          </div>
+          <div style="margin-top: 8px;"><a class="small" style="color:var(--text-muted);">View all →</a></div>
+        </div>
+      </div>
+
+      <div class="card" style="margin-top: 12px; border-color: var(--amber); background: var(--amber-soft);">
+        <div class="row" style="gap:10px;">
+          <span style="font-size:18px;">⚠</span>
+          <div style="flex:1;">
+            <strong>1 security discrepancy detected.</strong>
+            <span class="small">Long-term holdings (Vault) is declared as 2-of-3 multisig but the descriptor is single-key.</span>
+          </div>
+          <button class="btn">Review</button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+<div class="label">Populated — fiat consolidation off (default)</div>
+<div class="note">Sats only, no fiat anywhere. Hero shows total balance + "across 4 places" — no percentage moves. Holdings table has just sats column. This is what most users see most of the time.</div>
+
+<div class="group-title">State 3 — Populated, fiat consolidation in USD</div>
+
+<div class="window">
+  <div class="titlebar"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="url">localhost:8080 · TallyKeep · Home</span></div>
+  <div class="body">
+    <nav class="sidebar">
+      <div class="brand">TallyKeep</div>
+      <div class="nav-item active"><span class="nav-icon"></span>Home</div>
+      <div class="nav-item"><span class="nav-icon"></span>Holdings</div>
+      <div class="nav-item"><span class="nav-icon"></span>Send</div>
+      <div class="nav-item"><span class="nav-icon"></span>Receive</div>
+      <div class="nav-item"><span class="nav-icon"></span>Trading</div>
+      <div class="nav-item"><span class="nav-icon"></span>Blueprint</div>
+      <div class="nav-item"><span class="nav-icon"></span>Settings</div>
+      <div class="footer">
+        <div class="lab">Connected to</div>
+        <div>bitcoind · 832,501</div>
+      </div>
+    </nav>
+    <div class="main">
+
+      <div class="unit-controls">
+        <div class="row">
+          <span class="hint">Unit</span>
+          <div class="unit-cycle">sats <span class="arrow">↻</span></div>
+        </div>
+        <div style="flex:1;"></div>
+        <div class="row">
+          <span class="hint">Show fiat in</span>
+          <select class="currency-select">
+            <option value="">Off</option>
+            <option selected>USD</option>
+            <option>EUR</option>
+            <option>ARS</option>
+            <option>GBP</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="hero">
+        <div class="balance-block">
+          <div class="label-line">Total balance</div>
+          <div class="amount">52,387,100 <span class="unit-label">sats</span></div>
+          <div class="secondary-amount">≈ $33,427.50 USD</div>
+          <div class="meta">across 4 places</div>
+          <div class="source-line">Rate via Kraken · 2 min ago</div>
+        </div>
+        <div class="actions">
+          <button class="btn lg">Receive</button>
+          <button class="btn primary lg">Send</button>
+        </div>
+      </div>
+
+      <div class="card" style="padding: 0;">
+        <div style="padding: 12px 16px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border);">
+          <h3 style="margin:0;">Holdings</h3>
+          <button class="btn" style="font-size: 11px;">+ Add</button>
+        </div>
+        <table>
+          <thead>
+            <tr>
+              <th style="padding-left: 16px;">Type</th>
+              <th>Name</th>
+              <th class="num">Balance (sats)</th>
+              <th class="num">≈ USD</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td style="padding-left: 16px;"><span class="badge gray">Account</span></td>
+              <td>Kraken main</td>
+              <td class="num mono">1,905,000</td>
+              <td class="num mono">$1,216</td>
+              <td><span class="ind green"></span> Connected</td>
+            </tr>
+            <tr>
+              <td style="padding-left: 16px;"><span class="badge gray">Purse</span></td>
+              <td>Daily phone wallet</td>
+              <td class="num mono">482,100</td>
+              <td class="num mono">$308</td>
+              <td><span class="ind green"></span> OK</td>
+            </tr>
+            <tr>
+              <td style="padding-left: 16px;"><span class="badge gray">Strongbox</span></td>
+              <td>Cold reserve</td>
+              <td class="num mono">30,000,000</td>
+              <td class="num mono">$19,148</td>
+              <td><span class="ind green"></span> OK</td>
+            </tr>
+            <tr>
+              <td style="padding-left: 16px;"><span class="badge gray">Vault</span></td>
+              <td>Long-term holdings</td>
+              <td class="num mono">20,000,000</td>
+              <td class="num mono">$12,756</td>
+              <td><span class="ind amber"></span> 1 discrepancy</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+    </div>
+  </div>
+</div>
+<div class="label">Populated — fiat consolidation in USD</div>
+<div class="note">Same page, USD selected in dropdown. Hero gains a "≈ $33,427.50 USD" subtitle and rate source attribution ("Rate via Kraken · 2 min ago"). Holdings table gains a "≈ USD" column. Selecting another currency from the dropdown would change all fiat displays. Selecting "Off" returns to State 2.</div>
+
+<div class="group-title">Note on the unit cycle pill</div>
+
+<div class="card" style="max-width: 720px; padding: 16px 20px;">
+  <h3 style="margin: 0 0 10px;">How the unit cycle works</h3>
+  <div style="font-size: 13px; color: var(--text); line-height: 1.55;">
+    The <span class="unit-cycle" style="display: inline-flex; vertical-align: middle;">sats <span class="arrow">↻</span></span> pill in the controls bar is a click-to-cycle. It rotates through:
+    <ol style="margin: 8px 0; padding-left: 24px;">
+      <li><strong>sats</strong> (default, native unit)</li>
+      <li><strong>BTC</strong> (decimal Bitcoin)</li>
+      <li><strong>fiat currency</strong> — <em>only available if a currency is selected in the dropdown to the right</em></li>
+    </ol>
+    Each click rotates to the next unit. When fiat is "Off" in the dropdown, the cycle goes sats → BTC → sats. When fiat is set to USD, the cycle goes sats → BTC → USD → sats.
+    <br><br>
+    <span class="small">The fiat <em>consolidation</em> in the hero subtitle and Holdings table is independent of the cycle — it shows whenever a currency is selected, regardless of which unit the user is currently cycling on.</span>
+  </div>
+</div>
+<div class="label">Reference — unit cycle behavior</div>
+<div class="note">Two related but distinct controls. The dropdown turns fiat <em>display</em> on/off. The unit cycle pill chooses which is <em>primary</em>. They cooperate but don't duplicate.</div>
+
+</body>
+</html>

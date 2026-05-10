@@ -70,6 +70,7 @@ def _purse_body(watch_ext: str, watch_chg: str) -> dict:
     return {
         "name": f"Submit test {secrets.token_hex(2)}",
         "purpose": "spending",
+        "seed_origin": "external_watch_only",
         "declared_security": {
             "custody_model": "self_single",
             "signing_model": "software_hot",

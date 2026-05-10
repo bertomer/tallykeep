@@ -1,6 +1,6 @@
 # 05 — Savings Layer
 
-Scope: **watch-only view** over Holdings of type Purse, Strongbox, and Vault. Continuous chain monitoring, UTXO tracking, hygiene flags, and the **declared-vs-observable security analysis** that is one of v1's core differentiators.
+Scope: **watch-only view** over Holdings of type Purse, Strongbox, and Vault. Continuous chain monitoring, UTXO tracking, hygiene flags, and the **declared-vs-observable security analysis** that is one of TallyKeep's core differentiators.
 
 ## Responsibilities
 
@@ -25,13 +25,13 @@ Scope: **watch-only view** over Holdings of type Purse, Strongbox, and Vault. Co
 
 The user provides a BIP 380 output descriptor or a legacy xpub/ypub/zpub which is converted to canonical descriptor form using BDK.
 
-Supported descriptor types in v1:
+Supported descriptor types:
 - `pkh(...)` — legacy P2PKH
 - `sh(wpkh(...))` — nested SegWit
 - `wpkh(...)` — native SegWit
 - `tr(...)` — Taproot, single-key
 
-**Multisig descriptors are deferred to v2.** Even when creating a Vault Holding (which has multisig metadata fields), v1 accepts only single-key descriptors. The Vault metadata is stored for future use; the analyzer surfaces this as a discrepancy. This is acknowledged in the open-questions module.
+**Multisig descriptors are deferred.** Even when creating a Vault Holding (which has multisig metadata fields), the current build accepts only single-key descriptors. The Vault metadata is stored for future use; the analyzer surfaces the discrepancy honestly. The deferred work is captured in `future_iterations.md` as "Multisig descriptor support".
 
 ### Gap limit
 
@@ -90,7 +90,7 @@ When a transaction affects watched addresses, the scanner creates one `ledger_en
 
 The backend computes a `suggested_category` heuristically and writes it to the LedgerEntry. The user always confirms before it is applied to `category`.
 
-Heuristics in v1:
+Heuristics:
 - If counterparty address matches the `whitelist_address` of a CustodialProvider, suggest `CUSTODIAL_WITHDRAWAL` (incoming) or `CUSTODIAL_DEPOSIT` (outgoing)
 - If the LedgerEntry has `direction=INTERNAL`, suggest `INTERNAL_TRANSFER`
 - If a recent PaymentRequest's `broadcast_txid` matches and is not yet linked, link it via `resulting_ledger_entry_id` and suggest the category that PaymentRequest used
@@ -105,7 +105,7 @@ Heuristics in v1:
 6. User opens the entry, sees the suggestion, accepts or overrides.
 7. PATCH on `/api/v1/ledger-entries/{id}` records the user's choice; `categorized_at` is set.
 
-## UTXO hygiene flags (v1)
+## UTXO hygiene flags
 
 Computed at UTXO detection time and recomputed on fee-rate changes (the dust threshold depends on current fees).
 
@@ -154,7 +154,7 @@ Recommendations are advisory, never blocking. The user can dismiss each per-item
 
 ## Declared vs observable security analysis
 
-This is one of v1's core differentiators and the realization of the "shed light on your holdings" principle.
+This is one of TallyKeep's core differentiators and the realization of the "shed light on your holdings" principle.
 
 ### What is computed
 
@@ -175,7 +175,7 @@ ObservableSecurity(
 
 - **inferred_custody_model**: derived from descriptor structure. `pkh()`, `wpkh()`, `tr()` with one key → SELF_SINGLE. `sh(multi(...))`, `wsh(multi(...))`, `tr(multi_a(...))` → SELF_MULTISIG.
 - **inferred_multisig_parameters**: parsed directly from the descriptor when multisig.
-- **inferred_signing_model**: harder to infer purely from chain data. v1 uses these heuristics:
+- **inferred_signing_model**: harder to infer purely from chain data. Current heuristics:
   - If the descriptor has a clear xpub fingerprint matching a known hardware-wallet signing-pattern (Coldcard, Trezor, Ledger usually annotate descriptors), suggest `HARDWARE_OFFLINE`.
   - If recent signing patterns show very fast back-to-back transactions during normal hours, suggest `SOFTWARE_HOT`.
   - Otherwise, leave as `UNKNOWN` rather than guess.
@@ -214,11 +214,11 @@ Clicking opens a list of specific discrepancies with explanatory text. The user 
 
 ## Vault outgoing-payment guardrail
 
-Earlier specs encoded "DEEP_COLD cannot send" as a hardcoded rule on the type. Since SweepPolicy is now generalized and the hardcoded rule was dropped, the corresponding safeguard for Vaults is implemented as a **warning** during PaymentRequest creation:
+The Vault type is the strongest user-held storage tier; outgoing-from-Vault is a deliberate-by-design ceremony, not a routine action. The safeguard for Vaults is implemented as a **warning** during PaymentRequest creation (not a hardcoded type-system block — per the generalized-SweepPolicy / warn-don't-block discipline):
 
-- If the source Holding is a Vault with `purpose=long_term`, the PaymentRequest creation endpoint returns a `confirmation_required` flag along with a clear explanation: "You are composing an outgoing payment from a Vault declared as long-term. This is unusual; confirm you intend this."
+- If the source Holding is a Vault with `purpose=long_term`, the PaymentRequest creation endpoint returns a 200 response with `requires_confirmation=true` and a clear explanation: "You are composing an outgoing payment from a Vault declared as long-term. This is unusual; confirm you intend this." The frontend re-submits the request with explicit acknowledgement to proceed.
 - The frontend renders this as a modal with explicit "yes, I intend this" before proceeding.
-- The policy is configurable via the `banking.vault_outgoing_warns` feature flag (default `true` everywhere except Sovereign profile).
+- The policy is configurable via the `banking.vault_outgoing_warns` feature flag (default `true`; users can disable from Settings if they want to opt out of the warning).
 
 This keeps the safeguard real but moves it out of the type system into the UX policy layer, where the user has the final say.
 
@@ -230,10 +230,14 @@ Logic:
 - Sum confirmed balances across all non-archived Holdings.
 - For Account Holdings, use `last_known_balance_sats` with an "as of {timestamp}" indicator.
 - Break down by holding_type and by purpose.
-- Optionally convert to base currency (v1.1 feature, gated by `display.fiat_conversion.enabled`).
+- Optionally convert to base currency (deferred, gated by `display.fiat_conversion.enabled` — see `future_iterations.md` "Fiat display").
 
 UI contract: the global view always shows the per-Holding breakdown alongside the total. No silent consolidation.
 
-## Open question (deferred to module 13)
+## Fiat display
 
-**Rate source for fiat display.** v1 ships with sats/BTC display only. Fiat conversion is a v1.1 feature gated behind a flag. The rate source is then either: (a) the first connected CustodialProvider's ticker, or (b) a public price feed. Lean is (a) since it adds no third-party dependency.
+Fiat conversion is gated behind the `display.fiat_conversion.enabled`
+flag and is deferred to a future iteration. The rate source is the
+first connected CustodialProvider's ticker (no third-party
+dependency added). See the "Fiat display" entry in
+`future_iterations.md` for the full sketch.

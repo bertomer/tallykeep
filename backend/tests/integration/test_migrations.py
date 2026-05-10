@@ -108,8 +108,8 @@ def test_holding_singleton_check_constraint(clean_test_database: str) -> None:
         with engine.begin() as conn, pytest.raises(sa.exc.IntegrityError):
             conn.exec_driver_sql(
                 """
-                INSERT INTO user_profile (id, preset)
-                VALUES ('00000000-0000-0000-0000-000000000002', 'beginner')
+                INSERT INTO user_profile (id)
+                VALUES ('00000000-0000-0000-0000-000000000002')
                 """
             )
     finally:

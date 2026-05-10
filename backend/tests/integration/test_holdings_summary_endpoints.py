@@ -37,6 +37,7 @@ def _purse_body(*, expression: str | None = None, purpose: str = "spending") -> 
     return {
         "name": f"Summary test {secrets.token_hex(2)}",
         "purpose": purpose,
+        "seed_origin": "external_watch_only",
         "declared_security": {
             "custody_model": "self_single",
             "signing_model": "software_hot",

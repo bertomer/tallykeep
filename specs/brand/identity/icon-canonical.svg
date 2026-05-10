@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" aria-label="TallyKeep">
+  <title>TallyKeep — canonical icon (with grain)</title>
+  <desc>Medieval split tally stick: stock and foil arranged as a Y. Aged Oak wood with grain stripes; carvings (notches and hanging hole) cut through to show cream.</desc>
+  <defs>
+    <clipPath id="tk-stock-clip">
+      <path d="M 168.33 42.19 L 54.27 174.22 L 36.43 139.77 L 54.47 118.86 L 65.07 128.02 L 151.67 27.81 Z"/>
+    </clipPath>
+    <clipPath id="tk-foil-clip">
+      <polygon points="40.68,42.21 79.68,87.21 96.32,72.79 57.32,27.79"/>
+    </clipPath>
+  </defs>
+  <!-- Wood: stock + foil -->
+  <path d="M 168.33 42.19 L 54.27 174.22 L 36.43 139.77 L 54.47 118.86 L 65.07 128.02 L 151.67 27.81 Z" fill="#A88554"/>
+  <polygon points="40.68,42.21 79.68,87.21 96.32,72.79 57.32,27.79" fill="#A88554"/>
+  <!-- Grain stripes -->
+  <g stroke="#6F5638" stroke-width="1.4" stroke-linecap="butt" opacity="0.6">
+    <line x1="163.79" y1="38.27" x2="46.07" y2="174.53" clip-path="url(#tk-stock-clip)"/>
+    <line x1="156.22" y1="31.73" x2="38.50" y2="167.99" clip-path="url(#tk-stock-clip)"/>
+    <line x1="45.22"  y1="38.27" x2="84.52" y2="83.64"  clip-path="url(#tk-foil-clip)"/>
+    <line x1="52.78"  y1="31.73" x2="92.08" y2="77.09"  clip-path="url(#tk-foil-clip)"/>
+  </g>
+  <!-- Carvings: cream cut-throughs to the surface behind -->
+  <circle cx="53.76" cy="147.31" r="2.8" fill="#F4EAD5"/>
+  <polygon points="-3,12 3,12 2,5 -2,5"     fill="#F4EAD5" transform="translate(147 50) rotate(130.82)"/>
+  <polygon points="-4,12 4,12 2,4 -2,4"     fill="#F4EAD5" transform="translate(140 58) rotate(130.82)"/>
+  <polygon points="-3,12 3,12 2,5 -2,5"     fill="#F4EAD5" transform="translate(133 66) rotate(130.82)"/>
+  <polygon points="-3,-12 3,-12 2,-5 -2,-5" fill="#F4EAD5" transform="translate(62 50)  rotate(49.18)"/>
+  <polygon points="-4,-12 4,-12 2,-4 -2,-4" fill="#F4EAD5" transform="translate(69 58)  rotate(49.18)"/>
+  <polygon points="-3,-12 3,-12 2,-5 -2,-5" fill="#F4EAD5" transform="translate(76 66)  rotate(49.18)"/>
+</svg>

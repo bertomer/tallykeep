@@ -1,7 +1,7 @@
 """User profile endpoints (spec module 04 / 09).
 
 GET  /api/v1/profile  → singleton UserProfile
-PATCH /api/v1/profile → partial update
+PATCH /api/v1/profile → partial update (feature_flags, base_currency, locale)
 """
 
 from __future__ import annotations
@@ -34,8 +34,7 @@ async def patch_profile(
     session: Session = Depends(get_db_session),
 ) -> UserProfileResponse:
     if (
-        body.preset is None
-        and body.feature_flags is None
+        body.feature_flags is None
         and body.base_currency is None
         and body.locale is None
     ):
@@ -44,11 +43,10 @@ async def patch_profile(
     try:
         profile = profile_repo.update(
             session,
-            preset=body.preset,
             feature_flags=body.feature_flags,
             base_currency=body.base_currency,
             locale=body.locale,
         )
-    except ValueError as exc:  # domain invariant violation
+    except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     return UserProfileResponse.model_validate(profile)

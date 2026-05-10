@@ -1,0 +1,1581 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>TallyKeep — Mobile (v2 draft)</title>
+<style>
+  :root {
+    --bg: #f8fafc; --surface: #ffffff; --border: #e2e8f0; --border-strong: #cbd5e1;
+    --text: #0f172a; --text-muted: #64748b; --text-dim: #94a3b8; --sidebar: #f1f5f9;
+    --btc: #f59e0b; --btc-soft: #fef3c7;
+    --green: #16a34a; --green-soft: #dcfce7;
+    --amber: #ca8a04; --amber-soft: #fef9c3;
+    --red: #dc2626; --red-soft: #fee2e2;
+    --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  }
+  * { box-sizing: border-box; }
+  body { background: #cbd5e1; margin: 0; padding: 32px; font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; color: var(--text); font-size: 14px; line-height: 1.5; }
+  h1 { font-size: 24px; margin: 0 0 4px; }
+  .lede { color: var(--text-muted); margin-bottom: 24px; max-width: 820px; }
+  .changelog { background: var(--green-soft); border: 1px solid var(--green); border-radius: 8px; padding: 12px 16px; margin-bottom: 24px; max-width: 820px; font-size: 13px; }
+  .changelog strong { color: var(--green); }
+  .group-title { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; color: var(--text-muted); margin: 40px 0 12px; }
+  .group-title:first-of-type { margin-top: 0; }
+  .label { font-size: 13px; font-weight: 600; padding: 8px 4px 0; color: var(--text); }
+  .note { font-size: 12px; color: var(--text-muted); line-height: 1.55; padding-left: 4px; padding-top: 8px; max-width: 380px; }
+  .note strong { color: var(--text); }
+  .small { font-size: 11px; color: var(--text-muted); }
+  .mono { font-family: var(--mono); }
+  .row { display: flex; align-items: center; gap: 8px; }
+  .between { display: flex; align-items: center; justify-content: space-between; }
+
+  /* Phone frame */
+  .phone-row { display: flex; gap: 28px; flex-wrap: wrap; align-items: flex-start; }
+  .phone-cell { display: flex; flex-direction: column; align-items: flex-start; }
+  .phone {
+    width: 380px; height: 780px; background: var(--surface);
+    border: 8px solid #1e293b; border-radius: 36px;
+    box-shadow: 0 12px 28px rgba(15,23,42,0.18);
+    overflow: hidden; position: relative;
+    display: flex; flex-direction: column;
+  }
+  .phone .status-bar {
+    height: 28px; padding: 6px 18px 0;
+    display: flex; align-items: center; justify-content: space-between;
+    font-size: 11px; font-weight: 600; flex-shrink: 0;
+    background: var(--surface);
+  }
+  .phone .status-bar .left { font-variant-numeric: tabular-nums; }
+  .phone .status-bar .right { display: flex; align-items: center; gap: 4px; font-size: 10px; color: var(--text); }
+  .phone .notch {
+    position: absolute; left: 50%; top: 0; transform: translateX(-50%);
+    width: 110px; height: 22px; background: #1e293b; border-radius: 0 0 14px 14px; z-index: 5;
+  }
+  .phone .home-indicator {
+    position: absolute; bottom: 6px; left: 50%; transform: translateX(-50%);
+    width: 120px; height: 4px; background: #1e293b; border-radius: 999px; opacity: 0.35;
+  }
+  .phone .screen {
+    flex: 1; display: flex; flex-direction: column;
+    background: var(--bg); overflow: hidden;
+  }
+
+  /* Top bar */
+  .pbar {
+    padding: 10px 16px 8px; display: flex; align-items: center; justify-content: space-between;
+    background: var(--surface); border-bottom: 1px solid var(--border); flex-shrink: 0;
+  }
+  .pbar .title { font-size: 15px; font-weight: 600; }
+  .pbar .ico-btn { width: 32px; height: 32px; border-radius: 8px; background: var(--sidebar); display: flex; align-items: center; justify-content: center; font-size: 14px; color: var(--text-muted); }
+  .pbar .back { font-size: 18px; color: var(--text-muted); width: 28px; }
+
+  /* Bottom nav */
+  .pnav {
+    flex-shrink: 0; height: 64px;
+    border-top: 1px solid var(--border); background: var(--surface);
+    display: grid; grid-template-columns: repeat(4, 1fr);
+    padding-bottom: 14px;
+  }
+  .pnav-item {
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 3px; font-size: 10px; color: var(--text-dim); padding-top: 8px;
+  }
+  .pnav-item.active { color: var(--text); font-weight: 600; }
+  .pnav-ico { width: 22px; height: 22px; border-radius: 5px; background: var(--border); }
+  .pnav-item.active .pnav-ico { background: var(--btc); }
+
+  /* Scroll content */
+  .pcontent { flex: 1; overflow: auto; padding: 16px; }
+  .pcontent.flush { padding: 0; }
+  .pcontent.center { display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 32px 24px; text-align: center; }
+
+  /* Buttons */
+  .btn { padding: 10px 16px; font-size: 14px; font-weight: 500; border-radius: 8px; border: 1px solid var(--border-strong); background: var(--surface); color: var(--text); cursor: default; }
+  .btn.primary { background: var(--text); color: var(--surface); border-color: var(--text); }
+  .btn.full { width: 100%; padding: 14px 16px; font-size: 15px; font-weight: 600; }
+  .btn.ghost { border-color: transparent; background: transparent; color: var(--text-muted); }
+  .btn.tonal { background: var(--sidebar); border-color: var(--border); }
+  .btn[disabled], .btn.disabled { opacity: 0.55; }
+
+  /* HERO — new pattern, unit cycle inline */
+  .hero { padding: 22px 16px 14px; background: var(--surface); border-bottom: 1px solid var(--border); }
+  .hero .label-line { font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 6px; }
+  .hero .amount-line { display: flex; align-items: baseline; gap: 6px; flex-wrap: wrap; }
+  .hero .amount { font-family: var(--mono); font-size: 30px; font-weight: 600; line-height: 1.1; color: var(--text); }
+  .hero .unit-cycle-inline {
+    display: inline-flex; align-items: baseline; gap: 4px;
+    color: var(--text-muted); font-size: 16px; font-weight: 500;
+    padding: 2px 6px; border-radius: 6px;
+    background: var(--sidebar); border: 1px solid var(--border);
+    cursor: default;
+  }
+  .hero .unit-cycle-inline .arrow { font-size: 11px; color: var(--text-dim); }
+  .hero .meta-line { font-size: 11px; color: var(--text-muted); margin-top: 6px; }
+  .hero .fiat-line {
+    margin-top: 10px;
+    padding: 6px 0;
+    border-top: 1px dashed var(--border);
+    font-family: var(--mono); font-size: 13px; color: var(--text-muted);
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .hero .fiat-line .chev { color: var(--text-dim); font-size: 11px; }
+  .hero .fiat-source { font-family: ui-sans-serif, system-ui, sans-serif; font-size: 10px; color: var(--text-dim); margin-top: 1px; }
+  .hero .show-fiat-link {
+    margin-top: 8px; font-size: 11px; color: var(--text-dim);
+    display: inline-flex; align-items: center; gap: 4px;
+  }
+
+  /* Action row */
+  .action-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; padding: 12px 16px 16px; }
+  .action-btn {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
+    padding: 12px 8px; display: flex; align-items: center; justify-content: center; gap: 6px;
+    font-size: 14px; font-weight: 600;
+  }
+  .action-btn.primary { background: var(--text); color: var(--surface); border-color: var(--text); }
+  .action-btn.disabled { background: var(--sidebar); color: var(--text-muted); }
+
+  /* Holdings list */
+  .section-head { padding: 4px 16px 8px; display: flex; justify-content: space-between; align-items: center; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); }
+  .section-head a { color: var(--text-dim); font-size: 11px; font-weight: 500; text-transform: none; letter-spacing: 0; }
+  .list-card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; margin: 0 16px 12px; overflow: hidden; }
+  .list-row { padding: 12px 14px; display: flex; align-items: center; gap: 12px; border-bottom: 1px solid var(--border); }
+  .list-row:last-child { border-bottom: none; }
+  .type-ico { width: 36px; height: 36px; border-radius: 8px; background: var(--sidebar); display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 700; color: var(--text-muted); flex-shrink: 0; border: 1px solid var(--border); }
+  .type-ico.account { background: #ede9fe; color: #6d28d9; border-color: #ddd6fe; }
+  .type-ico.purse { background: #dbeafe; color: #1d4ed8; border-color: #bfdbfe; }
+  .type-ico.strongbox { background: var(--green-soft); color: var(--green); border-color: #bbf7d0; }
+  .type-ico.vault { background: #fee2e2; color: var(--red); border-color: #fecaca; }
+  .list-row .body-pad { flex: 1; min-width: 0; }
+  .list-row .name { font-size: 14px; font-weight: 600; color: var(--text); }
+  .list-row .sub { font-size: 11px; color: var(--text-muted); margin-top: 1px; display: flex; align-items: center; gap: 4px; }
+  .list-row .num-block { text-align: right; font-variant-numeric: tabular-nums; }
+  .list-row .balance { font-family: var(--mono); font-size: 13px; font-weight: 600; }
+  .list-row .balance-fiat { font-family: var(--mono); font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+  .badge { display: inline-block; font-size: 9px; padding: 1px 5px; border-radius: 3px; font-weight: 600; vertical-align: middle; text-transform: uppercase; letter-spacing: 0.04em; }
+  .badge.gray { background: var(--border); color: var(--text-muted); }
+  .badge.amber { background: var(--amber-soft); color: var(--amber); }
+  .badge.green { background: var(--green-soft); color: var(--green); }
+  .badge.red { background: var(--red-soft); color: var(--red); }
+  .badge.blue { background: #dbeafe; color: #1d4ed8; }
+  .ind { display: inline-block; width: 6px; height: 6px; border-radius: 50%; }
+  .ind.green { background: var(--green); }
+  .ind.amber { background: var(--amber); }
+  .ind.red { background: var(--red); }
+
+  /* Activity rows */
+  .activity-row { padding: 12px 14px; display: flex; align-items: center; gap: 12px; border-bottom: 1px solid var(--border); }
+  .activity-row:last-child { border-bottom: none; }
+  .activity-ico { width: 32px; height: 32px; border-radius: 50%; background: var(--sidebar); display: flex; align-items: center; justify-content: center; font-size: 13px; flex-shrink: 0; }
+  .activity-ico.in { background: var(--green-soft); color: var(--green); }
+  .activity-ico.out { background: var(--sidebar); color: var(--text); }
+
+  /* Form fields */
+  .field { padding: 14px 16px; border-bottom: 1px solid var(--border); background: var(--surface); }
+  .field-label { font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 4px; font-weight: 600; }
+  .field-input { width: 100%; padding: 6px 0; font-size: 16px; border: none; outline: none; font-family: var(--mono); }
+  .field-helper { font-size: 11px; color: var(--text-muted); margin-top: 4px; }
+  .field-row { display: flex; align-items: center; gap: 8px; padding: 14px 16px; border-bottom: 1px solid var(--border); background: var(--surface); }
+  .field-row:last-child { border-bottom: none; }
+  .field-row .k { font-size: 13px; color: var(--text-muted); flex: 1; }
+  .field-row .v { font-size: 14px; font-weight: 500; }
+
+  /* Banner */
+  .banner { margin: 12px 16px; padding: 12px; border-radius: 8px; font-size: 12px; line-height: 1.5; }
+  .banner.amber { background: var(--amber-soft); border: 1px solid var(--amber); color: #78350f; }
+  .banner.amber strong { color: var(--amber); }
+  .banner.gray { background: var(--sidebar); border: 1px solid var(--border); color: var(--text-muted); }
+  .banner.green { background: var(--green-soft); border: 1px solid var(--green); color: #065f46; }
+  .banner.green strong { color: var(--green); }
+
+  /* Sheet */
+  .sheet-overlay { position: absolute; inset: 0; background: rgba(15,23,42,0.45); display: flex; align-items: flex-end; justify-content: center; z-index: 10; }
+  .sheet { width: 100%; background: var(--surface); border-radius: 18px 18px 0 0; padding: 8px 0 24px; max-height: 78%; display: flex; flex-direction: column; }
+  .sheet-grab { width: 36px; height: 4px; background: var(--border-strong); border-radius: 999px; margin: 6px auto 14px; }
+  .sheet-title { font-size: 15px; font-weight: 600; padding: 0 18px 12px; }
+  .sheet-row { padding: 14px 18px; display: flex; align-items: center; gap: 12px; border-top: 1px solid var(--border); cursor: default; }
+  .sheet-row.disabled { opacity: 0.55; }
+  .sheet-row .body-pad { flex: 1; }
+  .sheet-row .row-name { font-size: 14px; font-weight: 600; }
+  .sheet-row .row-sub { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+
+  /* QR */
+  .qr {
+    width: 220px; height: 220px;
+    background: repeating-linear-gradient(0deg, #0f172a 0 6px, transparent 6px 12px),
+                repeating-linear-gradient(90deg, #0f172a 0 6px, transparent 6px 12px);
+    background-color: #fff; border: 8px solid #fff; outline: 1px solid var(--border);
+    margin: 0 auto;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .qr-inner { width: 50px; height: 50px; background: #fff; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 22px; color: var(--btc); }
+
+  /* Camera */
+  .camera { width: 280px; height: 280px; background: #0f172a; margin: 0 auto; position: relative; border-radius: 12px; display: flex; align-items: center; justify-content: center; }
+  .camera::before { content: ''; position: absolute; inset: 24px; border: 2px solid rgba(255,255,255,0.55); border-radius: 8px; }
+  .camera .scan-text { color: rgba(255,255,255,0.6); font-size: 11px; position: absolute; bottom: 12px; }
+
+  /* Bio prompt */
+  .bio-circle { width: 84px; height: 84px; border-radius: 50%; border: 3px solid var(--text); margin: 24px auto 16px; display: flex; align-items: center; justify-content: center; font-size: 36px; }
+
+  /* Toggle */
+  .toggle { width: 38px; height: 22px; border-radius: 999px; background: var(--text); position: relative; flex-shrink: 0; }
+  .toggle::after { content: ''; position: absolute; right: 2px; top: 2px; width: 18px; height: 18px; border-radius: 50%; background: #fff; }
+  .toggle.off { background: var(--border-strong); }
+  .toggle.off::after { left: 2px; right: auto; }
+
+  /* Wizard step indicator */
+  .steps { display: flex; gap: 4px; padding: 12px 16px; background: var(--surface); border-bottom: 1px solid var(--border); }
+  .step-bar { flex: 1; height: 3px; background: var(--border); border-radius: 999px; }
+  .step-bar.done { background: var(--text); }
+  .step-bar.active { background: var(--btc); }
+
+  /* Promise table */
+  .promise-table { width: 100%; max-width: 820px; border-collapse: collapse; font-size: 13px; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+  .promise-table th { text-align: left; padding: 10px 14px; background: var(--sidebar); font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); border-bottom: 1px solid var(--border); }
+  .promise-table td { padding: 10px 14px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  .promise-table tr:last-child td { border-bottom: none; }
+
+  hr { border: none; border-top: 1px solid var(--border); margin: 12px 0; }
+</style>
+</head>
+<body>
+
+<h1>TallyKeep — Mobile (v2 draft)</h1>
+<div class="lede">Second mobile pass. Reflects the form-factor decision documented in <code>mobile_form_factor_decision.md</code>: Capacitor wrapper from v1, mobile is a real product (not a companion), spending keys live in Keychain/Keystore. Compared to v1 the header is cleaner, mobile can add Holdings on its own, and Strongbox messaging is softer.</div>
+
+<div class="changelog">
+<strong>Changes from v1:</strong>
+<ul style="margin:6px 0 0 0; padding-left:20px;">
+  <li><strong>Header simplified.</strong> Unit cycle moved next to the balance amount as a small ⇄ pill. Standalone unit-controls bar removed. Currency picker moved to a tappable secondary line under the balance (and More → Display).</li>
+  <li><strong>Empty state inverted.</strong> "Add an Account or Purse from this phone" instead of "go to your desktop". Mobile now owns Holding creation for non-ceremonial types.</li>
+  <li><strong>Strongbox softened.</strong> Send still defers to desktop in v1, but message acknowledges v1.x QR-PSBT path is on the way.</li>
+  <li><strong>Settings shows secure storage truth.</strong> "Spending keys: stored in iOS Keychain, biometric-protected" — concrete, not vague.</li>
+  <li><strong>New: Add Holding screens.</strong> Picker + Purse-add wizard step demonstrate the new mobile-can-add posture.</li>
+</ul>
+</div>
+
+<!-- ==================================================== -->
+<!-- GROUP A — Pairing / Unlock                           -->
+<!-- ==================================================== -->
+
+<div class="group-title">A — First launch &amp; daily unlock</div>
+
+<div class="phone-row">
+
+  <!-- A1 First launch -->
+  <div class="phone-cell">
+    <div class="phone">
+      <div class="notch"></div>
+      <div class="status-bar"><span class="left">9:41</span><span class="right">●●●● 5G ▮▮▮</span></div>
+      <div class="screen">
+        <div class="pcontent center">
+          <div style="width: 64px; height: 64px; background: var(--btc); border-radius: 14px; display: flex; align-items: center; justify-content: center; color: white; font-size: 32px; font-weight: 700; margin-bottom: 18px;">₿</div>
+          <h2 style="font-size: 22px; margin: 0 0 6px; font-weight: 600;">TallyKeep</h2>
+          <div style="font-size: 12px; color: var(--text-muted); margin-bottom: 20px;">
+            Secure mobile app · keys protected by your device
+          </div>
+          <div style="font-size: 13px; color: var(--text-muted); margin-bottom: 30px; line-height: 1.55; max-width: 280px;">
+            To begin, sign in to your hosted TallyKeep or pair with one you self-host.
+          </div>
+
+          <button class="btn primary full" style="margin-bottom: 10px; max-width: 280px;">Sign in to hosted TallyKeep</button>
+          <button class="btn full" style="margin-bottom: 10px; max-width: 280px;">Pair with my self-hosted TallyKeep</button>
+          <button class="btn ghost" style="font-size: 12px;">I haven't set one up yet →</button>
+
+          <div style="position: absolute; bottom: 28px; left: 24px; right: 24px; font-size: 10px; color: var(--text-dim); text-align: center; line-height: 1.4;">
+            Spending keys generated on this device live in your phone's secure storage. They never leave the device unencrypted.
+          </div>
+        </div>
+      </div>
+      <div class="home-indicator"></div>
+    </div>
+    <div class="label">A1 — First launch</div>
+    <div class="note">Two paths reflecting hosted vs self-hosted deployment. The "secure mobile app" framing at the top and the bottom-of-screen disclosure communicate the Keychain/Keystore commitment without jargon. The TallyKeep logo carries the implicit "this is the real app" signal — distinct from the PWA-in-browser fallback at <code>tallykeep.app</code>.</div>
+  </div>
+
+  <!-- A2 Pair self-hosted -->
+  <div class="phone-cell">
+    <div class="phone">
+      <div class="notch"></div>
+      <div class="status-bar"><span class="left">9:41</span><span class="right">●●●● 5G ▮▮▮</span></div>
+      <div class="screen">
+        <div class="pbar">
+          <div class="back">←</div>
+          <div class="title">Pair with desktop</div>
+          <div style="width: 28px;"></div>
+        </div>
+        <div class="pcontent" style="padding: 16px;">
+          <div style="font-size: 13px; color: var(--text-muted); margin-bottom: 16px; line-height: 1.55;">
+            On your desktop, open TallyKeep → <strong>Settings → Paired devices → Add phone</strong>. A QR will appear.
+          </div>
+          <div class="camera"><div class="scan-text">Point at the QR on your desktop</div></div>
+          <div style="font-size: 11px; color: var(--text-muted); text-align: center; margin-top: 16px; line-height: 1.5;">
+            Phone and desktop must be on the same Wi-Fi for v1.<br>
+            Off-network pairing comes with v2 (WireGuard / Tailscale).
+          </div>
+          <hr>
+          <button class="btn tonal full" style="font-size: 13px;">Enter pairing code manually</button>
+        </div>
+      </div>
+      <div class="home-indicator"></div>
+    </div>
+    <div class="label">A2 — Pair self-hosted</div>
+    <div class="note">v1 limitation surfaced inline. Pairing handshake establishes a long-lived bearer token tied to this device's Keychain entry; revocable from desktop's Paired devices list. Hosted-tier path goes through "Sign in" → email/passphrase → device registration with biometric attestation.</div>
+  </div>
+
+  <!-- A3 Daily unlock -->
+  <div class="phone-cell">
+    <div class="phone">
+      <div class="notch"></div>
+      <div class="status-bar"><span class="left">9:41</span><span class="right">●●●● 5G ▮▮▮</span></div>
+      <div class="screen">
+        <div class="pcontent center">
+          <div style="width: 56px; height: 56px; background: var(--btc); border-radius: 12px; display: flex; align-items: center; justify-content: center; color: white; font-size: 26px; font-weight: 700; margin-bottom: 18px;">₿</div>
+          <div style="font-size: 14px; color: var(--text-muted); margin-bottom: 4px;">TallyKeep</div>
+          <div style="font-size: 16px; font-weight: 600; margin-bottom: 32px;">Welcome back</div>
+
+          <div class="bio-circle">⊙</div>
+          <div style="font-size: 13px; color: var(--text); font-weight: 500; margin-bottom: 4px;">Use Face ID</div>
+          <div style="font-size: 11px; color: var(--text-muted); margin-bottom: 32px;">Look at your phone to unlock</div>
+
+          <button class="btn ghost" style="font-size: 12px;">Use passphrase instead</button>
+
+          <div style="position: absolute; bottom: 28px; left: 0; right: 0; text-align: center;">
+            <div class="row" style="justify-content: center; font-size: 11px; color: var(--text-muted);">
+              <span class="ind green"></span> Connected · 832,501
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="home-indicator"></div>
+    </div>
+    <div class="label">A3 — Daily unlock</div>
+    <div class="note">Face ID gates unlock of the connection token AND the spending key. Same biometric, two scoped uses. Passphrase is the recovery anchor.</div>
+  </div>
+
+</div>
+
+<!-- ==================================================== -->
+<!-- GROUP B — Home                                       -->
+<!-- ==================================================== -->
+
+<div class="group-title">B — Home (the daily surface)</div>
+
+<div class="phone-row">
+
+  <!-- B1 Home, sats only -->
+  <div class="phone-cell">
+    <div class="phone">
+      <div class="notch"></div>
+      <div class="status-bar"><span class="left">9:41</span><span class="right">●●●● 5G ▮▮▮</span></div>
+      <div class="screen">
+        <div class="pbar">
+          <div class="title">TallyKeep</div>
+          <div class="ico-btn">⌕</div>
+        </div>
+
+        <div class="pcontent flush">
+          <div class="hero">
+            <div class="label-line">Total balance</div>
+            <div class="amount-line">
+              <div class="amount">52,387,100</div>
+              <div class="unit-cycle-inline">sats <span class="arrow">⇄</span></div>
+            </div>
+            <div class="meta-line">across 4 places</div>
+            <div class="show-fiat-link">Show as fiat →</div>
+          </div>
+
+          <div class="action-row">
+            <button class="action-btn">Receive</button>
+            <button class="action-btn primary">Send</button>
+          </div>
+
+          <div class="section-head">Holdings <a>+ Add</a></div>
+          <div class="list-card">
+            <div class="list-row">
+              <div class="type-ico account">A</div>
+              <div class="body-pad">
+                <div class="name">Kraken main</div>
+                <div class="sub"><span class="badge gray">Account</span><span class="ind green"></span> Connected</div>
+              </div>
+              <div class="num-block"><div class="balance">1,905,000</div></div>
+            </div>
+            <div class="list-row">
+              <div class="type-ico purse">P</div>
+              <div class="body-pad">
+                <div class="name">Daily phone wallet</div>
+                <div class="sub"><span class="badge gray">Purse</span><span class="ind green"></span> OK</div>
+              </div>
+              <div class="num-block"><div class="balance">482,100</div></div>
+            </div>
+            <div class="list-row">
+              <div class="type-ico strongbox">S</div>
+              <div class="body-pad">
+                <div class="name">Cold reserve</div>
+                <div class="sub"><span class="badge gray">Strongbox</span><span class="ind green"></span> OK</div>
+              </div>
+              <div class="num-block"><div class="balance">30,000,000</div></div>
+            </div>
+            <div class="list-row">
+              <div class="type-ico vault">V</div>
+              <div class="body-pad">
+                <div class="name">Long-term holdings</div>
+                <div class="sub"><span class="badge gray">Vault</span><span class="ind amber"></span> 1 issue</div>
+              </div>
+              <div class="num-block"><div class="balance">20,000,000</div></div>
+            </div>
+          </div>
+
+          <div class="section-head" style="margin-top: 4px;">Pending <span class="badge amber" style="margin-left: 4px;">2</span></div>
+          <div class="list-card">
+            <div class="list-row">
+              <div class="activity-ico in">↓</div>
+              <div class="body-pad">
+                <div class="name mono" style="font-family: var(--mono); font-size: 13px;">+150,000 sats</div>
+                <div class="sub">Cold reserve · suggested: Custodial withdrawal</div>
+              </div>
+              <button class="btn" style="font-size: 11px; padding: 5px 10px;">Tag</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="pnav">
+          <div class="pnav-item active"><div class="pnav-ico"></div>Home</div>
+          <div class="pnav-item"><div class="pnav-ico"></div>Activity</div>
+          <div class="pnav-item"><div class="pnav-ico"></div>Holdings</div>
+          <div class="pnav-item"><div class="pnav-ico"></div>More</div>
+        </div>
+      </div>
+      <div class="home-indicator"></div>
+    </div>
+    <div class="label">B1 — Home, sats only (default)</div>
+    <div class="note">Header gone. The unit pill <strong>sats ⇄</strong> sits inline with the balance amount — tap cycles sats → BTC → (if fiat configured) fiat → sats. "Show as fiat →" is a small gray opt-in for first-time fiat enablement; tapping opens the currency picker sheet. No always-visible chrome competing with the balance.</div>
+  </div>
+
+  <!-- B2 Home, fiat in ARS -->
+  <div class="phone-cell">
+    <div class="phone">
+      <div class="notch"></div>
+      <div class="status-bar"><span class="left">9:41</span><span class="right">●●●● 5G ▮▮▮</span></div>
+      <div class="screen">
+        <div class="pbar">
+          <div class="title">TallyKeep</div>
+          <div class="ico-btn">⌕</div>
+        </div>
+
+        <div class="pcontent flush">
+          <div class="hero">
+            <div class="label-line">Total balance</div>
+            <div class="amount-line">
+              <div class="amount">52,387,100</div>
+              <div class="unit-cycle-inline">sats <span class="arrow">⇄</span></div>
+            </div>
+            <div class="meta-line">across 4 places</div>
+            <div class="fiat-line">
+              <div>
+                <div>≈ AR$ 38,420,500</div>
+                <div class="fiat-source">Rate via Kraken · 2 min ago</div>
+              </div>
+              <div class="chev">ARS ▾</div>
+            </div>
+          </div>
+
+          <div class="action-row">
+            <button class="action-btn">Receive</button>
+            <button class="action-btn primary">Send</button>
+          </div>
+
+          <div class="section-head">Holdings <a>+ Add</a></div>
+          <div class="list-card">
+            <div class="list-row">
+              <div class="type-ico account">A</div>
+              <div class="body-pad">
+                <div class="name">Kraken main</div>
+                <div class="sub"><span class="badge gray">Account</span><span class="ind green"></span> Connected</div>
+              </div>
+              <div class="num-block"><div class="balance">1,905,000</div><div class="balance-fiat">AR$ 1,397,200</div></div>
+            </div>
+            <div class="list-row">
+              <div class="type-ico purse">P</div>
+              <div class="body-pad">
+                <div class="name">Daily phone wallet</div>
+                <div class="sub"><span class="badge gray">Purse</span><span class="ind green"></span> OK</div>
+              </div>
+              <div class="num-block"><div class="balance">482,100</div><div class="balance-fiat">AR$ 353,600</div></div>
+            </div>
+            <div class="list-row">
+              <div class="type-ico strongbox">S</div>
+              <div class="body-pad">
+                <div class="name">Cold reserve</div>
+                <div class="sub"><span class="badge gray">Strongbox</span><span class="ind green"></span> OK</div>
+              </div>
+              <div class="num-block"><div class="balance">30,000,000</div><div class="balance-fiat">AR$ 22,005,000</div></div>
+            </div>
+            <div class="list-row">
+              <div class="type-ico vault">V</div>
+              <div class="body-pad">
+                <div class="name">Long-term holdings</div>
+                <div class="sub"><span class="badge gray">Vault</span><span class="ind amber"></span> 1 issue</div>
+              </div>
+              <div class="num-block"><div class="balance">20,000,000</div><div class="balance-fiat">AR$ 14,664,700</div></div>
+            </div>
+          </div>
+
+          <div class="banner amber">
+            <strong>1 security issue.</strong> Long-term holdings declared as 2-of-3 multisig but the descriptor is single-key. <a style="color: var(--amber); font-weight: 600;">Review →</a>
+          </div>
+        </div>
+
+        <div class="pnav">
+          <div class="pnav-item active"><div class="pnav-ico"></div>Home</div>
+          <div class="pnav-item"><div class="pnav-ico"></div>Activity</div>
+          <div class="pnav-item"><div class="pnav-ico"></div>Holdings</div>
+          <div class="pnav-item"><div class="pnav-ico"></div>More</div>
+        </div>
+      </div>
+      <div class="home-indicator"></div>
+    </div>
+    <div class="label">B2 — Home, fiat in ARS</div>
+    <div class="note">Fiat consolidation is now a tappable line under the balance instead of a header dropdown. The "ARS ▾" affordance on the right opens the currency-picker sheet. Source attribution stays inline. The discrepancy banner is preserved for the §10 declared-vs-observable promise.</div>
+  </div>
+
+  <!-- B3 Home empty (paired but no Holdings) -->
+  <div class="phone-cell">
+    <div class="phone">
+      <div class="notch"></div>
+      <div class="status-bar"><span class="left">9:41</span><span class="right">●●●● 5G ▮▮▮</span></div>
+      <div class="screen">
+        <div class="pbar">
+          <div class="title">TallyKeep</div>
+          <div class="ico-btn">⌕</div>
+        </div>
+
+        <div class="pcontent flush">
+          <div class="hero" style="text-align: center; padding-top: 28px; padding-bottom: 20px;">
+            <div style="font-size: 16px; font-weight: 500; color: var(--text); margin-bottom: 6px;">Your stack, all in one place.</div>
+            <div style="font-size: 13px; color: var(--text-muted);">Add somewhere you keep BTC to begin.</div>
+          </div>
+
+          <div style="padding: 16px;">
+            <div style="font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 8px;">Add a Holding</div>
+            <div class="list-card" style="margin: 0 0 12px;">
+              <div class="list-row">
+                <div class="type-ico account">A</div>
+                <div class="body-pad">
+                  <div class="name">Account</div>
+                  <div class="sub">Money at Kraken, Bitstamp, etc.</div>
+                </div>
+                <div style="color: var(--text-muted);">+</div>
+              </div>
+              <div class="list-row">
+                <div class="type-ico purse">P</div>
+                <div class="body-pad">
+                  <div class="name">Purse</div>
+                  <div class="sub">Everyday wallet · keys here on this phone</div>
+                </div>
+                <div style="color: var(--text-muted);">+</div>
+              </div>
+              <div class="list-row">
+                <div class="type-ico strongbox">S</div>
+                <div class="body-pad">
+                  <div class="name">Strongbox</div>
+                  <div class="sub">Hardware wallet · scan its QR export</div>
+                </div>
+                <div style="color: var(--text-muted);">+</div>
+              </div>
+              <div class="list-row" style="opacity: 0.55;">
+                <div class="type-ico vault">V</div>
+                <div class="body-pad">
+                  <div class="name">Vault</div>
+                  <div class="sub">Multisig · set up on desktop</div>
+                </div>
+                <div style="color: var(--text-dim); font-size: 11px;">desktop</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="pnav">
+          <div class="pnav-item active"><div class="pnav-ico"></div>Home</div>
+          <div class="pnav-item"><div class="pnav-ico"></div>Activity</div>
+          <div class="pnav-item"><div class="pnav-ico"></div>Holdings</div>
+          <div class="pnav-item"><div class="pnav-ico"></div>More</div>
+        </div>
+      </div>
+      <div class="home-indicator"></div>
+    </div>
+    <div class="label">B3 — Home, empty</div>
+    <div class="note">Inverted from v1. Mobile now invites Holding creation directly. Account, Purse, Strongbox available from phone. Only Vault (multisig ceremony) defers to desktop — labelled as such, not just disabled. This is the LatAm phone-only user's first real screen after pairing/login.</div>
+  </div>
+
+</div>
+
+<!-- ==================================================== -->
+<!-- GROUP C — Holding detail                             -->
+<!-- ==================================================== -->
+
+<div class="group-title">C — Holding detail</div>
+
+<div class="phone-row">
+
+  <!-- C1 Purse detail -->
+  <div class="phone-cell">
+    <div class="phone">
+      <div class="notch"></div>
+      <div class="status-bar"><span class="left">9:41</span><span class="right">●●●● 5G ▮▮▮</span></div>
+      <div class="screen">
+        <div class="pbar">
+          <div class="back">←</div>
+          <div class="title">Daily phone wallet</div>
+          <div class="ico-btn">⋯</div>
+        </div>
+
+        <div class="pcontent flush">
+          <div class="hero">
+            <div class="row" style="margin-bottom: 8px;">
+              <div class="type-ico purse">P</div>
+              <div>
+                <div style="font-size: 13px; color: var(--text-muted);">Like a checking account</div>
+                <div class="row" style="font-size: 11px; color: var(--text-muted);"><span class="badge gray">Purse</span><span class="ind green"></span> OK</div>
+              </div>
+            </div>
+            <div class="amount-line" style="margin-top: 12px;">
+              <div class="amount">482,100</div>
+              <div class="unit-cycle-inline">sats <span class="arrow">⇄</span></div>
+            </div>
+            <div class="fiat-line">
+              <div>≈ AR$ 353,600</div>
+              <div class="chev">ARS ▾</div>
+            </div>
+          </div>
+
+          <div class="action-row">
+            <button class="action-btn">Receive</button>
+            <button class="action-btn primary">Send</button>
+          </div>
+
+          <div class="section-head">About this holding</div>
+          <div class="list-card">
+            <div class="field-row"><span class="k">Type</span><span class="v">Purse</span></div>
+            <div class="field-row"><span class="k">Signing</span><span class="v">This phone · biometric</span></div>
+            <div class="field-row"><span class="k">Lightning</span><span class="v"><span class="badge amber">v1.5</span></span></div>
+            <div class="field-row"><span class="k">Address gap</span><span class="v">3 / 20</span></div>
+          </div>
+
+          <div class="section-head">Recent activity</div>
+          <div class="list-card">
+            <div class="activity-row">
+              <div class="activity-ico out">↑</div>
+              <div class="body-pad">
+                <div style="font-size: 13px; font-weight: 500;">Bike shop</div>
+                <div class="sub">5 days ago · on-chain</div>
+              </div>
+              <div class="num-block">
+                <div class="balance">−200,000</div>
+                <div class="balance-fiat">−AR$ 146,600</div>
+              </div>
+            </div>
+            <div class="activity-row">
+              <div class="activity-ico in">↓</div>
+              <div class="body-pad">
+                <div style="font-size: 13px; font-weight: 500;">From Kraken main</div>
+                <div class="sub">12 days ago · sweep</div>
+              </div>
+              <div class="num-block">
+                <div class="balance">+682,100</div>
+                <div class="balance-fiat">+AR$ 500,200</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="pnav">
+          <div class="pnav-item"><div class="pnav-ico"></div>Home</div>
+          <div class="pnav-item"><div class="pnav-ico"></div>Activity</div>
+          <div class="pnav-item active"><div class="pnav-ico"></div>Holdings</div>
+          <div class="pnav-item"><div class="pnav-ico"></div>More</div>
+        </div>
+      </div>
+      <div class="home-indicator"></div>
+    </div>
+    <div class="label">C1 — Purse detail</div>
+    <div class="note">"Signing: This phone · biometric" — concrete answer to the question "where do my keys live?". Lightning v1.5 stub preserved. Header pattern reused throughout: amount + inline unit pill + tappable fiat secondary line.</div>
+  </div>
+
+  <!-- C2 Strongbox detail -->
+  <div class="phone-cell">
+    <div class="phone">
+      <div class="notch"></div>
+      <div class="status-bar"><span class="left">9:41</span><span class="right">●●●● 5G ▮▮▮</span></div>
+      <div class="screen">
+        <div class="pbar">
+          <div class="back">←</div>
+          <div class="title">Cold reserve</div>
+          <div class="ico-btn">⋯</div>
+        </div>
+
+        <div class="pcontent flush">
+          <div class="hero">
+            <div class="row" style="margin-bottom: 8px;">
+              <div class="type-ico strongbox">S</div>
+              <div>
+                <div style="font-size: 13px; color: var(--text-muted);">Like a savings account, you hold the key</div>
+                <div class="row" style="font-size: 11px; color: var(--text-muted);"><span class="badge gray">Strongbox</span><span class="ind green"></span> OK</div>
+              </div>
+            </div>
+            <div class="amount-line" style="margin-top: 12px;">
+              <div class="amount">30,000,000</div>
+              <div class="unit-cycle-inline">sats <span class="arrow">⇄</span></div>
+            </div>
+            <div class="fiat-line">
+              <div>≈ AR$ 22,005,000</div>
+              <div class="chev">ARS ▾</div>
+            </div>
+          </div>
+
+          <div class="action-row">
+            <button class="action-btn">Receive</button>
+            <button class="action-btn disabled">Send · use desktop</button>
+          </div>
+
+          <div class="banner gray">
+            Sending from a Strongbox needs your hardware wallet. <strong>Open TallyKeep on your desktop</strong> to sign and broadcast. <em>v1.x will bring this to mobile via QR-PSBT for compatible devices (Coldcard, Jade).</em>
+          </div>
+
+          <div class="section-head">About this holding</div>
+          <div class="list-card">
+            <div class="field-row"><span class="k">Type</span><span class="v">Strongbox</span></div>
+            <div class="field-row"><span class="k">Signing</span><span class="v">Hardware · Coldcard Mk4</span></div>
+            <div class="field-row"><span class="k">Receive address</span><span class="v mono" style="font-family: var(--mono); font-size: 11px;">bc1q…r3x5z</span></div>
+            <div class="field-row"><span class="k">Last seen</span><span class="v">5 hours ago</span></div>
+          </div>
+
+          <div class="section-head">Recent activity</div>
+          <div class="list-card">
+            <div class="activity-row">
+              <div class="activity-ico in">↓</div>
+              <div class="body-pad">
+                <div style="font-size: 13px; font-weight: 500;">Sweep from Kraken</div>
+                <div class="sub">1 week ago · on-chain</div>
+              </div>
+              <div class="num-block"><div class="balance">+5,000,000</div></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="pnav">
+          <div class="pnav-item"><div class="pnav-ico"></div>Home</div>
+          <div class="pnav-item"><div class="pnav-ico"></div>Activity</div>
+          <div class="pnav-item active"><div class="pnav-ico"></div>Holdings</div>
+          <div class="pnav-item"><div class="pnav-ico"></div>More</div>
+        </div>
+      </div>
+      <div class="home-indicator"></div>
+    </div>
+    <div class="label">C2 — Strongbox detail</div>
+    <div class="note">Send still gated to desktop in v1, but the message acknowledges QR-PSBT path is on the v1.x roadmap — softer than v1 of the mocks. Custody commitment held: phone never sees Strongbox signing material.</div>
+  </div>
+
+  <!-- C3 Account detail -->
+  <div class="phone-cell">
+    <div class="phone">
+      <div class="notch"></div>
+      <div class="status-bar"><span class="left">9:41</span><span class="right">●●●● 5G ▮▮▮</span></div>
+      <div class="screen">
+        <div class="pbar">
+          <div class="back">←</div>
+          <div class="title">Kraken main</div>
+          <div class="ico-btn">⋯</div>
+        </div>
+
+        <div class="pcontent flush">
+          <div class="hero">
+            <div class="row" style="margin-bottom: 8px;">
+              <div class="type-ico account">A</div>
+              <div>
+                <div style="font-size: 13px; color: var(--text-muted);">Money at a custodial provider</div>
+                <div class="row" style="font-size: 11px; color: var(--text-muted);"><span class="badge gray">Account</span><span class="ind green"></span> Connected · 3m ago</div>
+              </div>
+            </div>
+            <div class="amount-line" style="margin-top: 12px;">
+              <div class="amount">1,905,000</div>
+              <div class="unit-cycle-inline">sats <span class="arrow">⇄</span></div>
+            </div>
+            <div class="fiat-line">
+              <div>≈ AR$ 1,397,200</div>
+              <div class="chev">ARS ▾</div>
+            </div>
+          </div>
+
+          <div class="action-row">
+            <button class="action-btn">Withdraw to…</button>
+            <button class="action-btn primary">Send · sweep now</button>
+          </div>
+
+          <div class="banner gray">
+            Account funds are <strong>held by Kraken</strong>, not by you. Auto-sweep moves them off as soon as a deposit arrives. <a style="color: var(--text); font-weight: 600;">Edit policy →</a>
+          </div>
+
+          <div class="section-head">Auto-sweep</div>
+          <div class="list-card">
+            <div class="field-row"><span class="k">Trigger</span><span class="v">Balance &gt; 500,000 sats</span></div>
+            <div class="field-row"><span class="k">Destination</span><span class="v">Cold reserve</span></div>
+            <div class="field-row"><span class="k">Status</span><span class="v"><span class="ind green"></span> Active</span></div>
+          </div>
+        </div>
+
+        <div class="pnav">
+          <div class="pnav-item"><div class="pnav-ico"></div>Home</div>
+          <div class="pnav-item"><div class="pnav-ico"></div>Activity</div>
+          <div class="pnav-item active"><div class="pnav-ico"></div>Holdings</div>
+          <div class="pnav-item"><div class="pnav-ico"></div>More</div>
+        </div>
+      </div>
+      <div class="home-indicator"></div>
+    </div>
+    <div class="label">C3 — Account detail</div>
+    <div class="note">Sweep policy now editable from mobile (per new posture). Withdraw triggers a backend API call — no signing on phone needed because the Account doesn't have user keys. The "held by Kraken" reminder is constant, not just at onboarding.</div>
+  </div>
+
+</div>
+
+<!-- ==================================================== -->
+<!-- GROUP D — Send                                       -->
+<!-- ==================================================== -->
+
+<div class="group-title">D — Send flow</div>
+
+<div class="phone-row">
+
+  <!-- D1 Send origin -->
+  <div class="phone-cell">
+    <div class="phone">
+      <div class="notch"></div>
+      <div class="status-bar"><span class="left">9:41</span><span class="right">●●●● 5G ▮▮▮</span></div>
+      <div class="screen">
+        <div class="pbar">
+          <div class="back">×</div>
+          <div class="title">Send</div>
+          <div style="width: 28px;"></div>
+        </div>
+        <div class="pcontent flush">
+          <div class="section-head" style="padding-top: 16px;">From which holding?</div>
+          <div class="list-card">
+            <div class="list-row">
+              <div class="type-ico purse">P</div>
+              <div class="body-pad">
+                <div class="name">Daily phone wallet</div>
+                <div class="sub">Purse · keys on this phone, biometric</div>
+              </div>
+              <div class="num-block"><div class="balance">482,100</div></div>
+            </div>
+            <div class="list-row">
+              <div class="type-ico account">A</div>
+              <div class="body-pad">
+                <div class="name">Kraken main</div>
+                <div class="sub">Account · withdraw to a holding</div>
+              </div>
+              <div class="num-block"><div class="balance">1,905,000</div></div>
+            </div>
+          </div>
+
+          <div class="section-head">Sign on desktop in v1</div>
+          <div class="list-card">
+            <div class="list-row" style="opacity: 0.55;">
+              <div class="type-ico strongbox">S</div>
+              <div class="body-pad">
+                <div class="name">Cold reserve</div>
+                <div class="sub">Strongbox · hardware wallet · v1.x QR-PSBT</div>
+              </div>
+              <div class="num-block"><div class="balance">30,000,000</div></div>
+            </div>
+            <div class="list-row" style="opacity: 0.55;">
+              <div class="type-ico vault">V</div>
+              <div class="body-pad">
+                <div class="name">Long-term holdings</div>
+                <div class="sub">Vault · multisig ceremony · desktop</div>
+              </div>
+              <div class="num-block"><div class="balance">20,000,000</div></div>
+            </div>
+          </div>
+
+          <div style="padding: 0 16px;">
+            <div class="banner gray" style="margin: 0;">
+              Strongbox sends will arrive on mobile in v1.x via QR-PSBT. Vault multisig stays on desktop — too much ceremony for a phone.
+            </div>
+          </div>
+        </div>
+        <div class="pnav">
+          <div class="pnav-item"><div class="pnav-ico"></div>Home</div>
+          <div class="pnav-item"><div class="pnav-ico"></div>Activity</div>
+          <div class="pnav-item"><div class="pnav-ico"></div>Holdings</div>
+          <div class="pnav-item"><div class="pnav-ico"></div>More</div>
+        </div>
+      </div>
+      <div class="home-indicator"></div>
+    </div>
+    <div class="label">D1 — Send origin picker</div>
+    <div class="note">Two groups: enabled (Purse, Account-withdrawal) and gated (Strongbox, Vault). Strongbox now flagged as v1.x rather than "use desktop forever". Vault stays desktop-only because the ceremony genuinely doesn't fit a phone.</div>
+  </div>
+
+  <!-- D2 Send amount -->
+  <div class="phone-cell">
+    <div class="phone">
+      <div class="notch"></div>
+      <div class="status-bar"><span class="left">9:41</span><span class="right">●●●● 5G ▮▮▮</span></div>
+      <div class="screen">
+        <div class="pbar">
+          <div class="back">←</div>
+          <div class="title">Send · Daily phone wallet</div>
+          <div style="width: 28px;"></div>
+        </div>
+        <div class="pcontent flush" style="display: flex; flex-direction: column;">
+          <div class="field">
+            <div class="field-label">To</div>
+            <div class="row" style="gap: 6px;">
+              <input class="field-input" value="bc1qxy...4f29" style="flex: 1;">
+              <div class="ico-btn">▣</div>
+              <div class="ico-btn">⌗</div>
+            </div>
+            <div class="field-helper">Scan QR · Paste · Address book</div>
+          </div>
+          <div class="field" style="background: var(--bg);">
+            <div class="field-label">Amount</div>
+            <div class="amount-line" style="padding: 8px 0;">
+              <div style="font-family: var(--mono); font-size: 32px; font-weight: 600;">200,000</div>
+              <div class="unit-cycle-inline">sats <span class="arrow">⇄</span></div>
+            </div>
+            <div style="font-family: var(--mono); font-size: 12px; color: var(--text-muted);">≈ AR$ 146,650</div>
+          </div>
+
+          <div style="padding: 12px 16px; background: var(--surface); border-bottom: 1px solid var(--border);">
+            <div class="field-label" style="margin-bottom: 8px;">Speed</div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px;">
+              <div style="border: 1px solid var(--border-strong); border-radius: 8px; padding: 10px; text-align: center; opacity: 0.55;">
+                <div style="font-size: 11px; font-weight: 600;">Instant</div>
+                <div style="font-size: 10px; color: var(--text-muted);">Lightning · v1.5</div>
+              </div>
+              <div style="border: 2px solid var(--text); border-radius: 8px; padding: 9px; text-align: center;">
+                <div style="font-size: 11px; font-weight: 600;">Standard</div>
+                <div style="font-size: 10px; color: var(--text-muted);">~30 min · 240 sat</div>
+              </div>
+              <div style="border: 1px solid var(--border-strong); border-radius: 8px; padding: 10px; text-align: center;">
+                <div style="font-size: 11px; font-weight: 600;">Economy</div>
+                <div style="font-size: 10px; color: var(--text-muted);">~2 hr · 80 sat</div>
+              </div>
+            </div>
+          </div>
+
+          <div style="padding: 12px 16px; background: var(--surface); border-bottom: 1px solid var(--border);">
+            <div class="field-label" style="margin-bottom: 6px;">What you'll send</div>
+            <div class="between" style="font-size: 13px;"><span>Amount</span><span class="mono">200,000 sats</span></div>
+            <div class="between" style="font-size: 13px; color: var(--text-muted);"><span>Network fee</span><span class="mono">240 sats</span></div>
+            <div class="between" style="font-size: 14px; font-weight: 600; padding-top: 6px; border-top: 1px solid var(--border); margin-top: 6px;"><span>Total</span><span class="mono">200,240 sats</span></div>
+          </div>
+
+          <div style="flex: 1;"></div>
+          <div style="padding: 12px 16px;">
+            <button class="btn primary full">Review &amp; sign with Face ID</button>
+          </div>
+        </div>
+      </div>
+      <div class="home-indicator"></div>
+    </div>
+    <div class="label">D2 — Send amount + destination</div>
+    <div class="note">Primary action now reads "Review &amp; sign with Face ID" — sets the expectation that signing is biometric, on this device, no external wallet roundtrip needed because the Purse keys live in Keychain. Lightning stub preserved.</div>
+  </div>
+
+  <!-- D3 Send confirm + bio -->
+  <div class="phone-cell">
+    <div class="phone">
+      <div class="notch"></div>
+      <div class="status-bar"><span class="left">9:41</span><span class="right">●●●● 5G ▮▮▮</span></div>
+      <div class="screen">
+        <div class="pbar">
+          <div class="back">←</div>
+          <div class="title">Confirm send</div>
+          <div style="width: 28px;"></div>
+        </div>
+        <div class="pcontent flush">
+          <div class="hero" style="text-align: center;">
+            <div class="amount-line" style="justify-content: center;">
+              <div class="amount" style="font-size: 28px;">200,000</div>
+              <div class="unit-cycle-inline">sats <span class="arrow">⇄</span></div>
+            </div>
+            <div style="font-family: var(--mono); font-size: 13px; color: var(--text-muted); margin-top: 2px;">≈ AR$ 146,650</div>
+            <div style="font-size: 12px; color: var(--text-muted); margin-top: 8px;">From Daily phone wallet</div>
+          </div>
+
+          <div class="list-card" style="margin-top: 16px;">
+            <div class="field-row"><span class="k">To</span><span class="v mono" style="font-family: var(--mono); font-size: 11px;">bc1qxy…4f29</span></div>
+            <div class="field-row"><span class="k">Network</span><span class="v">On-chain · Standard</span></div>
+            <div class="field-row"><span class="k">Fee</span><span class="v mono" style="font-family: var(--mono);">240 sats</span></div>
+            <div class="field-row"><span class="k">Confirms in</span><span class="v">~30 min</span></div>
+          </div>
+
+          <div class="banner green">
+            <strong>Verify the address before approving.</strong> Compare the first and last characters above with what your recipient gave you — that's the last line of defence against malware.
+          </div>
+          <div style="flex: 1;"></div>
+          <div style="padding: 12px 16px;">
+            <button class="btn primary full">Sign with Face ID</button>
+            <button class="btn ghost full" style="margin-top: 8px;">Cancel</button>
+          </div>
+        </div>
+      </div>
+      <div class="home-indicator"></div>
+    </div>
+    <div class="label">D3 — Confirm and sign</div>
+    <div class="note">Different from v1: signing happens on-device (Keychain unlock via Face ID, native secp256k1 module — or JS-side signing with seed retrieved transiently). No roundtrip to an external wallet app. The address-verify reminder is concrete and addresses a real malware vector.</div>
+  </div>
+
+</div>
+
+<!-- ==================================================== -->
+<!-- GROUP E — Receive                                    -->
+<!-- ==================================================== -->
+
+<div class="group-title">E — Receive</div>
+
+<div class="phone-row">
+
+  <div class="phone-cell">
+    <div class="phone">
+      <div class="notch"></div>
+      <div class="status-bar"><span class="left">9:41</span><span class="right">●●●● 5G ▮▮▮</span></div>
+      <div class="screen">
+        <div class="pbar">
+          <div class="back">×</div>
+          <div class="title">Receive</div>
+          <div class="ico-btn">⤓</div>
+        </div>
+        <div class="pcontent flush">
+          <div style="padding: 12px 16px; background: var(--surface); border-bottom: 1px solid var(--border);">
+            <div class="field-label">Receive into</div>
+            <div class="row" style="justify-content: space-between; padding: 8px 0;">
+              <div class="row">
+                <div class="type-ico purse" style="width: 28px; height: 28px; font-size: 11px;">P</div>
+                <div style="font-size: 14px; font-weight: 600;">Daily phone wallet</div>
+              </div>
+              <div class="chev" style="color: var(--text-dim);">▾</div>
+            </div>
+          </div>
+
+          <div style="padding: 24px 16px 12px; text-align: center; background: var(--surface);">
+            <div class="qr"><div class="qr-inner">₿</div></div>
+            <div style="margin-top: 14px; font-family: var(--mono); font-size: 12px; color: var(--text-muted); word-break: break-all; padding: 0 16px;">bc1qxy7z5dhqfl0wn8a7r2nkep4mnwvhxs3lgg...</div>
+            <div style="margin-top: 6px; font-size: 11px; color: var(--text-dim);">A new address every time, for privacy.</div>
+          </div>
+
+          <div style="padding: 12px 16px;">
+            <div class="row" style="gap: 8px;">
+              <button class="btn tonal" style="flex: 1;">Copy address</button>
+              <button class="btn tonal" style="flex: 1;">Share</button>
+            </div>
+            <button class="btn ghost full" style="margin-top: 12px; font-size: 12px;">Set an amount &amp; label →</button>
+          </div>
+
+          <div style="padding: 0 16px;">
+            <div class="banner gray" style="margin: 0;">
+              <strong>Lightning</strong> arrives in v1.5. For now, payments go on-chain.
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="home-indicator"></div>
+    </div>
+    <div class="label">E1 — Receive</div>
+    <div class="note">Holding picker, QR, address. Privacy line educates without lecturing. Lightning stub preserved.</div>
+  </div>
+
+  <div class="phone-cell">
+    <div class="phone">
+      <div class="notch"></div>
+      <div class="status-bar"><span class="left">9:41</span><span class="right">●●●● 5G ▮▮▮</span></div>
+      <div class="screen">
+        <div class="pbar">
+          <div class="back">←</div>
+          <div class="title">Scan to send</div>
+          <div style="width: 28px;"></div>
+        </div>
+        <div class="pcontent flush" style="background: #0f172a;">
+          <div style="padding: 32px 16px 0;">
+            <div class="camera"><div class="scan-text">Scan a Bitcoin address or invoice</div></div>
+          </div>
+          <div style="padding: 24px 16px; color: rgba(255,255,255,0.85); text-align: center; font-size: 12px;">
+            We accept on-chain addresses, BIP-21 URIs, and (from v1.5) Lightning invoices.
+          </div>
+          <div style="flex: 1;"></div>
+          <div style="padding: 12px 16px;">
+            <button class="btn full" style="background: rgba(255,255,255,0.1); border-color: rgba(255,255,255,0.25); color: white;">Paste from clipboard</button>
+          </div>
+        </div>
+      </div>
+      <div class="home-indicator"></div>
+    </div>
+    <div class="label">E2 — Scan QR to send</div>
+    <div class="note">Native camera via Capacitor's <code>@capacitor/camera</code> plugin. Format detection in the parser.</div>
+  </div>
+
+</div>
+
+<!-- ==================================================== -->
+<!-- GROUP F — Activity                                   -->
+<!-- ==================================================== -->
+
+<div class="group-title">F — Activity &amp; categorisation</div>
+
+<div class="phone-row">
+
+  <div class="phone-cell">
+    <div class="phone">
+      <div class="notch"></div>
+      <div class="status-bar"><span class="left">9:41</span><span class="right">●●●● 5G ▮▮▮</span></div>
+      <div class="screen">
+        <div class="pbar">
+          <div style="width: 28px;"></div>
+          <div class="title">Activity</div>
+          <div class="ico-btn">⌕</div>
+        </div>
+
+        <div class="pcontent flush">
+          <div class="section-head" style="padding-top: 12px;">Pending <span class="badge amber" style="margin-left: 4px;">2</span></div>
+          <div class="list-card" style="border-color: var(--amber); background: var(--amber-soft);">
+            <div class="activity-row" style="border-color: rgba(202, 138, 4, 0.3);">
+              <div class="activity-ico in">↓</div>
+              <div class="body-pad">
+                <div style="font-size: 13px; font-weight: 500;">+150,000 sats</div>
+                <div class="sub">2h ago · Cold reserve · suggested: <strong style="color: var(--text);">Custodial withdrawal</strong></div>
+              </div>
+              <button class="btn tonal" style="font-size: 11px; padding: 5px 10px;">Tag</button>
+            </div>
+            <div class="activity-row">
+              <div class="activity-ico in">↓</div>
+              <div class="body-pad">
+                <div style="font-size: 13px; font-weight: 500;">+50,000 sats</div>
+                <div class="sub">1d ago · Daily phone wallet</div>
+              </div>
+              <button class="btn tonal" style="font-size: 11px; padding: 5px 10px;">Tag</button>
+            </div>
+          </div>
+
+          <div class="section-head">This week</div>
+          <div class="list-card">
+            <div class="activity-row">
+              <div class="activity-ico in">↓</div>
+              <div class="body-pad">
+                <div style="font-size: 13px; font-weight: 500;">Kraken withdrawal</div>
+                <div class="sub">3 days ago · Cold reserve · sweep</div>
+              </div>
+              <div class="num-block"><div class="balance">+150,000</div></div>
+            </div>
+            <div class="activity-row">
+              <div class="activity-ico out">↑</div>
+              <div class="body-pad">
+                <div style="font-size: 13px; font-weight: 500;">Bike shop</div>
+                <div class="sub">5 days ago · Daily phone wallet</div>
+              </div>
+              <div class="num-block"><div class="balance">−200,000</div></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="pnav">
+          <div class="pnav-item"><div class="pnav-ico"></div>Home</div>
+          <div class="pnav-item active"><div class="pnav-ico"></div>Activity</div>
+          <div class="pnav-item"><div class="pnav-ico"></div>Holdings</div>
+          <div class="pnav-item"><div class="pnav-ico"></div>More</div>
+        </div>
+      </div>
+      <div class="home-indicator"></div>
+    </div>
+    <div class="label">F1 — Activity feed</div>
+    <div class="note">Pending categorisation at the top with amber highlight, then chronological. Auto-suggestion via address-matches-CustodialProvider-whitelist.</div>
+  </div>
+
+  <div class="phone-cell">
+    <div class="phone">
+      <div class="notch"></div>
+      <div class="status-bar"><span class="left">9:41</span><span class="right">●●●● 5G ▮▮▮</span></div>
+      <div class="screen">
+        <div class="pbar">
+          <div style="width: 28px;"></div>
+          <div class="title">Activity</div>
+          <div class="ico-btn">⌕</div>
+        </div>
+        <div class="pcontent flush" style="position: relative;">
+          <div class="section-head" style="padding-top: 12px;">Pending <span class="badge amber" style="margin-left: 4px;">2</span></div>
+          <div class="list-card">
+            <div class="activity-row">
+              <div class="activity-ico in">↓</div>
+              <div class="body-pad">
+                <div style="font-size: 13px; font-weight: 500;">+150,000 sats</div>
+                <div class="sub">2h ago · Cold reserve</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="sheet-overlay">
+            <div class="sheet">
+              <div class="sheet-grab"></div>
+              <div class="sheet-title">Tag this incoming payment</div>
+              <div style="padding: 4px 18px 12px; font-size: 12px; color: var(--text-muted);">+150,000 sats · 2h ago · Cold reserve</div>
+              <div class="sheet-row">
+                <div class="type-ico account" style="width: 28px; height: 28px; font-size: 11px;">A</div>
+                <div class="body-pad">
+                  <div class="row-name">Custodial withdrawal · Kraken main</div>
+                  <div class="row-sub">Suggested — address matches Kraken whitelist</div>
+                </div>
+                <div style="font-size: 16px; color: var(--green);">●</div>
+              </div>
+              <div class="sheet-row">
+                <div class="activity-ico in" style="width: 28px; height: 28px; font-size: 12px;">↓</div>
+                <div class="body-pad">
+                  <div class="row-name">Income · payment received</div>
+                  <div class="row-sub">From a third party</div>
+                </div>
+              </div>
+              <div class="sheet-row">
+                <div class="type-ico" style="width: 28px; height: 28px; font-size: 11px;">↻</div>
+                <div class="body-pad">
+                  <div class="row-name">Transfer between my holdings</div>
+                  <div class="row-sub">Already linked to another holding</div>
+                </div>
+              </div>
+              <div class="sheet-row">
+                <div class="type-ico" style="width: 28px; height: 28px; font-size: 11px;">…</div>
+                <div class="body-pad">
+                  <div class="row-name">Other / custom</div>
+                  <div class="row-sub">Add a label and notes</div>
+                </div>
+              </div>
+              <div style="padding: 14px 18px 0;">
+                <button class="btn primary full">Confirm</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="home-indicator"></div>
+    </div>
+    <div class="label">F2 — Categorise sheet</div>
+    <div class="note">3-second flow. Auto-suggestion is pre-selected (green dot) but requires explicit confirm.</div>
+  </div>
+
+</div>
+
+<!-- ==================================================== -->
+<!-- GROUP G — More                                       -->
+<!-- ==================================================== -->
+
+<div class="group-title">G — More</div>
+
+<div class="phone-row">
+
+  <div class="phone-cell">
+    <div class="phone">
+      <div class="notch"></div>
+      <div class="status-bar"><span class="left">9:41</span><span class="right">●●●● 5G ▮▮▮</span></div>
+      <div class="screen">
+        <div class="pbar">
+          <div style="width: 28px;"></div>
+          <div class="title">More</div>
+          <div style="width: 28px;"></div>
+        </div>
+
+        <div class="pcontent flush">
+          <div style="padding: 16px;">
+
+            <div style="font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 8px;">Connection</div>
+            <div class="list-card" style="margin: 0 0 16px;">
+              <div class="field-row"><span class="k">Paired with</span><span class="v">Self-hosted · home.lan</span></div>
+              <div class="field-row"><span class="k">Status</span><span class="v"><span class="ind green"></span> Connected · 832,501</span></div>
+              <div class="field-row"><span class="k">Network</span><span class="v small">Same Wi-Fi · v2 will add remote</span></div>
+            </div>
+
+            <div style="font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 8px;">Spending keys</div>
+            <div class="list-card" style="margin: 0 0 16px;">
+              <div class="field-row"><span class="k">Storage</span><span class="v">iOS Keychain · biometric</span></div>
+              <div class="field-row"><span class="k">Daily wallet</span><span class="v"><span class="ind green"></span> Loaded</span></div>
+              <div class="field-row"><span class="k">Backup</span><span class="v" style="color: var(--amber);">Verify recovery →</span></div>
+            </div>
+
+            <div style="font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 8px;">Security</div>
+            <div class="list-card" style="margin: 0 0 16px;">
+              <div class="field-row"><span class="k">Daily unlock</span><span class="v row" style="gap: 8px;">Face ID <div class="toggle"></div></span></div>
+              <div class="field-row"><span class="k">Auto-lock</span><span class="v">After 1 minute</span></div>
+              <div class="field-row"><span class="k">Passphrase</span><span class="v" style="color: var(--text-muted);">Change · Recover</span></div>
+            </div>
+
+            <div style="font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 8px;">Display</div>
+            <div class="list-card" style="margin: 0 0 16px;">
+              <div class="field-row"><span class="k">Default unit</span><span class="v">sats</span></div>
+              <div class="field-row"><span class="k">Fiat consolidation</span><span class="v">ARS</span></div>
+              <div class="field-row"><span class="k">Show technical details</span><span class="v"><div class="toggle off"></div></span></div>
+            </div>
+
+            <div style="font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 8px;">Lightning <span class="badge amber" style="margin-left: 4px;">v1.5</span></div>
+            <div class="list-card" style="margin: 0 0 16px; opacity: 0.55;">
+              <div class="field-row"><span class="k">Lightning wallet</span><span class="v small">Not configured</span></div>
+              <div class="field-row"><span class="k">Send instant</span><span class="v small">Coming v1.5</span></div>
+            </div>
+
+            <div style="font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 8px;">Advanced</div>
+            <div class="list-card" style="margin: 0;">
+              <div class="field-row"><span class="k">Open desktop / web</span><span class="v" style="color: var(--text-muted);">›</span></div>
+              <div class="field-row"><span class="k">Unpair this phone</span><span class="v" style="color: var(--red);">›</span></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="pnav">
+          <div class="pnav-item"><div class="pnav-ico"></div>Home</div>
+          <div class="pnav-item"><div class="pnav-ico"></div>Activity</div>
+          <div class="pnav-item"><div class="pnav-ico"></div>Holdings</div>
+          <div class="pnav-item active"><div class="pnav-ico"></div>More</div>
+        </div>
+      </div>
+      <div class="home-indicator"></div>
+    </div>
+    <div class="label">G1 — More (settings root)</div>
+    <div class="note">New <strong>Spending keys</strong> section makes the Keychain commitment concrete: where keys live, whether the daily wallet is unlocked, and a Verify-recovery prompt. The label "iOS Keychain · biometric" tells a sophisticated user exactly what they need to know without being jargon-heavy. "Verify recovery" is the gentle nudge to write down the seed phrase before too many sats accumulate.</div>
+  </div>
+
+</div>
+
+<!-- ==================================================== -->
+<!-- GROUP H — Add Holding (NEW)                          -->
+<!-- ==================================================== -->
+
+<div class="group-title">H — Add Holding (new in v2)</div>
+
+<div class="phone-row">
+
+  <!-- H1 Add picker -->
+  <div class="phone-cell">
+    <div class="phone">
+      <div class="notch"></div>
+      <div class="status-bar"><span class="left">9:41</span><span class="right">●●●● 5G ▮▮▮</span></div>
+      <div class="screen">
+        <div class="pbar">
+          <div class="back">←</div>
+          <div class="title">Add a Holding</div>
+          <div style="width: 28px;"></div>
+        </div>
+        <div class="pcontent flush">
+          <div style="padding: 16px;">
+            <div style="font-size: 12px; color: var(--text-muted); margin-bottom: 14px; line-height: 1.55;">
+              What kind of place is your BTC kept in? Pick the closest match.
+            </div>
+
+            <div class="list-card" style="margin: 0 0 12px;">
+              <div class="list-row">
+                <div class="type-ico account">A</div>
+                <div class="body-pad">
+                  <div class="name">Account</div>
+                  <div class="sub">Like an exchange account · keys held by them</div>
+                </div>
+                <div style="color: var(--text-muted);">›</div>
+              </div>
+              <div class="list-row">
+                <div class="type-ico purse">P</div>
+                <div class="body-pad">
+                  <div class="name">Purse <span class="badge blue" style="margin-left: 4px;">on this phone</span></div>
+                  <div class="sub">Like a checking account · keys generated here</div>
+                </div>
+                <div style="color: var(--text-muted);">›</div>
+              </div>
+              <div class="list-row">
+                <div class="type-ico strongbox">S</div>
+                <div class="body-pad">
+                  <div class="name">Strongbox</div>
+                  <div class="sub">Like a savings account · scan a hardware wallet QR</div>
+                </div>
+                <div style="color: var(--text-muted);">›</div>
+              </div>
+              <div class="list-row" style="opacity: 0.55;">
+                <div class="type-ico vault">V</div>
+                <div class="body-pad">
+                  <div class="name">Vault</div>
+                  <div class="sub">Like a safety-deposit box · multisig setup on desktop</div>
+                </div>
+                <div style="color: var(--text-dim); font-size: 11px;">desktop</div>
+              </div>
+            </div>
+
+            <div class="banner gray" style="margin: 0;">
+              <strong>Already have a Purse elsewhere?</strong> Adding a Purse here can either generate fresh keys on this phone, or watch an existing wallet via its xpub.
+            </div>
+          </div>
+        </div>
+        <div class="pnav">
+          <div class="pnav-item"><div class="pnav-ico"></div>Home</div>
+          <div class="pnav-item"><div class="pnav-ico"></div>Activity</div>
+          <div class="pnav-item active"><div class="pnav-ico"></div>Holdings</div>
+          <div class="pnav-item"><div class="pnav-ico"></div>More</div>
+        </div>
+      </div>
+      <div class="home-indicator"></div>
+    </div>
+    <div class="label">H1 — Add Holding picker</div>
+    <div class="note">Banking analogies in subtitles, vocabulary preserved in titles. The "on this phone" badge on Purse signals where the keys go. Vault honestly defers to desktop. The note at the bottom flags the two flavours of Purse-add — hot (generate keys) vs watch-only (paste xpub).</div>
+  </div>
+
+  <!-- H2 Add Purse — choose method -->
+  <div class="phone-cell">
+    <div class="phone">
+      <div class="notch"></div>
+      <div class="status-bar"><span class="left">9:41</span><span class="right">●●●● 5G ▮▮▮</span></div>
+      <div class="screen">
+        <div class="pbar">
+          <div class="back">←</div>
+          <div class="title">New Purse</div>
+          <div style="width: 28px;"></div>
+        </div>
+
+        <div class="steps">
+          <div class="step-bar active"></div>
+          <div class="step-bar"></div>
+          <div class="step-bar"></div>
+        </div>
+
+        <div class="pcontent flush">
+          <div style="padding: 16px;">
+            <div style="font-size: 18px; font-weight: 600; margin-bottom: 6px;">Where will the keys live?</div>
+            <div style="font-size: 13px; color: var(--text-muted); margin-bottom: 18px; line-height: 1.55;">
+              A Purse is an everyday wallet. You decide whether to create new keys here or just watch a wallet you already have.
+            </div>
+
+            <div class="list-card" style="margin: 0 0 12px;">
+              <div class="list-row" style="padding: 16px 14px;">
+                <div style="width: 36px; height: 36px; border-radius: 8px; background: var(--btc-soft); border: 1px solid var(--btc); display: flex; align-items: center; justify-content: center; color: var(--btc); font-size: 16px; font-weight: 700;">📱</div>
+                <div class="body-pad">
+                  <div class="name">Generate on this phone</div>
+                  <div class="sub">Hot wallet · keys in iOS Keychain · biometric to spend</div>
+                </div>
+                <div style="color: var(--text-muted);">›</div>
+              </div>
+              <div class="list-row" style="padding: 16px 14px;">
+                <div style="width: 36px; height: 36px; border-radius: 8px; background: var(--sidebar); border: 1px solid var(--border); display: flex; align-items: center; justify-content: center; color: var(--text); font-size: 16px;">👁</div>
+                <div class="body-pad">
+                  <div class="name">Watch an existing wallet</div>
+                  <div class="sub">Paste or scan an xpub · spending stays in that wallet</div>
+                </div>
+                <div style="color: var(--text-muted);">›</div>
+              </div>
+            </div>
+
+            <div class="banner gray" style="margin: 0;">
+              <strong>Generate</strong> if you want this phone to be your daily spend device.<br>
+              <strong>Watch</strong> if you already use Phoenix, Aqua, BlueWallet — TallyKeep tracks balance and history without touching your keys.
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="home-indicator"></div>
+    </div>
+    <div class="label">H2 — Add Purse · key location</div>
+    <div class="note">The hot-vs-watch split made explicit. "Generate on this phone" matches the card-like spending mechanism the user described — fresh BIP39 seed in Keychain, Face-ID-gated. "Watch an existing wallet" is for users who already have Phoenix/Aqua/etc. and just want the banking surface around them. Strongbox flow (next step, not drawn) similarly accepts a hardware wallet's QR-export.</div>
+  </div>
+
+</div>
+
+<!-- ==================================================== -->
+<!-- PROMISE CHECK                                        -->
+<!-- ==================================================== -->
+
+<div class="group-title">Promise check — v2</div>
+
+<div style="margin-bottom: 14px; max-width: 820px; font-size: 13px; color: var(--text-muted); line-height: 1.55;">
+With the form-factor decision locked in (<code>mobile_form_factor_decision.md</code>), the conflict and tension rows from v1's promise check resolve. Here's the updated state.
+</div>
+
+<table class="promise-table">
+  <thead>
+    <tr>
+      <th style="width: 38%;">Locked-in commitment</th>
+      <th style="width: 12%;">Mobile</th>
+      <th>How / where</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>No custody, ever — backend never holds Bitcoin keys</td>
+      <td><span class="badge green">Held</span></td>
+      <td>Backend stays watch-only. Spending keys for Purse and Lightning live <em>on the user's phone</em>, in iOS Keychain / Android Keystore — never on TallyKeep infrastructure.</td>
+    </tr>
+    <tr>
+      <td>No spending keys in PWA frontend (any platform)</td>
+      <td><span class="badge green">Held</span></td>
+      <td>PWA on desktop or mobile-browser holds zero spending material. Only the Capacitor app holds keys, gated by hardware-backed secure storage.</td>
+    </tr>
+    <tr>
+      <td>Banking ergonomics — no crypto-native friction</td>
+      <td><span class="badge green">Held</span></td>
+      <td>Bottom-nav structure. Banking analogies in pickers and tooltips. Header simplified — unit cycle is inline with balance, not a chrome bar. Currency picker is a tap-to-open sheet, not a permanent dropdown.</td>
+    </tr>
+    <tr>
+      <td>Sats-default, fiat opt-in</td>
+      <td><span class="badge green">Held</span></td>
+      <td>B1 sats-only default with "Show as fiat →" link. B2 fiat-on with rate attribution. Currency picker on the secondary line itself.</td>
+    </tr>
+    <tr>
+      <td>No performance metrics on home</td>
+      <td><span class="badge green">Held</span></td>
+      <td>No daily change indicators anywhere.</td>
+    </tr>
+    <tr>
+      <td>Vocabulary preserved (Account, Purse, Strongbox, Vault)</td>
+      <td><span class="badge green">Held</span></td>
+      <td>All four type names canonical in lists, headers, and the Add Holding picker. Banking analogies as descriptions, not replacements.</td>
+    </tr>
+    <tr>
+      <td>Declared vs observable security analyser</td>
+      <td><span class="badge green">Held</span></td>
+      <td>B2 surfaces the discrepancy banner inline. Deep "Review" still routes to desktop or full-web for the diagnostic surface.</td>
+    </tr>
+    <tr>
+      <td>Lightning keys on-device, not server-side</td>
+      <td><span class="badge amber">v1.5</span></td>
+      <td>Stubbed throughout v1. When shipped: Capacitor only — never PWA. Documented in <code>mobile_form_factor_decision.md</code>.</td>
+    </tr>
+    <tr>
+      <td>Mobile is a real product, not a companion</td>
+      <td><span class="badge green">Held</span></td>
+      <td>Account, Purse, Strongbox addable from phone. Sweep policy editable from phone. Send from on-device Purse keys with biometric. Only Vault setup and (v1) Strongbox sends defer to desktop.</td>
+    </tr>
+    <tr>
+      <td>Phone-only target market workable</td>
+      <td><span class="badge green">Held</span></td>
+      <td>The LatAm/Africa user can sign in to hosted-tier, add Account + Purse, send and receive — without ever touching a desktop. The §10 amendment makes this real.</td>
+    </tr>
+    <tr>
+      <td>v1 backend on localhost, no auth</td>
+      <td><span class="badge amber">v1 limitation</span></td>
+      <td>Self-hosted users on the Capacitor app: same-Wi-Fi only in v1, via mDNS or LAN IP at pairing. Real off-network needs v2 (WireGuard/Tailscale). Hosted-tier path bypasses this entirely. Honest in A2 and G1.</td>
+    </tr>
+    <tr>
+      <td>Strongbox sends from mobile</td>
+      <td><span class="badge amber">v1.x</span></td>
+      <td>Honest stub in v1: "use desktop". v1.x adds QR-PSBT roundtrip for compatible hardware wallets (Coldcard, Jade). Vault stays desktop because the multisig ceremony genuinely doesn't fit a phone.</td>
+    </tr>
+  </tbody>
+</table>
+
+<div class="group-title">Open questions</div>
+<div style="max-width: 820px; font-size: 13px; line-height: 1.6;">
+  Carried forward from <code>mobile_form_factor_decision.md</code>:
+  <ol style="padding-left: 22px; margin: 0;">
+    <li style="margin-bottom: 8px;">Native secp256k1 plugin in v1 vs v1.5 (does signing happen in native code or in JS after Keychain decrypt).</li>
+    <li style="margin-bottom: 8px;">Reproducible-build target date (v1.x or v1.5).</li>
+    <li style="margin-bottom: 8px;">F-Droid inclusion — depends on Capacitor and Lightning SDK licence chain.</li>
+    <li style="margin-bottom: 8px;">iOS Safari PWA fallback usability — should it support a PSBT-QR roundtrip even though it can't hold keys?</li>
+    <li style="margin-bottom: 8px;">Hosted-tier login UX inside Capacitor app (email + passphrase, OAuth, LNURL-auth?).</li>
+    <li style="margin-bottom: 8px;">ARS as default fiat for Argentine users — given inflation regime, does USD make a saner default? Worth benchmarking against Lemon, Belo, Ripio defaults.</li>
+    <li style="margin-bottom: 8px;">Desktop home page and onboarding HTML (<code>tallykeep_home_final.html</code>, <code>tallykeep_onboarding_validated.html</code>) should adopt the same simplified header pattern (unit cycle inline, currency in secondary line). Not done in this pass.</li>
+  </ol>
+</div>
+
+</body>
+</html>

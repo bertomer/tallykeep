@@ -1,7 +1,7 @@
 """UserProfile domain type (spec module 02 / 09).
 
-Singleton per installation. Feature flags are resolved against the named preset, with
-the JSONB overrides column taking precedence.
+Singleton per installation. Feature flags are resolved from user_profile.feature_flags
+(explicit overrides) falling back to DEFAULT_FLAG_VALUES. There is no preset concept.
 """
 
 from __future__ import annotations
@@ -10,8 +10,6 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from uuid import UUID
 
-from tallykeep.domain.enums import ProfilePreset
-
 # Spec module 03: the singleton row's id is fixed.
 USER_PROFILE_SINGLETON_ID = UUID("00000000-0000-0000-0000-000000000001")
 
@@ -19,7 +17,6 @@ USER_PROFILE_SINGLETON_ID = UUID("00000000-0000-0000-0000-000000000001")
 @dataclass
 class UserProfile:
     id: UUID
-    preset: ProfilePreset
     feature_flags: dict[str, bool] = field(default_factory=dict)  # overrides only
     base_currency: str = "EUR"
     locale: str = "en"

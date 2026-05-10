@@ -31,6 +31,7 @@ def _purse_body(*, name: str = "main", gap_limit: int = 5) -> dict:
     return {
         "name": f"Processing test {secrets.token_hex(2)}",
         "purpose": "spending",
+        "seed_origin": "external_watch_only",
         "declared_security": {
             "custody_model": "self_single",
             "signing_model": "software_hot",

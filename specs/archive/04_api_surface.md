@@ -1,10 +1,10 @@
-# 04 — API Surface (Internal, v1)
+# 04 — API Surface (Internal)
 
-All endpoints are under `/api/v1/`. The frontend is the only client in v1, but the contract is designed as if an external caller would use it later.
+All endpoints are under `/api/v1/`. The `/api/v1/` URL prefix is the API URI version (independent of project phases per ADR-0003); breaking changes go to `/api/v2/`. The frontend is the only client today, but the contract is designed as if an external caller would use it later.
 
 ## Conventions
 
-- **Authentication**: none in v1. Localhost binding is the security boundary.
+- **Authentication**: none in the dev phase. Localhost binding is the security boundary. App-level auth (passphrase + biometric) is a private-ship requirement per ADR-0003.
 - **Format**: JSON in, JSON out. UTF-8. Content-Type required.
 - **Errors**: RFC 7807 Problem Details format.
   ```json
@@ -147,11 +147,23 @@ POST /api/v1/holdings/purse
     "purpose": "spending",
     "display_color": "#10b981",
     "declared_security": { "custody_model": "self_single", "signing_model": "software_hot", ... },
+    "seed_origin": "external_watch_only" | "tallykeep_managed",
     "descriptors": [
       { "name": "main", "expression": "wpkh([abc/84'/0'/0']xpub.../0/*)", "change_expression": "wpkh([abc/84'/0'/0']xpub.../1/*)", "network": "mainnet", "address_type": "native_segwit", "gap_limit": 20 }
     ]
   }
   201 : Holding (Purse subtype)
+  Validation:
+    - seed_origin is required.
+    - At least one descriptor is required (regardless of seed_origin). For
+      tallykeep_managed Purses, the client generated the seed locally and posts
+      the descriptor derived from it; the seed itself never crosses to the backend.
+    - Single-address-only descriptors are rejected (must be xpub or descriptor that
+      derives many addresses).
+    - The backend does NOT validate the client build type. Whether a given client
+      can ultimately sign for a tallykeep_managed Purse is a runtime check that
+      client performs against its local secure storage. See 02_domain_model.md
+      §"Signing capability is per-client".
 
 POST /api/v1/holdings/strongbox
   body: {
@@ -175,7 +187,7 @@ POST /api/v1/holdings/vault
     "descriptors": [...]
   }
   201 : Holding (Vault subtype)
-  Validation in v1: only single-signature multisig descriptors are accepted (full multisig descriptor support deferred to v2). The vault metadata fields are stored but the spec admits the descriptor-level enforcement is v2.
+  Validation: only single-key descriptors are accepted (full multisig descriptor support deferred — see `future_iterations.md` "Multisig descriptor support"). Vault metadata fields are stored regardless; the analyzer surfaces the multisig-declared-but-single-key discrepancy honestly.
 ```
 
 ## Descriptors
@@ -202,7 +214,7 @@ Most Account-related operations are accessible via the parent Holding endpoints.
 ```
 GET    /api/v1/custodial-providers/supported
   200 : [{ adapter_id, display_name, capabilities, requires_passphrase }]
-  Lists what the v1 build supports, with metadata.
+  Lists what the current build supports, with metadata.
 
 GET    /api/v1/custodial-providers/{id}
   200 : CustodialProvider (without secret references resolved)
@@ -248,7 +260,7 @@ GET   /api/v1/ledger-entries
 
 GET   /api/v1/ledger-entries/{id}
   200 : LedgerEntry with linked underlying source
-        (OnChainTransaction object, or LightningPayment in v1.5, or CustodialEvent)
+        (OnChainTransaction object, or LightningPayment once that iteration ships, or CustodialEvent)
 
 PATCH /api/v1/ledger-entries/{id}
   body: { "category"?, "counterparty_label"?, "note"? }
@@ -276,7 +288,7 @@ GET  /api/v1/banking/payment-requests                  ?holding_id=&status=
 GET  /api/v1/banking/payment-requests/{id}             includes resulting_ledger_entry if confirmed
 
 GET  /api/v1/banking/payment-requests/{id}/psbt        Returns PSBT base64 or binary via Accept header
-GET  /api/v1/banking/payment-requests/{id}/psbt.qr     Returns QR PNG (or animated frames in v1.1)
+GET  /api/v1/banking/payment-requests/{id}/psbt.qr     Returns QR PNG (animated multi-frame deferred — see `future_iterations.md` "PSBT-by-QR roundtrip on mobile")
 
 POST /api/v1/banking/payment-requests/{id}/submit-signed
   body: { "psbt_base64": "..." } | { "signed_transaction_hex": "..." }
@@ -455,7 +467,7 @@ Secrets are never in this export. The user separately exports those (or remember
 
 ## Rate limits
 
-None enforced internally in v1 (single user). External custodial provider APIs are rate-limited by the worker via ccxt's built-in throttling. bitcoind RPC is rate-limited by the node's configuration.
+None enforced internally (single-user app). External custodial provider APIs are rate-limited by the worker via ccxt's built-in throttling. bitcoind RPC is rate-limited by the node's configuration.
 
 ## OpenAPI specification
 

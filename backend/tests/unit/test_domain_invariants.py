@@ -29,7 +29,6 @@ from tallykeep.domain import (
     Network,
     PaymentStatus,
     PaymentType,
-    ProfilePreset,
     ProviderKind,
     ProviderPermissions,
     Purpose,
@@ -557,23 +556,16 @@ class TestSweepPolicy:
 class TestUserProfile:
     def test_singleton_id_enforced(self) -> None:
         with pytest.raises(ValueError, match="singleton id"):
-            UserProfile(
-                id=uuid4(),
-                preset=ProfilePreset.INTERMEDIATE,
-            )
+            UserProfile(id=uuid4())
 
     def test_singleton_id_accepted(self) -> None:
-        p = UserProfile(
-            id=USER_PROFILE_SINGLETON_ID,
-            preset=ProfilePreset.INTERMEDIATE,
-        )
-        assert p.preset == ProfilePreset.INTERMEDIATE
+        p = UserProfile(id=USER_PROFILE_SINGLETON_ID)
+        assert p.feature_flags == {}
 
     def test_base_currency_must_be_three_letters(self) -> None:
         with pytest.raises(ValueError, match="base_currency"):
             UserProfile(
                 id=USER_PROFILE_SINGLETON_ID,
-                preset=ProfilePreset.INTERMEDIATE,
                 base_currency="EURO",
             )
 

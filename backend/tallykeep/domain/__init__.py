@@ -25,7 +25,6 @@ from tallykeep.domain.enums import (
     Network,
     PaymentStatus,
     PaymentType,
-    ProfilePreset,
     ProviderKind,
     Purpose,
     SafetyWarningKind,
@@ -100,7 +99,6 @@ __all__ = [
     "JobStatus",
     # User profile
     "UserProfile",
-    "ProfilePreset",
     "USER_PROFILE_SINGLETON_ID",
     # Analysis
     "ObservableSecurity",

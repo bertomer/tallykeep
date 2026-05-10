@@ -1,8 +1,8 @@
-# 10 — Threat Model (v1)
+# 10 — Threat Model
 
 ## Summary
 
-The v1 app runs on a host machine owned by the user, binds only to localhost, holds no Bitcoin signing material, never places orders, and can withdraw from CustodialProviders only to addresses pre-whitelisted on the provider's side and verified by the app.
+The app runs on a host machine owned by the user, binds only to localhost, holds no Bitcoin signing material, never places orders, and can withdraw from CustodialProviders only to addresses pre-whitelisted on the provider's side and verified by the app.
 
 **Single-line security property**: *an attacker who fully compromises the host machine can drain operational balances (Account funds via withdrawal-to-whitelisted-only, plus future Lightning balance), and can read the user's complete transaction history, but cannot drain Strongbox or Vault funds.*
 
@@ -14,7 +14,7 @@ The v1 app runs on a host machine owned by the user, binds only to localhost, ho
 | Private keys for Vault Holdings | Critical | Multisig co-signers, possibly geographically separated. Never on the host. |
 | Private keys for Purse Holdings | High | On the user's connected day-to-day device (phone, laptop). May or may not be on the same host as the app. |
 | CustodialProvider API credentials (read + withdrawal-whitelisted) | High | OS keyring (development) or encrypted database (Docker), never plaintext on disk |
-| Lightning node credentials (v1.5: macaroons, runefile, gRPC certs) | Medium-High | Encrypted on the host |
+| Lightning node credentials (once the Lightning iteration ships: macaroons, runefile, gRPC certs) | Medium-High | Encrypted on the host |
 | Descriptors and xpubs | Medium (privacy) | Database on the host |
 | LedgerEntries, labels, categorizations | Medium (privacy) | Database on the host |
 | SweepPolicy configurations | Low | Database on the host |
@@ -24,7 +24,7 @@ The v1 app runs on a host machine owned by the user, binds only to localhost, ho
 
 ## Actors
 
-| Actor | Capability | Defended in v1? |
+| Actor | Capability | Defended? |
 |---|---|---|
 | Curious roommate / passerby | Brief physical access to unlocked screen | Yes — sensitive data visible but no irreversible action without external signing device |
 | Opportunistic malware (user-level execution) | Read keyring or DB; act through the app's API | Partially — see attack S1 |
@@ -82,7 +82,7 @@ The v1 app runs on a host machine owned by the user, binds only to localhost, ho
 - Read the OS keyring (development mode) or read the encrypted database file. In Docker mode, the encryption key is in the running backend's process memory, so the attacker can dump that memory. Either way, **CustodialProvider API credentials are exposed**.
 - Read the database directly: descriptors (privacy loss), labels, transaction history, sweep policies.
 - Submit withdrawal requests through provider APIs. **However**: the provider's whitelist limits withdrawals to the user's whitelisted address (a Strongbox or Vault address). The attacker drains the Account, but the funds land in the user's own cold storage. This is by design.
-- (v1.5) Read Lightning node credentials. Drain Lightning operational balance.
+- Once the Lightning iteration ships: read Lightning node credentials. Drain Lightning operational balance.
 - Submit PaymentRequests through the backend's banking API. **However**: the attacker cannot sign them. The PSBT is built but cannot be broadcast without the user's external signing device.
 
 **What the attacker cannot do:**
@@ -91,7 +91,7 @@ The v1 app runs on a host machine owned by the user, binds only to localhost, ho
 - Change the withdrawal whitelist on the provider's side (requires provider-side authentication with 2FA, not just the API key).
 - Forge a signed PSBT.
 
-**Mitigations in v1:**
+**Mitigations:**
 - Provider API credentials are withdraw-whitelisted to non-Account Holdings.
 - Passphrase unlock in Docker mode ensures the encryption key requires user presence at startup. (Note: once the app is unlocked, the key is in process memory and an attacker with the right access can read it. The unlock barrier protects against attackers who get a stale disk image, not against attackers running concurrently with an unlocked app.)
 - Account balances are the only liquid asset on the host's surface; sweep policies minimize this balance.
@@ -160,7 +160,7 @@ An adversary publishes a malicious fork that looks identical and tricks the user
 
 **Impact:** potentially everything.
 
-**Mitigation:** out of scope for v1. Documented in the README. v1.0 release ships with checksums and signed releases as a v1.1 hardening item.
+**Mitigation:** out of scope through the personal-use phase. Documented in the README. The public-ship event includes signed releases + reproducible builds (per ADR-0003 ship-gate bundle) and signed releases for self-hosters (see `future_iterations.md` "Signed releases for self-hosters").
 
 ### S9 — Subscriber outage causing missed events
 
@@ -180,7 +180,7 @@ User reuses a weak passphrase, or it is keylogged.
 
 ## Security controls summary
 
-| Control | v1 status |
+| Control | Status |
 |---|---|
 | Localhost-only binding | Enforced |
 | No public API | Enforced |
@@ -199,11 +199,11 @@ User reuses a weak passphrase, or it is keylogged.
 | Logging redaction (denylist) | Enforced |
 | Persist-first-emit-second for critical events | Enforced |
 | Audit tables (sweep_execution, broadcast_attempt, event_emission_log) | Enforced |
-| Signed releases | Planned for v1.0; not v1-dev |
-| TLS | Not needed in v1 (localhost). Required if v2 enables remote access. |
+| Signed releases | Public-ship event (per ADR-0003 ship-gate bundle); not in dev or personal-use phase |
+| TLS | Not needed currently (localhost). Required when remote access is added — see `future_iterations.md` "Remote access for self-hosters". |
 | Backup guidance in documentation | Yes |
 
-## Things explicitly NOT defended in v1
+## Things explicitly NOT defended
 
 - Root attacker on the host: out of scope.
 - Signing device compromise: out of scope; user's responsibility.
@@ -212,9 +212,126 @@ User reuses a weak passphrase, or it is keylogged.
 - Denial of service by malicious bitcoind: user runs their own node; out of scope.
 - Phishing of the app itself: out of scope.
 
-## Posture for future versions
+## Mobile addendum (Capacitor build)
 
-- **v2** — when remote access is added (recommended via WireGuard or Tailscale), API-layer auth becomes required: token-based, not passwords. TLS is required for any traffic beyond localhost, even over an encrypted tunnel.
-- **v2** — when order placement is added, a new threat class appears (loss via malicious orders). Dry-run mode and per-order confirmation become required defaults; auto-execution behind extra gates.
-- **v3** — if multi-user support is ever considered, the entire threat model is revisited. User isolation, per-user secret storage, audit trails become first-class concerns.
-- **v5+** — multisig vault primitives with structured collaboration (DLCs, LSP-mediated arrangements) introduce counterparty risk that does not exist in v1. Each one needs its own threat model.
+The threat model above is host-centered: it covers TallyKeep's
+backend running on the user's host machine, with the SvelteKit
+frontend served from there or from the hosted tier. The mobile build
+(Capacitor wrap, distributed via app store / sideload, also reachable
+in the dev phase via direct APK / TestFlight) introduces a second
+surface with its own asset model and adversary considerations. This
+addendum captures the load-bearing decisions per ADR-0002, ADR-0003,
+and pre-implementation item `purse-flavors`. Full interleaving of
+mobile assets
+into the host-centered sections above is documentation work that may
+land in a future iteration; the addendum is authoritative until then.
+
+### Mobile-specific assets
+
+| Asset | Sensitivity | Where it lives |
+|---|---|---|
+| TallyKeep-managed Purse seed | Critical | iOS Keychain (Secure Enclave) / Android Keystore (TEE / StrongBox where available), AES-256-GCM at rest, biometric-gated. Lives only on the specific client device that generated (or restored) it. Capacitor build only. |
+| Lightning channel state and node keys (Lightning iteration) | Critical | Same — iOS Keychain / Android Keystore. Capacitor build only. |
+| Hosted-tier session token | High | Keychain/Keystore on Capacitor; encrypted IndexedDB on browser PWA |
+| Paired-device bearer tokens | High | Same as session token |
+
+### Mobile-specific principles (locked)
+
+- **Browser build holds no Bitcoin signing material, ever.** Desktop
+  browser, mobile browser, installed PWA — none of them. Recovery
+  for connection-only material is "revoke and re-pair," so eviction
+  is annoying but not catastrophic.
+- **Capacitor build is the only surface that holds spending keys.**
+  TallyKeep-managed Purse seeds and Lightning material live there
+  (in iOS Keychain / Android Keystore). Strongbox and Vault keys
+  never live on any TallyKeep build — they remain on hardware
+  wallets / multisig co-signers, exactly as in the host-centered
+  model above.
+- **The backend never holds a reference to a Purse seed**, encrypted
+  or otherwise. `seed_origin` records intent (TallyKeep generated
+  the seed vs. the user imported a watch-only descriptor); it does
+  not record where the seed lives. The seed location is per-client
+  runtime state, indexed locally by `holding_id`.
+- **Purse has two seed origins** (resolved per pre-implementation
+  item `purse-flavors`):
+  - *External-watch-only* — onboarded via xpub / descriptor. No
+    seed lives in any TallyKeep client; the seed is in another hot
+    wallet (Phoenix, BlueWallet, Mutiny, Sparrow's hot mode).
+    Available on browser and Capacitor. Spending always points back
+    to the source wallet.
+  - *TallyKeep-managed* — TallyKeep generated the seed during
+    Add-Holding. The seed lives in *the client device that ran the
+    creation flow*, in its Keychain/Keystore. Other clients
+    accessing the same backend see the same Holding but as
+    view-only, with a "go sign on the device that holds the seed"
+    gate. The "create TallyKeep wallet" affordance is gated
+    client-side by the client's capability to generate and securely
+    store a seed (Capacitor: yes; browser PWA: no).
+
+### Mobile-specific scenarios
+
+**S11 — Lost or stolen phone (Capacitor build).** An attacker obtains
+the user's unlocked phone, or bypasses the lock screen.
+
+- *Impact:* if the attacker bypasses biometric (face presented,
+  sleeping user, coercion), they can spend from any TallyKeep-managed
+  Purse whose seed lives on this phone, plus Lightning balances.
+  Strongbox and Vault funds remain safe (no keys on phone). The
+  dev-phase JS-signing posture (per ADR-0003) does not worsen this
+  scenario; the bottleneck is still phone access.
+- *Mitigation:* biometric prompt on every signing operation;
+  passphrase fallback for high-value spends (configurable);
+  out-of-band seed backup is the load-bearing recovery (per pending
+  pre-implementation item `seed-backup-disclosure`).
+
+**S12 — Mobile-device user-level malware.** A malicious app sandboxed
+on the same device attempts to read TallyKeep's Keychain/Keystore
+entries.
+
+- *Impact:* Keychain/Keystore is sandboxed per-app on iOS and Android
+  with hardware-backed isolation (Secure Enclave / TEE / StrongBox).
+  A user-level malicious app cannot read another app's Keychain
+  entries without privilege elevation.
+- *Mitigation:* OS sandbox; do not write seed material to shared
+  storage; do not log seed-derived intermediates. Native signing
+  plugin (ship-gate item per ADR-0003) tightens this further by
+  keeping the seed inside native code during signing — replaces the
+  dev-phase JS-signing posture.
+
+**S13 — Browser-build pretending to sign.** The browser build does
+not have access to any client-local seed. An attacker compromises the
+browser-served frontend code and tries to capture seed material.
+
+- *Impact:* none, because the browser build has no seed available
+  to capture — it has no Keychain/Keystore access, and the backend
+  has no seed reference to leak. The "spending requires the app or
+  external sign" gate (per pre-implementation item `purse-flavors`)
+  is enforced at the architectural level.
+- *Mitigation:* architectural — the gate is in the SvelteKit code
+  itself (`NativeBridge` interface throws on browser builds for
+  native operations, and the per-client signing-capability check
+  short-circuits to view-only). Designing to a single shared codebase
+  with platform-conditional behaviour avoids the temptation of
+  "let's just sign in JS for browser convenience."
+
+### Dev-phase relaxation (per ADR-0003)
+
+During the development phase, JS-side signing in the Capacitor build
+(using `@noble/secp256k1` with the seed retrieved from
+Keychain/Keystore) is acceptable instead of native-code signing. The
+known weaker model — a malicious dependency or WebView RCE during the
+signing window can extract the seed — is tolerable when the assets
+and devices are Rémy's. Native signing becomes a ship-gate item; the
+dev-phase posture is **not** the public-ship posture.
+
+## Posture for deferred work
+
+Each item below is captured in `future_iterations.md`; this section
+sketches the threat-model delta each one introduces, so the iteration
+that picks it up has a starting point for its own threat-model
+addendum.
+
+- **Remote access for self-hosters** — when remote access is added (recommended via WireGuard or Tailscale), API-layer auth becomes required: token-based, not passwords. TLS is required for any traffic beyond localhost, even over an encrypted tunnel.
+- **Order placement on custodial providers** — when order placement is added, a new threat class appears (loss via malicious orders). Dry-run mode and per-order confirmation become required defaults; auto-execution behind extra gates.
+- **Multi-user support** — if ever considered, the entire threat model is revisited. User isolation, per-user secret storage, audit trails become first-class concerns. Not in any current iteration plan.
+- **Investment layer with structured yield** (per `future_iterations.md`) — multisig vault primitives with structured collaboration (DLCs, LSP-mediated arrangements) introduce counterparty risk that does not exist today. Requires its own threat model.

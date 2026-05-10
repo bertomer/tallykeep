@@ -74,6 +74,7 @@ def _to_response(holding: Holding) -> HoldingResponse:
         total_signers=holding.total_signers,
         timelock_blocks=holding.timelock_blocks,
         recovery_setup_notes=holding.recovery_setup_notes,
+        seed_origin=holding.seed_origin,
     )
 
 
@@ -109,6 +110,7 @@ async def create_purse(
             display_order=body.display_order,
             descriptors=body.descriptors,
             adapter=_ADAPTER,
+            seed_origin=body.seed_origin,
         )
         session.commit()
     except DescriptorAlreadyExists as exc:
