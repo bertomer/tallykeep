@@ -37,7 +37,7 @@ try {
     Write-Host "cannot resolve specs/ root from $scriptDir"
     exit 2
 }
-Set-Location $specsDir
+Push-Location $specsDir
 
 $script:failCount = 0
 
@@ -270,8 +270,10 @@ if (Test-Path $tokens) {
 Write-Host ""
 if ($script:failCount -eq 0) {
     Write-Host "PASS - sanity sweep clean."
+    Pop-Location
     exit 0
 } else {
     Write-Host "FAIL - $($script:failCount) check(s) failed. Fix in the same commit (PROCESS.md §2.9)."
+    Pop-Location
     exit 1
 }
