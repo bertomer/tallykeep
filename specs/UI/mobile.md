@@ -56,6 +56,21 @@ screen-state) per the convention in `UI/mockups/README.md`.
   stores) — those are code, not spec.
 - Brand identity, copy voice — placeholder per ADR-0003.
 
+## Migration note for the first Send / Receive iteration
+
+The per-Holding Send and Receive flow detail (Account "Withdraw
+to whitelist", Purse external-watch-only redirect to source
+wallet, TallyKeep-managed Purse native-sign vs gate, Strongbox
+PSBT roundtrip, Vault) currently lives in `UI/README.md` §Send
+and §Receive because it predates the iteration-driven
+mobile-spec convention. **The first Send/Receive iteration's
+scope must include moving that detail into the corresponding
+flow sections of this file**, alongside the gauntlet answers,
+and stripping it from `UI/README.md` (which then keeps only the
+cross-platform flow inventory). This avoids the per-Holding
+detail living in two places once mobile.md gains a real
+`## Send` and `## Receive` section.
+
 ## Iteration roadmap (rough)
 
 The pre-shipping mobile UI iterations target the private-ship event

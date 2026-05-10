@@ -221,7 +221,7 @@ frontend served from there or from the hosted tier. The mobile build
 in the dev phase via direct APK / TestFlight) introduces a second
 surface with its own asset model and adversary considerations. This
 addendum captures the load-bearing decisions per ADR-0002, ADR-0003,
-and pre-implementation item `purse-flavors`. Full interleaving of
+ADR-0006 (slug `purse-flavors`), and ADR-0007. Full interleaving of
 mobile assets
 into the host-centered sections above is documentation work that may
 land in a future iteration; the addendum is authoritative until then.
@@ -252,8 +252,8 @@ land in a future iteration; the addendum is authoritative until then.
   the seed vs. the user imported a watch-only descriptor); it does
   not record where the seed lives. The seed location is per-client
   runtime state, indexed locally by `holding_id`.
-- **Purse has two seed origins** (resolved per pre-implementation
-  item `purse-flavors`):
+- **Purse has two seed origins** (resolved per ADR-0006, slug
+  `purse-flavors`):
   - *External-watch-only* — onboarded via xpub / descriptor. No
     seed lives in any TallyKeep client; the seed is in another hot
     wallet (Phoenix, BlueWallet, Mutiny, Sparrow's hot mode).
@@ -305,8 +305,8 @@ browser-served frontend code and tries to capture seed material.
 - *Impact:* none, because the browser build has no seed available
   to capture — it has no Keychain/Keystore access, and the backend
   has no seed reference to leak. The "spending requires the app or
-  external sign" gate (per pre-implementation item `purse-flavors`)
-  is enforced at the architectural level.
+  external sign" gate (per ADR-0006) is enforced at the
+  architectural level.
 - *Mitigation:* architectural — the gate is in the SvelteKit code
   itself (`NativeBridge` interface throws on browser builds for
   native operations, and the per-client signing-capability check

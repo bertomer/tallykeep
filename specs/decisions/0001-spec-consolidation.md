@@ -11,6 +11,17 @@
 > `UI/backend_deltas.md` is replaced by the iteration cycle:
 > `next_iteration.md` + `future_iterations.md`). The body below is
 > kept as historical record.
+>
+> **Editorial note (2026-05):** the body's "Files affected" list still
+> references the original filename `09_profiles_and_flags.md` and the
+> original "absorb no named presets" plan. The actual resolutions
+> went further: the file was renamed `09_feature_flags.md` and named
+> presets were dropped entirely (replaced by onboarding-question-driven
+> defaults). Both moves are recorded in the
+> `profile-presets-vs-contextual` Decided entry in
+> `pre-implementation.md`. The body below is kept as historical record
+> per ADR append-only discipline; consult the Decided entry for the
+> current state.
 
 ## Context
 

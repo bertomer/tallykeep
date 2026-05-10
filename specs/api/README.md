@@ -40,16 +40,20 @@ starts.
 
 - This file is the **contract** for UI work. UI specs consume it; UI
   specs do not redefine endpoint shapes.
-- **Currency is mandatory.** Any code change touching the API surface
-  (new endpoint, schema change, removed field, SSE event change) must
-  be accompanied by regeneration of this file in the same iteration.
-  Drift between OpenAPI and code is a bug. The coding agent is
-  responsible.
-- When work needs a backend change, the change is listed as part of
-  the relevant iteration in `../next_iteration.md` (per ADR-0002,
+- **Currency is mandatory.** Any code change touching the API
+  surface (new endpoint, schema change, removed field, SSE event
+  change) must be accompanied by regeneration of this file in the
+  closeout commit of that iteration. Drift between OpenAPI and
+  code is a bug. The coding agent is responsible.
+- **Regeneration timing.** Regen happens during iteration closeout
+  (`PROCESS.md §2.7` stage 5), **after** Rémy's smoke-test +
+  Swagger validation gives the explicit greenlight — not while the
+  code is still being iterated. Regenerating mid-iteration captures
+  half-built state; regenerating after greenlight captures the
+  shipped state.
+- When work needs a backend change, the change is listed as part
+  of the relevant iteration in `../next_iteration.md` (per ADR-0002,
   replacing the older `UI/backend_deltas.md` proposal).
-- After the backend implements an iteration item that touched the API
-  surface, regenerate this file. The iteration is not complete until
-  the OpenAPI matches the code.
+- The iteration is not complete until the OpenAPI matches the code.
 - Manual edits to `openapi.yaml` are forbidden. If it's
   wrong, the backend is wrong; fix it there.

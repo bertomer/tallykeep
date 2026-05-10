@@ -1,17 +1,13 @@
 # Mobile mockups
 
 Page-per-file HTML mockups for visual fine-tuning. Each file is
-self-contained, imports shared tokens and shell styles, and targets a
-mobile viewport.
+self-contained, imports shared tokens and shell styles, and
+targets the mobile baseline viewport.
 
-## Why page-per-file
-
-- Easier to fine-tune one screen without scrolling through 1000 lines.
-- Easier to point a coding agent at "implement this screen" with one
-  filename.
-- Easier to diff individual screens across iterations.
-- A mockup's status (draft / review / validated) is per-screen, which
-  matches how decisions actually move through the project.
+Working rules for mockups (page-per-file rule, status semantics,
+ADR thresholds, baseline + smoke-test viewports) live in
+`PROCESS.md §2.3` and `§5`. This file holds operational layout
+only — naming, header structure, file structure, contact sheet.
 
 ## Naming
 
@@ -42,7 +38,6 @@ mobile_add_account_01_provider.html
 mobile_add_account_02_credentials.html
 mobile_add_purse_01_origin.html
 mobile_add_purse_02_seed_backup.html
-...
 
 mobile_onboarding_01_welcome.html
 mobile_onboarding_02_passphrase.html
@@ -73,6 +68,10 @@ Header comment lines (always include):
 -->
 ```
 
+Status field is one of `draft` / `review` / `validated`. Semantics
+and the "ADR or no ADR" test for changes to a validated mockup are
+in `PROCESS.md §7`.
+
 Each file imports shared CSS:
 
 ```html
@@ -92,68 +91,33 @@ Body wraps content in a `phone-frame` for visual review:
 </body>
 ```
 
-## Viewport target
-
-Calibrated to the Argentine market (primary launch geography per
-project plan): Samsung ~48% of devices, Motorola ~27%, Apple ~12%.
-Mid-range Galaxy A and Motorola Moto G dominate.
-
-- **Baseline: 360 × 800** (mid Galaxy A, Moto G — the broad
-  mid-range). Mobile-first principle: if it works here, it works
-  everywhere.
-- **Smoke-test at:** 384 × 854 (Galaxy A56-class), 390 × 844
-  (iPhone 14 / 15 / 16), 412 × 900 (larger Android, Pixel-style).
-- **Browsers to check:** Chrome (region-leading), Samsung Internet
-  (default on the largest phone share — Chromium-based but with
-  quirks), Safari mobile (Apple share).
-- Safe-area insets respected via the `.phone-screen` paddings in
-  `_shared/shell.css`.
-
 ## Self-contained for review
 
 - No JS dependencies. Static HTML + CSS.
-- If a state needs interactivity to communicate, draft both states as
-  separate files (e.g. `..._fiat_off.html` and `..._fiat_on.html`)
-  rather than relying on JS toggles.
-- Inline any per-screen CSS overrides in a `<style>` block at the top
-  of `<head>`, after the shared CSS imports.
-
-## Status field
-
-Header `Status:` is one of:
-
-- **draft** — under iteration; not yet reviewed
-- **review** — submitted for review; pending feedback
-- **validated** — design locked; the corresponding section in
-  `UI/mobile.md` references this file
-
-When a screen moves to validated, edit `UI/mobile.md` to lock the
-reference. Cosmetic iteration on a validated mockup is fine
-afterwards — edit the file and update its date. Changes that touch a
-locked principle, reverse a foundational design decision, or affect
-security / posture / vocabulary need an ADR plus a fresh draft.
-
-Examples:
-
-- *Edit, no ADR:* refining a label, tweaking tap targets, adjusting
-  spacing, adding a tap-to-toggle on the unit indicator.
-- *ADR + fresh draft:* adding a Send button to a screen previously
-  decided to be view-only on browser, changing the trust boundary,
-  modifying vocabulary, reversing a posture call.
-
-The test: if it feels like *let me refine this*, edit. If it feels
-like *wait, should we even do this?* — that's an ADR moment. (See
-`PROCESS.md` §7.)
+- If a state needs interactivity to communicate, draft both states
+  as separate files (e.g. `..._fiat_off.html` and
+  `..._fiat_on.html`) rather than relying on JS toggles.
+- Inline any per-screen CSS overrides in a `<style>` block at the
+  top of `<head>`, after the shared CSS imports.
 
 ## Visual contact sheet
 
-The visual index lives at `index.html` in this directory — a grid of
-all mockups loaded as iframes for at-a-glance review. Useful for
-spotting drift across screens (colors, type, spacing, navigation
-conventions).
+`index.html` in this directory loads all mockups as iframes for
+at-a-glance review — useful for spotting drift across screens
+(colors, type, spacing, navigation conventions).
 
-When adding or removing a mockup, update the `mockups` array near the
-top of `index.html`.
+When adding or removing a mockup, update the `mockups` array near
+the top of `index.html`. The iteration-done sanity sweep
+(`PROCESS.md §2.9`) verifies the array matches the files present.
 
-Open `index.html` in any browser; click any card to open the full-size
-mockup in a new tab.
+Open `index.html` in any browser; click any card to open the
+full-size mockup in a new tab.
+
+## Pointers (don't duplicate the rules below)
+
+- Page-per-file rule and rationale → `PROCESS.md §2.3`
+- Baseline + smoke-test viewports, browser matrix →
+  `PROCESS.md §5`
+- Status semantics and ADR test → `PROCESS.md §7`
+- Mockup-iteration acceptance (validated mockups referenced from
+  `UI/mobile.md`) → `PROCESS.md §2.7`

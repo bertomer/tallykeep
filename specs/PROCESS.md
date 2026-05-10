@@ -28,9 +28,9 @@ specs/
 ├── api/
 │   └── openapi.yaml ... frozen backend contract (generated)
 ├── brand/
-│   ├── README.md ........... canonical product identity, layout, status
-│   ├── tallykeep_<artifact>_v<N>_lock.html ... one big lock doc per artifact
-│   │                       (mark, wordmark, future lockup, etc. — see brand/README.md)
+│   ├── README.md ........... brand layout, status, pointers
+│   ├── tallykeep_<artifact>_v<N>_<status>.html ... one big lock doc per artifact
+│   │                       (mark, wordmark, future lockup). status: lock | draft | superseded
 │   ├── tallykeep_<voice-piece>_v<N>_<status>.md ... voice/about/tagline copy
 │   ├── identity/
 │   │   ├── README.md ....... import-target conventions
@@ -39,7 +39,7 @@ specs/
 │   └── assets/ ............. (when present) built artifacts: favicon.ico,
 │                            app-store icons, social cards, etc.
 ├── decisions/
-│   ├── README.md ........... ADR convention
+│   ├── README.md ........... ADR convention + index
 │   └── NNNN-title.md ....... one ADR per foundational decision
 ├── UI/
 │   ├── README.md ........... cross-platform flow inventory + decisions
@@ -48,28 +48,149 @@ specs/
 │   └── mockups/
 │       ├── README.md ....... naming + index
 │       ├── _shared/
-│       │   ├── tokens.css .. brand tokens (placeholder)
+│       │   ├── tokens.css .. brand tokens
 │       │   └── shell.css ... phone-frame and common layout
 │       └── mobile_<flow>_<state>.html ... one page per file
+├── tools/
+│   └── check-spec.sh ....... iteration-done sanity sweep (see §2.9)
 └── archive/ ................ historical iterations, never source of truth
 ```
 
-Modules 11–14 of the original spec retire in the consolidation merge.
-Their content redistributes per ADR-0002. Modules 00–10 remain canonical
-product description.
+Modules 11–14 of the original spec retired in the consolidation
+merge. Their content redistributes per ADR-0002. Modules 00–10
+remain canonical product description.
 
-The split between **target product** (canonical specs `00`–`10`,
-`decisions/`, `UI/`, `api/`) and **path to target** (`next_iteration.md`,
-`future_iterations.md`, `pre-implementation.md`) is deliberate. Target
-evolves in place; path cycles through iterations.
+**Three doc roles, one job each:**
 
-Anything not in canonical or `decisions/` is either iteration scope, a
-working draft, an arbitration item, or archived history. The next agent
-should never need to read `archive/` to do its job.
+- **Target-product canon** (`00`–`10`, `UI/`, `api/openapi.yaml`,
+  `brand/`) — what TallyKeep IS. Edited in lockstep with every
+  brainstorm decision. Never describes process.
+- **Path-to-target** (`next_iteration.md`, `future_iterations.md`,
+  `pre-implementation.md`) — what's being worked, what's open,
+  what's deferred. Never describes the canonical product.
+- **Rules and decisions** (this file, `decisions/`) — how we work,
+  what we've decided. **Process lives in PROCESS only.**
+  Foundational decisions live as ADRs only. Other READMEs in the
+  tree describe layout and status; for rules they point here.
+
+Anything not in canonical, path-to-target, or `decisions/` is
+either a working draft or archived history. The next agent should
+never need to read `archive/` to do its job.
 
 ---
 
 ## 2. Core rules
+
+### Roles
+
+A new agent landing in this repo plays one of a small set of
+roles. The roles are not tools or personas — they are different
+**work-shapes**, each with its own input, output, and acceptance
+gate. The first thing an arriving agent should do (before
+anything in §6) is locate which role the current session is in.
+The boot sequence routes by role implicitly; this section makes
+the routing explicit.
+
+**Specification agent** — drafts and edits the spec.
+- *Input:* a brainstorm session with Rémy, an open question in
+  `pre-implementation.md`, or drift the §2.9 sweep surfaced.
+- *Output:* edits to canonical docs (`00`–`10`, `UI/`, `brand/`),
+  entries in `next_iteration.md` /
+  `pre-implementation.md` / `future_iterations.md`, ADRs in
+  `decisions/`, mockup files when the iteration includes them.
+  **Never code.**
+- *Gate:* Rémy reads the spec edits and confirms ("yes, that's
+  the call"), or sends back to arbitration.
+
+**Coding agent** — implements a sharpened iteration.
+- *Input:* `next_iteration.md`'s active iteration block.
+  Does not invent scope; if scope is empty, stops and reports
+  per `next_iteration.md` "What an arriving agent should do".
+- *Output:* code commits implementing the iteration. At
+  closeout: regenerated `api/openapi.yaml` and edited
+  `next_iteration.md` removing shipped items.
+- *Gate:* the human-validation handoff in §2.7 stages 3–4 —
+  smoke tests + Swagger UI check + Rémy's explicit greenlight.
+  See §2.7 for the mandatory stop and the closeout sequence.
+
+**Design / brand agent** — draws and locks the visual surface.
+- *Input:* a UI iteration block, or a brand-artifact revision
+  (mark, wordmark, future lockup, voice draft).
+- *Output:* mockup HTML files in `UI/mockups/`, brand lock docs
+  in `brand/`, regenerated `brand/identity/*.svg`, lockstep
+  `tokens.css` updates, edits to `UI/mobile.md` flow sections
+  when a mockup is validated.
+- *Gate:* Rémy's visual validation (look, vocabulary, gauntlet
+  question 4 "confirmation honesty"). **Not** smoke tests, not
+  OpenAPI regeneration. The lockstep propagation rule (brand →
+  identity SVGs → tokens.css) is §2.4.
+
+**Marketing agent** (future, post-public-ship event) — drafts
+external-facing copy.
+- *Input:* brand voice principles
+  (`brand/tallykeep_about_v1_draft.md`) plus a brief.
+- *Output:* tagline, marketing-site copy, app-store listings,
+  social cards, blog drafts. Lives outside the spec tree
+  (probably a sibling marketing-site repo).
+- *Gate:* Rémy on voice and factual accuracy. Banking-ergonomics
+  framing per `00_README.md` "Why this exists"; never the maxi
+  voice (no "be your own bank", "stack sats", "orange-pill",
+  "sound money", laser eyes).
+
+**Triage / consolidation agent** (rare, on demand) — audits the
+spec tree for drift and proposes targeted fixes.
+- *Input:* suspicion that multi-session work has drifted, or a
+  failing §2.9 sanity sweep that needs more than mechanical fixes.
+- *Output:* an audit report, then targeted edits closing the
+  gaps. The work that produced the current shape of this
+  PROCESS.md was a triage pass.
+- *Gate:* Rémy reviews the findings and prioritizes the fix
+  order before any edits land.
+
+**One agent, one role per session — with a deliberate escape
+hatch.** The base rule is one role per session. Mixing roles
+unconsciously — "I'll code AND update the spec while I'm here" —
+is how the original consolidation merge became necessary.
+
+The escape hatch: an agent **may** transition roles within a
+single session if the transition is **explicit** and the next
+role's input is sharpened first.
+
+- *Tight iteration (one screen, narrow bug fix, single-flow
+  mockup):* one session can run spec-agent → coding-agent
+  end-to-end. The agent says, in chat to Rémy, "scope is
+  sharpened — switching to coding agent now, working against
+  this specific scope." From that moment it does not edit
+  canonical specs except for the §2.7 closeout.
+- *Large iteration (multiple modules, multi-day work, new
+  feature surface):* split sessions. Spec agent sharpens with
+  Rémy, hands off; coding agent picks up the sharpened
+  iteration in a fresh session. The session boundary enforces
+  the role boundary mechanically — the right shape when the
+  iteration is large enough that role-mixing risk is real.
+
+If a coding session uncovers a real spec issue, the agent
+stops, names the issue, and either explicitly transitions to
+spec-agent (after Rémy confirms scope of the spec change) or
+hands the issue to a separate session. Same in reverse: a spec
+agent that finds itself wanting to write production code has
+stepped out of role; sharpen the iteration and hand off
+instead. The forbidden move is silent role-mixing — discovering
+spec ambiguity, picking an interpretation, and shipping both
+the code and the matching spec edit in the same commit without
+Rémy seeing the spec call. That is the failure mode this rule
+exists to prevent.
+
+**Which rules apply to which role.** Most rules in this section
+apply to every role. The role-specific bits are signaled by the
+gates: §2.7 (iteration cycle stages) is the coding agent's loop,
+§3 (gauntlet) is run primarily by spec and design agents,
+§2.3 (mockups page-per-file) + §2.4 (brand lock-doc pattern) +
+§4 (browser fine-tuning) + §5 (mockup convention) are mostly
+the design/brand agent's territory, §2.8 (naming discipline)
+binds the coding agent at the identifier layer and the spec
+agent at the vocabulary layer. §2.9 (sanity sweep) and §6 (boot
+sequence) apply to every role.
 
 ### 2.1 No parallel "amendments" docs
 
@@ -116,7 +237,8 @@ backend changes without regenerating.
 
 Drift between code and `api/openapi.yaml` is a bug, not a deferred
 chore. If you find drift, treat it as iteration scope (open a small
-janitorial iteration), not a TODO.
+janitorial iteration), not a TODO. The iteration-done sanity sweep
+(§2.9) catches this mechanically.
 
 ### 2.3 Mockups are page-per-file
 
@@ -145,10 +267,14 @@ screen is a unit of state that evolves independently. Don't try to
 "normalize" the brand folder into per-aspect files (a `colors.md`,
 a `typography.md`, etc.). The lock-doc pattern is the spec.
 
-Naming: `tallykeep_<artifact>_v<N>_lock.html` for visual lock docs;
-`tallykeep_<voice-piece>_v<N>_<status>.md` for voice/copy. The
-`v<N>` suffix is intentional and exempt from the "no _v1 suffix"
-rule — these are versioned checkpoints, not living docs.
+Naming: `tallykeep_<artifact>_v<N>_<status>.html` for visual lock
+docs; `tallykeep_<voice-piece>_v<N>_<status>.md` for voice/copy.
+Status is one of `lock` / `draft` / `superseded`. The `tallykeep_`
+prefix is kept (brand artifacts are consumed outside this folder
+by mockups, frontend, and future marketing — self-identifying
+filenames matter). The `v<N>` suffix is intentional and exempt
+from the "no _v1 suffix" rule that applies to UI specs — brand
+lock docs are versioned checkpoints, not living docs.
 
 **Brand → identity → consumers.** Lock docs embed inline SVG so
 they read standalone. Clean SVG files for downstream consumption
@@ -196,21 +322,80 @@ later) — not into the agent's head.
 
 ### 2.7 Iteration cycle
 
-The coding agent works one iteration at a time. The active iteration's
-sharpened scope lives in `next_iteration.md`. Future iterations live in
-`future_iterations.md` as rough captured ideas, awaiting promotion.
+The coding agent works one iteration at a time. The active
+iteration's sharpened scope lives in `next_iteration.md`. Future
+iterations live in `future_iterations.md` as rough captured ideas,
+awaiting promotion.
 
-When an iteration completes:
+**Stages of a coding iteration:**
 
-- Items shipped → removed from `next_iteration.md`.
-- OpenAPI regenerated.
-- Mockups marked validated where applicable.
-- One item from `future_iterations.md` is promoted, sharpened, and
-  becomes the new active iteration.
+1. **Sharpen.** Rémy + agent fill in the iteration template in
+   `next_iteration.md` (scope in/out, tasks, acceptance, deps). The
+   coding agent does not start work on a half-sharpened iteration.
 
-When a brainstorm session produces a decision: edit the canonical doc
-**and** `next_iteration.md` in lockstep, every time. New ideas not in
-the active scope go to `future_iterations.md`. No parallel notes.
+2. **Code.** Agent implements the scope. Runs the in-tree test
+   suites (pytest, frontend tests if any) and the spec sanity
+   sweep (`tools/check-spec.ps1` on Windows or `check-spec.sh`
+   on Linux/Mac, per §2.9).
+
+3. **Stop and hand off.** When the agent thinks the work is done,
+   it **stops**. It posts a "ready for verification" message that
+   summarizes:
+   - what changed (files, endpoints, schemas, UI)
+   - what was tested on the agent's side and the results
+   - what's left for Rémy to verify (typically: smoke-test
+     `.ps1` against the running backend, Swagger UI manual
+     check, hand-test of any new flow)
+   - what should happen on greenlight (the closeout list below,
+     so Rémy knows what "go" triggers)
+
+   **The agent does not start cleanup work at this stage.** It
+   does **not** regenerate `api/openapi.yaml`, does **not** edit
+   `next_iteration.md`, does **not** promote the next item, does
+   **not** assume "my tests passed" means "shipped." Those are
+   post-validation steps. The handoff is a hard stop.
+
+4. **Rémy validates.** Smoke tests (the project's `.ps1` suite
+   against the running backend), Swagger UI check, anything else
+   relevant to the iteration. He responds with one of:
+   - **Greenlight** — "go", "ship it", "OK", or equivalent.
+     Proceed to closeout.
+   - **Fixes needed** — specific issues. Agent loops back to
+     stage 2.
+
+5. **Closeout.** Only on Rémy's explicit greenlight. The agent:
+   - Regenerates `api/openapi.yaml` from the running backend if
+     this iteration touched any API surface (per §2.2). Manual
+     edits to the file are forbidden — if it's wrong, fix the
+     backend, restart, regenerate.
+   - Edits `next_iteration.md`: removes shipped scope items;
+     leaves a brief `## Shipped <date> (commit ...)` record
+     under the iteration block, or empties the active section
+     back to template if this iteration was the last.
+   - Marks any newly validated mockups in `UI/mobile.md` per §5.
+   - Runs the sanity sweep (§2.9) one final time. **Must pass.**
+   - Commits the closeout in a single change. Commit message
+     references the iteration name and the validation context
+     ("closeout after Rémy greenlight on YYYY-MM-DD").
+
+6. **Promote.** One item from `future_iterations.md` is sharpened
+   into the new active-iteration block. Picking the next item is
+   **collaborative** — the agent does not pick alone. If Rémy
+   isn't in the conversation, the agent stops here and reports
+   "iteration closed; no successor sharpened yet."
+
+**Why the stage-3 stop is mandatory.** The smoke-test suite plus
+Swagger UI check is what catches the "agent thinks the API is
+right but a real client says otherwise" failure mode. The
+agent's own tests don't substitute. Skipping to closeout because
+"my tests passed" is the same shape of error as bypassing
+OpenAPI regeneration because "I didn't change much."
+
+When a brainstorm session produces a decision: edit the canonical
+doc **and** `next_iteration.md` in lockstep, every time. New ideas
+not in the active scope go to `future_iterations.md`. No parallel
+notes. Foundational decisions get an ADR (per §7); non-foundational
+decisions ride in the canonical-doc edit alone.
 
 ### 2.8 Naming discipline
 
@@ -228,8 +413,59 @@ identifiers do not. A field is `total_balance_sats`, not `your_money`.
 cost of decoding the abbreviation is paid by every reader forever.
 
 Industry-standard exceptions are accepted as-is: UTXO, PSBT, BIP,
-RPC, BTC, sats, LN, gRPC, SSE, API, KDF, GCM. Add to this list with
-care; brevity is not a sufficient reason on its own.
+RPC, BTC, sats, LN, gRPC, SSE, API, KDF, GCM, plus the SQL prefix
+`idx_*` for index names. Add to this list with care; brevity is
+not a sufficient reason on its own.
+
+### 2.9 Iteration-done sanity sweep
+
+The sweep runs at two points:
+
+- **Coding stage 2** (per §2.7) — agent runs it locally before the
+  stage-3 handoff, so the "ready for verification" message reflects
+  a clean tree.
+- **Closeout stage 5** — agent runs it again after regenerating
+  OpenAPI and editing `next_iteration.md`. **Must pass before the
+  closeout commit lands.**
+
+Most checks are mechanical and run via `tools/check-spec.ps1`
+(Windows) or `tools/check-spec.sh` (Linux/Mac). Either is
+sufficient; the two are kept in sync. A few seconds either way.
+
+Checklist:
+
+1. **OpenAPI matches code.** If the iteration touched any
+   endpoint, schema, SSE event, error type, or locked-state
+   behavior, `api/openapi.yaml` was regenerated from the running
+   backend during the closeout commit (§2.7 stage 5). The check
+   verifies the file exists and is non-trivial in size; mismatch
+   between the file and the live backend surfaces only when Rémy
+   re-checks Swagger.
+2. **ADR index is current.** Every file in `decisions/NNNN-*.md`
+   appears in the index in `decisions/README.md`, and no entry in
+   the index points at a missing file.
+3. **Mockup index is current.** The `mockups` array near the top
+   of `UI/mockups/index.html` matches the set of
+   `mobile_*.html` files in `UI/mockups/`. New mockups added,
+   removed mockups taken out.
+4. **No broken backtick file refs.** Cross-references like
+   `\`02_domain_model.md\`` resolve to a real file, in non-archive
+   docs. Archive references are exempt; retired-filename
+   references in ADRs (kept for historical context) pass via the
+   script's allow-list.
+5. **Brand → tokens lockstep.** If a brand lock doc was edited
+   (color values, typography, spacing scales used by tokens), the
+   matching values in `UI/mockups/_shared/tokens.css` were updated
+   in the same change, and the file's "Last touched" stamp was
+   bumped. The script flags any lock doc whose mtime is newer
+   than tokens.css. If `brand/identity/*.svg` was edited, the
+   inline SVG in the source lock doc matches.
+6. **No "Decided" parallel ledger.** `pre-implementation.md`
+   contains only Open items. Closed items left the file (to ADR or
+   canonical doc edits, per §2.6).
+
+If any check fails, the iteration isn't done. Fix in the same
+commit, not as a TODO. Drift is a bug, not a chore (per §2.2).
 
 ---
 
@@ -298,18 +534,21 @@ of these, escalate as arbitration.
    deps on the Bitcoin path. (Lightning will reintroduce this question
    when Breez SDK lands; flag there.)
 
-Verdict: reconcilable in v1.
+Verdict: reconcilable in current scope (dev / personal-use phase
+per ADR-0003).
 
 ### Where the irreconcilable corners actually live
 
-The principle-stressing flows in v1's scope are predictable. Most are
-already deferred or have a path:
+The principle-stressing flows in current scope are predictable.
+Most are already deferred or have a path:
 
 - **Order placement on custodial providers** — needs trade-permissioned
-  API key on backend. Deferred to v2. Pulling it forward forces a
+  API key on backend. Deferred to post-shipping (see
+  `future_iterations.md`). Pulling it forward forces a
   custody-adjacent regulatory conversation.
 - **Own-LSP for Lightning** — TallyKeep operates routing infrastructure
-  seeing payment metadata. v2+. Flag with an ADR when pursued.
+  seeing payment metadata. Post-shipping. Flag with an ADR when
+  pursued.
 - **Tax / accounting export on hosted tier** — backend already has the
   data; hosted-tier privacy notice covers it. Reconcilable but
   explicit.
@@ -391,19 +630,48 @@ security / posture / vocabulary need an ADR plus a fresh draft. See
 
 ## 6. Working agreement for the next agent
 
+This is the **canonical agent boot sequence**. Other READMEs in
+the spec tree (`brand/README.md`, `UI/mockups/README.md`, etc.)
+point here rather than duplicating it.
+
 When starting a new session:
 
-1. Read `00_README.md` and `PROCESS.md` (this).
-2. Read `next_iteration.md` — that is your scope.
-3. Read the canonical spec module(s) relevant to your scope.
-4. Read `pre-implementation.md` to know what's blocked.
-5. `future_iterations.md` is reference only; do not work it.
-6. Confirm `api/openapi.yaml` is current; if not, regenerate
+0. **Identify your role.** Read §2 "Roles" first. Determine
+   whether this session is spec-agent work, coding-agent work,
+   design/brand-agent work, or triage. If you're not sure, ask
+   Rémy before doing anything else — the gates and outputs differ
+   per role and "I'll figure it out" is how role-mixing starts.
+1. Read `00_README.md` — what TallyKeep is.
+2. Read `PROCESS.md` (this) — how we work, including the
+   reconcilability gauntlet (§3) and the iteration-done sanity
+   sweep (§2.9).
+3. Walk the ADR index in `decisions/README.md`; read every ADR.
+   These are the foundational decisions that don't get
+   re-litigated. They are short and worth the time.
+4. Read `next_iteration.md` — that is your scope. If there is no
+   active iteration, do not invent one; report current state and
+   stop.
+5. Read the canonical spec module(s) relevant to your scope.
+6. Read `pre-implementation.md` — Open items only; that's what's
+   blocked on Rémy's arbitration.
+7. `future_iterations.md` is reference only; do not work it.
+8. Confirm `api/openapi.yaml` is current; if not, regenerate
    from the running backend.
-7. If your scope touches anything user-facing (UI, copy, color,
-   icons, app-store assets), skim `brand/README.md` to know
-   whether brand is locked or still in placeholder mode.
-8. Then proceed.
+9. If your scope touches anything user-facing (UI, copy, color,
+   icons, app-store assets), skim `brand/README.md` to confirm
+   brand status (v1 locked / v2 in flight / etc.).
+10. Then proceed.
+
+Iteration handling, in one paragraph: code → run `tools/check-spec.ps1`
+(or `.sh`) → **stop and say "ready for verification"** → wait for
+Rémy's smoke-tests + Swagger check + explicit greenlight → on
+greenlight, regenerate OpenAPI, clean up `next_iteration.md`, run
+the sweep one final time, commit. Full sequence with the
+mandatory stop is in §2.7; the sanity sweep is §2.9.
+
+Specifically: do **not** regenerate `api/openapi.yaml`, do **not**
+edit `next_iteration.md`, do **not** promote the next item before
+Rémy gives an explicit go. "My tests passed" is not "shipped."
 
 Defaults:
 

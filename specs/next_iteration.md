@@ -61,6 +61,24 @@ this mockup at this viewport; this gauntlet step passes.>
 <what blocks this iteration: pre-implementation items needing
 arbitration, prior iterations not yet shipped, third-party things.>
 
+#### Verification (Rémy)
+
+<what Rémy will run / check after the agent's stage-3 handoff,
+before greenlighting closeout. Default for backend iterations:
+the project's `.ps1` smoke-test suite + a Swagger UI walk-through
+of any touched endpoint. Default for UI iterations: open the
+named mockups + hand-test the new flow at 360×800. Add anything
+iteration-specific.>
+
+#### Closeout
+
+The agent does **not** start closeout until Rémy gives an
+explicit greenlight after stage-4 validation. On greenlight the
+agent: regenerates `api/openapi.yaml` (if API surface changed),
+removes shipped scope items from this file, runs
+`tools/check-spec.ps1`, commits. Full sequence in
+`PROCESS.md §2.7` stages 3–5.
+
 ---
 
 ## Active iteration
@@ -89,27 +107,37 @@ iteration.
 
 ### What an arriving agent should do
 
-1. Read `00_README.md`, `PROCESS.md`, this file.
-2. If Rémy is in the conversation, say so and ask which screen-flow
-   he wants to sharpen first (the roadmap below is the candidate
-   list).
-3. If Rémy is not in the conversation, do not invent scope. Report
-   the current state and stop.
+The boot sequence is in `PROCESS.md §6`. Don't duplicate it here.
+The thing specific to the current bottleneck:
+
+- If Rémy is in the conversation, ask which screen-flow he wants to
+  sharpen first (the roadmap below is the candidate list).
+- If Rémy is not in the conversation, do not invent scope. Report
+  the current state and stop.
 
 ### Decisions already pre-bagged for the first iterations
 
-- Home empty's four Add affordances are a popup on Add-Holding tap,
-  not directly inline on the empty state.
-- Watch-only Purse onboarding accepts xpub or descriptor only, not
-  single addresses (per pre-implementation item `purse-flavors`).
-- TallyKeep-managed Purse creation: the "Create a TallyKeep wallet"
-  affordance is gated client-side on the device's capability to
-  generate and securely store a seed; browser builds hide it with
-  an install-the-app message (per `purse-flavors`).
+**Transient.** This section captures decisions sharpened during
+brainstorm sessions that haven't yet been folded into a concrete
+iteration. When the first Onboarding + Home iteration is
+sharpened using the template above, **these bullets fold into
+its Scope (in) section** and this transient block is removed.
+It's not canonical and shouldn't be referenced from outside this
+file.
+
+- Home empty's four Add affordances are a popup on Add-Holding
+  tap, not directly inline on the empty state.
+- Watch-only Purse onboarding accepts xpub or descriptor only,
+  not single addresses (per ADR-0006, slug `purse-flavors`).
+- TallyKeep-managed Purse creation: the "Create a TallyKeep
+  wallet" affordance is gated client-side on the device's
+  capability to generate and securely store a seed; browser
+  builds hide it with an install-the-app message (per ADR-0006).
 - Mobile baseline viewport: 360 × 800 (per `UI/mockups/README.md`).
 
-When the next iteration is sharpened, this section gets filled in
-using the template above.
+When the next iteration is sharpened, this section gets filled
+in using the template above and the bullets above migrate into
+it.
 
 ---
 
@@ -134,7 +162,7 @@ security-health work lands.
 5. **Activity + Categorization** — cross-Holding feed plus
    per-Holding categorization
 6. **Sweep Policy + Trading view** — Account-originated sweeps in
-   v1 dev-phase scope
+   the dev-phase scope
 7. **Settings** — including the security-health system at least
    for seed-backup warnings (private-ship gate)
 

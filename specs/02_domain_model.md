@@ -111,9 +111,8 @@ class Vault(Holding):
 
 `seed_origin` records **what kind of wallet this Purse is** in a way
 that is stable across devices and meaningful to all of them. It is
-the resolution of arbitration item `purse-flavors` in
-`pre-implementation.md`. The split is structural because the spending
-UX differs materially.
+the resolution recorded in ADR-0006 (slug `purse-flavors`). The
+split is structural because the spending UX differs materially.
 
 `seed_origin` does **not** record where the seed physically lives.
 That is a per-client, runtime concern (see "Signing capability is

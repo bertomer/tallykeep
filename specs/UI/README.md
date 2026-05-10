@@ -134,8 +134,8 @@ clarity, not in the primary labels.
 | Strongbox | Like a savings account, but you hold the key | A safer spot for medium-term holdings, usually on a hardware wallet |
 | Vault | Like a safety-deposit box | A heavily-protected long-term holding, multi-key, used rarely |
 
-Purse has two seed origins per pre-implementation item
-`purse-flavors`. The seed origin is a backend-stored intent field;
+Purse has two seed origins per ADR-0006 (slug `purse-flavors`).
+The seed origin is a backend-stored intent field;
 *which client device actually holds the seed* is a per-client,
 runtime fact (see module 02 §"Signing capability is per-client").
 
@@ -188,10 +188,10 @@ first visit. Contains:
 
 Recent activity and categorization live in the Activity tab
 (cross-Holding view) and on per-Holding detail pages — never on the
-home / consolidated landing page (per pre-implementation item
-`categorization-queue-mobile`).
-The home is for at-a-glance "where is my money" and primary actions;
-the Activity tab is for review and categorization work.
+home / consolidated landing page. The home is for at-a-glance
+"where is my money" and primary actions; the Activity tab is for
+review and categorization work. The push-driven categorization
+prompt is captured for later in `future_iterations.md`.
 
 ### Add Holding
 
@@ -202,9 +202,9 @@ Type chooser → type-specific flow.
 - **Add Purse:** binary at the start of the flow:
     - **Import an existing wallet** (`seed_origin=external_watch_only`)
       — paste / QR an xpub or descriptor. **xpub or descriptor only**
-      — single-address import is not supported (per pre-implementation
-      item `purse-flavors`; observing one address misrepresents
-      wallet activity that rotates across many addresses).
+      — single-address import is not supported (per ADR-0006;
+      observing one address misrepresents wallet activity that
+      rotates across many addresses).
     - **Create a new TallyKeep wallet**
       (`seed_origin=tallykeep_managed`) — TallyKeep generates a
       fresh seed into the current client's Keychain/Keystore and
@@ -344,12 +344,11 @@ tab visible-disabled today.
 
 ### Activity + Categorization
 
-Cross-Holding activity feed (per pre-implementation item
-`categorization-queue-mobile`). On
-mobile: a dedicated Activity tab carries this. Categorization is
-possible from the per-Holding detail page and from the Activity
-tab. Push-driven categorization prompts and timed in-app popups are
-captured in `future_iterations.md` for a later iteration.
+Cross-Holding activity feed. On mobile: a dedicated Activity tab
+carries this. Categorization is possible from the per-Holding
+detail page and from the Activity tab. Push-driven categorization
+prompts and timed in-app popups are captured in
+`future_iterations.md` for a later iteration.
 
 ### Custodial accounts and sweep policies
 

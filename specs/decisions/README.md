@@ -8,7 +8,7 @@ otherwise re-litigate.
 - Foundational tech choices (libraries, protocols, deployment models)
 - Security model decisions (custody, key storage, threat model deltas)
 - Product principle changes
-- Scope changes (in or out of v1)
+- Scope changes (in or out of pre-shipping / post-shipping per ADR-0003)
 - Anything that took more than 30 minutes of discussion to settle, or
   that any future agent might be tempted to undo without reading the
   reasoning
@@ -43,6 +43,20 @@ Sections:
 When superseding an earlier ADR, set the old one's status to
 `Superseded by NNNN` and link forward.
 
+When migrating a closed item out of `pre-implementation.md` into an
+ADR, add a `Migrated from:` line in the header preserving the
+original slug, so existing back-references in canonical docs still
+resolve.
+
 ## Index
 
-- 0001 — Spec consolidation pass
+Keep this list in sync with the files in this folder. The
+iteration-done sanity sweep (`PROCESS.md §2.9`) checks it.
+
+- [0001 — Spec consolidation pass](0001-spec-consolidation.md) — Accepted; refined by 0002
+- [0002 — Iteration cycle and module retirement](0002-iteration-cycle.md) — Accepted
+- [0003 — Project phases and shipping milestones](0003-personal-use-phase.md) — Accepted
+- [0004 — Backend OpenAPI is the API contract](0004-api-as-contract.md) — Accepted
+- [0005 — Feature flags replace named user profiles](0005-feature-flags-replace-presets.md) — Accepted
+- [0006 — Purse seed origin and per-client signing capability](0006-purse-seed-origin.md) — Accepted
+- [0007 — Browser-first development with NativeBridge stubs](0007-browser-first-with-nativebridge.md) — Accepted

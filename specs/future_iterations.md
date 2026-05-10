@@ -794,7 +794,7 @@ removed.
 - **Sketch:** A sibling product to TallyKeep's banking app, sharing
   deployment shell and possibly auth (post-public-ship). Own
   database, own threat model, own regulatory analysis. Not a
-  generalization of the v1 domain.
+  generalization of the current banking-app domain.
 - **Touches:** new product surface, regulatory analysis,
   legal counsel
 - **Status:** idea

@@ -49,10 +49,13 @@
   --color-border-focus:      #A88554; /* primary (focus rings adopt the brand color) */
 
   /* ---------------- Semantic ---------------- */
-  /* NOT in the brand lock docs. Current values retained from the
-     pre-lock placeholder. Revisit only if a screen renders badly
-     against the warm-tone surfaces — not a session, a "fix when
-     you see it" item.                                        */
+  /* KNOWN GAP — these are not in the brand v1 lock docs. Current
+     values retain the pre-lock placeholder. Documented in
+     brand/README.md "Status"; resolved at the public-ship-event
+     brand finalization, which extends the palette explicitly.
+     If a screen renders badly against the warm-tone surfaces
+     before then, treat it as a tokens-css iteration; do not
+     change values silently.                                  */
   --color-success:           #16a34a;
   --color-success-soft:      #dcfce7;
   --color-warning:           #ca8a04;
@@ -63,9 +66,9 @@
   --color-info-soft:         #e0f2fe;
 
   /* ---------------- Holding type accents ---------------- */
-  /* NOT in the brand lock docs. Current values retained from the
-     pre-lock placeholder. Same revisit-when-needed posture as
-     the semantic colors above.                                */
+  /* KNOWN GAP — same as the semantic colors above: not in the
+     brand v1 lock docs, resolved at the public-ship-event brand
+     finalization. Documented in brand/README.md "Status".    */
   --color-holding-account:   #0284c7; /* custodial — info-blue */
   --color-holding-purse:     #16a34a; /* online keys — green   */
   --color-holding-strongbox: #ca8a04; /* offline keys — amber  */
@@ -118,8 +121,14 @@
   --shadow-lg: 0 12px 32px rgba(26, 26, 26, 0.12);
 
   /* ---------------- Mobile shell ---------------- */
-  --mobile-viewport-width:  390px;
-  --mobile-viewport-height: 844px;
+  /* Baseline viewport per PROCESS.md §5 and UI/mockups/README.md:
+     360 × 800 (mid Galaxy A, Moto G — broad Argentine mid-range).
+     Mobile-first principle: if it works at 360, it works on the
+     larger smoke-test sizes (384×854 Galaxy A56, 390×844 iPhone,
+     412×900 larger Android). Resize the phone-frame in dev tools
+     to confirm at those sizes; do not change the baseline tokens. */
+  --mobile-viewport-width:  360px;
+  --mobile-viewport-height: 800px;
   --mobile-safe-top:        44px;
   --mobile-safe-bottom:     34px;
   --mobile-bottom-nav:      64px;

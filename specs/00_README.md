@@ -83,7 +83,7 @@ See `future_iterations.md` for the full backlog with `pre-shipping` /
 - Token issuance
 - Stablecoins, Monero, non-Bitcoin chains *as custody*. (Read-only aggregation of non-BTC balances at connected providers is an open arbitration item — see `pre-implementation.md`.)
 - Inventing a new offline payment protocol
-- Telemetry, usage analytics, or crash reporting to TallyKeep / Anthropic / any third-party endpoint. The app is self-hosted; the user is the customer, not the data source. If a user wants to share a crash log, it is a manual file they choose to send.
+- Telemetry, usage analytics, or crash reporting to TallyKeep or any third-party endpoint. The app is self-hosted; the user is the customer, not the data source. If a user wants to share a crash log, it is a manual file they choose to send.
 
 ## Module map
 
