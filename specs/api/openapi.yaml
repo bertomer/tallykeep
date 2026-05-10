@@ -1,3 +1,7 @@
+WARNING: Running pip as the 'root' user can result in broken permissions and conflicting behaviour with the system package manager. It is recommended to use a virtual environment instead: https://pip.pypa.io/warnings/venv
+
+[notice] A new release of pip is available: 24.0 -> 26.1.1
+[notice] To update, run: pip install --upgrade pip
 openapi: 3.1.0
 info:
   title: TallyKeep
@@ -3465,6 +3469,10 @@ components:
             format: uuid
           - type: 'null'
           title: Custodial Provider Id
+        seed_origin:
+          anyOf:
+          - $ref: '#/components/schemas/PurseSeedOrigin'
+          - type: 'null'
         signing_device_label:
           anyOf:
           - type: string
@@ -4070,14 +4078,6 @@ components:
       - broadcast_txid
       - resulting_ledger_entry_id
       title: PaymentRequestOut
-    ProfilePreset:
-      type: string
-      enum:
-      - beginner
-      - intermediate
-      - sovereign
-      - custom
-      title: ProfilePreset
     ProviderKind:
       type: string
       enum:
@@ -4121,6 +4121,8 @@ components:
           minimum: 0.0
           title: Display Order
           default: 0
+        seed_origin:
+          $ref: '#/components/schemas/PurseSeedOrigin'
         descriptors:
           items:
             $ref: '#/components/schemas/DescriptorInput'
@@ -4133,8 +4135,15 @@ components:
       - name
       - purpose
       - declared_security
+      - seed_origin
       - descriptors
       title: PurseCreate
+    PurseSeedOrigin:
+      type: string
+      enum:
+      - external_watch_only
+      - tallykeep_managed
+      title: PurseSeedOrigin
     RecomputeBody:
       properties:
         holding_id:
@@ -4622,8 +4631,6 @@ components:
           type: string
           format: uuid
           title: Id
-        preset:
-          $ref: '#/components/schemas/ProfilePreset'
         feature_flags:
           additionalProperties:
             type: boolean
@@ -4646,7 +4653,6 @@ components:
       type: object
       required:
       - id
-      - preset
       - base_currency
       - locale
       - created_at
@@ -4654,10 +4660,6 @@ components:
       title: UserProfileResponse
     UserProfileUpdate:
       properties:
-        preset:
-          anyOf:
-          - $ref: '#/components/schemas/ProfilePreset'
-          - type: 'null'
         feature_flags:
           anyOf:
           - additionalProperties:
@@ -4679,6 +4681,7 @@ components:
             minLength: 2
           - type: 'null'
           title: Locale
+      additionalProperties: false
       type: object
       title: UserProfileUpdate
     UtxoHygieneResponse:
