@@ -12,27 +12,35 @@ discipline, brand → tokens propagation, ADR thresholds) live in
 
 ## Status
 
-**v1 mark and wordmark are locked. Voice/about is draft.**
+**Mark, wordmark, and palette are locked. Voice/about is draft.**
 
 Brand work is far enough along to call the locked artifacts the
-working v1 brand, not a placeholder. The public-ship event (per
-ADR-0003) will either confirm v1 as the final shipped brand or
-revise it; until then, v1 is what's canonical.
+working brand, not a placeholder. The public-ship event (per
+ADR-0003) will either confirm them as the final shipped brand or
+revise; until then, these are canonical.
 
 | Artifact | Status | File |
 |---|---|---|
 | Brand mark (icon) | Locked v1 | `tallykeep_brand_mark_v1_lock.html` |
 | Wordmark | Locked v1 | `tallykeep_wordmark_v1_lock.html` |
+| Palette (semantic + Holding-type identity) | Locked v2 | `tallykeep_palette_v2_lock.html` |
+| Holding-type icons (4 + Purse variants) | Locked v2 | `identity/holding-*.svg` |
 | Voice / about | Draft v1 | `tallykeep_about_v1_draft.md` |
 | Tagline | In consideration | (inside the wordmark lock doc, §9) |
+| Palette v1 | Superseded by v2 | `tallykeep_palette_v1_superseded.html` |
 
-**Tokens are in sync.** `UI/mockups/_shared/tokens.css` was
-remapped 2026-05 by extracting values from the lock-doc page
-chrome (the docs are themselves rendered in the brand). Holding-
-type accents and semantic colors (success/warning/danger/info)
-were not in the lock docs and stay at their pre-lock values until
-the public-ship-event brand finalization extends the palette
-explicitly. Documented as a known gap in `tokens.css`.
+**Tokens are in sync.** `UI/mockups/_shared/tokens.css` is sourced
+from the palette v2 lock doc. The wood (Aged Oak, Grain, Cream)
+mirrors the mark and wordmark. The semantic palette (success /
+warning / danger / info) is the v1.1 AA-tightened leaf-bright set
+— info remains provisional. The Holding-type accents (limestone,
+auburn leather, iron, brushed steel) landed at v2 lock; they
+replaced the pre-brand placeholder values that previously sat
+in `tokens.css`. No remaining gaps in the palette layer.
+
+The next brand work is iconography beyond the brand mark + Holding
+icons (action / nav / status icons for general UI), motion principles,
+and dark mode — all flagged in the palette v2 lock doc §9 Open items.
 
 ## Layout
 

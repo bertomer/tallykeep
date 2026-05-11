@@ -1,0 +1,792 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>TallyKeep — palette v1.0 · lock & handoff</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+    background: #FAFAF7;
+    color: #2A2A2A;
+    margin: 0;
+    padding: 0;
+    line-height: 1.6;
+    font-size: 15px;
+  }
+  .doc { max-width: 880px; margin: 0 auto; padding: 64px 40px 120px; }
+
+  .meta {
+    font-family: ui-monospace, "SF Mono", monospace;
+    font-size: 11px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: #B0915E;
+    margin-bottom: 12px;
+  }
+  h1 {
+    font-size: 42px;
+    font-weight: 700;
+    margin: 0 0 12px;
+    letter-spacing: -0.025em;
+    color: #1A1A1A;
+  }
+  .lead {
+    font-size: 17px;
+    color: #555;
+    margin: 0 0 16px;
+    max-width: 640px;
+    line-height: 1.55;
+  }
+  .stamp {
+    font-family: ui-monospace, monospace;
+    font-size: 11px;
+    color: #999;
+    letter-spacing: 0.05em;
+  }
+
+  section { margin-top: 72px; }
+  h2 {
+    font-size: 22px;
+    font-weight: 700;
+    margin: 0 0 24px;
+    letter-spacing: -0.015em;
+    color: #1A1A1A;
+    padding-bottom: 8px;
+    border-bottom: 1px solid #E8E2D2;
+  }
+  h3 {
+    font-size: 14px;
+    font-weight: 600;
+    margin: 28px 0 10px;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+    color: #444;
+  }
+  p { margin: 0 0 14px; }
+  ul, ol { margin: 0 0 14px; padding-left: 22px; }
+  li { margin-bottom: 6px; }
+  code {
+    font-family: ui-monospace, "SF Mono", monospace;
+    font-size: 0.88em;
+    background: #F1ECDD;
+    padding: 1px 6px;
+    border-radius: 3px;
+    color: #6A4F2A;
+  }
+  pre {
+    font-family: ui-monospace, "SF Mono", monospace;
+    font-size: 12px;
+    background: #F1ECDD;
+    padding: 18px 20px;
+    border-radius: 8px;
+    color: #4A3A1F;
+    overflow-x: auto;
+    line-height: 1.55;
+    margin: 12px 0;
+  }
+  strong { color: #1A1A1A; }
+
+  .toc {
+    background: white;
+    border: 1px solid #E8E2D2;
+    border-radius: 12px;
+    padding: 18px 24px;
+    margin: 28px 0 0;
+    font-size: 13px;
+  }
+  .toc-title { font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; color: #888; margin-bottom: 8px; }
+  .toc ol { margin: 0; padding-left: 18px; counter-reset: section; list-style: none; }
+  .toc li { counter-increment: section; padding: 3px 0; color: #666; }
+  .toc li::before { content: counter(section, decimal-leading-zero) " · "; color: #B0915E; font-family: ui-monospace, monospace; font-size: 11px; }
+  .toc a { color: #444; text-decoration: none; }
+  .toc a:hover { color: #1A1A1A; text-decoration: underline; }
+
+  /* Wood anchor strip */
+  .wood-strip {
+    display: flex;
+    gap: 12px;
+    margin: 16px 0 8px;
+  }
+  .wood-cell {
+    flex: 1;
+    height: 72px;
+    border-radius: 8px;
+    padding: 12px 14px;
+    font-family: ui-monospace, monospace;
+    font-size: 11px;
+    line-height: 1.4;
+    border: 1px solid rgba(0,0,0,0.04);
+  }
+  .wood-cell .name { font-weight: 600; font-size: 12px; }
+  .wood-cell .hex { opacity: 0.85; margin-top: 2px; }
+
+  /* Semantic chip cards */
+  .sem-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    margin: 16px 0;
+  }
+  .sem-card {
+    background: white;
+    border: 1px solid #E8E2D2;
+    border-radius: 12px;
+    padding: 16px 18px;
+  }
+  .sem-card .head {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    margin-bottom: 10px;
+  }
+  .sem-card .name { font-weight: 600; font-size: 15px; color: #1A1A1A; }
+  .sem-card .nick { font-size: 12px; color: #888; font-family: ui-monospace, monospace; }
+  .sem-card .swatches {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 6px;
+    margin-bottom: 10px;
+  }
+  .sem-card .swatches .sw {
+    height: 36px;
+    border-radius: 5px;
+    border: 1px solid rgba(0,0,0,0.05);
+  }
+  .sem-card .labels {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 6px;
+    font-family: ui-monospace, monospace;
+    font-size: 10px;
+    color: #888;
+  }
+  .sem-card .labels span { text-align: center; }
+  .sem-card .role { font-size: 12px; color: #555; line-height: 1.5; margin-top: 12px; }
+
+  /* In-context demos */
+  .demo-section {
+    background: white;
+    border: 1px solid #E8E2D2;
+    border-radius: 12px;
+    padding: 20px 22px;
+    margin: 16px 0;
+  }
+  .demo-section .label {
+    font-size: 11px;
+    color: #888;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    margin-bottom: 10px;
+  }
+  .banner {
+    padding: 12px 14px;
+    border-radius: 6px;
+    margin-bottom: 10px;
+  }
+  .banner .title { font-weight: 600; font-size: 13px; margin-bottom: 2px; }
+  .banner .body { font-size: 12px; }
+
+  .button-row {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    margin-top: 14px;
+  }
+  .btn {
+    border: none;
+    padding: 10px 18px;
+    border-radius: 6px;
+    font-size: 13px;
+    font-weight: 600;
+    font-family: inherit;
+    cursor: pointer;
+    color: white;
+  }
+  .btn.success { background: #267a36; }
+  .btn.warning { background: #a05210; }
+  .btn.danger  { background: #b8351b; }
+  .btn.info    { background: #2e6699; }
+
+  .cream-bg { background: #F4EAD5; padding: 16px; border-radius: 8px; margin-top: 14px; }
+  .cream-bg .label { color: #6F5638; }
+
+  /* Token reference table */
+  .token-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+    margin: 16px 0;
+  }
+  .token-table th, .token-table td {
+    text-align: left;
+    padding: 10px 12px;
+    border-bottom: 1px solid #E8E2D2;
+  }
+  .token-table th {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: #888;
+    font-weight: 600;
+  }
+  .token-table tr:last-child td { border-bottom: none; }
+  .token-table .var { font-family: ui-monospace, monospace; font-size: 12px; color: #4A3A1F; }
+  .token-table .val { font-family: ui-monospace, monospace; font-size: 12px; color: #888; }
+  .token-table .chip {
+    display: inline-block;
+    width: 14px; height: 14px;
+    border-radius: 3px;
+    border: 1px solid rgba(0,0,0,0.08);
+    vertical-align: middle;
+    margin-right: 8px;
+  }
+  .token-table .group {
+    background: #FAFAF7;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: #888;
+    font-weight: 600;
+  }
+
+  /* Decisions log */
+  .decisions { font-size: 14px; color: #555; }
+  .decisions dt {
+    font-weight: 600;
+    color: #1A1A1A;
+    margin-top: 16px;
+    font-size: 13px;
+  }
+  .decisions dt:first-child { margin-top: 0; }
+  .decisions dd { margin: 4px 0 0 0; line-height: 1.6; }
+
+  /* Open items */
+  .open-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 12px;
+    margin-top: 12px;
+  }
+  .open-item {
+    background: white;
+    border: 1px solid #E8E2D2;
+    border-radius: 10px;
+    padding: 14px 18px;
+    font-size: 13px;
+  }
+  .open-item .title {
+    font-weight: 600;
+    color: #1A1A1A;
+    font-size: 14px;
+    margin-bottom: 4px;
+  }
+  .open-item .body { color: #666; line-height: 1.55; }
+
+  footer {
+    margin-top: 96px;
+    padding-top: 32px;
+    border-top: 1px solid #E8E2D2;
+    font-size: 12px;
+    color: #999;
+    text-align: center;
+  }
+</style>
+</head>
+<body>
+<div class="doc">
+
+  <header>
+    <div class="meta">Palette · v1.0 · SUPERSEDED by v2 (2026-05-10)</div>
+    <h1>TallyKeep palette</h1>
+    <p class="lead">
+      Wood anchor (locked v1) plus the semantic palette (success / warning / danger / info)
+      tuned warm-and-leaf-bright to sit congruently on cream and page-background surfaces.
+      The mark and wordmark lock the wood; this doc locks the application palette
+      that consumes them.
+    </p>
+    <div class="stamp">May 2026 · arbitrated with Rémy · v1.1 AA-tightened (2026-05-10)</div>
+
+    <div class="toc">
+      <div class="toc-title">Contents</div>
+      <ol>
+        <li><a href="#anchor">Wood anchor</a></li>
+        <li><a href="#philosophy">Philosophy — restraint</a></li>
+        <li><a href="#semantics">Semantic palette</a></li>
+        <li><a href="#in-context">In context</a></li>
+        <li><a href="#tokens">Token reference</a></li>
+        <li><a href="#contrast">Accessibility &amp; contrast</a></li>
+        <li><a href="#decisions">Decisions log</a></li>
+        <li><a href="#open">Open items</a></li>
+      </ol>
+    </div>
+  </header>
+
+  <!-- 1. ANCHOR -->
+  <section id="anchor">
+    <h2>1 · Wood anchor</h2>
+    <p>
+      The brand wood, locked in <code>tallykeep_brand_mark_v1_lock</code> §3 and
+      <code>tallykeep_wordmark_v1_lock</code> §7. Reproduced here so this doc reads
+      standalone and so the semantic palette can be visually checked against it.
+      Authoritative source remains the mark and wordmark lock docs.
+    </p>
+
+    <div class="wood-strip">
+      <div class="wood-cell" style="background: #A88554; color: #F4EAD5;">
+        <div class="name">Aged Oak</div>
+        <div class="hex">#A88554</div>
+      </div>
+      <div class="wood-cell" style="background: #6F5638; color: #F4EAD5;">
+        <div class="name">Grain</div>
+        <div class="hex">#6F5638</div>
+      </div>
+      <div class="wood-cell" style="background: #F4EAD5; color: #1A1A1A;">
+        <div class="name">Cream</div>
+        <div class="hex">#F4EAD5</div>
+      </div>
+      <div class="wood-cell" style="background: #FAFAF7; color: #555;">
+        <div class="name">Page bg</div>
+        <div class="hex">#FAFAF7</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 2. PHILOSOPHY -->
+  <section id="philosophy">
+    <h2>2 · Philosophy — restraint over decoration</h2>
+
+    <p>
+      Generic web semantics (saturated green / red / amber, used freely) treat color as
+      decoration — every form passes/fails, every toast cheers or scolds. Banking-grade
+      restraint <em>earns</em> color: <strong>green only for confirmed-on-chain with enough
+      depth</strong> (per <code>PROCESS.md §3</code> gauntlet Q4 — confirmation honesty),
+      <strong>red only for irreversible-loss risk</strong>, <strong>amber for
+      action-needed</strong>, <strong>info muted to near-neutral</strong>. The result: most
+      of the UI is text on cream, and color appears where consequence appears.
+    </p>
+
+    <p>
+      This locks the mental rule for downstream design. A reviewer should ask, of any
+      proposed use of green: does this represent a verifiably-true positive end state? If
+      not, it shouldn't be green. Same test for red and consequence; same test for amber
+      and pending action.
+    </p>
+
+    <h3>Hue family — warm-tuned, not generic-modern</h3>
+    <p>
+      The wood palette is yellow-brown, low-mid saturation, mid lightness. A modern
+      saturated palette (Tailwind <code>#16a34a</code> green, <code>#dc2626</code> red)
+      sits on cream like a foreign body. The locked palette below is <em>warm-tuned</em> —
+      hues drawn from natural references (holly leaf, holly berry, autumn maple,
+      cornflower) — and dialed bright enough to retain signal strength. Specifically not
+      muted-historical (the v0 sketch ran too quiet, especially for danger).
+    </p>
+  </section>
+
+  <!-- 3. SEMANTICS -->
+  <section id="semantics">
+    <h2>3 · The semantic palette</h2>
+
+    <p>
+      Each semantic provides four token slots: <strong>main</strong> (text/icon/border-stripe),
+      <strong>soft</strong> (banner / badge background tint), <strong>border</strong> (mid-tone
+      separator on soft-bg components), and <strong>text-on-soft</strong> (deep variant for
+      legible text inside a soft-bg fill).
+    </p>
+
+    <div class="sem-grid">
+
+      <div class="sem-card">
+        <div class="head">
+          <div class="name">success</div>
+          <div class="nick">holly leaf · deep</div>
+        </div>
+        <div class="swatches">
+          <div class="sw" style="background: #267a36;"></div>
+          <div class="sw" style="background: #d4ead0;"></div>
+          <div class="sw" style="background: #6cb074;"></div>
+          <div class="sw" style="background: #1c4f24;"></div>
+        </div>
+        <div class="labels">
+          <span>main</span><span>soft</span><span>border</span><span>text/soft</span>
+        </div>
+        <div class="role">
+          Confirmation. Reserved for verifiably-true positive end states — a transaction
+          is confirmed to sufficient depth, a setup is complete, a destination is
+          whitelisted. Never for "form is valid" or interim states.
+        </div>
+      </div>
+
+      <div class="sem-card">
+        <div class="head">
+          <div class="name">warning</div>
+          <div class="nick">autumn maple · deep</div>
+        </div>
+        <div class="swatches">
+          <div class="sw" style="background: #a05210;"></div>
+          <div class="sw" style="background: #f5dfb8;"></div>
+          <div class="sw" style="background: #d8a35c;"></div>
+          <div class="sw" style="background: #663d0a;"></div>
+        </div>
+        <div class="labels">
+          <span>main</span><span>soft</span><span>border</span><span>text/soft</span>
+        </div>
+        <div class="role">
+          Action needed but recoverable. Privacy hygiene flags (address reuse, dust UTXOs),
+          PSBT awaiting external signature, fee tier flagged unusual, seed-backup overdue.
+          Hue-distinct from Aged Oak — push amber-orange, never amber-yellow.
+        </div>
+      </div>
+
+      <div class="sem-card">
+        <div class="head">
+          <div class="name">danger</div>
+          <div class="nick">holly berry · deep</div>
+        </div>
+        <div class="swatches">
+          <div class="sw" style="background: #b8351b;"></div>
+          <div class="sw" style="background: #f3d4c8;"></div>
+          <div class="sw" style="background: #d1846c;"></div>
+          <div class="sw" style="background: #5a1d0d;"></div>
+        </div>
+        <div class="labels">
+          <span>main</span><span>soft</span><span>border</span><span>text/soft</span>
+        </div>
+        <div class="role">
+          Irreversible-loss risk. Destructive actions (delete a Holding, broadcast a
+          unverified transaction), broadcast failures, security-discrepancy banner when the
+          analyzer fires hard. When red appears, the user's eye must stop.
+        </div>
+      </div>
+
+      <div class="sem-card">
+        <div class="head">
+          <div class="name">info <span style="color: #B0915E; font-size: 11px; font-weight: 500;">· provisional</span></div>
+          <div class="nick">cornflower · deep</div>
+        </div>
+        <div class="swatches">
+          <div class="sw" style="background: #2e6699;"></div>
+          <div class="sw" style="background: #d3dfeb;"></div>
+          <div class="sw" style="background: #739abc;"></div>
+          <div class="sw" style="background: #1f3f63;"></div>
+        </div>
+        <div class="labels">
+          <span>main</span><span>soft</span><span>border</span><span>text/soft</span>
+        </div>
+        <div class="role">
+          Neutral notice. Tooltips, "via [source] · 2m ago" attributions, hosted-tier
+          disclosure banners. <strong>Provisional:</strong> kept for now; collapse decision
+          (drop info, ride on muted text + brand accent) deferred per Open §1.
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- 4. IN CONTEXT -->
+  <section id="in-context">
+    <h2>4 · In context</h2>
+
+    <div class="demo-section">
+      <div class="label">Confirmation banner — page surface</div>
+      <div class="banner" style="background: #d4ead0; border-left: 3px solid #267a36;">
+        <div class="title" style="color: #1c4f24;">Confirmed · 6 blocks deep</div>
+        <div class="body" style="color: #266030;">Transaction effectively final on chain.</div>
+      </div>
+
+      <div class="label" style="margin-top: 18px;">Blueprint hygiene flag</div>
+      <div class="banner" style="background: #f5dfb8; border-left: 3px solid #a05210;">
+        <div class="title" style="color: #663d0a;">Address reuse detected</div>
+        <div class="body" style="color: #7a4a10;">Two outputs to the same address weakens privacy.</div>
+      </div>
+
+      <div class="label" style="margin-top: 18px;">Broadcast failure</div>
+      <div class="banner" style="background: #f3d4c8; border-left: 3px solid #b8351b;">
+        <div class="title" style="color: #5a1d0d;">Could not broadcast</div>
+        <div class="body" style="color: #6e2412;">Network unavailable. Signed PSBT held locally.</div>
+      </div>
+
+      <div class="label" style="margin-top: 18px;">Hosted-tier disclosure (info, provisional)</div>
+      <div class="banner" style="background: #d3dfeb; border-left: 3px solid #2e6699;">
+        <div class="title" style="color: #1f3f63;">You are on TallyKeep-hosted</div>
+        <div class="body" style="color: #2a4d76;">The backend sees your descriptors. Spending keys never transit.</div>
+      </div>
+
+      <div class="button-row">
+        <button class="btn success">Mark received</button>
+        <button class="btn warning">Replace with higher fee</button>
+        <button class="btn danger">Delete this Holding</button>
+        <button class="btn info">View provider details</button>
+      </div>
+    </div>
+
+    <div class="demo-section">
+      <div class="label">On cream sidebar surface — banners need stronger separation</div>
+      <p style="font-size: 13px; color: #666; line-height: 1.55; margin-bottom: 14px;">
+        Soft variants sit close in value to cream (#F4EAD5). When a banner lands on a cream
+        surface (sidebar, hero card), lean on the border-stripe rather than the fill.
+        Demonstrated below.
+      </p>
+      <div class="cream-bg">
+        <div class="label">Confirmed · cream surface</div>
+        <div class="banner" style="background: #d4ead0; border-left: 3px solid #267a36;">
+          <div class="title" style="color: #1c4f24;">Confirmed · 6 blocks deep</div>
+          <div class="body" style="color: #266030;">Transaction effectively final on chain.</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 5. TOKEN REFERENCE -->
+  <section id="tokens">
+    <h2>5 · Token reference</h2>
+
+    <p>
+      Canonical values for <code>UI/mockups/_shared/tokens.css</code> and the future
+      SvelteKit equivalent. Frontend code references variable <em>names</em>; values change
+      here when the brand revises.
+    </p>
+
+    <table class="token-table">
+      <thead>
+        <tr><th>Variable</th><th>Value</th><th>Use</th></tr>
+      </thead>
+      <tbody>
+        <tr class="group"><td colspan="3">Wood (anchor — owned by mark/wordmark lock docs)</td></tr>
+        <tr><td class="var">--color-primary</td>            <td class="val"><span class="chip" style="background:#A88554;"></span>#A88554</td><td>Aged Oak</td></tr>
+        <tr><td class="var">--color-primary-strong</td>     <td class="val"><span class="chip" style="background:#6F5638;"></span>#6F5638</td><td>Grain</td></tr>
+        <tr><td class="var">--color-on-primary</td>         <td class="val"><span class="chip" style="background:#F4EAD5;"></span>#F4EAD5</td><td>Cream — text/icon on Aged Oak</td></tr>
+        <tr><td class="var">--color-bg</td>                 <td class="val"><span class="chip" style="background:#FAFAF7;"></span>#FAFAF7</td><td>Page background</td></tr>
+
+        <tr class="group"><td colspan="3">Success — holly leaf · deep</td></tr>
+        <tr><td class="var">--color-success</td>            <td class="val"><span class="chip" style="background:#267a36;"></span>#267a36</td><td>Main — text, icon, border-stripe</td></tr>
+        <tr><td class="var">--color-success-soft</td>       <td class="val"><span class="chip" style="background:#d4ead0;"></span>#d4ead0</td><td>Banner / badge background</td></tr>
+        <tr><td class="var">--color-success-border</td>     <td class="val"><span class="chip" style="background:#6cb074;"></span>#6cb074</td><td>Mid-tone separator</td></tr>
+        <tr><td class="var">--color-success-text-on-soft</td><td class="val"><span class="chip" style="background:#1c4f24;"></span>#1c4f24</td><td>Text inside a soft-bg fill</td></tr>
+
+        <tr class="group"><td colspan="3">Warning — autumn maple · deep</td></tr>
+        <tr><td class="var">--color-warning</td>            <td class="val"><span class="chip" style="background:#a05210;"></span>#a05210</td><td>Main</td></tr>
+        <tr><td class="var">--color-warning-soft</td>       <td class="val"><span class="chip" style="background:#f5dfb8;"></span>#f5dfb8</td><td>Banner / badge bg</td></tr>
+        <tr><td class="var">--color-warning-border</td>     <td class="val"><span class="chip" style="background:#d8a35c;"></span>#d8a35c</td><td>Mid-tone separator</td></tr>
+        <tr><td class="var">--color-warning-text-on-soft</td><td class="val"><span class="chip" style="background:#663d0a;"></span>#663d0a</td><td>Text inside soft-bg fill</td></tr>
+
+        <tr class="group"><td colspan="3">Danger — holly berry · deep</td></tr>
+        <tr><td class="var">--color-danger</td>             <td class="val"><span class="chip" style="background:#b8351b;"></span>#b8351b</td><td>Main</td></tr>
+        <tr><td class="var">--color-danger-soft</td>        <td class="val"><span class="chip" style="background:#f3d4c8;"></span>#f3d4c8</td><td>Banner / badge bg</td></tr>
+        <tr><td class="var">--color-danger-border</td>      <td class="val"><span class="chip" style="background:#d1846c;"></span>#d1846c</td><td>Mid-tone separator</td></tr>
+        <tr><td class="var">--color-danger-text-on-soft</td><td class="val"><span class="chip" style="background:#5a1d0d;"></span>#5a1d0d</td><td>Text inside soft-bg fill</td></tr>
+
+        <tr class="group"><td colspan="3">Info — cornflower · deep (provisional)</td></tr>
+        <tr><td class="var">--color-info</td>               <td class="val"><span class="chip" style="background:#2e6699;"></span>#2e6699</td><td>Main</td></tr>
+        <tr><td class="var">--color-info-soft</td>          <td class="val"><span class="chip" style="background:#d3dfeb;"></span>#d3dfeb</td><td>Banner / badge bg</td></tr>
+        <tr><td class="var">--color-info-border</td>        <td class="val"><span class="chip" style="background:#739abc;"></span>#739abc</td><td>Mid-tone separator</td></tr>
+        <tr><td class="var">--color-info-text-on-soft</td>  <td class="val"><span class="chip" style="background:#1f3f63;"></span>#1f3f63</td><td>Text inside soft-bg fill</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <!-- 6. ACCESSIBILITY -->
+  <section id="contrast">
+    <h2>6 · Accessibility &amp; contrast</h2>
+
+    <p>
+      The v1.1 values were tuned to comfortably clear <strong>WCAG AA 4.5:1</strong> for
+      normal body text on every surface the product uses (page background, white card,
+      cream sidebar). The earlier v1 values failed AA for success and warning on page-bg
+      and white; those were corrected 2026-05-10 (decisions log §7).
+    </p>
+
+    <table class="token-table">
+      <thead>
+        <tr><th>Main on surface</th><th>Page bg #FAFAF7</th><th>White</th><th>Cream #F4EAD5</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>success <code>#267a36</code></td><td class="val">5.11 : 1 ✓</td><td class="val">5.34 : 1 ✓</td><td class="val">4.51 : 1 ✓</td></tr>
+        <tr><td>warning <code>#a05210</code></td><td class="val">5.36 : 1 ✓</td><td class="val">5.61 : 1 ✓</td><td class="val">4.74 : 1 ✓</td></tr>
+        <tr><td>danger <code>#b8351b</code></td><td class="val">5.75 : 1 ✓</td><td class="val">6.13 : 1 ✓</td><td class="val">5.08 : 1 ✓</td></tr>
+        <tr><td>info <code>#2e6699</code></td><td class="val">5.77 : 1 ✓</td><td class="val">6.06 : 1 ✓</td><td class="val">5.10 : 1 ✓</td></tr>
+      </tbody>
+    </table>
+
+    <p style="margin-top: 14px;">Soft-bg + text-on-soft pairings (used in banners and badges):</p>
+
+    <table class="token-table">
+      <thead>
+        <tr><th>Pairing</th><th>Ratio</th><th>Pass</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>success text-on-soft <code>#1c4f24</code> on success-soft <code>#d4ead0</code></td><td class="val">8.6 : 1</td><td>AAA</td></tr>
+        <tr><td>warning text-on-soft <code>#663d0a</code> on warning-soft <code>#f5dfb8</code></td><td class="val">8.2 : 1</td><td>AAA</td></tr>
+        <tr><td>danger text-on-soft <code>#5a1d0d</code> on danger-soft <code>#f3d4c8</code></td><td class="val">9.0 : 1</td><td>AAA</td></tr>
+        <tr><td>info text-on-soft <code>#1f3f63</code> on info-soft <code>#d3dfeb</code></td><td class="val">9.4 : 1</td><td>AAA</td></tr>
+      </tbody>
+    </table>
+
+    <p style="font-size: 13px; color: #666; margin-top: 14px;">
+      <strong>White-on-main (buttons).</strong> All four mains carry white text at 5.3–6.1:1 —
+      AA body for the destructive button, the success button, and equivalents.
+    </p>
+
+    <p style="font-size: 13px; color: #666; margin-top: 8px;">
+      <strong>Implication.</strong> The v1.1 palette is unconditionally usable as
+      body-text-on-light-surface — no weight bumping required, no surface caveats. The
+      cost was a uniform shift toward deeper saturation; the deep-leaf-bright register
+      reads as "weighted" rather than "muted," which is congruent with the restraint
+      philosophy.
+    </p>
+  </section>
+
+  <!-- 7. DECISIONS -->
+  <section id="decisions">
+    <h2>7 · Decisions log</h2>
+
+    <dl class="decisions">
+      <dt>v1.1 — AA tightening (2026-05-10)</dt>
+      <dd>
+        Initial v1 values failed WCAG AA 4.5:1 for body text on page-bg: success
+        <code>#2e8a3f</code> at 4.16:1, warning <code>#cc7a14</code> at 3.15:1.
+        (Documented ratios in the original v1 lock were inflated; corrected here.)
+        Rather than document caveats around weight-bumping or surface restrictions,
+        all four mains were tuned darker so they comfortably pass AA on every surface
+        the product uses (page-bg, white, cream). Soft / border / text-on-soft tokens
+        unchanged. Rejected previous mains kept on file in §7 for context.
+      </dd>
+
+      <dt>Restraint over decoration</dt>
+      <dd>
+        Color earns its appearance. Generic web semantics (Tailwind defaults) treat
+        green/red as decorative; banking-grade restraint reserves them for the moments
+        that map to consequence. Specifically wired to gauntlet Q4 (confirmation honesty)
+        — green requires verifiable-true on-chain depth, never composed/signed/broadcast
+        intermediates.
+      </dd>
+
+      <dt>Hue family — warm-tuned, leaf-bright</dt>
+      <dd>
+        Drawn from natural references (holly leaf, holly berry, autumn maple, cornflower).
+        Saturated enough to retain signal strength; not so saturated they look like
+        Tailwind. The v0 muted sketch ran too quiet — danger especially needed brighter
+        chroma to actually stop the eye on destructive actions.
+      </dd>
+
+      <dt>Four-token pattern (main / soft / border / text-on-soft)</dt>
+      <dd>
+        Chose four tokens per semantic over the prior two-token (main / soft) pattern.
+        Rationale: real banner / badge components need a separator (border) and a
+        legible text color inside a soft-bg fill (text-on-soft). Three of those four are
+        derivable from the main, but explicit tokens prevent accidental low-contrast
+        pairings.
+      </dd>
+
+      <dt>Info kept provisional</dt>
+      <dd>
+        Cornflower works on its own. As a fourth color in a warm-and-earthy palette, it's
+        the hue-outlier. Open question (deferred): collapse info into muted text +
+        brand-color accent, dropping the slot entirely. Held provisional pending a real
+        screen test where a hosted-tier disclosure or attribution surface forces the call.
+      </dd>
+
+      <dt>Rejected — decorative defaults (Tailwind-ish)</dt>
+      <dd>
+        <code>#16a34a</code> success, <code>#ca8a04</code> warning, <code>#dc2626</code>
+        danger, <code>#0284c7</code> info. Pasted-on against cream; would have made
+        TallyKeep look like a generic SaaS. Kept on file in tokens.css as the rejected
+        baseline.
+      </dd>
+
+      <dt>Rejected — v0 muted (rust / dusty)</dt>
+      <dd>
+        <code>#3a7d44</code> sage, <code>#b8741c</code> deep amber, <code>#a23a1c</code>
+        rust, <code>#4a6c8a</code> dusty blue. Elegant but undersold danger and
+        confirmation. Worth keeping in mind if the brand voice ever leans more
+        contemplative — could be a future variant for read-only / archive surfaces.
+      </dd>
+
+      <dt>Rejected — v1 leaf-bright (pre-AA fix)</dt>
+      <dd>
+        <code>#2e8a3f</code> success, <code>#cc7a14</code> warning, <code>#c4361c</code>
+        danger, <code>#3672a8</code> info. Right hue family, right brand feel — but
+        success and warning failed AA body on page-bg. Replaced by the deeper variants
+        above 2026-05-10. The aesthetic gap between v1 and v1.1 is small; the
+        accessibility gap is decisive.
+      </dd>
+    </dl>
+  </section>
+
+  <!-- 8. OPEN -->
+  <section id="open">
+    <h2>8 · Open items</h2>
+
+    <div class="open-grid">
+      <div class="open-item">
+        <div class="title">Info collapse decision</div>
+        <div class="body">
+          Drop the info slot entirely; ride neutral notices on muted text + brand-color
+          accent. Defer until a real screen — hosted-tier disclosure, "via Mempool · 2m
+          ago" attribution, tooltip — forces the call. Will produce a v2 lock if info is
+          dropped or repurposed.
+        </div>
+      </div>
+      <div class="open-item">
+        <div class="title">Holding-type accents</div>
+        <div class="body">
+          Account / Purse / Strongbox / Vault need distinct accent colors that stay
+          distinguishable from each other AND from the four semantics above. Eight
+          distinct hues in the warm family is genuinely tight. Next session's work;
+          will land as v2 lock extending §3.
+        </div>
+      </div>
+      <div class="open-item">
+        <div class="title">Dark mode</div>
+        <div class="body">
+          Light-mode only here. Wordmark §7 has dark-mode rules; mark §8 flags dark mode
+          as untested for the icon. The semantic palette will need dark-mode counterparts
+          (deeper-but-not-saturated softs, lighter mains) before any dark theme ships.
+          Tackle alongside dark mode for the icon and surfaces — not a values-only
+          extension.
+        </div>
+      </div>
+      <div class="open-item">
+        <div class="title">Confirmation-state spine</div>
+        <div class="body">
+          Open question: does Bitcoin confirmation depth (composed → signed → broadcast →
+          confirmed-1 → confirmed-6 → effectively-final) ride on the four-color
+          semantic palette, or does it get its own dedicated 3-token spine (pending /
+          partial / final)? Affects how the Send and Activity flows visualize
+          progression. Best resolved in the Send-iteration design pass.
+        </div>
+      </div>
+      <div class="open-item">
+        <div class="title">Real-screen check before final lock</div>
+        <div class="body">
+          This palette is locked as the working v1. Recommendation: run it through one
+          full mockup (Onboarding + Home populated) and one banner-heavy surface
+          (security-discrepancy banner on home) before promoting to a "final" status.
+          Anything that misbehaves under realistic content density surfaces only there.
+        </div>
+      </div>
+      <div class="open-item">
+        <div class="title">Trademark</div>
+        <div class="body">
+          Carried over from mark/wordmark open lists — palette doesn't change the
+          trademark question, but confirms the brand combination (mark + wordmark +
+          color system) that needs registering pre-public-announcement. Lawyer-question
+          for ship-gate.
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    <div>TallyKeep palette · v1.0 lock · May 2026</div>
+    <div style="margin-top: 6px;">
+      Cross-reference: <code>tallykeep_brand_mark_v1_lock</code> ·
+      <code>tallykeep_wordmark_v1_lock</code> ·
+      consumer: <code>UI/mockups/_shared/tokens.css</code>
+    </div>
+  </footer>
+
+</div>
+</body>
+</html>

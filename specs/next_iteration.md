@@ -134,6 +134,113 @@ file.
   capability to generate and securely store a seed; browser
   builds hide it with an install-the-app message (per ADR-0006).
 - Mobile baseline viewport: 360 × 800 (per `UI/mockups/README.md`).
+- *(Onboarding screen 1 — Connect)* Welcome screen killed; the
+  Connect screen is the first-touch surface. Single question:
+  "Connect to your TallyKeep" — QR scan primary, manual URL
+  entry secondary, "don't have one yet" ghost CTA opens external
+  docs link. Persistent acknowledgment-required principles card
+  with three lines (open source / no accounts / TallyKeep never
+  holds your keys) and an [I understand] button. Card appears
+  on Screen 1 only and does not reappear after acknowledgment.
+- *(Onboarding screen 1 — Connect)* Wordmark-icony at 280 px
+  is the brand surface; intended to land as the dynamic-mark
+  surface (tap-to-regenerate-grain) when implemented in
+  SvelteKit. Mockup is static per `UI/mockups/README.md`. The
+  brand v1 → v2 lock-doc bump that sanctions the wordmark-icony
+  embedded Y as a dynamic surface is part of this iteration's
+  scope (per `future_iterations.md` "Dynamic brand mark on
+  first-touch surfaces").
+- *(Onboarding screen 2 — Paired)* Single screen combining
+  pair-success confirmation + biometric setup. Initial state
+  shows green checkmark, "Paired with your TallyKeep", server
+  label, then a "Lock TallyKeep with your biometric" prompt
+  with [Enable biometric unlock] primary and [Skip for now]
+  text-link. Skip triggers a bottom-sheet modal asking for
+  explicit confirmation. Biometric is opt-in (not required) —
+  tradeoff per `pre-implementation.md` `traveling-user-recovery`.
+- *(Onboarding screen 2 — Paired)* Brand-strip continues with
+  the same 280-px wordmark; the dynamic-mark behavior is
+  Screen-1-only per the "first-touch only" sanctioning.
+- *(Backend, Onboarding screen 2)* `server_label` field added
+  to `01_architecture.md` §"Configuration model". Operator sets
+  it during stack installation; surfaced to clients on pairing.
+  Optional; absent ⇒ clients render endpoint or connection-ID
+  only.
+- *(Hosted-tier, deferred)* Connection-ID format favors
+  word-pair-encoded memorable strings (e.g. `crisp-river-7842`)
+  over raw UUID — non-predictable AND human-handleable. Captured
+  in `future_iterations.md` "Hosted tier infrastructure".
+- *(Auth-layer scope)* When this iteration sharpens for code, the
+  pairing-handshake crypto choice (`pre-implementation.md`
+  `pairing-handshake-crypto`) needs to be settled, because it
+  shapes the backend's pairing endpoints and the device-credential
+  format.
+- *(Unlock + recovery model — locked by ADR-0008, two-layer)*
+  Per `decisions/0008-passphrase-and-recovery-model.md`. Layer 1:
+  daily unlock = biometric default + "Use passphrase instead"
+  text-link fallback on the lock screen. Phone forwards the
+  typed passphrase to the backend for validation; phone never
+  stores the passphrase. Layer 2: deep recovery when the local
+  credential is fully lost = re-pair via QR (same flow as
+  initial pairing). One passphrase per stack — the user has one
+  secret to remember (the server's). Communicated on the
+  biometric-done onboarding screen via the facts card
+  ("Daily unlock: Biometric · passphrase fallback" /
+  "Deep recovery: Re-pair from desktop") plus a short explainer.
+  Iteration scope includes the daily-unlock mockups
+  (`mobile_unlock_biometric.html`, `mobile_unlock_passphrase.html`).
+- *(Backend, auth layer)* Backend exposes
+  `POST /api/v1/auth/passphrase-validate` (or equivalent) for the
+  phone to call during fallback unlock. Rate-limited to prevent
+  brute-force. Endpoint compares Argon2id of input against the
+  stored derivation; never stores or logs the raw passphrase.
+  Exact shape + comparison method + rate-limit policy sharpen
+  during the auth-layer iteration (private-ship gate per
+  ADR-0003).
+- *(Onboarding screen 2 — `no_biometric` variant)* When
+  `NativeBridge.canUseBiometric()` returns false at Screen 02
+  entry, render `mobile_onboarding_02_paired_no_biometric.html`
+  instead of the biometric-prompt variant. Single [Continue]
+  CTA; threat-model copy is honest about OS-lock-only protection
+  plus recovery path.
+- *(Screen 02 wording — warning placement)* The threat-model
+  explainer ("Without it, anyone who can unlock your phone...")
+  appears ONLY in the skip-confirm bottom sheet, not on the
+  initial Paired screen. Banking-grade discipline: warnings on
+  the path that warrants them, not on the default path.
+- *(Home empty — banking-grade structure)* Sharpened across
+  three passes 2026-05-10. First pass (centered hero + big
+  primary CTA) rejected as Phoenix-aesthetic. Second pass
+  (`+ Add` text-link) rejected on translation grounds. Final:
+  app-bar wordmark; hero on its own white surface, left-aligned
+  mono amount with a small single-arrow rotate icon stacked
+  above the `sats` label, subdued `Show in fiat` link below;
+  "Holdings" section header with right-aligned 28-px circular
+  filled `+` button (translation-free); empty list-card
+  placeholder ("No Holdings yet"); bottom nav. No tagline, no
+  explainer copy, no big shiny button. Section structure
+  preserved at zero state. The Add-Holding popup (four type
+  choices: Account / Purse / Strongbox / Vault) is its own
+  surface, sharpens during the Add-Holding iteration.
+- *(Affordance discipline — translation-free where unambiguous)*
+  Sharpened during Home-empty session 2026-05-10. Prefer icon-
+  only or symbol-only affordances over labeled buttons when
+  the meaning is unambiguous from context. Labels stay where
+  they carry semantic content that can't be reduced to a
+  symbol (primary CTAs: "Enable biometric unlock", "Continue",
+  "Unlock"). This compounds positively across LatAm/Africa
+  translation surfaces.
+- *(Bottom nav)* Present from the empty state per Rémy's call.
+  Four tabs: Home (active), Activity (greyed when empty),
+  Holdings (greyed when empty), More (enabled — Settings always
+  works). Exact tab set is not locked; sharpens with the
+  Settings + Activity iterations.
+- *(Unit + currency on Home)* Sats default, unit pill cycles
+  sats / BTC on tap. Show-fiat link opens a currency picker
+  sheet; once a fiat is selected, the fiat line appears below
+  the sats amount with source attribution per `UI/README.md`.
+  The picker sheet sharpens in the same iteration or with
+  Settings.
 
 When the next iteration is sharpened, this section gets filled
 in using the template above and the bullets above migrate into

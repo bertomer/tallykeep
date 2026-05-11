@@ -217,6 +217,7 @@ GET /api/v1/events/stream?topics=chain.*,holding.*,banking.*
 - Secrets (custodial provider credentials, node RPC password, future Lightning macaroons) are stored encrypted; see module 03 for the cryptography details.
 - Development mode uses the OS keyring; Docker mode uses an encrypted Postgres table unlocked by a passphrase the user enters at startup.
 - **The passphrase is never stored.** If the user restarts the container, they re-enter it. Until unlock, all endpoints that require a secret return `423 Locked`.
+- `server_label` — a free-form human-readable name the operator sets during stack installation (e.g. "Rémy's home stack", "Argentina parents' Umbrel"). Surfaced to clients on pairing and on subsequent connection sanity-checks. Optional; absent value means clients render only the connection endpoint or hosted-tier connection-ID. Sharpened during the onboarding-screen-2 session 2026-05.
 
 ## Project layout
 

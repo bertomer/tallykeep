@@ -7,12 +7,26 @@ SVG for human readers; these files are for machine consumers.
 
 ## Files
 
+### Brand identity (mark + wordmark, v1 locked)
+
 | File | Source lock doc | When to use |
 |---|---|---|
 | `icon-canonical.svg` | `tallykeep_brand_mark_v1_lock.html` §1 | Default. 32 px and up. With grain stripes. |
 | `icon-solid.svg`     | `tallykeep_brand_mark_v1_lock.html` §2 | Favicon, ≤16 px. No grain (sub-pixel noise at small sizes). |
 | `wordmark-plain.svg` | `tallykeep_wordmark_v1_lock.html` §3   | Plain typeset wordmark, no embedded icon. Display tier (92 px). |
 | `wordmark-icony.svg` | `tallykeep_wordmark_v1_lock.html` §4   | Wordmark with the canonical icon between "tall" and "keep". Display tier (92 px). |
+
+### Holding-type icons (v2 palette lock)
+
+| File | Source lock doc | When to use |
+|---|---|---|
+| `holding-account.svg`           | `tallykeep_palette_v2_lock.html` §4 | Account type — classical pediment institution. Filled limestone. |
+| `holding-purse-watch-only.svg`  | `tallykeep_palette_v2_lock.html` §4 | Purse with `seed_origin=external_watch_only`. Brass cord variant. Also the default/canonical "Purse" icon for the type chooser. |
+| `holding-purse-managed.svg`     | `tallykeep_palette_v2_lock.html` §4 | Purse with `seed_origin=tallykeep_managed`. Dark cord variant. |
+| `holding-strongbox.svg`         | `tallykeep_palette_v2_lock.html` §4 | Strongbox — iron chest. Filled dark steel. |
+| `holding-vault.svg`             | `tallykeep_palette_v2_lock.html` §4 | Vault — brushed-steel door with brass hub, three T-handles, six inner tubes. Hinge on left. |
+
+Holding icons are designed for ≥32 px (Add-Holding popup, detail headers). In Holding-list rows the icon is omitted and a 4 px colored stripe carries the type identification (color tokens `--color-holding-*`).
 
 All SVGs use `viewBox` for resolution-independent scaling. Sizing
 in CSS via `width` / `height` overrides the intrinsic `width`/
@@ -31,7 +45,9 @@ When a lock doc revises (v1 → v2), regenerate the corresponding SVG
 file in this folder in the same change. Do not edit these files
 without updating the source lock doc.
 
-## Color tokens used (locked v1)
+## Color tokens used
+
+### Brand identity (locked v1)
 
 - **Aged Oak** `#A88554` — wood (stock + foil fill)
 - **Grain** `#6F5638` — stripe lines (stroke 1.4, opacity 0.6)
@@ -43,6 +59,15 @@ without updating the source lock doc.
   not into a separate cream container)
 - **Wordmark text** `#1A1A1A` (light surfaces) / `#F4EAD5` (dark
   surfaces) — see wordmark lock doc §7 for dark-mode rules
+
+### Holding-type icons (locked v2 palette)
+
+- **Limestone** `#9c9388` — Account fill
+- **Auburn leather** `#80452f` — Purse fill (both variants)
+- **Iron** `#4a4d4f` — Strongbox fill
+- **Brushed steel body** `#7a8189` and **frame** `#5c6470` — Vault
+- **Brass** `#b89968` — Vault hub + ring, Purse watch-only cord
+- **Dark cord** `#1a0805` — Purse managed cord (high-contrast against auburn)
 
 If the consumer renders on a different background than the locked
 defaults, override the carving fill to match. The SVGs are

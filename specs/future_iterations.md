@@ -55,27 +55,147 @@ removed.
 
 ### Hosted tier infrastructure
 
-- **Captured:** 2026-05 (from `design_decisions.md` §11, pre-merge)
+- **Captured:** 2026-05 (from `design_decisions.md` §11, pre-merge);
+  sharpened during onboarding-screen-1 session 2026-05.
 - **Motivation:** Phone-only LatAm/Africa users without home labs.
   Primary growth path beyond personal use.
-- **Sketch:** Backend deployable on TallyKeep infrastructure with
-  client-side encryption boundary preserving the no-custody promise.
-  Key topology decision pending: per-customer dedicated bitcoin node
-  (more expensive, simpler privacy story) vs shared bitcoin node
-  with per-customer scoped queries (cheaper at scale, requires
-  careful privacy design — descriptors and labels segregated, no
-  cross-customer leakage). $7-12/mo placeholder pricing, 30-day free
-  trial.
+- **Sketch:**
+    - **Auth model — connection-ID + passphrase, no email, no
+      account.** User declares they want hosted infrastructure;
+      system generates an opaque connection-ID; user sets a
+      passphrase on their hosted instance (the same server-side
+      passphrase that encrypts secrets at rest per
+      `01_architecture.md` §"Configuration model" — one passphrase
+      per stack). No email, no identity, no KYC. Preserves
+      design principle #6 in `00_README.md` ("no accounts in our
+      app") cleanly.
+    - **Connection-ID format — non-predictable AND memorable.**
+      Sharpened during onboarding-screen-2 session 2026-05.
+      Favor word-pair-encoded format like `crisp-river-7842` over
+      raw UUID. Two requirements: (a) UUID-grade entropy
+      (≥128 bits) so it can't be guessed, brute-forced, or
+      enumerated; (b) human-handleable so users can write it down,
+      type it, read it aloud over a phone call to recover access.
+      Reference encoding: WordSafe / Diceware-style pairs of
+      adjective + noun + 4-digit suffix. The 4-digit suffix
+      preserves entropy when the wordlist is small. EFF short
+      wordlist (~1300 words) gives ~10 bits per word; two words
+      + 13-bit suffix ≈ 33 bits → not enough alone. Stretch with
+      Argon2id-derived authentication or pair the connection-ID
+      with the user's passphrase as a two-factor primitive.
+      Cryptography decision pending in dedicated session when
+      hosted-tier promotes.
+    - **Per-user instance, shared bitcoind/LN nodes.** Each user
+      gets their own backend + DB + Redis + worker; bitcoind and
+      Lightning nodes are shared infrastructure (not duplicated
+      per user — that's the topology decision). Cost-model
+      pending: dedicated-DB-per-user vs shared-DB-with-tenant-
+      isolation may be necessary at scale.
+    - **30-day free trial → soft-degradation → 10-day grace →
+      deletion.** At trial expiry, the instance switches to
+      read-only (user can connect, view balances, but can't
+      create Holdings, run sweeps, or send/receive). After 10
+      additional days without payment, the instance is deleted.
+      Behavioral hypothesis: lazy human flesh stays paying.
+    - **Privacy boundary disclosure (mandatory).** Self-hosted
+      gives true privacy; hosted-tier trades some for convenience.
+      What TallyKeep-the-operator can theoretically see on
+      hosted-tier:
+        - **Descriptors** (xpubs / output descriptors) — anyone
+          with read access can reconstruct the wallet's full
+          transaction history, balances over time, and counterparty
+          patterns. Public-key data, but a meaningful privacy
+          leak. *Structurally cannot be E2E-encrypted* — the chain
+          analyzer needs descriptors in plaintext to do its job.
+        - **Categorization labels** (counterparty names, purposes)
+          — sensitive personal financial data. *Could later be
+          E2E-encrypted blobs* (server stores, never reads).
+        - **Custodial provider API keys** — encrypted at rest with
+          the user's passphrase but pass through plaintext briefly
+          during a provider call. Same as self-host.
+      Disclosure surfaced at the onboarding hosted-tier choice
+      AND as a security-health item users acknowledge with the
+      same lifecycle as `seed-backup-disclosure`. Comparison
+      reference: Bitwarden's hosted vault (zero-knowledge for
+      most data, but the model has its limits).
+    - **No email = no recovery.** Lose your connection-ID and your
+      hosted instance is gone (Bitcoin is fine — re-importable
+      from hardware-wallet/seed backup — but TallyKeep state,
+      categorizations, sweep policies, history, gone). Disclosed
+      explicitly at hosted-tier signup with a "save this
+      somewhere safe" warning treated like the BTC stack /
+      privacy / UTXO warnings (security-health system,
+      acknowledgment-required).
+    - **Abuse mitigation.** Without email-based identity, scripted
+      attackers can spin up infinite trial instances. Friction
+      options to evaluate: small Lightning sat-payment to claim
+      an instance (fits the brand); proof-of-work challenge;
+      CAPTCHA; rate-limit by IP. Decision pending.
+    - **Operational support — no email = no out-of-band reach.**
+      User-side break-glass (server outage, security advisory)
+      cannot be pushed via email. Fallback options: in-app
+      banner system, public status page checked at app launch,
+      announce-only Lightning address publishing key updates.
+      Decision pending; needs to be designed before public-ship.
+    - **Billing.** $7-12/mo placeholder. Payment options to
+      evaluate: Lightning (fits the brand), credit card (defeats
+      the no-account principle if Stripe-CustomerID is required).
+      Lightning-first feels right.
 - **Touches:** architecture, threat model, deployment, billing,
-  privacy notice in onboarding
+  privacy notice in onboarding, security-health system
+  (acknowledgment lifecycle), abuse mitigation, support
+  infrastructure
 - **Status:** sketched
 - **Milestone:** TBD — Rémy to decide whether hosted tier launches
   with public-ship (in the ship-gate bundle) or follows in
   post-shipping. Self-host launch first is defensible (smaller
   initial blast radius); hosted-tier-from-day-one captures more of
   the LatAm/Africa target market faster.
-- **Notes:** Onboarding choice already exists in mockups with
-  "Coming soon" stub. Privacy boundary explicit at onboarding.
+- **Notes:** Onboarding screen-1 (`mobile_onboarding_01_connect.html`)
+  is drafted to anticipate this — "Connect to your TallyKeep" works
+  for both self-hosted (scan QR / enter URL) and hosted-tier (claim
+  connection-ID) without changing structure. Hosted-tier specifics
+  (claim flow UI, payment page, soft-degradation banners) are a
+  separate iteration when this entry promotes.
+
+  **Hosted-tier onboarding screens that materially differ from the
+  self-hosted flow** (sharpened during the onboarding-screen-2
+  review 2026-05-10, kept here so the hosted-tier iteration starts
+  from a defined gap-list):
+
+  - *Hosted-tier signup* — likely lives in a web browser (TBD —
+    could be app-internal too). Generates the connection-ID,
+    user sets a server passphrase. The current Screen 01's
+    "Don't have a TallyKeep yet? → see docs" ghost CTA is the
+    bridge: docs explain how to spin up either self-hosted
+    (Docker / Umbrel / Start9) OR claim a hosted instance.
+  - *Backup-credentials screen* (new, app-side). Critical step
+    after first hosted-tier pairing: user must save their
+    connection-ID + passphrase somewhere safe. Without
+    email-based recovery (the no-email-no-account principle),
+    losing both = instance is gone (Bitcoin recoverable via
+    hardware backup; TallyKeep state — categorizations, sweep
+    policies, history — gone). Acknowledgment-required pattern,
+    same lifecycle as `seed-backup-disclosure` in the
+    security-health system.
+  - *Paired-confirmation server identifier* — surfaces the
+    connection-ID alongside the label, e.g.
+    `crisp-river-7842 · TallyKeep hosted`; endpoint is the
+    hosted URL (`https://app.tallykeep.io/...`).
+  - *Deep-recovery copy* — differs from self-hosted. Self-hosted
+    says "Re-pair from desktop"; hosted-tier says "Re-pair from
+    your hosted dashboard" (and the dashboard URL is part of
+    the saved-credentials acknowledgment screen).
+  - *Traveling-hosted-tier-user-without-second-device.* Open
+    design question for this iteration: if the user is on their
+    only phone, has lost their device credential, and needs to
+    re-pair, how do they display a QR? Candidate solutions
+    include: hosted dashboard accessible from the same phone's
+    web browser, recovery codes set during signup, Lightning
+    sat-payment as a friction-attached recovery affordance.
+  - *Passphrase-fallback unlock* — same mechanism as self-hosted
+    (per ADR-0008). Phone forwards passphrase to hosted backend
+    for validation. No app-side difference.
 
 ### Lightning support
 
@@ -806,6 +926,135 @@ removed.
   to be re-asked carefully if pursued. Rejected adjacent: lending,
   borrowing, yield without contract-bound user-key retention.
 
+### Multi-server per single client
+
+- **Captured:** 2026-05 (during onboarding-screen-2 session, when
+  Rémy considered whether the server identifier needed to be
+  prominent on the paired-confirmation screen)
+- **Motivation:** Power-user case for the sovereignty audience.
+  Examples: home stack + parents' Umbrel for inheritance management,
+  home stack + work-pseudonym stack, home stack + traveling test
+  instance. Currently the architecture and onboarding assume
+  single-server-per-client (one paired stack, one device credential
+  in the Keychain). Extending to multi-server adds non-trivial UX
+  surface.
+- **Sketch:**
+    - **Connect screen extension.** Currently terminal — once paired,
+      the user lands on Home. Multi-server adds a Settings → "Paired
+      stacks" view + an "Add another stack" affordance that
+      re-runs the Connect flow without unpairing the existing one.
+    - **Switch-server affordance.** Top-level UI element (likely the
+      app bar or a Settings-rooted toggle) for moving between paired
+      stacks. Active stack's identifier prominent; inactive stacks
+      one tap away.
+    - **Per-stack data isolation.** Each paired stack has its own
+      device credential, its own observable Holdings, its own
+      cached state. The phone holds N credentials; the user picks
+      which is active.
+    - **Notification routing.** When push notifications land
+      (post-Lightning iteration), the notification has to indicate
+      which stack it's about — otherwise tapping a notification
+      lands on the wrong active context.
+    - **Paired stacks server-side.** The inverse problem: the
+      server's "paired devices" list shows N devices for the user.
+      That part already needs to exist for single-stack
+      revocation; multi-server doesn't change the server side.
+- **Touches:** mobile UI (Connect, Settings, app bar, Home),
+  device-credential storage shape (Keychain entry per stack vs
+  array), backend (no change — multi-server is a client-side
+  concern, the server doesn't know about other stacks the device
+  is paired with), `UI/mobile.md` Onboarding section, future
+  notification handler.
+- **Status:** idea
+- **Milestone:** **post-public-ship** (Rémy's call: "defers to after
+  public shipping for sure"). Not blocking for personal-use phase
+  or public-ship event. The single-server-per-client model is the
+  default and will likely cover the majority of public-ship users;
+  multi-server is power-user expansion.
+- **Notes:** Onboarding-screen-2 design assumes single-server when
+  rendering the paired-server identifier. If multi-server lands,
+  the paired-confirmation screen gains an "and your existing
+  stack(s)" line, or the Add-stack flow is folded into Settings
+  rather than re-running through Onboarding. Defer the design.
+
+---
+
+### Dynamic brand mark on first-touch surfaces
+
+- **Captured:** 2026-05 (during onboarding-screen-1 session, after
+  Rémy noted excitement about showcasing the dynamic mark)
+- **Motivation:** The brand v1 mark lock doc
+  (`brand/tallykeep_brand_mark_v1_lock.html` §5) already implements
+  a working tap-to-regenerate-grain interaction (~80 LOC, seeded
+  xorshift32 PRNG, both halves regenerate matching stripes — the
+  verification metaphor of split tally sticks made tactile, the
+  pedagogical heart of the brand). v1 sanctions it for the
+  **landing-page hero only**; everywhere else uses the locked
+  static seed. Extending the sanction to one or more first-touch
+  surfaces in the app would let new users experience the verification
+  metaphor at the moment of first arrival, which is structurally
+  the same shape of moment as a landing-page hero.
+- **Sketch:**
+    - **Connect screen (primary candidate, `mobile_onboarding_01_connect.html`).**
+      The screen's brand surface is `wordmark-icony` (the wordmark
+      with the canonical Y embedded between "tall" and "keep"),
+      not the bare icon. Make the whole wordmark area the tap
+      target; on tap, only the embedded Y's grain regenerates
+      (the "tall" and "keep" text stays static). This is a small
+      extension of brand v1 §5, which demoed the dynamic
+      interaction on the bare canonical icon — the same seeded
+      PRNG and rendering function applies, only the surrounding
+      typography changes. v1 → v2 lock-doc bump should explicitly
+      sanction the wordmark-icony embedded Y as a dynamic surface
+      alongside the bare icon. This is the user's first-touch
+      moment in the app; the metaphor lands hardest here, and zero
+      additional screen real estate is consumed (the brand mark
+      was already going to be there).
+    - **Settings → About / How it works (secondary candidate).**
+      A dedicated explainer page where the mark is the visual
+      anchor for "what tallykeep means as a verification primitive."
+      Less time-pressured than the Connect screen, more room for
+      the full caption ("The grain matches. A tally stick is split
+      from a single piece of wood. The pattern on both halves is
+      the proof — that's how you knew it was real.").
+    - **Other surfaces** (home page, Holding detail, etc.) stay
+      static-mark-with-locked-seed per the current brand rule.
+- **Touches:**
+    - **Brand:** v1 → v2 lock-doc bump for the mark, updating §5
+      "Landing-page interaction" to extend the sanction list. Per
+      `PROCESS.md §2.4`, pre-public-ship lock-doc edits are
+      allowed without an ADR; v1 → v2 is the convention. Update
+      the canonical SVG export in `brand/identity/` if any visual
+      detail changes (probably not — the dynamic component reuses
+      the canonical geometry).
+    - **Frontend:** SvelteKit component implementing the demo from
+      §5 of the lock doc. Mockups are static (per
+      `UI/mockups/README.md`); the dynamic version lands in code.
+    - **`UI/mobile.md` Onboarding section:** note that the Connect
+      screen's brand mark is the dynamic variant (when this
+      iteration ships).
+- **Status:** sketched
+- **Milestone:** **TBD** — best guess: pre-shipping (between
+  private-ship and public-ship), since the personal-use phase is
+  exactly when defining UX patterns get tested against daily use.
+  Could also pull forward into the Capacitor / private-ship
+  iteration if the wrapping work is touching this screen anyway.
+- **Notes:**
+    - Discoverability: the demo-hint text ("Tap to verify a new
+      pair") in the lock doc is for a documentation context; the
+      Connect screen probably wants a subtler hint (a one-time
+      pulse on first launch? no hint and trust the affordance is
+      noticed?). Sharpen during the iteration.
+    - Accessibility: keyboard-activate (`Enter` / `Space`) already
+      implemented in the lock doc demo. Carry forward.
+    - Animation budget: the lock doc uses an 180ms opacity
+      crossfade. Cheap enough on any phone. No perf concern.
+    - Content of the seed display ("seed · 7777" in the lock doc
+      demo) does not belong on the Connect screen — that's a
+      doc-context affordance for the lock doc only.
+
+---
+
 ### "Tap to see under the hood" — UI spine pattern
 
 - **Captured:** 2026-05 (mid-conversation, exploring TallyKeep's
@@ -856,6 +1105,255 @@ removed.
     - **Discoverability.** If it's the spine, users need to know
       about it. Onboarding mention? First-run hint? Or let them
       discover by accident?
+
+---
+
+### Non-custodial sourcing router (best-execution for Bitcoin acquisition)
+
+- **Captured:** 2026-05 (sparring session captured verbatim in
+  `archive/2026-05_parking_notes_sourcing_and_decumulation.md`)
+- **Motivation:** Atomic-swap venues (SideSwap, Mostro, Boltz) and
+  custodial Accounts are paths to the same outcome — sats into a
+  Holding. Building a venue forks scope into protocol territory
+  currently being closed by Lightning Labs / Blockstream / Tether-
+  Bitfinex multi-year teams. Building a **router** that picks the
+  best path per transfer is the wedge: Smart Order Routing applied
+  to self-custody Bitcoin acquisition. Reinforces banking-grade
+  ergonomics; never asks the user the word "swap."
+- **Sketch:**
+    - Sourcing path becomes a first-class concept alongside
+      `CustodialProvider` Accounts. User sees a single banking-style
+      "transfer" UI; routing happens behind it.
+    - Evaluator inputs: amount, time tolerance, counterparty
+      preferences, depth, current quotes, user's connected providers.
+    - Suggested integration order: SideSwap (Liquid PSBT atomic
+      swaps — most production-ready) → Mostro (Nostr-based LN P2P)
+      → Boltz (quote service for BTC ↔ LN ↔ Liquid) → custodial
+      route + immediate sweep (the dev-phase path, becomes one
+      input among many).
+    - Compliance framing: **"never recustody," not "no KYC."** Most
+      realistic users KYC at the on-ramp anyway. The wedge is
+      "identity proven once at the on-ramp, funds stay sovereign
+      forever."
+- **Touches:** trading layer (`07_trading_layer.md`), domain model
+  (sourcing path concept — possibly a new entity), UI sourcing
+  flow, threat model, regulatory posture
+- **Status:** sketched
+- **Milestone:** post-shipping (source notes explicitly v1.5+)
+- **Notes:**
+    - **Direct competitor on the sourcing side: Peach Bitcoin** —
+      mobile-first, Swiss, EU/LatAm/Africa coverage. Different
+      wedge (Peach is a venue; TallyKeep would be a router across
+      venues + custodial), but the closest market overlap. Study
+      feature set and traction before sharpening.
+    - **SideSwap caveat:** venue (matching server) is trusted; chain
+      (Liquid Federation, ~70 entities) is federated. If single-
+      vendor risk matters, build on the open Liquid PSBT swap
+      protocol itself (`docs.liquid.net/docs/swaps-and-smart-contracts`),
+      with LiquiDEX / TDEX as alternative consumers.
+    - **Vocabulary discipline.** "Swap" overloads three different
+      things in crypto: (1) atomic-swap primitive (HTLC/PTLC,
+      proper finance: DvP with simultaneous bilateral settlement);
+      (2) CLOB trading with atomic settlement (SideSwap, Bisq —
+      these are *trades*, not swaps); (3) AMM "swaps" (Uniswap-
+      style, different design school, doesn't fit the wedge —
+      impermanent loss, slippage on size, MEV). Integrate (2);
+      skip (3). Worth a vocabulary ADR when this entry sharpens.
+    - **Don't build a venue.** Source notes are emphatic — building
+      an orderbook fragments solo-builder scope across two
+      unrelated hard problems with no compounding leverage. The
+      router is the moat; protocols underneath are commodity
+      infrastructure to ride on.
+
+### Target-price accumulation (limit-bid sourcing)
+
+- **Captured:** 2026-05 (same sparring session as the sourcing-
+  router entry; archive file as above)
+- **Motivation:** Once instant-execution sourcing exists, the
+  natural follow-on is letting the user post a passive limit bid
+  at the price they're happy to buy at, routed to the best venue.
+  The fill IS the goal — no adverse-selection problem, no market-
+  making risk. Banking-grade framing: **"Set the price you want
+  to buy at. We route your bid to the best venue. Fill auto-sweeps
+  to Strongbox."** Same liquidity-contribution effect as market-
+  makers without the structural risk story.
+- **Sketch:** New SourcingPolicy variant (sibling to instant-
+  sourcing): limit-price bid posted to the routed venue, listening
+  for fill, on-fill triggers auto-sweep to the destination Holding.
+  Cancel / amend affordances. Execution-uncertainty disclosure
+  honest — bid at X, BTC rallies past X without touching it →
+  user watched from sidelines, capital locked. That's the cost of
+  being a patient buyer, which is what the target user signed up
+  for.
+- **Touches:** trading layer, sourcing-router (blocks on the entry
+  above), UI sourcing flow, threat model
+- **Status:** sketched
+- **Milestone:** post-shipping (sequencable: instant-execution
+  router first, limit-price router after — source notes frame as
+  v1 → v1.5)
+- **Notes:**
+    - **Vocabulary lock candidates (sharpen alongside brand voice
+      work):**
+        - ❌ "Earn the spread" — misleading. Real spread capture
+          (50–200 bps on thin books) requires posting both sides
+          and getting filled on both = market making. Likely trips
+          AMF/CSSF marketing rules in EU.
+        - ✅ "Skip the taker fee" — honest. User saves the venue's
+          taker fee (typically 0.2%) by being a maker. Fee saving,
+          not spread capture.
+    - **Do not build market-making.** Onboarding clients into a
+      structurally losing game dressed as "earn the maker fee" =
+      reputational damage. Strict distinction in source notes:
+      target-price accumulation is single-sided and aligned with
+      directional view; market-making is two-sided and faces
+      adverse selection on thin books.
+    - Reference precedents: Strike's "buy the dip," Swan's limit
+      orders. Neither does this well in a self-custody, route-
+      across-venues shape.
+
+### Decumulation + planning layer (the fourth product layer)
+
+- **Captured:** 2026-05 (same sparring session; archive file as above)
+- **Motivation:** TallyKeep's three current layers (savings /
+  banking / trading) cover accumulation and current spending.
+  They don't cover decumulation — "how do I spend this when I no
+  longer earn." Pensions are roughly 70% decumulation, 30% growth;
+  current spec is the opposite. Vault-as-pension is **segment-
+  dependent**: in high-inflation economies (Argentina, Turkey,
+  Nigeria, Lebanon) the Vault IS the pension because the local
+  "risk-free fiat asset" doesn't exist; in EU the Vault
+  *complements* traditional pension infrastructure (PEA / PER /
+  assurance-vie give tax wrappers self-custody can't replicate
+  without becoming a PSAN/CASP custodian — which would destroy
+  the self-custody thesis).
+- **Sketch:** SweepPolicy in reverse, same primitive. Vault /
+  Strongbox as source, Account / Purse as sink, scheduled or
+  trigger-driven. Three additions beyond raw periodic sweep:
+    1. **Buffer layer (bucket strategy from CFP literature).**
+       12–24 months of declared monthly spend in stable form
+       (Purse, plus possibly a small stablecoin sleeve depending
+       on resolution of the "stablecoins as transit" candidate
+       principle below). Replenish when BTC is up. Textbook fix
+       for **sequence-of-returns risk** — the classic retirement-
+       finance failure mode (force-selling stack at the bottom
+       during drawdowns).
+    2. **Dynamic withdrawal rate.** Even the simple "draw 4% of
+       vault annually, recalculate yearly" beats fixed-EUR/month
+       substantially. Guyton-Klinger guardrails or variable-
+       percentage-withdrawal as a policy layer on top of
+       SweepPolicy.
+    3. **Tax-aware projection.** France: 30% PFU on crypto capital
+       gains. **Show** projected tax events alongside projected
+       purchasing power; do not **advise** (configurable
+       simulator, not "we recommend X% per year" — that crosses
+       AMF rules on personalized financial advice).
+- **Touches:** new product layer (likely a new spec module —
+  module-11-shaped, e.g. a decumulation-layer module), domain
+  model (SweepPolicy direction + new Buffer / WithdrawalRate
+  entities), trading layer (cap-gains tagging in LedgerEntry),
+  UI (calculator + planning view), threat model, regulatory
+  framing
+- **Status:** sketched
+- **Milestone:** post-shipping (far post — needs a population of
+  users who have accumulated enough to plan decumulation)
+- **Notes:**
+    - **Regulatory framing locked in source notes:** frame as
+      **configurable calculator + automation the user drives**,
+      never as personalized advice. AMF actively polices
+      personalized financial advice in France.
+    - **"Without any risk" doesn't appear in user-facing copy.**
+      BTC has volatility (60–80% drawdowns are historically
+      normal), regulatory, and operational risk (lost keys,
+      multisig coordination). Source notes flag the language as
+      trip-wire for MiCA marketing rules in EU. Candidate brand-
+      voice guardrail.
+    - Segment-driven UX: Argentine schoolteacher vs French
+      employee with a PER have different decumulation needs. The
+      planning view exploration for each is itself a sharpening-
+      session when this entry promotes.
+    - Direct-BTC-payment as a withdrawal path is bonus; off-ramp
+      is the realistic default for the foreseeable future (BTC
+      direct-pay still <5% of normal household spend even in
+      target markets, per source notes).
+    - Adjacent to but distinct from the existing "Retirement plan
+      with timelock" entry. Timelock is the script-enforced
+      lock-period mechanic on a Holding; this entry is the
+      consumption-planning layer on top of accumulated Holdings.
+      They compose.
+
+### PSD2 / Open Banking integration for fiat-leg verification
+
+- **Captured:** 2026-05 (same sparring session — EU-specific angle
+  on the non-custodial sourcing question; archive file as above)
+- **Motivation:** Every "P2P BTC-fiat" platform (Bisq, HodlHodl,
+  Peach, Mostro) faces the same asymmetry: BTC leg is verifiable
+  on-chain, fiat leg isn't — atomicity is cryptographically
+  impossible, so they all bolt on a multisig + arbitrator pattern
+  resolving fiat disputes socially. **PSD2 Access-to-Account (AIS)
+  APIs** let a regulated entity programmatically verify "€X landed
+  in this IBAN from that IBAN at this timestamp." Not trustless —
+  bank and AISP are trust anchors — but **collapses ~95% of fiat-
+  receipt disputes into automated resolution.** No existing P2P
+  platform has built this properly. If TallyKeep is EU-domiciled
+  and partners with an AISP (Tink, TrueLayer, Bridge by Bud) or
+  holds an AISP license itself, there's a real wedge for the
+  sourcing-router's EU-fiat-input path.
+- **Sketch:**
+    - For the EU sourcing-router path on P2P venues: when the user
+      receives fiat into their connected IBAN as part of a P2P
+      sell-side leg, the AISP integration verifies receipt
+      automatically and releases the BTC leg from escrow without
+      arbitrator involvement.
+    - Two licensing paths: (a) partner with an existing AISP —
+      lower regulatory cost, dependency on the partner; (b) become
+      AISP-licensed under ACPR — higher cost, fewer dependencies,
+      real moat.
+    - Honest disclosure: AISP + bank are trust anchors; the
+      "atomicity" here is regulatory-grade, not cryptographic.
+- **Touches:** trading layer, sourcing-router (blocks on the
+  router entry above), regulatory posture (AISP licensing is a
+  real regime change), threat model, new external dependency
+- **Status:** idea
+- **Milestone:** post-shipping
+- **Notes:**
+    - **Hostage to the sourcing-router entry sharpening + a
+      separate regulatory analysis** of AISP licensing cost (PSD2
+      AIS under ACPR in France — the lighter end of the payment-
+      services regime; PSP authorization is heavier and not the
+      target here). Verify current ACPR / PSD2 framework before
+      committing.
+    - Why no P2P platform has built it: most are non-EU or pre-
+      EU-presence, and the AISP path is real work. This entry is
+      what "EU domicile is a wedge instead of a tax" looks like
+      for TallyKeep on the sourcing side.
+
+### Taproot Assets on Lightning sourcing (wait-and-watch)
+
+- **Captured:** 2026-05 (same sparring session; archive file as above)
+- **Motivation:** Per source notes (verify before relying), USDT
+  went live on Lightning mainnet Q1 2026 via Taproot Assets. RFQ-
+  based atomic conversion at edge nodes — sender pays USDT,
+  receiver gets BTC (or any combination). Settlement on actual
+  Bitcoin, open protocol, multiple implementations possible, no
+  federation (vs Liquid). Plausibly the future BTC-native trading
+  infrastructure; production-grade orderbook flows estimated 12–24
+  months from capture time. When mature, becomes a sourcing path
+  preferable to Liquid because of the trust model.
+- **Sketch:** Future integration in the sourcing-router. As
+  *consumer* first (RFQ to existing edge nodes). Operating our own
+  Taproot Assets edge node is a separate, larger commitment that
+  overlaps market-making territory — apply the "don't build
+  market-making" guardrail from the target-price-accumulation entry.
+- **Touches:** trading layer, sourcing-router (blocks on the
+  router entry above), Lightning integration (blocks on the
+  Lightning entry)
+- **Status:** idea
+- **Milestone:** post-shipping — wait-and-watch
+- **Notes:** Re-verify Taproot Assets maturity annually. Bitcoin
+  trading infrastructure is currently roughly Lightning circa 2018
+  per source notes — primitives work, network forming, UX poor,
+  liquidity thin. Production-grade infrastructure estimated 2–4
+  years out from capture time.
 
 ---
 
