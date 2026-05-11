@@ -1,0 +1,317 @@
+<!--
+  Title: Mobile — Home (empty)
+  Status: validated  (Rémy greenlight 2026-05-10 after three design passes)
+  Date last touched: 2026-05-10
+  Replaces: archive/UI/tallykeep_mobile_v2.html §B3 "Home empty" (richer empty state with welcome heading + four inline Add tiles, now stripped) AND the first iteration of this file (centered-Phoenix-aesthetic, rejected by Rémy 2026-05-10)
+
+  Design note: banking-grade structure, not minimal-aesthetic.
+  Left-aligned mono amount (institutional feel — numerals don't
+  shift position as they grow). Small inline cycle icon above the
+  "sats" unit label (NOT a pill button — the unit isn't the action
+  surface). Suppressed show-fiat link (we don't push fiat
+  consolidation; it's available, not promoted). Sectioned layout
+  with "Holdings" header + small "+ Add" affordance — even at zero
+  state, so the user feels the app's information architecture.
+  Empty list-card placeholder rather than nothing — banking-grade
+  apps mark structure even when empty.
+
+  Pattern adapted from archive/UI/tallykeep_mobile_v2.html §B1
+  (populated home), pulled back to the empty case by removing the
+  Send/Receive action row and replacing the holdings list with an
+  empty placeholder.
+-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>TallyKeep — Mobile — Home (empty)</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="_shared/tokens.css">
+<link rel="stylesheet" href="_shared/shell.css">
+<style>
+  .phone-screen {
+    padding-top: var(--mobile-safe-top);
+    padding-bottom: var(--mobile-safe-bottom);
+    background: var(--color-bg);
+  }
+
+  /* ---------- App bar ---------- */
+  .app-bar {
+    height: var(--mobile-app-bar);
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    padding: 0 var(--space-4);
+    background: var(--color-surface);
+    border-bottom: 1px solid var(--color-border);
+  }
+  .app-bar svg.wordmark-icony {
+    width: 120px;
+    height: auto;
+    display: block;
+  }
+
+  /* ---------- Hero — consolidated view ---------- */
+  .hero {
+    flex-shrink: 0;
+    padding: var(--space-5) var(--space-4) var(--space-4);
+    background: var(--color-surface);
+    border-bottom: 1px solid var(--color-border);
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--space-2);
+  }
+  .hero .label-line {
+    font-size: var(--font-size-xs);
+    color: var(--color-text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    font-weight: var(--font-weight-semibold);
+  }
+  .amount-line {
+    display: flex;
+    align-items: baseline;
+    gap: var(--space-3);
+  }
+  .amount {
+    font-family: var(--font-mono);
+    font-size: 36px;
+    font-weight: var(--font-weight-semibold);
+    color: var(--color-text);
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+  }
+  /* Unit label — "sats" with a small ↻ in superscript-position
+     to its right (think "sats²" notation with ↻ as the exponent).
+     The ↻ is the tap-affordance for cycling sats / BTC. Sized at
+     --font-size-md (16 px) — bumped up from base (14 px) so the
+     lowercase "sats" doesn't read too small next to the chunkier
+     all-caps "BTC" when cycled. Balances the visual weight of
+     both unit states. */
+  .unit-label {
+    font-size: var(--font-size-md);
+    color: var(--color-text-muted);
+    font-weight: var(--font-weight-medium);
+    line-height: 1;
+  }
+  .unit-toggle {
+    background: transparent;
+    border: 0;
+    padding: 0 0 0 2px;
+    margin: 0;
+    font-size: 0.7em;
+    vertical-align: super;
+    line-height: 1;
+    color: var(--color-text-muted);
+    cursor: pointer;
+    font-family: inherit;
+  }
+  .unit-toggle:hover { color: var(--color-text); }
+  .show-fiat-link {
+    background: transparent;
+    border: 0;
+    padding: 0;
+    color: var(--color-text-dim);
+    font-size: var(--font-size-xs);
+    cursor: pointer;
+    margin-top: var(--space-1);
+  }
+  .show-fiat-link:hover { color: var(--color-text-muted); }
+
+  /* ---------- Section header ---------- */
+  .section-head {
+    padding: var(--space-3) var(--space-4) var(--space-2);
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+  }
+  .section-head .title {
+    font-size: var(--font-size-xs);
+    font-weight: var(--font-weight-semibold);
+    color: var(--color-text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+  /* Add affordance — rounded-square outlined "+" button. Quieter
+     than filled, more elegant than circular-filled. Translation-
+     free (the "+" is universal). Thin SVG stroke for elegance. */
+  .section-head .add-btn {
+    width: 28px;
+    height: 28px;
+    border-radius: var(--radius-md);
+    border: 1.5px solid var(--color-primary);
+    background: transparent;
+    color: var(--color-primary);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    padding: 0;
+  }
+  .section-head .add-btn svg {
+    width: 14px;
+    height: 14px;
+  }
+
+  /* ---------- Empty list-card placeholder ---------- */
+  .list-card-empty {
+    margin: 0 var(--space-4) var(--space-3);
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    padding: var(--space-5) var(--space-4);
+    text-align: center;
+    font-size: var(--font-size-sm);
+    color: var(--color-text-dim);
+  }
+
+  /* ---------- Scroll spacer ---------- */
+  .scroll-area {
+    flex: 1;
+    overflow-y: auto;
+  }
+
+  /* ---------- Bottom nav ---------- */
+  .bottom-nav {
+    height: var(--mobile-bottom-nav);
+    flex-shrink: 0;
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    background: var(--color-surface);
+    border-top: 1px solid var(--color-border);
+  }
+  .nav-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    padding: var(--space-2) 0;
+    font-size: 10px;
+    color: var(--color-text-dim);
+    background: transparent;
+    border: 0;
+    cursor: pointer;
+  }
+  .nav-item .nav-ico {
+    width: 22px;
+    height: 22px;
+    color: currentColor;
+  }
+  .nav-item.active { color: var(--color-primary-strong); font-weight: var(--font-weight-semibold); }
+  .nav-item.disabled { color: var(--color-text-dim); opacity: 0.4; cursor: not-allowed; }
+  .nav-item.enabled-inactive { color: var(--color-text-muted); }
+</style>
+</head>
+<body>
+
+<div class="mockup-meta">
+  <strong>Mobile — Home (empty)</strong> ·
+  <span class="status-validated">validated</span> ·
+  2026-05-10 · 360×800
+</div>
+
+<div class="phone-frame">
+  <div class="phone-screen">
+
+    <!-- App bar — small wordmark-icony at left, static -->
+    <div class="app-bar">
+      <svg class="wordmark-icony" viewBox="0 0 450 145" xmlns="http://www.w3.org/2000/svg" aria-label="tallykeep" role="img">
+        <text x="0" y="92" font-family="Manrope, system-ui, sans-serif" font-weight="600" font-size="92" letter-spacing="-2" class="mark-text">tall</text>
+        <svg x="143" y="42" width="76" height="84" viewBox="36.43 27.79 131.9 146.43">
+          <defs>
+            <clipPath id="wm-stock-clip"><path d="M 168.33 42.19 L 54.27 174.22 L 36.43 139.77 L 54.47 118.86 L 65.07 128.02 L 151.67 27.81 Z"/></clipPath>
+            <clipPath id="wm-foil-clip"><polygon points="40.68,42.21 79.68,87.21 96.32,72.79 57.32,27.79"/></clipPath>
+          </defs>
+          <path d="M 168.33 42.19 L 54.27 174.22 L 36.43 139.77 L 54.47 118.86 L 65.07 128.02 L 151.67 27.81 Z" class="mark-wood"/>
+          <polygon points="40.68,42.21 79.68,87.21 96.32,72.79 57.32,27.79" class="mark-wood"/>
+          <g class="mark-grain" stroke-width="1.4" stroke-linecap="butt" opacity="0.6">
+            <line x1="163.79" y1="38.27" x2="46.07" y2="174.53" clip-path="url(#wm-stock-clip)"/>
+            <line x1="156.22" y1="31.73" x2="38.50" y2="167.99" clip-path="url(#wm-stock-clip)"/>
+            <line x1="45.22"  y1="38.27" x2="84.52" y2="83.64"  clip-path="url(#wm-foil-clip)"/>
+            <line x1="52.78"  y1="31.73" x2="92.08" y2="77.09"  clip-path="url(#wm-foil-clip)"/>
+          </g>
+          <circle cx="53.76" cy="147.31" r="2.8" class="mark-carving"/>
+          <polygon points="-3,12 3,12 2,5 -2,5"     class="mark-carving" transform="translate(147 50) rotate(130.82)"/>
+          <polygon points="-4,12 4,12 2,4 -2,4"     class="mark-carving" transform="translate(140 58) rotate(130.82)"/>
+          <polygon points="-3,12 3,12 2,5 -2,5"     class="mark-carving" transform="translate(133 66) rotate(130.82)"/>
+          <polygon points="-3,-12 3,-12 2,-5 -2,-5" class="mark-carving" transform="translate(62 50)  rotate(49.18)"/>
+          <polygon points="-4,-12 4,-12 2,-4 -2,-4" class="mark-carving" transform="translate(69 58)  rotate(49.18)"/>
+          <polygon points="-3,-12 3,-12 2,-5 -2,-5" class="mark-carving" transform="translate(76 66)  rotate(49.18)"/>
+        </svg>
+        <text x="228" y="92" font-family="Manrope, system-ui, sans-serif" font-weight="600" font-size="92" letter-spacing="-2" class="mark-text">keep</text>
+      </svg>
+    </div>
+
+    <!-- Scrollable area — hero + sections -->
+    <div class="scroll-area">
+
+      <!-- Hero — consolidated view, left-aligned, on its own surface -->
+      <div class="hero">
+        <div class="label-line">Total balance</div>
+        <div class="amount-line">
+          <span class="amount">0</span>
+          <span class="unit-label">sats<button class="unit-toggle" aria-label="Cycle unit: sats / BTC">↻</button></span>
+        </div>
+        <button class="show-fiat-link">Show in fiat</button>
+      </div>
+
+      <!-- Holdings section — sectioned even at zero state -->
+      <div class="section-head">
+        <span class="title">Holdings</span>
+        <button class="add-btn" aria-label="Add a Holding">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+            <line x1="12" y1="5" x2="12" y2="19"/>
+            <line x1="5" y1="12" x2="19" y2="12"/>
+          </svg>
+        </button>
+      </div>
+      <div class="list-card-empty">
+        No Holdings yet
+      </div>
+
+    </div>
+
+    <!-- Bottom nav -->
+    <nav class="bottom-nav" aria-label="Primary navigation">
+      <button class="nav-item active" aria-current="page">
+        <svg class="nav-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M 3 12 L 12 3 L 21 12 M 6 10 L 6 21 L 18 21 L 18 10"/>
+        </svg>
+        Home
+      </button>
+      <button class="nav-item disabled" disabled aria-disabled="true">
+        <svg class="nav-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+          <line x1="5" y1="7"  x2="19" y2="7"/>
+          <line x1="5" y1="12" x2="19" y2="12"/>
+          <line x1="5" y1="17" x2="19" y2="17"/>
+        </svg>
+        Activity
+      </button>
+      <button class="nav-item disabled" disabled aria-disabled="true">
+        <svg class="nav-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="4" y="6"  width="16" height="4" rx="1"/>
+          <rect x="4" y="12" width="16" height="4" rx="1"/>
+          <rect x="4" y="18" width="16" height="2" rx="1"/>
+        </svg>
+        Holdings
+      </button>
+      <button class="nav-item enabled-inactive">
+        <svg class="nav-ico" viewBox="0 0 24 24" fill="currentColor">
+          <circle cx="6"  cy="12" r="2"/>
+          <circle cx="12" cy="12" r="2"/>
+          <circle cx="18" cy="12" r="2"/>
+        </svg>
+        More
+      </button>
+    </nav>
+
+  </div>
+</div>
+
+</body>
+</html>

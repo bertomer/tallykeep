@@ -160,3 +160,25 @@ body {
 .text-dim   { color: var(--color-text-dim); }
 .mono       { font-family: var(--font-mono); }
 .hero-num   { font-size: var(--font-size-hero); font-weight: var(--font-weight-bold); line-height: var(--line-height-tight); }
+
+/* ---------------- Status indicators ---------------- */
+
+/* Success indicator — green checkmark in a soft-green circle.
+   Used for: paired-confirmation, sweep-completed, payment-confirmed,
+   and similar positive end-states. Modifier classes adjust size. */
+.success-indicator {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: var(--color-success-soft);
+  color: var(--color-success-text-on-soft);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 28px;
+  font-weight: var(--font-weight-bold);
+  line-height: 1;
+  flex-shrink: 0;
+}
+.success-indicator.lg { width: 72px; height: 72px; font-size: 36px; }
+.success-indicator.sm { width: 32px; height: 32px; font-size: 16px; }

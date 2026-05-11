@@ -1,0 +1,211 @@
+<!--
+  Title: Mobile — Onboarding 02 — Paired (no biometric capacity)
+  Status: draft
+  Date last touched: 2026-05-10
+  Replaces: (new — added during onboarding-screen-2 review)
+
+  Design note: when the device's biometric capability check returns
+  unavailable (no Face ID / Touch ID / fingerprint sensor, or OS
+  disabled biometric for this app), the screen renders this variant
+  instead of the biometric-prompt variant. NativeBridge exposes a
+  `canUseBiometric()` query at app startup; the routing decision
+  happens at Screen 02 entry. There is no [Enable biometric] CTA on
+  this screen — only [Continue]. The threat-model copy here is
+  honest about the reduced protection.
+-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>TallyKeep — Mobile — Onboarding 02 — No biometric</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="_shared/tokens.css">
+<link rel="stylesheet" href="_shared/shell.css">
+<style>
+  .phone-screen {
+    padding-top: var(--mobile-safe-top);
+    padding-bottom: var(--mobile-safe-bottom);
+  }
+
+  .brand-strip {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: var(--space-5) var(--space-4) var(--space-4);
+  }
+  .brand-strip svg.wordmark-icony {
+    width: 280px;
+    height: auto;
+    display: block;
+  }
+
+  .paired-block {
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--space-2);
+    padding: var(--space-3) var(--space-4) var(--space-4);
+    text-align: center;
+  }
+  .paired-block .label-line {
+    font-size: var(--font-size-md);
+    font-weight: var(--font-weight-semibold);
+    color: var(--color-text);
+    margin-top: var(--space-2);
+  }
+  .paired-block .server-label {
+    font-size: var(--font-size-sm);
+    color: var(--color-text-muted);
+  }
+
+  .section-divider {
+    flex-shrink: 0;
+    height: 1px;
+    background: var(--color-border);
+    margin: 0 var(--space-4);
+  }
+
+  .no-biometric-block {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    padding: var(--space-5) var(--space-4) var(--space-4);
+    overflow-y: auto;
+  }
+  .no-biometric-block h1 {
+    font-size: var(--font-size-lg);
+    font-weight: var(--font-weight-semibold);
+    line-height: var(--line-height-tight);
+    color: var(--color-text);
+    margin: 0 0 var(--space-2);
+    text-align: center;
+  }
+  .no-biometric-block .lede {
+    font-size: var(--font-size-sm);
+    color: var(--color-text-muted);
+    text-align: center;
+    margin-bottom: var(--space-4);
+    line-height: var(--line-height-default);
+  }
+  .info-block {
+    background: var(--color-info-soft);
+    border: 1px solid var(--color-info-border);
+    border-radius: var(--radius-md);
+    padding: var(--space-3) var(--space-4);
+  }
+  .info-block .label {
+    font-size: var(--font-size-xs);
+    font-weight: var(--font-weight-semibold);
+    color: var(--color-info-text-on-soft);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: var(--space-2);
+  }
+  .info-block .body {
+    font-size: var(--font-size-sm);
+    color: var(--color-info-text-on-soft);
+    line-height: var(--line-height-default);
+  }
+  .info-block .body strong { font-weight: var(--font-weight-semibold); }
+
+  .cta-stack {
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    padding: 0 var(--space-4) var(--space-4);
+    margin-top: auto;
+  }
+  .btn-primary-block {
+    width: 100%;
+    padding: var(--space-3) var(--space-4);
+    font-size: var(--font-size-base);
+    font-weight: var(--font-weight-semibold);
+    border-radius: var(--radius-md);
+    border: 1px solid var(--color-primary);
+    background: var(--color-primary);
+    color: var(--color-on-primary);
+    cursor: pointer;
+  }
+</style>
+</head>
+<body>
+
+<div class="mockup-meta">
+  <strong>Mobile — Onboarding 02 — No biometric</strong> ·
+  <span class="status-draft">draft</span> ·
+  2026-05-10 · 360×800
+</div>
+
+<div class="phone-frame">
+  <div class="phone-screen">
+
+    <div class="brand-strip">
+      <!-- viewBox tightened to 0 0 425 145 — see Screen 01's note. -->
+      <svg class="wordmark-icony" viewBox="0 0 450 145" xmlns="http://www.w3.org/2000/svg" aria-label="tallykeep" role="img">
+        <text x="0" y="92" font-family="Manrope, system-ui, sans-serif" font-weight="600" font-size="92" letter-spacing="-2" class="mark-text">tall</text>
+        <svg x="143" y="42" width="76" height="84" viewBox="36.43 27.79 131.9 146.43">
+          <defs>
+            <clipPath id="wm-stock-clip"><path d="M 168.33 42.19 L 54.27 174.22 L 36.43 139.77 L 54.47 118.86 L 65.07 128.02 L 151.67 27.81 Z"/></clipPath>
+            <clipPath id="wm-foil-clip"><polygon points="40.68,42.21 79.68,87.21 96.32,72.79 57.32,27.79"/></clipPath>
+          </defs>
+          <path d="M 168.33 42.19 L 54.27 174.22 L 36.43 139.77 L 54.47 118.86 L 65.07 128.02 L 151.67 27.81 Z" class="mark-wood"/>
+          <polygon points="40.68,42.21 79.68,87.21 96.32,72.79 57.32,27.79" class="mark-wood"/>
+          <g class="mark-grain" stroke-width="1.4" stroke-linecap="butt" opacity="0.6">
+            <line x1="163.79" y1="38.27" x2="46.07" y2="174.53" clip-path="url(#wm-stock-clip)"/>
+            <line x1="156.22" y1="31.73" x2="38.50" y2="167.99" clip-path="url(#wm-stock-clip)"/>
+            <line x1="45.22"  y1="38.27" x2="84.52" y2="83.64"  clip-path="url(#wm-foil-clip)"/>
+            <line x1="52.78"  y1="31.73" x2="92.08" y2="77.09"  clip-path="url(#wm-foil-clip)"/>
+          </g>
+          <circle cx="53.76" cy="147.31" r="2.8" class="mark-carving"/>
+          <polygon points="-3,12 3,12 2,5 -2,5"     class="mark-carving" transform="translate(147 50) rotate(130.82)"/>
+          <polygon points="-4,12 4,12 2,4 -2,4"     class="mark-carving" transform="translate(140 58) rotate(130.82)"/>
+          <polygon points="-3,12 3,12 2,5 -2,5"     class="mark-carving" transform="translate(133 66) rotate(130.82)"/>
+          <polygon points="-3,-12 3,-12 2,-5 -2,-5" class="mark-carving" transform="translate(62 50)  rotate(49.18)"/>
+          <polygon points="-4,-12 4,-12 2,-4 -2,-4" class="mark-carving" transform="translate(69 58)  rotate(49.18)"/>
+          <polygon points="-3,-12 3,-12 2,-5 -2,-5" class="mark-carving" transform="translate(76 66)  rotate(49.18)"/>
+        </svg>
+        <text x="228" y="92" font-family="Manrope, system-ui, sans-serif" font-weight="600" font-size="92" letter-spacing="-2" class="mark-text">keep</text>
+      </svg>
+    </div>
+
+    <div class="paired-block">
+      <div class="success-indicator" aria-hidden="true">✓</div>
+      <div class="label-line">Paired with your TallyKeep</div>
+      <div class="server-label">Rémy's home server</div>
+    </div>
+
+    <div class="section-divider"></div>
+
+    <div class="no-biometric-block">
+      <h1>This device doesn't have biometric</h1>
+      <div class="lede">
+        No Face ID, Touch ID, or fingerprint sensor available — that's
+        fine.
+      </div>
+
+      <div class="info-block">
+        <div class="label">How TallyKeep stays locked</div>
+        <div class="body">
+          You'll unlock TallyKeep with your <strong>passphrase</strong>
+          each time you open the app — the same passphrase as your
+          server, nothing new to remember. If you ever lose access
+          entirely (phone wiped, app reinstalled), re-pair from your
+          desktop with a fresh QR.
+        </div>
+      </div>
+    </div>
+
+    <div class="cta-stack">
+      <button class="btn-primary-block">Continue</button>
+    </div>
+
+  </div>
+</div>
+
+</body>
+</html>

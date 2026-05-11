@@ -151,13 +151,30 @@
   // Mockup index — update when adding or removing files.
   // Each entry: { file, title, status (draft|review|validated) }
   const mockups = [
-    // Examples (kept commented as a guide; uncomment when files exist):
-    // { file: 'mobile_onboarding_01_welcome.html',
-    //   title: 'Onboarding — Welcome',
-    //   status: 'draft' },
-    // { file: 'mobile_home_empty.html',
-    //   title: 'Home — empty',
-    //   status: 'draft' },
+    { file: 'mobile_onboarding_01_connect.html',
+      title: 'Onboarding 01 — Connect',
+      status: 'draft' },
+    { file: 'mobile_onboarding_02_paired.html',
+      title: 'Onboarding 02 — Paired (initial)',
+      status: 'draft' },
+    { file: 'mobile_onboarding_02_paired_biometric_done.html',
+      title: 'Onboarding 02 — Biometric enabled',
+      status: 'draft' },
+    { file: 'mobile_onboarding_02_paired_skip_confirm.html',
+      title: 'Onboarding 02 — Skip-biometric confirm',
+      status: 'draft' },
+    { file: 'mobile_onboarding_02_paired_no_biometric.html',
+      title: 'Onboarding 02 — No biometric capacity',
+      status: 'draft' },
+    { file: 'mobile_unlock_biometric.html',
+      title: 'Unlock — biometric default',
+      status: 'draft' },
+    { file: 'mobile_unlock_passphrase.html',
+      title: 'Unlock — passphrase entry',
+      status: 'draft' },
+    { file: 'mobile_home_empty.html',
+      title: 'Home — empty',
+      status: 'validated' },
   ];
 
   const grid = document.getElementById('grid');

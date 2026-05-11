@@ -1,78 +1,125 @@
 /*
-  TallyKeep — design tokens (brand v1)
+  TallyKeep — design tokens
 
-  Values derived from the brand v1 lock documents:
-    - brand/tallykeep_brand_mark_v1_lock.html  (palette §3, color tokens)
-    - brand/tallykeep_wordmark_v1_lock.html    (typography, dark-mode)
+  TEST MODE — Phase 1 of 3 (System V · Verdigris)
+  -------------------------------------------------
+  This file is currently overridden with a test palette so Rémy can
+  evaluate non-brown alternatives in the mockups. The brand lock docs
+  in brand/ are UNCHANGED — this is *only* a tokens.css swap to see
+  the system in motion. Revert by restoring tokens.css from git or
+  outputs/tokens.css.original.
 
-  The lock documents are themselves rendered in the brand — page
-  chrome, surfaces, text, borders, and code-block fills are the
-  brand applied to a working surface. These tokens extract those
-  values verbatim. There were no decisions to make here; the
-  decisions were already made in the lock docs.
+    Phase 1 (active):  System V · Verdigris — warm bone surface,
+                       deep oxidised-copper accent (#1E7D5E).
+    Phase 2 (pending): System I · Indigo — cool white surface,
+                       woad indigo accent (#2E4F95).
+    Phase 3 (pending): System S · Sage — warm cream surface,
+                       muted botanical green accent (#6B8569).
 
-  Token *names* are stable across brand revisions; values change
-  when a new brand version locks. UI components and mockups
-  reference token names, not raw values.
+  Original brand v1 (Aged Oak) values preserved in
+  outputs/tokens.css.original. Lock-doc / identity-SVG / palette-v2
+  Holding-accent values UNCHANGED — those are part of the brand v1
+  story and only get touched if a swap is adopted (per PROCESS §2.4
+  lockstep rule).
 
-  Status: brand v1 (locked working brand; public-ship event will
-          confirm or revise per ADR-0003)
-  Last touched: 2026-05
+  Status: TEST OVERRIDE — not a brand revision
+  Last touched: 2026-05-10 (palette v2 — Holding-type accents)
 */
 
 :root {
-  /* ---------------- Brand (v1 — locked) ---------------- */
-  /* Source: brand mark §3 "Color tokens".                  */
-  --color-primary:           #A88554; /* Aged Oak           */
-  --color-primary-soft:      #F1ECDD; /* lighter cream — used as soft surface for the brand color (e.g. code-block fill in lock docs) */
-  --color-primary-strong:    #6F5638; /* Grain              */
-  --color-on-primary:        #F4EAD5; /* Cream — the carving color reads on Aged Oak */
+  /* ---------------- Brand (TEST — System V · Verdigris) ----- */
+  /* Source: tallykeep_three_palettes.html (uploaded test file). */
+  --color-primary:           #1E7D5E; /* Verdigris (oxidised copper, deep) */
+  --color-primary-soft:      #DDEDE6; /* pale verdigris tint — soft surface for the brand color */
+  --color-primary-strong:    #155A43; /* deeper verdigris — hover/active   */
+  --color-on-primary:        #FFFFFF; /* white reads on Verdigris (4.7:1 AA) */
 
   /* ---------------- Surfaces ---------------- */
-  /* Source: lock-doc page chrome.                          */
-  --color-bg:                #FAFAF7; /* page background (warm off-white) */
-  --color-surface:           #FFFFFF; /* cards, swatches, demo frames    */
-  --color-surface-raised:    #FFFFFF;
-  --color-sidebar:           #F4EAD5; /* cream — the warmer surface for sidebars / icon hero */
-  --color-overlay:           rgba(26, 26, 26, 0.4); /* dark text color at 40% — modal overlay */
+  --color-bg:                #F4F0E5; /* Warm Bone — page background      */
+  --color-surface:           #FBF8EF; /* Pale Bone — cards, modals        */
+  --color-surface-raised:    #FFFFFF; /* paper-white for raised elements  */
+  --color-sidebar:           #F4F0E5; /* same as bg — no separate brand-warm surface in V */
+  --color-overlay:           rgba(26, 31, 27, 0.4); /* ink-charcoal at 40% — modal overlay */
 
   /* ---------------- Text ---------------- */
-  /* Source: lock-doc text colors.                          */
-  --color-text:              #1A1A1A; /* headings, primary text */
-  --color-text-muted:        #555555; /* lead, body              */
-  --color-text-dim:          #888888; /* TOC labels, captions    */
-  --color-text-inverse:      #F4EAD5; /* cream — text on dark surfaces (per wordmark dark-mode rules) */
+  --color-text:              #1A1F1B; /* Ink Charcoal — faint green undertone */
+  --color-text-muted:        #555555; /* unchanged */
+  --color-text-dim:          #888888; /* unchanged */
+  --color-text-inverse:      #F4F0E5; /* Warm Bone — text on dark surfaces */
 
   /* ---------------- Borders ---------------- */
-  --color-border:            #E8E2D2; /* primary border — the warm-tone neutral used throughout lock docs */
-  --color-border-strong:     #D4C8AB; /* deeper warm-tone for stronger separation */
-  --color-border-focus:      #A88554; /* primary (focus rings adopt the brand color) */
+  --color-border:            #E3DED0; /* bone-tinted warm neutral */
+  --color-border-strong:     #CFC9B5; /* deeper bone-tinted */
+  --color-border-focus:      #1E7D5E; /* primary (focus rings adopt the brand color) */
+
+  /* ---------------- Brand mark (logo) ---------------- */
+  /* The mockups inline the wordmark-icony SVG; these tokens drive
+     its three paint layers + the wordmark text so a tokens.css
+     palette swap propagates to the logo.
+
+       --brand-mark-wood    : the "stock + foil" filled body of the
+                              icon. Defaults to --color-primary so it
+                              tracks the accent. Override here if the
+                              logo should keep an independent story
+                              (e.g. brown wood with a non-brown accent).
+       --brand-mark-grain   : longitudinal grain stripes drawn over
+                              the wood with low opacity. Defaults to
+                              --color-primary-strong.
+       --brand-mark-carving : the through-cuts in the icon (notches,
+                              hanging hole). In the wordmark-icony
+                              variant these are filled with the page
+                              background so the cuts read as "into
+                              the surface". Defaults to --color-bg.
+       --brand-mark-text    : the "tall" and "keep" text in the
+                              wordmark. Defaults to --color-text.
+
+     Painted via class selectors below — SVG paths in the inlined
+     wordmark carry these classes instead of hardcoded fills.        */
+  --brand-mark-wood:         var(--color-primary);
+  --brand-mark-grain:        var(--color-primary-strong);
+  --brand-mark-carving:      var(--color-bg);
+  --brand-mark-text:         var(--color-text);
 
   /* ---------------- Semantic ---------------- */
-  /* KNOWN GAP — these are not in the brand v1 lock docs. Current
-     values retain the pre-lock placeholder. Documented in
-     brand/README.md "Status"; resolved at the public-ship-event
-     brand finalization, which extends the palette explicitly.
-     If a screen renders badly against the warm-tone surfaces
-     before then, treat it as a tokens-css iteration; do not
-     change values silently.                                  */
-  --color-success:           #16a34a;
-  --color-success-soft:      #dcfce7;
-  --color-warning:           #ca8a04;
-  --color-warning-soft:      #fef9c3;
-  --color-danger:            #dc2626;
-  --color-danger-soft:       #fee2e2;
-  --color-info:              #0284c7;
-  --color-info-soft:         #e0f2fe;
+  /* Source: brand/tallykeep_palette_v1_lock.html §3, §5.
+     Warm-tuned, leaf-bright. Restraint philosophy — color
+     earns its appearance (gauntlet Q4 wired to success).
+     Four tokens per semantic: main (text/icon/border-stripe),
+     soft (banner/badge bg), border (mid-tone separator),
+     text-on-soft (deep variant for legible text inside soft-bg).
+     Info is provisional — collapse decision deferred per the
+     palette lock §8.                                        */
+  --color-success:               #267a36; /* holly leaf — deep */
+  --color-success-soft:          #d4ead0;
+  --color-success-border:        #6cb074;
+  --color-success-text-on-soft:  #1c4f24;
+
+  --color-warning:               #a05210; /* autumn maple — deep */
+  --color-warning-soft:          #f5dfb8;
+  --color-warning-border:        #d8a35c;
+  --color-warning-text-on-soft:  #663d0a;
+
+  --color-danger:                #b8351b; /* holly berry — deep */
+  --color-danger-soft:           #f3d4c8;
+  --color-danger-border:         #d1846c;
+  --color-danger-text-on-soft:   #5a1d0d;
+
+  --color-info:                  #2e6699; /* cornflower — deep, provisional */
+  --color-info-soft:             #d3dfeb;
+  --color-info-border:           #739abc;
+  --color-info-text-on-soft:     #1f3f63;
 
   /* ---------------- Holding type accents ---------------- */
-  /* KNOWN GAP — same as the semantic colors above: not in the
-     brand v1 lock docs, resolved at the public-ship-event brand
-     finalization. Documented in brand/README.md "Status".    */
-  --color-holding-account:   #0284c7; /* custodial — info-blue */
-  --color-holding-purse:     #16a34a; /* online keys — green   */
-  --color-holding-strongbox: #ca8a04; /* offline keys — amber  */
-  --color-holding-vault:     #7c3aed; /* ceremonial — violet   */
+  /* Source: brand/tallykeep_palette_v2_lock.html §4.
+     Natural-object accents — limestone (Account), auburn leather
+     (Purse), iron (Strongbox), brushed steel (Vault). Used as
+     icon fill colors and as list-row stripe colors. Icons live
+     in rich moments (Add Holding popup, detail headers); list
+     rows show a 4 px-wide colored stripe only.                */
+  --color-holding-account:   #9c9388; /* limestone — institutional warm-grey */
+  --color-holding-purse:     #80452f; /* auburn leather — daily wallet       */
+  --color-holding-strongbox: #4a4d4f; /* iron — cold storage                 */
+  --color-holding-vault:     #6c7682; /* brushed steel — ceremonial          */
 
   /* ---------------- Type ---------------- */
   /* Source: wordmark lock §2 "Typeface · Manrope 600".     */
@@ -134,3 +181,15 @@
   --mobile-bottom-nav:      64px;
   --mobile-app-bar:         52px;
 }
+
+/* ----------------------------------------------------------------- */
+/* Brand-mark painter rules                                           */
+/* Inline wordmark SVGs in mockups use these classes instead of       */
+/* hardcoded fills, so a tokens swap repaints the logo automatically. */
+/* Source-of-truth SVGs in brand/identity/ still carry their v1 hex   */
+/* values — they get regenerated only when a brand revision locks.    */
+/* ----------------------------------------------------------------- */
+.mark-wood    { fill:   var(--brand-mark-wood); }
+.mark-grain   { stroke: var(--brand-mark-grain); }
+.mark-carving { fill:   var(--brand-mark-carving); }
+.mark-text    { fill:   var(--brand-mark-text); }
