@@ -15,6 +15,14 @@ REPO_ROOT="$(cd "${HOOK_DIR}/.." && pwd)"
 
 cd "${REPO_ROOT}"
 
+# Skip the test run when every staged file is under specs/ — no backend
+# code can have changed, so the NRT adds no signal.
+STAGED=$(git diff --cached --name-only)
+if [ -n "$STAGED" ] && ! echo "$STAGED" | grep -qv '^specs/'; then
+  echo "pre-commit: specs-only change — skipping NRT."
+  exit 0
+fi
+
 # Refuse if Docker is not running. We want a clear error rather than a misleading hook
 # success.
 if ! docker info >/dev/null 2>&1; then
