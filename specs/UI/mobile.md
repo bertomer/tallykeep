@@ -99,7 +99,7 @@ When an iteration ships, its corresponding section appears below.
   as the dynamic-mark surface (tap to regenerate matching grain
   on both halves of the embedded Y) when the SvelteKit build
   ships — see `future_iterations.md` "Dynamic brand mark on
-  first-touch surfaces". *Status: draft.*
+  first-touch surfaces". *Status: validated (Rémy greenlight 2026-05-10).*
 - `mobile_onboarding_02_paired.html` — second screen (initial
   state). Combines pair-success confirmation + biometric setup.
   Header carries the same wordmark-icony (static after Screen 1).
@@ -111,14 +111,14 @@ When an iteration ships, its corresponding section appears below.
   explaining the threat model honestly ("Without it, anyone who
   can unlock your phone can open TallyKeep. With it, only you
   can."). Two CTAs: [Enable biometric unlock] primary,
-  [Skip for now] text-link. *Status: draft.*
+  [Skip for now] text-link. *Status: validated (Rémy greenlight 2026-05-10).*
 - `mobile_onboarding_02_paired_biometric_done.html` — second
   screen, post-biometric-enabled state. Single prominent
   success indicator (large green check), "All set" heading, a
   facts card showing both anchors ("Connected to: Rémy's home
   server" + "Daily unlock: Biometric · passphrase fallback"),
   [Continue] primary.
-  Single CTA — no skip path from this state. *Status: draft.*
+  Single CTA — no skip path from this state. *Status: validated (Rémy greenlight 2026-05-10).*
 - `mobile_onboarding_02_paired_skip_confirm.html` — second
   screen, with bottom-sheet modal confirming the skip-biometric
   intent. Underlying screen visible behind a scrim
@@ -130,7 +130,7 @@ When an iteration ships, its corresponding section appears below.
   [Skip — continue without] (warning-tinted, brand-soft amber).
   Pattern is mobile-native (iOS / Android both default to bottom
   sheets for confirm-or-cancel choices); preserves context so
-  the user sees what they're about to skip past. *Status: draft.*
+  the user sees what they're about to skip past. *Status: validated (Rémy greenlight 2026-05-10).*
 - `mobile_onboarding_02_paired_no_biometric.html` — second screen,
   variant rendered when the device's biometric capability check
   returns unavailable (no sensor, or OS disabled biometric for
@@ -207,7 +207,7 @@ block Screen 02 design.
   available). Same connection-status anchor at bottom. The
   typed passphrase is forwarded to the backend over the paired
   connection for validation; the phone never stores it.
-  *Status: draft.*
+  *Status: validated (Rémy greenlight 2026-05-10).*
 
 ### Reconcilability gauntlet answers
 

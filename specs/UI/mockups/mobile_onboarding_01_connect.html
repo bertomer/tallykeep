@@ -1,6 +1,6 @@
 <!--
   Title: Mobile — Onboarding 01 — Connect to your TallyKeep
-  Status: draft
+  Status: validated  (Rémy greenlight 2026-05-10)
   Date last touched: 2026-05-10
   Replaces: archive/UI/tallykeep_mobile_v2.html §A1 "First launch"
 -->
@@ -229,7 +229,7 @@
 
 <div class="mockup-meta">
   <strong>Mobile — Onboarding 01 — Connect</strong> ·
-  <span class="status-draft">draft</span> ·
+  <span class="status-validated">validated</span> ·
   2026-05-10 · 360×800
 </div>
 
@@ -239,8 +239,13 @@
     <!-- Brand strip — wordmark-icony, prominent -->
     <!--
       Inlined frozen copy of brand/identity/wordmark-icony.svg.
-      Carving fills are #FAFAF7 (page background) so the icon reads
-      as a cut into the surface, per the brand v1 lock decision.
+      Painted via .mark-wood / .mark-grain / .mark-carving /
+      .mark-text class hooks (see _shared/tokens.css) so the logo
+      tracks the active palette. Carving fills are tokenized
+      (--brand-mark-carving) — matches --color-bg by convention so
+      the icon reads as a cut into the surface, per the brand v1
+      lock decision; can diverge if a palette wants a different
+      mark story.
       Keep in lockstep with brand/identity/wordmark-icony.svg until
       the SvelteKit build replaces these mockups with proper imports.
       Manrope 600 loaded from Google Fonts in <head>.
@@ -259,34 +264,34 @@
               font-weight="600"
               font-size="92"
               letter-spacing="-2"
-              fill="#1A1A1A">tall</text>
+              class="mark-text">tall</text>
         <svg x="143" y="42" width="76" height="84" viewBox="36.43 27.79 131.9 146.43">
           <defs>
             <clipPath id="wm-stock-clip"><path d="M 168.33 42.19 L 54.27 174.22 L 36.43 139.77 L 54.47 118.86 L 65.07 128.02 L 151.67 27.81 Z"/></clipPath>
             <clipPath id="wm-foil-clip"><polygon points="40.68,42.21 79.68,87.21 96.32,72.79 57.32,27.79"/></clipPath>
           </defs>
-          <path d="M 168.33 42.19 L 54.27 174.22 L 36.43 139.77 L 54.47 118.86 L 65.07 128.02 L 151.67 27.81 Z" fill="#A88554"/>
-          <polygon points="40.68,42.21 79.68,87.21 96.32,72.79 57.32,27.79" fill="#A88554"/>
-          <g stroke="#6F5638" stroke-width="1.4" stroke-linecap="butt" opacity="0.6">
+          <path d="M 168.33 42.19 L 54.27 174.22 L 36.43 139.77 L 54.47 118.86 L 65.07 128.02 L 151.67 27.81 Z" class="mark-wood"/>
+          <polygon points="40.68,42.21 79.68,87.21 96.32,72.79 57.32,27.79" class="mark-wood"/>
+          <g class="mark-grain" stroke-width="1.4" stroke-linecap="butt" opacity="0.6">
             <line x1="163.79" y1="38.27" x2="46.07" y2="174.53" clip-path="url(#wm-stock-clip)"/>
             <line x1="156.22" y1="31.73" x2="38.50" y2="167.99" clip-path="url(#wm-stock-clip)"/>
             <line x1="45.22"  y1="38.27" x2="84.52" y2="83.64"  clip-path="url(#wm-foil-clip)"/>
             <line x1="52.78"  y1="31.73" x2="92.08" y2="77.09"  clip-path="url(#wm-foil-clip)"/>
           </g>
-          <circle cx="53.76" cy="147.31" r="2.8" fill="#FAFAF7"/>
-          <polygon points="-3,12 3,12 2,5 -2,5"     fill="#FAFAF7" transform="translate(147 50) rotate(130.82)"/>
-          <polygon points="-4,12 4,12 2,4 -2,4"     fill="#FAFAF7" transform="translate(140 58) rotate(130.82)"/>
-          <polygon points="-3,12 3,12 2,5 -2,5"     fill="#FAFAF7" transform="translate(133 66) rotate(130.82)"/>
-          <polygon points="-3,-12 3,-12 2,-5 -2,-5" fill="#FAFAF7" transform="translate(62 50)  rotate(49.18)"/>
-          <polygon points="-4,-12 4,-12 2,-4 -2,-4" fill="#FAFAF7" transform="translate(69 58)  rotate(49.18)"/>
-          <polygon points="-3,-12 3,-12 2,-5 -2,-5" fill="#FAFAF7" transform="translate(76 66)  rotate(49.18)"/>
+          <circle cx="53.76" cy="147.31" r="2.8" class="mark-carving"/>
+          <polygon points="-3,12 3,12 2,5 -2,5"     class="mark-carving" transform="translate(147 50) rotate(130.82)"/>
+          <polygon points="-4,12 4,12 2,4 -2,4"     class="mark-carving" transform="translate(140 58) rotate(130.82)"/>
+          <polygon points="-3,12 3,12 2,5 -2,5"     class="mark-carving" transform="translate(133 66) rotate(130.82)"/>
+          <polygon points="-3,-12 3,-12 2,-5 -2,-5" class="mark-carving" transform="translate(62 50)  rotate(49.18)"/>
+          <polygon points="-4,-12 4,-12 2,-4 -2,-4" class="mark-carving" transform="translate(69 58)  rotate(49.18)"/>
+          <polygon points="-3,-12 3,-12 2,-5 -2,-5" class="mark-carving" transform="translate(76 66)  rotate(49.18)"/>
         </svg>
         <text x="228" y="92"
               font-family="Manrope, system-ui, sans-serif"
               font-weight="600"
               font-size="92"
               letter-spacing="-2"
-              fill="#1A1A1A">keep</text>
+              class="mark-text">keep</text>
       </svg>
     </div>
 
