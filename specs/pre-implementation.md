@@ -51,13 +51,20 @@ explicitly checks "I backed up my keys safely, I understand the
 consequences."
 
 This persistent warning lives in a broader **security-health
-system** alongside other persistent warnings:
+system** (user-visible heading on Home: "Security health")
+alongside other persistent items:
 
 - Privacy / Blueprint warnings (address reuse, etc.)
 - Strongbox frequent-usage warning (large amounts on a Strongbox
   used for daily spending)
 - Vault declared-vs-observable mismatch
 - Hosted-tier privacy-boundary acknowledgment
+- Principles acknowledgment not yet given — surfaces here if the
+  user reached Home without clicking `[I understand]` on the
+  Onboarding 01 Connect screen's principles card. Item copy
+  invites the user to re-read the principles (open source / no
+  accounts / your keys stay yours) and acknowledge. Per
+  `UI/mobile.md` Onboarding Notes.
 
 **Why this is preferable to a hard gate:** the hard gate forces
 the user to act at an inconvenient moment (just generated the

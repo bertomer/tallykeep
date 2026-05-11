@@ -429,7 +429,7 @@ removed.
 - **Captured:** 2026-05 (pre-implementation item
   `seed-backup-disclosure`, plus broader scope from the original
   `design_decisions.md` §9 Blueprint analysis)
-- **Motivation:** Several persistent warnings need a shared home so
+- **Motivation:** Several persistent items need a shared home so
   the user has one place to see ongoing security concerns, without
   any of them being silently hidden. Includes:
     - Purse seed not backed up (`seed-backup-disclosure`)
@@ -437,9 +437,17 @@ removed.
     - Vault metadata mismatch
     - Address reuse / dust / round-number outputs (Blueprint findings)
     - Hosted-tier privacy boundary not acknowledged
-- **Sketch:** A dedicated tab or persistent banner showing all open
-  security findings, severity-tagged, dismissible-with-acknowledgment
-  where appropriate, never silently hidden.
+    - Principles acknowledgment not yet given — informational, joins
+      after Onboarding screen 01 skip (per `UI/mobile.md` Onboarding
+      Notes 2026-05-10)
+- **Sketch:** A dedicated section on Home (heading: **"Security
+  health"**) and/or a dedicated tab showing all open security and
+  acknowledgment items, severity-tagged where applicable,
+  dismissible-with-acknowledgment, never silently hidden.
+  User-visible heading "Security health" matches banking-grade
+  norms (Apple Health "Health checks", "Account health" in retail
+  banking). Item copy stays calm; the heading carries the
+  seriousness register.
 - **Touches:** UI mobile + desktop, backend events, threat model
 - **Status:** sketched
 - **Milestone:** **pre-shipping** — at least the seed-backup warning

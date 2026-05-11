@@ -533,15 +533,43 @@ you know" without lecturing, and tells the curious user "this
 is a tool, not a one-tap wallet." A skippable Welcome would be
 clutter; either it's load-bearing or it's gone.
 
-**Principles card is acknowledgment-required, onboarding-only.**
-Until the user clicks "I understand," the card stays visible
-on this screen; it does not gate the primary CTA (the user can
-tap "scan QR" without acknowledging). After acknowledgment, the
-card does not appear again — neither on subsequent onboarding
-screens nor on the home page. Principles get re-anchored later
-via Settings → "How TallyKeep works" page, first-time tooltips
-on sensitive flows, and the security-health system. One light
-pass at the door, not a permanent banner.
+**Principles card — acknowledgment flow with Security health
+fallback.** Sharpened across the onboarding sessions
+2026-05-10. Two paths:
+
+- *Acknowledged on Screen 01.* User clicks `[I understand]`.
+  Card disappears permanently. Principles never re-surface
+  on subsequent onboarding screens or on Home. Re-readable
+  anytime via Settings → "How TallyKeep works".
+- *Skipped on Screen 01.* User taps "scan QR" (or the manual
+  URL entry / docs ghost CTA) without clicking
+  `[I understand]`. The card disappears from the onboarding
+  flow (we don't re-surface it across Screens 02 / Unlock /
+  etc. — those are not the place). Instead, an "Acknowledge
+  how TallyKeep works" item appears in the **Security health**
+  zone on Home, alongside the seed-backup warning, future
+  UTXO-reuse warnings, declared-vs-observable mismatches, etc.
+  User dismisses it from there by tapping into the item and
+  acknowledging.
+
+The Security health zone is its own iteration (per
+`future_iterations.md` "Security-health system", milestone
+pre-shipping). For the current Onboarding iteration's empty
+Home, the zone does not yet appear — meaning a skip during
+personal-use phase leaves the principles unacknowledged with
+no re-surface (acceptable since Rémy is the only user during
+this phase and will acknowledge on first launch). Public-ship
+requires the Security health iteration to have landed for the
+cycle to close cleanly. Cross-iteration dependency captured
+in `next_iteration.md` transient bullets.
+
+The user-visible heading on Home for this zone is
+**"Security health"** — consistent with banking-grade norms
+(Apple Health "Health checks", "Account health" in retail
+banking apps) and accurate to the framing: the principles
+(open source, no accounts, no key custody) ARE the security
+model at the architecture level. Item copy stays calm and
+descriptive; the heading carries the seriousness register.
 
 **"Don't have a TallyKeep yet? →" links out to docs, not in-app.**
 There is no in-app fictional mode — the architecture (Docker

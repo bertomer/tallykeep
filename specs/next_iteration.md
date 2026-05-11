@@ -141,7 +141,21 @@ file.
   docs link. Persistent acknowledgment-required principles card
   with three lines (open source / no accounts / TallyKeep never
   holds your keys) and an [I understand] button. Card appears
-  on Screen 1 only and does not reappear after acknowledgment.
+  on Screen 1 only. If the user clicks [I understand], the
+  principles are dismissed permanently. If the user skips past
+  without acknowledging, the principles surface as an item in
+  the **Security health** zone on Home (per the corrected
+  acknowledgment flow sharpened 2026-05-10).
+- *(Cross-iteration dependency — Security health system)* The
+  full re-surface cycle for the principles acknowledgment (and
+  the seed-backup warning, Strongbox frequent-usage, Vault
+  mismatch, hosted-tier privacy ack, future Blueprint findings)
+  depends on the Security-health system landing — captured in
+  `future_iterations.md` "Security-health system", milestone
+  pre-shipping. For personal-use phase the gap is acceptable
+  (Rémy as sole user will acknowledge on first launch). Public-
+  ship requires the Security-health iteration to have shipped
+  for the unacknowledged-principles cycle to close cleanly.
 - *(Onboarding screen 1 — Connect)* Wordmark-icony at 280 px
   is the brand surface; intended to land as the dynamic-mark
   surface (tap-to-regenerate-grain) when implemented in
