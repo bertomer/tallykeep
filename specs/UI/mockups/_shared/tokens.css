@@ -1,7 +1,7 @@
 /*
   TallyKeep — design tokens
 
-  TEST MODE — Phase 3 of 3 (System S · Sage)
+  TEST MODE — Phase 3d (verdigris UI + Aged Oak mark, decoupled)
   -------------------------------------------------
   This file is currently overridden with a test palette so Rémy can
   evaluate non-brown alternatives in the mockups. The brand lock docs
@@ -9,19 +9,32 @@
   the system in motion. Revert by restoring tokens.css from git or
   outputs/tokens.css.original.
 
-    Phase 1 (done):    System V · Verdigris — warm bone surface,
-                       deep oxidised-copper accent (#1E7D5E).
-    Phase 2 (done):    System I · Indigo — cool white surface,
-                       woad indigo accent (#2E4F95).
-    Phase 3 (active):  System S · Sage — warm cream surface,
-                       muted botanical green accent (#6B8569).
+    Phase 1  (done):    System V · Verdigris — warm bone + verdigris.
+    Phase 2  (done):    System I · Indigo — cool white + indigo.
+    Phase 3  (done):    System S · Sage — warm cream + sage.
+    Phase 3b (done):    Sage on cool-white — Rémy: cream felt off,
+                        sage saturation reads thin without warmth.
+    Phase 3c (done):    Verdigris on cool-white — Rémy: best of the
+                        combinations so far; mark feels off (green
+                        tally doesn't read as wood).
+    Phase 3d (done):    Verdigris UI + decoupled Aged Oak mark.
+                        Rémy showed a museum-tally reference photo:
+                        actual centuries-aged oak reads dusty
+                        olive-tan, not the saturated warm tan the
+                        brand mark v1 lock currently specifies.
+    Phase 3e (active):  Verdigris UI on cool-white + mark wood
+                        retoned to an aged-tally olive-tan.
+                        Bridges Verdigris and brown via the shared
+                        "patina/oxidation" narrative — verdigris is
+                        oxidised copper; aged oak is oxidised wood.
 
-  CONTRAST CAVEAT (System S): white-on-sage CTA = 3.6:1, fails
-  WCAG AA for body text. Passes for large/CTA button text only.
-  Wise plays this card by using the dark primary as button text
-  on a sage button — which sharpens the "looks like Wise" risk.
-  Current tokens default to white for consistency with V and I;
-  if S is adopted, override --color-on-primary to --color-text.
+  Mark values are eyeballed from the photo, not eyedropped — expect
+  to nudge. If 3e is adopted, the brand mark v1 lock doc needs a
+  v1 → v2 bump (per PROCESS §2.4 lockstep): the canonical "Aged Oak"
+  hex updates, the mark anatomy comment about "freshly carved oak"
+  updates to "centuries-aged oak", identity/*.svg regenerates.
+
+  Contrast: white-on-Verdigris CTA = 4.7:1 — passes WCAG AA.
 
   Original brand v1 (Aged Oak) values preserved in
   outputs/tokens.css.original. Lock-doc / identity-SVG / palette-v2
@@ -34,30 +47,32 @@
 */
 
 :root {
-  /* ---------------- Brand (TEST — System I · Indigo) -------- */
-  /* Source: tallykeep_three_palettes.html (uploaded test file). */
-  --color-primary:           #2E4F95; /* Woad Indigo (deep natural-dye) */
-  --color-primary-soft:      #DDE3F0; /* pale indigo tint — soft surface for the brand color */
-  --color-primary-strong:    #233D74; /* deeper indigo — hover/active   */
-  --color-on-primary:        #FFFFFF; /* white reads on Woad Indigo (6.6:1 AAA) */
+  /* ---------------- Brand (TEST — Hybrid: Verdigris on cool white) -- */
+  /* Primary, soft, strong: from System V · Verdigris.
+     Surfaces, borders, overlay, text: from System I · Indigo's
+     cool-white world. Isolation test — see header.                    */
+  --color-primary:           #1E7D5E; /* Verdigris (oxidised copper, deep) — from V */
+  --color-primary-soft:      #DDEDE6; /* pale verdigris tint — from V */
+  --color-primary-strong:    #155A43; /* deeper verdigris — from V */
+  --color-on-primary:        #FFFFFF; /* white on Verdigris (4.7:1 AA) */
 
-  /* ---------------- Surfaces ---------------- */
-  --color-bg:                #F4F5F8; /* Cool White — page background     */
-  --color-surface:           #FCFCFE; /* Paper White — cards, modals      */
-  --color-surface-raised:    #FFFFFF; /* paper-white for raised elements  */
-  --color-sidebar:           #F4F5F8; /* same as bg — no separate brand-warm surface in I */
+  /* ---------------- Surfaces (from System I) ---------------- */
+  --color-bg:                #F4F5F8; /* Cool White — page background    */
+  --color-surface:           #FCFCFE; /* Paper White — cards, modals     */
+  --color-surface-raised:    #FFFFFF; /* paper-white for raised elements */
+  --color-sidebar:           #F4F5F8; /* same as bg */
   --color-overlay:           rgba(21, 23, 31, 0.4); /* ink-blue-black at 40% — modal overlay */
 
   /* ---------------- Text ---------------- */
-  --color-text:              #15171F; /* Ink Blue-Black — faint blue undertone */
+  --color-text:              #1A1F1B; /* Ink Charcoal — faint green undertone (paired with verdigris) */
   --color-text-muted:        #555555; /* unchanged */
   --color-text-dim:          #888888; /* unchanged */
-  --color-text-inverse:      #F4F5F8; /* Cool White — text on dark surfaces */
+  --color-text-inverse:      #F4F5F8; /* Cool White — text on dark surfaces (matches bg) */
 
-  /* ---------------- Borders ---------------- */
+  /* ---------------- Borders (from System I) ---------------- */
   --color-border:            #E3E5EB; /* cool-tinted neutral */
   --color-border-strong:     #CACCD4; /* deeper cool-tinted */
-  --color-border-focus:      #2E4F95; /* primary (focus rings adopt the brand color) */
+  --color-border-focus:      #1E7D5E; /* primary (focus rings adopt the brand color) */
 
   /* ---------------- Brand mark (logo) ---------------- */
   /* The mockups inline the wordmark-icony SVG; these four tokens
@@ -86,10 +101,10 @@
      Painted via the class selectors at the bottom of this file —
      SVG paths in the inlined wordmark carry the .mark-* classes
      instead of hardcoded fills.                                    */
-  --brand-mark-wood:         #2E4F95; /* Woad Indigo — matches --color-primary by convention */
-  --brand-mark-grain:        #233D74; /* deeper indigo — matches --color-primary-strong */
+  --brand-mark-wood:         #9E9573; /* Aged-tally olive-tan — dusty oxidised oak (best-guess from photo) */
+  --brand-mark-grain:        #6B6147; /* deeper olive-brown — grain stripes */
   --brand-mark-carving:      #F4F5F8; /* Cool White — matches --color-bg (so cuts read as page) */
-  --brand-mark-text:         #15171F; /* Ink Blue-Black — matches --color-text */
+  --brand-mark-text:         #1A1F1B; /* Ink Charcoal — matches --color-text */
 
   /* ---------------- Semantic ---------------- */
   /* Source: brand/tallykeep_palette_v1_lock.html §3, §5.
