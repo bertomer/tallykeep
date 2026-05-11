@@ -249,10 +249,46 @@ on them. Naming convention in `UI/mockups/README.md`.
 ### 2.4 Brand: lock-doc pattern, brand → tokens propagation
 
 Brand identity is canonical in `brand/`. UI references CSS variables
-from `UI/mockups/_shared/tokens.css` (and later the SvelteKit
-equivalent), which embody the brand decisions made in `brand/`. The
-relationship is one-way: brand is the source, tokens are the
-consumer.
+from `UI/mockups/_shared/tokens.css` (which the SvelteKit build
+consumes directly — same file, not a parallel copy, so mockups and
+shipped code stay in lockstep mechanically), which embody the brand
+decisions made in `brand/`. The relationship is one-way: brand is
+the source, tokens are the consumer.
+
+**Consumer discipline (no hardcoding).** Downstream code — mockups,
+SvelteKit components, marketing site, future F-Droid / App Store
+listings, anything visual — consumes via the indirection layer
+only:
+
+- *Colors:* `var(--color-*)` from `tokens.css`. Never raw hex
+  values in component files (`#A88554`, `#2e8a3f`) — every color
+  reference goes through a token.
+- *Icons:* import from `brand/identity/*.svg`, ideally via a thin
+  wrapper component (e.g. `<Icon name="home" />`) so the
+  consumer-side API stays stable as the icon set grows. Never
+  inline SVG paths in feature component files. The mockup-tier
+  inlining of `wordmark-icony` and the nav icons is a workaround
+  for static-HTML / file:// loading; SvelteKit must import
+  cleanly.
+- *Spacing, radii, shadows, type:* `var(--space-*)`,
+  `var(--radius-*)`, `var(--shadow-*)`, `var(--font-*)`. Never
+  raw values.
+
+The structural check: swapping brand v2 → v3 must be possible by
+editing the source artifacts only (palette lock doc + identity/
+SVGs) and propagating to `tokens.css`. No grep-and-replace
+through component files. If a component needs a value that
+doesn't exist as a token, **add the token** (lockstep with the
+brand lock doc per the status-driven discipline below) — don't
+invent the value in the component.
+
+The brand-side working surface for palette exploration is
+`brand/tallykeep_palette_canvas.html`. It is not a lock doc and
+not the consumer's source-of-truth — read it only when adding a
+new token or understanding the rationale behind a value. The
+canonical sources stay the lock docs:
+`tallykeep_palette_v<N>_lock.html`, `tallykeep_brand_mark_v<N>_lock.html`,
+etc.
 
 **Lock-doc pattern (different from UI mockups, on purpose).** Each
 canonical brand artifact (mark, wordmark, future lockup, etc.) gets

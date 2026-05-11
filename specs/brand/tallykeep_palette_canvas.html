@@ -1,0 +1,1111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TallyKeep — Brand Palette Canvas</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+<!-- Single source of truth for brand colors. Everything below reads
+     from these tokens. Edit tokens.css → reload this page. -->
+<link rel="stylesheet" href="../UI/mockups/_shared/tokens.css">
+
+<style>
+  /* ===========================================================
+     Page chrome — deliberately INDEPENDENT of brand tokens so this
+     surface stays neutral across palette experiments. The brand
+     swatches live inside this chrome; the chrome itself doesn't
+     change colour when you swap the palette.
+     =========================================================== */
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    font-family: 'Manrope', system-ui, -apple-system, sans-serif;
+    background: #f5f5f7;
+    color: #1c1c1e;
+    -webkit-font-smoothing: antialiased;
+    font-size: 14px;
+    line-height: 1.5;
+  }
+  .page { max-width: 1280px; margin: 0 auto; padding: 32px 24px 80px; }
+
+  .canvas-meta {
+    border: 1px solid #e2e2e5;
+    background: #ffffff;
+    border-radius: 12px;
+    padding: 20px 24px;
+    margin-bottom: 28px;
+  }
+  .canvas-meta h1 {
+    font-size: 20px;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    margin-bottom: 6px;
+  }
+  .canvas-meta p {
+    font-size: 13px;
+    color: #555;
+    max-width: 720px;
+  }
+  .canvas-meta code {
+    background: #f0f0f3;
+    padding: 1px 6px;
+    border-radius: 4px;
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+    font-size: 12px;
+  }
+
+  /* Section scaffolding */
+  section.brand-section {
+    margin-bottom: 28px;
+    background: #ffffff;
+    border: 1px solid #e2e2e5;
+    border-radius: 12px;
+    overflow: hidden;
+  }
+  .section-head {
+    padding: 16px 24px 14px;
+    border-bottom: 1px solid #ececef;
+    display: flex;
+    align-items: baseline;
+    gap: 14px;
+  }
+  .section-head h2 {
+    font-size: 14px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: #1c1c1e;
+  }
+  .section-head .hint {
+    font-size: 12px;
+    color: #8a8a8f;
+  }
+  .section-body { padding: 20px 24px 24px; }
+
+  /* Swatch grid */
+  .swatch-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 14px;
+  }
+  .swatch {
+    border: 1px solid #ececef;
+    border-radius: 8px;
+    overflow: hidden;
+    background: #fafafc;
+  }
+  .swatch .chip {
+    height: 64px;
+    width: 100%;
+    border-bottom: 1px solid rgba(0,0,0,0.06);
+  }
+  .swatch .meta {
+    padding: 8px 10px 10px;
+    font-size: 11px;
+  }
+  .swatch .meta .name {
+    font-weight: 600;
+    color: #1c1c1e;
+    margin-bottom: 1px;
+  }
+  .swatch .meta .token {
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+    color: #555;
+    font-size: 10.5px;
+  }
+  .swatch .meta .note {
+    color: #888;
+    margin-top: 3px;
+    font-size: 10.5px;
+    line-height: 1.35;
+  }
+
+  /* Mark sizes row */
+  .mark-row {
+    display: flex;
+    align-items: flex-end;
+    gap: 28px;
+    flex-wrap: wrap;
+    padding: 6px 0 4px;
+  }
+  .mark-cell {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+  }
+  .mark-cell .size-label {
+    font-size: 10px;
+    color: #888;
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  }
+  .mark-frame {
+    background: var(--color-bg);
+    border: 1px solid var(--color-border);
+    border-radius: 8px;
+    padding: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .mark-frame.dark {
+    background: var(--color-text);
+  }
+  /* .dark wrappers carry .on-dark-surface so --brand-mark-carving
+     re-scopes to the dark ink — see tokens.css for the rule.       */
+
+  /* Wordmark row */
+  .wordmark-row {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+  .wordmark-cell {
+    padding: 22px 24px;
+    border-radius: 10px;
+    border: 1px solid var(--color-border);
+    background: var(--color-bg);
+    display: flex;
+    align-items: center;
+    gap: 18px;
+  }
+  .wordmark-cell.surface { background: var(--color-surface); }
+  .wordmark-cell.dark {
+    background: var(--color-text);
+    border-color: var(--color-text);
+  }
+  .wordmark-cell .label {
+    font-size: 11px;
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+    color: #888;
+    min-width: 160px;
+  }
+  .wordmark-cell.dark .label { color: var(--color-text-inverse); opacity: 0.6; }
+
+  /* CTA demo */
+  .cta-demo {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 14px;
+    align-items: center;
+    padding: 14px 0 6px;
+  }
+  .btn-primary {
+    background: var(--color-primary);
+    color: var(--color-on-primary);
+    border: 1px solid var(--color-primary);
+    padding: 10px 18px;
+    border-radius: 8px;
+    font: inherit;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .btn-primary.hover { background: var(--color-primary-strong); border-color: var(--color-primary-strong); }
+  .btn-primary.disabled { opacity: 0.5; cursor: not-allowed; }
+  .btn-soft {
+    background: var(--color-primary-soft);
+    color: var(--color-primary-strong);
+    border: 1px solid var(--color-primary-soft);
+    padding: 10px 18px;
+    border-radius: 8px;
+    font: inherit;
+    font-weight: 600;
+  }
+  .btn-ghost {
+    background: transparent;
+    color: var(--color-primary);
+    border: 1px solid var(--color-primary);
+    padding: 10px 18px;
+    border-radius: 8px;
+    font: inherit;
+    font-weight: 600;
+  }
+  .cta-demo .label {
+    font-size: 11px;
+    color: #888;
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  }
+
+  /* Surface demo */
+  .surface-row {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 12px;
+  }
+  .surface-card {
+    border-radius: 8px;
+    border: 1px solid var(--color-border);
+    padding: 16px;
+    font-size: 13px;
+    min-height: 100px;
+  }
+  .surface-card .role {
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--color-text-dim);
+    margin-bottom: 6px;
+  }
+  .surface-card .token {
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+    font-size: 11px;
+    color: var(--color-text-muted);
+  }
+  .surface-card h3 {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--color-text);
+    margin: 8px 0 4px;
+  }
+  .surface-card p {
+    color: var(--color-text-muted);
+    font-size: 12.5px;
+  }
+
+  .surface-bg       { background: var(--color-bg); }
+  .surface-surface  { background: var(--color-surface); }
+  .surface-raised   { background: var(--color-surface-raised); box-shadow: 0 2px 6px rgba(0,0,0,0.06); }
+  .surface-sidebar  { background: var(--color-sidebar); }
+  .surface-dark {
+    background: var(--color-text);
+    color: var(--color-text-inverse);
+    border-color: var(--color-text);
+  }
+  .surface-dark .role { color: var(--color-text-inverse); opacity: 0.5; }
+  .surface-dark h3 { color: var(--color-text-inverse); }
+  .surface-dark p  { color: var(--color-text-inverse); opacity: 0.8; }
+  .surface-dark .token { color: var(--color-text-inverse); opacity: 0.5; }
+
+  /* Borders demo */
+  .border-row { display: flex; flex-wrap: wrap; gap: 16px; padding: 6px 0; }
+  .input-demo {
+    flex: 1;
+    min-width: 220px;
+    padding: 10px 12px;
+    border-radius: 8px;
+    background: var(--color-surface);
+    font: inherit;
+    font-size: 13px;
+    color: var(--color-text);
+  }
+  .input-demo.normal  { border: 1px solid var(--color-border); }
+  .input-demo.strong  { border: 1px solid var(--color-border-strong); }
+  .input-demo.focused { border: 2px solid var(--color-border-focus); outline: none; }
+
+  /* Semantic quadrants */
+  .semantic-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 16px;
+  }
+  .semantic-card {
+    border-radius: 10px;
+    border: 1px solid #ececef;
+    overflow: hidden;
+  }
+  .semantic-head {
+    padding: 8px 12px;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    background: #fafafc;
+    color: #555;
+  }
+  .semantic-body { padding: 12px; display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+  .semantic-quad {
+    border-radius: 6px;
+    padding: 8px 10px;
+    font-size: 10.5px;
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+    border: 1px solid transparent;
+  }
+  .quad-main    { color: #fff; font-weight: 600; }
+  .quad-soft    { }
+  .quad-border  { background: #fff; }
+  .quad-text    { background: #fff; }
+
+  /* Semantic banner (in-context demo) */
+  .semantic-banner {
+    margin: 10px 12px 12px;
+    padding: 10px 12px;
+    border-radius: 8px;
+    border: 1px solid;
+    font-size: 12px;
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+  }
+  .semantic-banner .dot {
+    flex-shrink: 0;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    margin-top: 5px;
+  }
+
+  /* Holding accents */
+  .holdings-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    gap: 14px;
+  }
+  .holding-card {
+    border: 1px solid #ececef;
+    border-radius: 10px;
+    overflow: hidden;
+    background: #ffffff;
+  }
+  .holding-card .chip {
+    height: 56px;
+    display: flex;
+    align-items: center;
+    padding: 0 16px;
+  }
+  .holding-card .chip span {
+    background: rgba(255,255,255,0.94);
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 10.5px;
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+    color: #1c1c1e;
+  }
+  .holding-card .meta { padding: 10px 14px 12px; font-size: 12px; }
+  .holding-card .meta .name { font-weight: 600; color: #1c1c1e; }
+  .holding-card .meta .role { color: #888; font-size: 11px; margin-top: 2px; }
+
+  /* List-row stripe demo (the actual use of the holding color in list view) */
+  .row-strip-demo { margin-top: 10px; }
+  .row {
+    position: relative;
+    padding: 10px 14px 10px 22px;
+    background: var(--color-surface);
+    border-radius: 8px;
+    border: 1px solid var(--color-border);
+    margin-bottom: 6px;
+    font-size: 13px;
+    color: var(--color-text);
+  }
+  .row::before {
+    content: '';
+    position: absolute;
+    top: 8px; bottom: 8px; left: 8px;
+    width: 4px;
+    border-radius: 2px;
+  }
+  .row.account    ::before { background: var(--color-holding-account); }
+  .row.purse      ::before { background: var(--color-holding-purse); }
+  .row.strongbox  ::before { background: var(--color-holding-strongbox); }
+  .row.vault      ::before { background: var(--color-holding-vault); }
+  .row .label { font-size: 11px; color: var(--color-text-muted); margin-left: 6px; }
+
+  /* Gap / tension callouts */
+  .tension-card {
+    border-left: 3px solid #d97706;
+    background: #fffaf0;
+    border-radius: 8px;
+    padding: 14px 16px;
+    margin-bottom: 12px;
+    font-size: 13px;
+  }
+  .tension-card .label {
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: #b45309;
+    margin-bottom: 6px;
+  }
+  .tension-card p { color: #555; line-height: 1.55; }
+  .tension-card .pair {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    margin-right: 14px;
+    margin-top: 6px;
+  }
+  .tension-card .pair .swatch-mini {
+    width: 16px; height: 16px;
+    border-radius: 4px;
+    border: 1px solid rgba(0,0,0,0.12);
+  }
+  .tension-card .pair code {
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+    font-size: 11px;
+  }
+
+  /* Dark mode placeholder */
+  .dark-placeholder {
+    border: 1px dashed #c4c4c7;
+    border-radius: 10px;
+    padding: 18px 20px;
+    background: #fafafc;
+    font-size: 13px;
+    color: #555;
+    line-height: 1.6;
+  }
+  .dark-placeholder strong { color: #1c1c1e; }
+  .dark-placeholder ul {
+    margin: 8px 0 0 18px;
+    color: #555;
+  }
+  .dark-placeholder code {
+    background: #ececef;
+    padding: 1px 6px;
+    border-radius: 4px;
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+    font-size: 11.5px;
+  }
+</style>
+</head>
+<body>
+
+<div class="page">
+
+  <header class="canvas-meta">
+    <h1>TallyKeep · Brand Palette Canvas</h1>
+    <p>
+      Live brand surface. All swatches and inlined SVGs read directly from
+      <code>../UI/mockups/_shared/tokens.css</code> via the
+      <code>.mark-*</code> class hooks and CSS custom properties. Edit a
+      token, reload this page, see the change everywhere. Zero duplication
+      with the spec.
+      <br><br>
+      <strong>This file is the iteration view. Narrative, anatomy, and
+      decisions log live in the lock docs in <code>brand/</code>.</strong>
+      Don't put prose here.
+    </p>
+  </header>
+
+  <!-- =============================================================
+       1 · BRAND MARK
+       Canonical (with grain) and Solid (favicon) at multiple sizes.
+       All four paint layers wired through .mark-* classes.
+       ============================================================= -->
+  <section class="brand-section">
+    <div class="section-head">
+      <h2>1 · Brand mark</h2>
+      <span class="hint">canonical = grain; solid = favicon ≤16px</span>
+    </div>
+    <div class="section-body">
+
+      <div class="mark-row">
+        <!-- 16px solid favicon test -->
+        <div class="mark-cell">
+          <div class="mark-frame">
+            <svg width="16" height="16" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg" aria-label="favicon test">
+              <path d="M 168.33 42.19 L 54.27 174.22 L 36.43 139.77 L 54.47 118.86 L 65.07 128.02 L 151.67 27.81 Z" class="mark-wood"/>
+              <polygon points="40.68,42.21 79.68,87.21 96.32,72.79 57.32,27.79" class="mark-wood"/>
+              <circle cx="53.76" cy="147.31" r="2.8" class="mark-carving"/>
+              <polygon points="-3,12 3,12 2,5 -2,5"     class="mark-carving" transform="translate(147 50) rotate(130.82)"/>
+              <polygon points="-4,12 4,12 2,4 -2,4"     class="mark-carving" transform="translate(140 58) rotate(130.82)"/>
+              <polygon points="-3,12 3,12 2,5 -2,5"     class="mark-carving" transform="translate(133 66) rotate(130.82)"/>
+              <polygon points="-3,-12 3,-12 2,-5 -2,-5" class="mark-carving" transform="translate(62 50)  rotate(49.18)"/>
+              <polygon points="-4,-12 4,-12 2,-4 -2,-4" class="mark-carving" transform="translate(69 58)  rotate(49.18)"/>
+              <polygon points="-3,-12 3,-12 2,-5 -2,-5" class="mark-carving" transform="translate(76 66)  rotate(49.18)"/>
+            </svg>
+          </div>
+          <div class="size-label">16px · solid (favicon)</div>
+        </div>
+
+        <!-- 32px solid -->
+        <div class="mark-cell">
+          <div class="mark-frame">
+            <svg width="32" height="32" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+              <path d="M 168.33 42.19 L 54.27 174.22 L 36.43 139.77 L 54.47 118.86 L 65.07 128.02 L 151.67 27.81 Z" class="mark-wood"/>
+              <polygon points="40.68,42.21 79.68,87.21 96.32,72.79 57.32,27.79" class="mark-wood"/>
+              <circle cx="53.76" cy="147.31" r="2.8" class="mark-carving"/>
+              <polygon points="-3,12 3,12 2,5 -2,5"     class="mark-carving" transform="translate(147 50) rotate(130.82)"/>
+              <polygon points="-4,12 4,12 2,4 -2,4"     class="mark-carving" transform="translate(140 58) rotate(130.82)"/>
+              <polygon points="-3,12 3,12 2,5 -2,5"     class="mark-carving" transform="translate(133 66) rotate(130.82)"/>
+              <polygon points="-3,-12 3,-12 2,-5 -2,-5" class="mark-carving" transform="translate(62 50)  rotate(49.18)"/>
+              <polygon points="-4,-12 4,-12 2,-4 -2,-4" class="mark-carving" transform="translate(69 58)  rotate(49.18)"/>
+              <polygon points="-3,-12 3,-12 2,-5 -2,-5" class="mark-carving" transform="translate(76 66)  rotate(49.18)"/>
+            </svg>
+          </div>
+          <div class="size-label">32px · solid</div>
+        </div>
+
+        <!-- 64px canonical (with grain) -->
+        <div class="mark-cell">
+          <div class="mark-frame">
+            <svg width="64" height="64" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+              <defs>
+                <clipPath id="mc64-stock"><path d="M 168.33 42.19 L 54.27 174.22 L 36.43 139.77 L 54.47 118.86 L 65.07 128.02 L 151.67 27.81 Z"/></clipPath>
+                <clipPath id="mc64-foil"><polygon points="40.68,42.21 79.68,87.21 96.32,72.79 57.32,27.79"/></clipPath>
+              </defs>
+              <path d="M 168.33 42.19 L 54.27 174.22 L 36.43 139.77 L 54.47 118.86 L 65.07 128.02 L 151.67 27.81 Z" class="mark-wood"/>
+              <polygon points="40.68,42.21 79.68,87.21 96.32,72.79 57.32,27.79" class="mark-wood"/>
+              <g class="mark-grain" stroke-width="1.4" stroke-linecap="butt" opacity="0.6">
+                <line x1="163.79" y1="38.27" x2="46.07" y2="174.53" clip-path="url(#mc64-stock)"/>
+                <line x1="156.22" y1="31.73" x2="38.50" y2="167.99" clip-path="url(#mc64-stock)"/>
+                <line x1="45.22"  y1="38.27" x2="84.52" y2="83.64"  clip-path="url(#mc64-foil)"/>
+                <line x1="52.78"  y1="31.73" x2="92.08" y2="77.09"  clip-path="url(#mc64-foil)"/>
+              </g>
+              <circle cx="53.76" cy="147.31" r="2.8" class="mark-carving"/>
+              <polygon points="-3,12 3,12 2,5 -2,5"     class="mark-carving" transform="translate(147 50) rotate(130.82)"/>
+              <polygon points="-4,12 4,12 2,4 -2,4"     class="mark-carving" transform="translate(140 58) rotate(130.82)"/>
+              <polygon points="-3,12 3,12 2,5 -2,5"     class="mark-carving" transform="translate(133 66) rotate(130.82)"/>
+              <polygon points="-3,-12 3,-12 2,-5 -2,-5" class="mark-carving" transform="translate(62 50)  rotate(49.18)"/>
+              <polygon points="-4,-12 4,-12 2,-4 -2,-4" class="mark-carving" transform="translate(69 58)  rotate(49.18)"/>
+              <polygon points="-3,-12 3,-12 2,-5 -2,-5" class="mark-carving" transform="translate(76 66)  rotate(49.18)"/>
+            </svg>
+          </div>
+          <div class="size-label">64px · canonical</div>
+        </div>
+
+        <!-- 192px canonical hero -->
+        <div class="mark-cell">
+          <div class="mark-frame">
+            <svg width="192" height="192" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+              <defs>
+                <clipPath id="mc192-stock"><path d="M 168.33 42.19 L 54.27 174.22 L 36.43 139.77 L 54.47 118.86 L 65.07 128.02 L 151.67 27.81 Z"/></clipPath>
+                <clipPath id="mc192-foil"><polygon points="40.68,42.21 79.68,87.21 96.32,72.79 57.32,27.79"/></clipPath>
+              </defs>
+              <path d="M 168.33 42.19 L 54.27 174.22 L 36.43 139.77 L 54.47 118.86 L 65.07 128.02 L 151.67 27.81 Z" class="mark-wood"/>
+              <polygon points="40.68,42.21 79.68,87.21 96.32,72.79 57.32,27.79" class="mark-wood"/>
+              <g class="mark-grain" stroke-width="1.4" stroke-linecap="butt" opacity="0.6">
+                <line x1="163.79" y1="38.27" x2="46.07" y2="174.53" clip-path="url(#mc192-stock)"/>
+                <line x1="156.22" y1="31.73" x2="38.50" y2="167.99" clip-path="url(#mc192-stock)"/>
+                <line x1="45.22"  y1="38.27" x2="84.52" y2="83.64"  clip-path="url(#mc192-foil)"/>
+                <line x1="52.78"  y1="31.73" x2="92.08" y2="77.09"  clip-path="url(#mc192-foil)"/>
+              </g>
+              <circle cx="53.76" cy="147.31" r="2.8" class="mark-carving"/>
+              <polygon points="-3,12 3,12 2,5 -2,5"     class="mark-carving" transform="translate(147 50) rotate(130.82)"/>
+              <polygon points="-4,12 4,12 2,4 -2,4"     class="mark-carving" transform="translate(140 58) rotate(130.82)"/>
+              <polygon points="-3,12 3,12 2,5 -2,5"     class="mark-carving" transform="translate(133 66) rotate(130.82)"/>
+              <polygon points="-3,-12 3,-12 2,-5 -2,-5" class="mark-carving" transform="translate(62 50)  rotate(49.18)"/>
+              <polygon points="-4,-12 4,-12 2,-4 -2,-4" class="mark-carving" transform="translate(69 58)  rotate(49.18)"/>
+              <polygon points="-3,-12 3,-12 2,-5 -2,-5" class="mark-carving" transform="translate(76 66)  rotate(49.18)"/>
+            </svg>
+          </div>
+          <div class="size-label">192px · hero</div>
+        </div>
+
+        <!-- 64px on dark surface -->
+        <div class="mark-cell">
+          <div class="mark-frame dark on-dark-surface">
+            <svg width="64" height="64" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+              <defs>
+                <clipPath id="mcdk-stock"><path d="M 168.33 42.19 L 54.27 174.22 L 36.43 139.77 L 54.47 118.86 L 65.07 128.02 L 151.67 27.81 Z"/></clipPath>
+                <clipPath id="mcdk-foil"><polygon points="40.68,42.21 79.68,87.21 96.32,72.79 57.32,27.79"/></clipPath>
+              </defs>
+              <path d="M 168.33 42.19 L 54.27 174.22 L 36.43 139.77 L 54.47 118.86 L 65.07 128.02 L 151.67 27.81 Z" class="mark-wood"/>
+              <polygon points="40.68,42.21 79.68,87.21 96.32,72.79 57.32,27.79" class="mark-wood"/>
+              <g class="mark-grain" stroke-width="1.4" stroke-linecap="butt" opacity="0.6">
+                <line x1="163.79" y1="38.27" x2="46.07" y2="174.53" clip-path="url(#mcdk-stock)"/>
+                <line x1="156.22" y1="31.73" x2="38.50" y2="167.99" clip-path="url(#mcdk-stock)"/>
+                <line x1="45.22"  y1="38.27" x2="84.52" y2="83.64"  clip-path="url(#mcdk-foil)"/>
+                <line x1="52.78"  y1="31.73" x2="92.08" y2="77.09"  clip-path="url(#mcdk-foil)"/>
+              </g>
+              <!-- On dark, carvings need an inverse fill — currently they
+                   resolve to --color-bg which makes them light. That's the
+                   intent: cuts show whatever is behind. On a dark page
+                   this would need --color-bg-dark; flagged in §10. -->
+              <circle cx="53.76" cy="147.31" r="2.8" class="mark-carving"/>
+              <polygon points="-3,12 3,12 2,5 -2,5"     class="mark-carving" transform="translate(147 50) rotate(130.82)"/>
+              <polygon points="-4,12 4,12 2,4 -2,4"     class="mark-carving" transform="translate(140 58) rotate(130.82)"/>
+              <polygon points="-3,12 3,12 2,5 -2,5"     class="mark-carving" transform="translate(133 66) rotate(130.82)"/>
+              <polygon points="-3,-12 3,-12 2,-5 -2,-5" class="mark-carving" transform="translate(62 50)  rotate(49.18)"/>
+              <polygon points="-4,-12 4,-12 2,-4 -2,-4" class="mark-carving" transform="translate(69 58)  rotate(49.18)"/>
+              <polygon points="-3,-12 3,-12 2,-5 -2,-5" class="mark-carving" transform="translate(76 66)  rotate(49.18)"/>
+            </svg>
+          </div>
+          <div class="size-label">64px · on dark</div>
+        </div>
+      </div>
+
+      <!-- mark token swatches -->
+      <div class="swatch-grid" style="margin-top: 22px;">
+        <div class="swatch">
+          <div class="chip" style="background: var(--brand-mark-wood)"></div>
+          <div class="meta">
+            <div class="name">Wood</div>
+            <div class="token">--brand-mark-wood</div>
+            <div class="note">Stock + foil filled body. Reads "the wood".</div>
+          </div>
+        </div>
+        <div class="swatch">
+          <div class="chip" style="background: var(--brand-mark-grain)"></div>
+          <div class="meta">
+            <div class="name">Grain</div>
+            <div class="token">--brand-mark-grain</div>
+            <div class="note">Longitudinal stripes, drawn at 0.6 opacity.</div>
+          </div>
+        </div>
+        <div class="swatch">
+          <div class="chip" style="background: var(--brand-mark-carving); border-bottom: 1px solid #ccc;"></div>
+          <div class="meta">
+            <div class="name">Carving</div>
+            <div class="token">--brand-mark-carving</div>
+            <div class="note">Through-cuts. By convention = --color-bg.</div>
+          </div>
+        </div>
+        <div class="swatch">
+          <div class="chip" style="background: var(--brand-mark-text)"></div>
+          <div class="meta">
+            <div class="name">Wordmark text</div>
+            <div class="token">--brand-mark-text</div>
+            <div class="note">"tall" + "keep" text. By convention = --color-text.</div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- =============================================================
+       2 · WORDMARK
+       ============================================================= -->
+  <section class="brand-section">
+    <div class="section-head">
+      <h2>2 · Wordmark</h2>
+      <span class="hint">app-bar (180px), display (280px), plain, on dark</span>
+    </div>
+    <div class="section-body">
+
+      <div class="wordmark-row">
+
+        <!-- Icony, app-bar size -->
+        <div class="wordmark-cell">
+          <div class="label">icon-y · 180px<br>(app-bar)</div>
+          <svg width="180" viewBox="0 0 450 145" xmlns="http://www.w3.org/2000/svg" aria-label="tallykeep">
+            <text x="0" y="92" font-family="Manrope, system-ui, sans-serif" font-weight="600" font-size="92" letter-spacing="-2" class="mark-text">tall</text>
+            <svg x="143" y="42" width="76" height="84" viewBox="36.43 27.79 131.9 146.43">
+              <defs>
+                <clipPath id="w1-stock"><path d="M 168.33 42.19 L 54.27 174.22 L 36.43 139.77 L 54.47 118.86 L 65.07 128.02 L 151.67 27.81 Z"/></clipPath>
+                <clipPath id="w1-foil"><polygon points="40.68,42.21 79.68,87.21 96.32,72.79 57.32,27.79"/></clipPath>
+              </defs>
+              <path d="M 168.33 42.19 L 54.27 174.22 L 36.43 139.77 L 54.47 118.86 L 65.07 128.02 L 151.67 27.81 Z" class="mark-wood"/>
+              <polygon points="40.68,42.21 79.68,87.21 96.32,72.79 57.32,27.79" class="mark-wood"/>
+              <g class="mark-grain" stroke-width="1.4" stroke-linecap="butt" opacity="0.6">
+                <line x1="163.79" y1="38.27" x2="46.07" y2="174.53" clip-path="url(#w1-stock)"/>
+                <line x1="156.22" y1="31.73" x2="38.50" y2="167.99" clip-path="url(#w1-stock)"/>
+                <line x1="45.22"  y1="38.27" x2="84.52" y2="83.64"  clip-path="url(#w1-foil)"/>
+                <line x1="52.78"  y1="31.73" x2="92.08" y2="77.09"  clip-path="url(#w1-foil)"/>
+              </g>
+              <circle cx="53.76" cy="147.31" r="2.8" class="mark-carving"/>
+              <polygon points="-3,12 3,12 2,5 -2,5"     class="mark-carving" transform="translate(147 50) rotate(130.82)"/>
+              <polygon points="-4,12 4,12 2,4 -2,4"     class="mark-carving" transform="translate(140 58) rotate(130.82)"/>
+              <polygon points="-3,12 3,12 2,5 -2,5"     class="mark-carving" transform="translate(133 66) rotate(130.82)"/>
+              <polygon points="-3,-12 3,-12 2,-5 -2,-5" class="mark-carving" transform="translate(62 50)  rotate(49.18)"/>
+              <polygon points="-4,-12 4,-12 2,-4 -2,-4" class="mark-carving" transform="translate(69 58)  rotate(49.18)"/>
+              <polygon points="-3,-12 3,-12 2,-5 -2,-5" class="mark-carving" transform="translate(76 66)  rotate(49.18)"/>
+            </svg>
+            <text x="228" y="92" font-family="Manrope, system-ui, sans-serif" font-weight="600" font-size="92" letter-spacing="-2" class="mark-text">keep</text>
+          </svg>
+        </div>
+
+        <!-- Icony, display size, on surface card -->
+        <div class="wordmark-cell surface">
+          <div class="label">icon-y · 280px<br>(display tier)</div>
+          <svg width="280" viewBox="0 0 450 145" xmlns="http://www.w3.org/2000/svg" aria-label="tallykeep">
+            <text x="0" y="92" font-family="Manrope, system-ui, sans-serif" font-weight="600" font-size="92" letter-spacing="-2" class="mark-text">tall</text>
+            <svg x="143" y="42" width="76" height="84" viewBox="36.43 27.79 131.9 146.43">
+              <defs>
+                <clipPath id="w2-stock"><path d="M 168.33 42.19 L 54.27 174.22 L 36.43 139.77 L 54.47 118.86 L 65.07 128.02 L 151.67 27.81 Z"/></clipPath>
+                <clipPath id="w2-foil"><polygon points="40.68,42.21 79.68,87.21 96.32,72.79 57.32,27.79"/></clipPath>
+              </defs>
+              <path d="M 168.33 42.19 L 54.27 174.22 L 36.43 139.77 L 54.47 118.86 L 65.07 128.02 L 151.67 27.81 Z" class="mark-wood"/>
+              <polygon points="40.68,42.21 79.68,87.21 96.32,72.79 57.32,27.79" class="mark-wood"/>
+              <g class="mark-grain" stroke-width="1.4" stroke-linecap="butt" opacity="0.6">
+                <line x1="163.79" y1="38.27" x2="46.07" y2="174.53" clip-path="url(#w2-stock)"/>
+                <line x1="156.22" y1="31.73" x2="38.50" y2="167.99" clip-path="url(#w2-stock)"/>
+                <line x1="45.22"  y1="38.27" x2="84.52" y2="83.64"  clip-path="url(#w2-foil)"/>
+                <line x1="52.78"  y1="31.73" x2="92.08" y2="77.09"  clip-path="url(#w2-foil)"/>
+              </g>
+              <circle cx="53.76" cy="147.31" r="2.8" class="mark-carving"/>
+              <polygon points="-3,12 3,12 2,5 -2,5"     class="mark-carving" transform="translate(147 50) rotate(130.82)"/>
+              <polygon points="-4,12 4,12 2,4 -2,4"     class="mark-carving" transform="translate(140 58) rotate(130.82)"/>
+              <polygon points="-3,12 3,12 2,5 -2,5"     class="mark-carving" transform="translate(133 66) rotate(130.82)"/>
+              <polygon points="-3,-12 3,-12 2,-5 -2,-5" class="mark-carving" transform="translate(62 50)  rotate(49.18)"/>
+              <polygon points="-4,-12 4,-12 2,-4 -2,-4" class="mark-carving" transform="translate(69 58)  rotate(49.18)"/>
+              <polygon points="-3,-12 3,-12 2,-5 -2,-5" class="mark-carving" transform="translate(76 66)  rotate(49.18)"/>
+            </svg>
+            <text x="228" y="92" font-family="Manrope, system-ui, sans-serif" font-weight="600" font-size="92" letter-spacing="-2" class="mark-text">keep</text>
+          </svg>
+        </div>
+
+        <!-- Plain wordmark -->
+        <div class="wordmark-cell">
+          <div class="label">plain · 280px</div>
+          <svg width="280" viewBox="0 0 380 120" xmlns="http://www.w3.org/2000/svg" aria-label="tallykeep">
+            <text x="0" y="92" font-family="Manrope, system-ui, sans-serif" font-weight="600" font-size="92" letter-spacing="-2" class="mark-text">tallykeep</text>
+          </svg>
+        </div>
+
+        <!-- On dark surface -->
+        <div class="wordmark-cell dark on-dark-surface">
+          <div class="label">on dark · text-inverse</div>
+          <svg width="280" viewBox="0 0 380 120" xmlns="http://www.w3.org/2000/svg" aria-label="tallykeep">
+            <text x="0" y="92" font-family="Manrope, system-ui, sans-serif" font-weight="600" font-size="92" letter-spacing="-2" fill="var(--color-text-inverse)">tallykeep</text>
+          </svg>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+  <!-- =============================================================
+       3 · PRIMARY PALETTE
+       ============================================================= -->
+  <section class="brand-section">
+    <div class="section-head">
+      <h2>3 · Primary palette</h2>
+      <span class="hint">brand color + CTA states</span>
+    </div>
+    <div class="section-body">
+
+      <div class="swatch-grid">
+        <div class="swatch">
+          <div class="chip" style="background: var(--color-primary)"></div>
+          <div class="meta">
+            <div class="name">Primary</div>
+            <div class="token">--color-primary</div>
+            <div class="note">CTA fill, focus ring, brand "y".</div>
+          </div>
+        </div>
+        <div class="swatch">
+          <div class="chip" style="background: var(--color-primary-soft); border-bottom: 1px solid #ccc;"></div>
+          <div class="meta">
+            <div class="name">Primary soft</div>
+            <div class="token">--color-primary-soft</div>
+            <div class="note">Soft surface for badges, banner bg.</div>
+          </div>
+        </div>
+        <div class="swatch">
+          <div class="chip" style="background: var(--color-primary-strong)"></div>
+          <div class="meta">
+            <div class="name">Primary strong</div>
+            <div class="token">--color-primary-strong</div>
+            <div class="note">Hover, active, pressed states.</div>
+          </div>
+        </div>
+        <div class="swatch">
+          <div class="chip" style="background: var(--color-on-primary); border-bottom: 1px solid #ccc;"></div>
+          <div class="meta">
+            <div class="name">On primary</div>
+            <div class="token">--color-on-primary</div>
+            <div class="note">Text/icon color when sitting on --color-primary.</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="cta-demo">
+        <button class="btn-primary">Default CTA</button>
+        <button class="btn-primary hover">Hover state</button>
+        <button class="btn-primary disabled">Disabled</button>
+        <button class="btn-soft">Soft secondary</button>
+        <button class="btn-ghost">Ghost outline</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- =============================================================
+       4 · SURFACES + TEXT
+       ============================================================= -->
+  <section class="brand-section">
+    <div class="section-head">
+      <h2>4 · Surfaces &amp; text</h2>
+      <span class="hint">each surface shows text at the three tones</span>
+    </div>
+    <div class="section-body">
+      <div class="surface-row">
+        <div class="surface-card surface-bg">
+          <div class="role">--color-bg</div>
+          <h3>Page background</h3>
+          <p>Muted body text reads like this.</p>
+          <p class="token">--color-text-muted on --color-bg</p>
+        </div>
+        <div class="surface-card surface-surface">
+          <div class="role">--color-surface</div>
+          <h3>Card surface</h3>
+          <p>Cards, modals, inputs sit on this.</p>
+          <p class="token">--color-text on --color-surface</p>
+        </div>
+        <div class="surface-card surface-raised">
+          <div class="role">--color-surface-raised</div>
+          <h3>Raised</h3>
+          <p>Floating cards, popovers, drawers.</p>
+          <p class="token">+ shadow elevation</p>
+        </div>
+        <div class="surface-card surface-sidebar">
+          <div class="role">--color-sidebar</div>
+          <h3>Sidebar / hero</h3>
+          <p>Warm panels, icon hero containers.</p>
+          <p class="token">--color-sidebar</p>
+        </div>
+        <div class="surface-card surface-dark on-dark-surface">
+          <div class="role">--color-text (as dark surface)</div>
+          <h3>Dark / inverse</h3>
+          <p>Text inverse, used in modal overlays and dark headers.</p>
+          <p class="token">--color-text-inverse on --color-text</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- =============================================================
+       5 · BORDERS
+       ============================================================= -->
+  <section class="brand-section">
+    <div class="section-head">
+      <h2>5 · Borders</h2>
+      <span class="hint">three border tones via input demo</span>
+    </div>
+    <div class="section-body">
+      <div class="border-row">
+        <input class="input-demo normal"  type="text" placeholder="--color-border (default)">
+        <input class="input-demo strong"  type="text" placeholder="--color-border-strong">
+        <input class="input-demo focused" type="text" placeholder="--color-border-focus" value="focused state">
+      </div>
+    </div>
+  </section>
+
+  <!-- =============================================================
+       6 · SEMANTIC COLORS
+       4 quadrants per state: main / soft / border / text-on-soft
+       ============================================================= -->
+  <section class="brand-section">
+    <div class="section-head">
+      <h2>6 · Semantic states</h2>
+      <span class="hint">success · warning · danger · info (info provisional)</span>
+    </div>
+    <div class="section-body">
+
+      <div class="semantic-grid">
+
+        <!-- SUCCESS -->
+        <div class="semantic-card">
+          <div class="semantic-head">Success · holly leaf</div>
+          <div class="semantic-body">
+            <div class="semantic-quad quad-main" style="background: var(--color-success)">--color-success<br>main</div>
+            <div class="semantic-quad quad-soft" style="background: var(--color-success-soft); color: var(--color-success-text-on-soft)">--color-success-soft<br>soft bg</div>
+            <div class="semantic-quad quad-border" style="border-color: var(--color-success-border); color: var(--color-success-border)">--color-success-border<br>mid-tone</div>
+            <div class="semantic-quad quad-text" style="color: var(--color-success-text-on-soft); border: 1px solid var(--color-success-border)">text-on-soft<br>deep</div>
+          </div>
+          <div class="semantic-banner" style="background: var(--color-success-soft); border-color: var(--color-success-border); color: var(--color-success-text-on-soft)">
+            <span class="dot" style="background: var(--color-success)"></span>
+            Holding confirmed · 6 of 6 confirmations
+          </div>
+        </div>
+
+        <!-- WARNING -->
+        <div class="semantic-card">
+          <div class="semantic-head">Warning · autumn maple</div>
+          <div class="semantic-body">
+            <div class="semantic-quad quad-main" style="background: var(--color-warning)">--color-warning<br>main</div>
+            <div class="semantic-quad quad-soft" style="background: var(--color-warning-soft); color: var(--color-warning-text-on-soft)">--color-warning-soft<br>soft bg</div>
+            <div class="semantic-quad quad-border" style="border-color: var(--color-warning-border); color: var(--color-warning-border)">--color-warning-border<br>mid-tone</div>
+            <div class="semantic-quad quad-text" style="color: var(--color-warning-text-on-soft); border: 1px solid var(--color-warning-border)">text-on-soft<br>deep</div>
+          </div>
+          <div class="semantic-banner" style="background: var(--color-warning-soft); border-color: var(--color-warning-border); color: var(--color-warning-text-on-soft)">
+            <span class="dot" style="background: var(--color-warning)"></span>
+            Backup not confirmed · seed responsibility is yours
+          </div>
+        </div>
+
+        <!-- DANGER -->
+        <div class="semantic-card">
+          <div class="semantic-head">Danger · holly berry</div>
+          <div class="semantic-body">
+            <div class="semantic-quad quad-main" style="background: var(--color-danger)">--color-danger<br>main</div>
+            <div class="semantic-quad quad-soft" style="background: var(--color-danger-soft); color: var(--color-danger-text-on-soft)">--color-danger-soft<br>soft bg</div>
+            <div class="semantic-quad quad-border" style="border-color: var(--color-danger-border); color: var(--color-danger-border)">--color-danger-border<br>mid-tone</div>
+            <div class="semantic-quad quad-text" style="color: var(--color-danger-text-on-soft); border: 1px solid var(--color-danger-border)">text-on-soft<br>deep</div>
+          </div>
+          <div class="semantic-banner" style="background: var(--color-danger-soft); border-color: var(--color-danger-border); color: var(--color-danger-text-on-soft)">
+            <span class="dot" style="background: var(--color-danger)"></span>
+            Pair lost · re-scan QR on your home server
+          </div>
+        </div>
+
+        <!-- INFO -->
+        <div class="semantic-card">
+          <div class="semantic-head">Info · cornflower (provisional)</div>
+          <div class="semantic-body">
+            <div class="semantic-quad quad-main" style="background: var(--color-info)">--color-info<br>main</div>
+            <div class="semantic-quad quad-soft" style="background: var(--color-info-soft); color: var(--color-info-text-on-soft)">--color-info-soft<br>soft bg</div>
+            <div class="semantic-quad quad-border" style="border-color: var(--color-info-border); color: var(--color-info-border)">--color-info-border<br>mid-tone</div>
+            <div class="semantic-quad quad-text" style="color: var(--color-info-text-on-soft); border: 1px solid var(--color-info-border)">text-on-soft<br>deep</div>
+          </div>
+          <div class="semantic-banner" style="background: var(--color-info-soft); border-color: var(--color-info-border); color: var(--color-info-text-on-soft)">
+            <span class="dot" style="background: var(--color-info)"></span>
+            Off-network pairing requires v2 (WireGuard / Tailscale)
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+  <!-- =============================================================
+       7 · HOLDING-TYPE ACCENTS
+       ============================================================= -->
+  <section class="brand-section">
+    <div class="section-head">
+      <h2>7 · Holding-type accents</h2>
+      <span class="hint">palette v2 — natural-object accents, used as icon fills + 4px row stripes</span>
+    </div>
+    <div class="section-body">
+
+      <div class="holdings-grid">
+        <div class="holding-card">
+          <div class="chip" style="background: var(--color-holding-account)"><span>--color-holding-account</span></div>
+          <div class="meta">
+            <div class="name">Account · limestone</div>
+            <div class="role">Institutional warm-grey · classical pediment</div>
+          </div>
+        </div>
+        <div class="holding-card">
+          <div class="chip" style="background: var(--color-holding-purse)"><span>--color-holding-purse</span></div>
+          <div class="meta">
+            <div class="name">Purse · auburn leather</div>
+            <div class="role">Daily wallet · warm/spending</div>
+          </div>
+        </div>
+        <div class="holding-card">
+          <div class="chip" style="background: var(--color-holding-strongbox)"><span>--color-holding-strongbox</span></div>
+          <div class="meta">
+            <div class="name">Strongbox · iron</div>
+            <div class="role">Cold storage · solitary</div>
+          </div>
+        </div>
+        <div class="holding-card">
+          <div class="chip" style="background: var(--color-holding-vault)"><span>--color-holding-vault</span></div>
+          <div class="meta">
+            <div class="name">Vault · brushed steel</div>
+            <div class="role">Multisig ceremony · ceremonial</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- List-row stripe demo: where the holding color actually
+           appears in production UI (per palette v2 lock). -->
+      <div class="row-strip-demo">
+        <div class="row account">     Strongbox · Coldcard <span class="label">Account row · limestone stripe</span></div>
+        <div class="row purse">       Purse · Daily       <span class="label">Purse row · auburn stripe</span></div>
+        <div class="row strongbox">   Strongbox · Backup   <span class="label">Strongbox row · iron stripe</span></div>
+        <div class="row vault">       Vault · 2-of-3       <span class="label">Vault row · steel stripe</span></div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- =============================================================
+       8 · DARK MODE — PLACEHOLDER
+       ============================================================= -->
+  <section class="brand-section">
+    <div class="section-head">
+      <h2>8 · Dark mode</h2>
+      <span class="hint">not defined yet — placeholder</span>
+    </div>
+    <div class="section-body">
+      <div class="dark-placeholder">
+        <strong>Dark-mode tokens are not defined in tokens.css yet.</strong>
+        Sections 4 and 1 above use <code>--color-text</code> as the dark
+        surface (a hack to get a "dark on light" preview). A proper dark
+        mode needs its own surface ramp.
+        <ul>
+          <li>Required new tokens: <code>--color-bg-dark</code>,
+              <code>--color-surface-dark</code>,
+              <code>--color-surface-raised-dark</code>,
+              <code>--color-border-dark</code>,
+              <code>--color-text-dark</code>,
+              <code>--color-text-muted-dark</code>.</li>
+          <li><strong>Brand-mark carving on dark — solved.</strong>
+              Any wrapper carrying the <code>.on-dark-surface</code>
+              class re-scopes <code>--brand-mark-carving</code> to the
+              dark ink locally. Pattern is in
+              <code>tokens.css</code>. When dark-mode page surfaces
+              ship, the same class applies to <code>&lt;body&gt;</code>
+              (or the dark-mode root) and the carvings track
+              automatically — no new token required.</li>
+          <li>Semantic states need a dark variant — particularly the
+              soft backgrounds, which currently use pale tints unsuited
+              to dark surfaces.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- =============================================================
+       9 · TENSIONS — visible problems in the current palette
+       ============================================================= -->
+  <section class="brand-section">
+    <div class="section-head">
+      <h2>9 · Tensions in the current palette</h2>
+      <span class="hint">visible problems · resolve before locking</span>
+    </div>
+    <div class="section-body">
+
+      <div class="tension-card">
+        <div class="label">Holding-account vs brand-mark wood</div>
+        <p>
+          The Account-type accent (<code>--color-holding-account</code>,
+          limestone) and the brand-mark wood (<code>--brand-mark-wood</code>)
+          are visually nearly identical when the wood leans olive-tan.
+          On a screen with the wordmark in the app bar and an Account
+          holding in the list, the two read as the same material.
+        </p>
+        <div>
+          <span class="pair"><span class="swatch-mini" style="background: var(--color-holding-account)"></span><code>account limestone</code></span>
+          <span class="pair"><span class="swatch-mini" style="background: var(--brand-mark-wood)"></span><code>mark wood</code></span>
+        </div>
+        <p style="margin-top: 8px;">Decision needed: retune limestone (palette v2 → v3), or shift the wood away from limestone's hue.</p>
+      </div>
+
+      <div class="tension-card">
+        <div class="label">Primary vs success — both green</div>
+        <p>
+          <code>--color-primary</code> (verdigris) and
+          <code>--color-success</code> (holly leaf) are both deep
+          saturated greens. On a screen showing a primary CTA and a
+          success banner together, the user may not parse "brand" vs
+          "this means success" at a glance. Hue gap is small (~30°).
+        </p>
+        <div>
+          <span class="pair"><span class="swatch-mini" style="background: var(--color-primary)"></span><code>primary verdigris</code></span>
+          <span class="pair"><span class="swatch-mini" style="background: var(--color-success)"></span><code>success holly</code></span>
+        </div>
+        <p style="margin-top: 8px;">Decision needed: shift success toward a yellower / brighter green to widen the hue gap, or commit to the collision (success only ever appears far from a CTA).</p>
+      </div>
+
+      <div class="tension-card">
+        <div class="label">Brand mark at favicon size</div>
+        <p>
+          Look at the 16px solid icon in §1. The wood-and-grain
+          relationship breaks down at sub-pixel scales — grain becomes
+          noise, then disappears. With low-saturation woods (the
+          olive-tan), the silhouette flattens further. The mark v1 lock
+          accounts for this by providing a solid-only variant for ≤16px,
+          but the solid variant is still low-contrast at that scale.
+        </p>
+        <p style="margin-top: 8px;">Decision needed: either widen the wood/grain luminance gap, or accept that the favicon reads as a flat tan shape (banking on the "Y silhouette" alone for recognition).</p>
+      </div>
+
+      <div class="tension-card">
+        <div class="label">Identity SVGs vs canvas inlines</div>
+        <p>
+          <code>brand/identity/icon-canonical.svg</code>,
+          <code>icon-solid.svg</code>, and
+          <code>wordmark-icony.svg</code> still hardcode brand v1
+          Aged Oak (#A88554) and Grain (#6F5638). Frontend imports of
+          these will NOT track the palette — only inline SVGs with
+          <code>.mark-*</code> class hooks (mockups + this canvas) follow
+          tokens.css.
+        </p>
+        <p style="margin-top: 8px;">Decision needed at lock-doc bump: either rewrite the identity SVGs to use class-based fills (and document the "consumer must inline, not <code>&lt;img&gt;</code>" rule), or regenerate them with the current adopted hex (and accept that swaps require regeneration). The first is more flexible; the second matches §2.4 lockstep more cleanly.</p>
+      </div>
+
+    </div>
+  </section>
+
+</div>
+
+</body>
+</html>

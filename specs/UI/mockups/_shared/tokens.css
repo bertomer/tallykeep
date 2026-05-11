@@ -219,3 +219,35 @@
 .mark-grain   { stroke: var(--brand-mark-grain); }
 .mark-carving { fill:   var(--brand-mark-carving); }
 .mark-text    { fill:   var(--brand-mark-text); }
+
+/* ----------------------------------------------------------------- */
+/* Dark-surface scoping for the brand mark                            */
+/*                                                                    */
+/* The carving anatomy is "cuts that reveal the surface BEHIND the    */
+/* mark". On a light page, --brand-mark-carving = --color-bg, so the  */
+/* cuts read as page-showing-through. On a dark surface (modal        */
+/* header, dark hero, future dark-mode page), the carving needs to    */
+/* match that dark surface — otherwise cuts read as bright dots, the  */
+/* opposite of the intent.                                            */
+/*                                                                    */
+/* Elegant fix: re-declare --brand-mark-carving locally on any        */
+/* "dark context" wrapper. CSS variable scoping cascades into the     */
+/* SVG's .mark-carving paint rule automatically. No new token, no     */
+/* per-element overrides, no maintenance of parallel light/dark       */
+/* variants.                                                          */
+/*                                                                    */
+/* Convention: any element whose visible background is the dark       */
+/* surface (--color-text used as bg, or a future --color-bg-dark)     */
+/* should carry the .on-dark-surface class. Brand-mark SVGs nested    */
+/* inside it pick up the override.                                    */
+/*                                                                    */
+/* Wordmark text on dark is a separate question — text legibility on  */
+/* dark uses --color-text-inverse via the regular text rules, not     */
+/* via .mark-text (which by convention matches --color-text and IS    */
+/* the right "carved into stone" feel on light surfaces). If/when a   */
+/* dark-mode wordmark variant is specified, add a parallel scoping    */
+/* override for --brand-mark-text here.                               */
+/* ----------------------------------------------------------------- */
+.on-dark-surface {
+  --brand-mark-carving: var(--color-text); /* dark ink = the dark surface itself */
+}

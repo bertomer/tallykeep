@@ -210,6 +210,76 @@ and the same-LAN constraint goes away.
 
 ---
 
+### `brand-canvas-vs-narrative-split`
+
+**Status:** open (deferred — depends on palette stabilising)
+
+**Item:** PROCESS.md §2.4 currently bundles narrative and live data
+into a single lock-doc per brand artifact. During the May 2026
+palette iteration sweep, this surfaced as friction: editing tokens
+to find the right palette was easier in `tokens.css` than in the
+lock docs, because the lock docs interleave hex values with prose,
+anatomy, decisions log, and geometry.
+
+A new artifact was introduced as the iteration view:
+`brand/tallykeep_palette_canvas.html`. It links `tokens.css`
+directly, inlines the wordmark/icon SVGs with `.mark-*` class
+hooks, and shows the full brand surface (mark sizes, wordmark
+variants, primary palette, surfaces, text, borders, semantic
+states, holding accents, dark-mode placeholder, visible tensions).
+Zero prose, zero duplication.
+
+The existing lock docs
+(`tallykeep_brand_mark_v1_lock.html`,
+`tallykeep_wordmark_v1_lock.html`,
+`tallykeep_palette_v1_superseded.html`,
+`tallykeep_palette_v2_lock.html`) remain unchanged for now.
+
+**Leading direction:** once the palette stabilises (verdigris UI
+on cool-white surfaces + olive-tan aged-tally mark looks like the
+direction as of 2026-05), file an ADR formalising the
+canvas-vs-narrative split:
+
+- Canvas (`tallykeep_palette_canvas.html`) is the live data view;
+  consumed by mockups and (later) frontend code via `tokens.css`.
+- Lock docs become narrative + anatomy + decisions log only —
+  prose about why the brand is what it is, without re-stating
+  the data. They reference the canvas for "what does it look like
+  right now".
+- New brand-artifact pattern: each canonical artifact (mark,
+  wordmark, future lockup) gets a markdown narrative doc; the
+  canvas is the cross-artifact data view.
+
+**Why deferred:** premature to restructure while the palette is
+still in flux. If the verdigris direction reverses or shifts, the
+restructure work would partly redo itself. Lock-step the ADR with
+the brand v1 → v2 bump if/when verdigris-on-cool is adopted.
+
+**Open part — full session needed:**
+
+- ADR copy: rules for what goes in canvas vs. narrative.
+- Migration plan for the four existing v1 lock docs (rewrite as
+  narrative-only, or keep as v1 historical and start fresh
+  narrative for v2).
+- Identity SVG question (`brand/identity/*.svg` currently hardcode
+  Aged Oak; only inline SVGs with class hooks follow tokens.css).
+  Decision: rewrite identity SVGs to use class-based fills (more
+  flexible, requires consumers to inline rather than `<img>`), or
+  keep hex-baked and regenerate per brand version (matches §2.4
+  lockstep more cleanly).
+- Whether the canvas should additionally expose non-color tokens
+  (type, spacing, radius, shadow) in v2.
+
+**Recommendation:** keep the canvas + lock docs coexisting until
+brand v2 ships; do the restructure ADR as part of the brand v1 →
+v2 bump iteration. Do not redo the canvas-vs-lock-doc split as a
+standalone iteration — fold it into a "brand stabilises" iteration.
+
+**Decision:** ___ (pending session, blocked by palette adoption)
+**Decided on:** ___
+
+---
+
 ## Migration log (one-time, 2026-05)
 
 The previous "Decided" section of this file is removed under the

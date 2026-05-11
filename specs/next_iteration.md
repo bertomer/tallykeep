@@ -83,182 +83,464 @@ removes shipped scope items from this file, runs
 
 ## Active iteration
 
-*No active coding iteration. The `spec-cleanup-backend-deltas`
-iteration shipped 2026-05-10 (commit `cf62741`). All acceptance
-criteria passed — 460 tests passed, 1 skipped.*
+### Iteration: Onboarding + Daily Unlock + Home (empty)
+
+**Started:** 2026-05
+
+**Goal:** A user with a TallyKeep server running somewhere can
+pair their phone via QR or manual URL, choose biometric or
+passphrase unlock, and land on a working empty Home — backed by a
+new auth layer (device credentials + passphrase-validate
+endpoint) that ends the dev-phase no-auth posture.
+
+#### Scope (in) — required
+
+**Backend — auth layer (private-ship gate per ADR-0003):**
+
+- *`server_label` field* in `configuration.toml` per
+  `01_architecture.md` §"Configuration model". Optional; operator
+  sets it at stack deployment; surfaced to clients on pairing.
+  Exposed via `GET /api/v1/server/info` (or equivalent) so the
+  phone can render "Connected to: <label>" on the paired-confirm
+  screen.
+- *Pairing handshake* per `pre-implementation.md`
+  `pairing-handshake-crypto` (leading direction: plain endpoint
+  URL + single-use ephemeral token, ~60 s TTL, single-use,
+  rate-limited):
+  - `POST /api/v1/pairing/issue` — server-side, generates a
+    one-time pairing token + endpoint payload. (Dev-phase: a CLI
+    or test helper triggers issuance; the desktop "Add device"
+    UI that calls this lands in a later iteration.)
+  - `POST /api/v1/pairing/redeem` — phone-side, accepts the
+    token, validates (TTL, single-use, not-already-redeemed),
+    issues a long-lived device credential. Rate-limited.
+- *Device-credential store* — new `paired_device` table
+  (Alembic migration): id, credential_hash, label_optional,
+  created_at, last_seen_at, revoked_at. Argon2id of the
+  credential on the wire compared against stored hash; raw
+  credential never stored. Server emits the credential once on
+  successful redemption; phone stores it via
+  `NativeBridge.secureStorage`.
+- *Passphrase-validate endpoint* per ADR-0008:
+  - `POST /api/v1/auth/passphrase-validate` — accepts a
+    passphrase candidate, compares Argon2id of input against the
+    server's existing passphrase-derived key. Never stores or
+    logs the raw passphrase. Rate-limited (exact threshold +
+    backoff policy sharpens during impl).
+- *Auth middleware* — every API endpoint that previously had no
+  auth now requires a valid device credential
+  (`Authorization: Bearer <credential>` or equivalent). 401 on
+  missing/invalid. Exempt: pairing endpoints, `server/info`,
+  health endpoint. Per `01_architecture.md` §"Network security
+  posture" — this iteration ends the "no auth on the API in the
+  dev phase" relaxation.
+- *Device revocation* — `DELETE /api/v1/devices/{credential_id}`.
+  Marks the credential revoked; subsequent requests with that
+  credential return 401. (Desktop UI to call this lands later.)
+- Unit + integration tests for all of the above.
+
+**Frontend (SvelteKit, browser-dev per ADR-0007):**
+
+- *`NativeBridge` interface* with browser-dev stubs:
+  - `scanQR()` — browser-dev: visible "this build cannot scan —
+    Capacitor needed" gate banner; user falls back to manual URL
+    entry. Capacitor impl lands at private-ship.
+  - `secureStorage.{set, get, delete}(key)` — browser-dev:
+    `localStorage` with a visible dev-mode warning that real
+    builds use Keychain/Keystore.
+  - `biometric.canUseBiometric()` — browser-dev: returns `false`
+    by default (rendering the no-biometric variant of Onboarding
+    02). A query string or toggle can override for visual
+    testing.
+  - `biometric.unlock()` — browser-dev: stubbed return.
+- *Onboarding 01 — Connect.* Translate
+  `mobile_onboarding_01_connect.html` → SvelteKit route
+  `/onboarding/connect`. Manual URL entry posts to
+  `/api/v1/pairing/redeem`. QR scan stubbed in browser-dev.
+  Principles card with `[I understand]` acknowledgment
+  (persist user pref). "Don't have a TallyKeep yet?" ghost CTA
+  opens external docs link in a new tab. If user skips past
+  without acknowledging the principles, the unacknowledged-
+  state persists for the Security-health system to surface
+  later (out-of-scope for this iteration — acceptable gap, see
+  Dependencies).
+- *Onboarding 02 — Paired.* Translate the four mockup variants
+  to `/onboarding/paired` with a state machine:
+  - On entry, call `canUseBiometric()`. If false → render
+    `mobile_onboarding_02_paired_no_biometric.html`. If true →
+    render `mobile_onboarding_02_paired.html` (initial).
+  - `[Enable biometric]` triggers `biometric.unlock()`. On
+    success → render `mobile_onboarding_02_paired_biometric_done.html` →
+    `[Continue]` → `/home`.
+  - `[Skip — use passphrase only]` → bottom sheet from
+    `mobile_onboarding_02_paired_skip_confirm.html`. Cancel → back to initial. Confirm
+    "Continue with passphrase only" → flag biometric-not-enabled
+    in user prefs → `/home`.
+- *Daily Unlock.* Translate the two mockups to `/unlock` with a
+  state machine:
+  - On app open with credential present → render
+    `mobile_unlock_biometric.html`; auto-fire
+    `biometric.unlock()`. On success → `/home`. (Skipped if user
+    opted out of biometric or `canUseBiometric()` returned
+    false — render passphrase variant directly.)
+  - "Use passphrase instead" → render
+    `mobile_unlock_passphrase.html`. POST input to
+    `/api/v1/auth/passphrase-validate`. On OK → `/home`. On NO →
+    inline error + retry; after N failures → rate-limit
+    feedback.
+- *Home (empty).* Translate `mobile_home_empty.html` →
+  `/home`. Renders based on Holdings count (0 → empty). Brand
+  mark in app bar, balance hero (`0` + `↻` cycle on `sats`),
+  subdued "Show in fiat" link, "Holdings" section header with
+  outlined `+` button, empty list-card placeholder, bottom nav
+  (Home active, Activity/Holdings disabled, More enabled).
+- *Honest gates per ADR-0007* — every Capacitor-only capability
+  invocation shows a visible "Capacitor needed" gate in
+  browser-dev.
+- *Stub for next iteration* — the `+` button on Home empty
+  no-ops (or opens a placeholder bottom sheet that says "Add
+  Holding flow lands in the next iteration"). Full Add-Holding
+  picker is out-of-scope (see "Pre-bagged for Add Holding"
+  below).
+
+**Brand asset discipline (locked engineering principle per
+`PROCESS.md §2.4` "Consumer discipline"):**
+
+The SvelteKit build consumes brand assets via the indirection
+layer only — colors, icons, spacing, radii, shadows, type. No
+hardcoded values in component files. The structural check: brand
+v2 → v3 must propagate by editing source artifacts + tokens, not
+by grep-and-replace through components. If a value is needed and
+no token exists, add the token (lockstep with the brand lock doc)
+— don't invent in component code.
+
+Sources for this iteration:
+
+- *Color tokens:* `UI/mockups/_shared/tokens.css` — the SvelteKit
+  build imports / consumes this file directly (no parallel copy).
+  Already in sync with `brand/tallykeep_palette_v2_lock.html`
+  (the canonical source for color values + rationale). The
+  working-surface canvas (`brand/tallykeep_palette_canvas.html`)
+  is supplementary — coding agent reads it only if a value or
+  rationale is unclear, never consumes from it directly.
+- *Icons:* import from `brand/identity/*.svg`. The locked set so
+  far includes `icon-canonical.svg`, `icon-solid.svg`,
+  `wordmark-plain.svg`, `wordmark-icony.svg`, and the
+  Holding-type icons holding-account/purse/strongbox/vault.svg
+  (per `brand/README.md` Status table). Wrap in a thin
+  `<Icon name="..." />` component so the consumer-side API stays
+  stable as the icon set grows.
+- *Action / nav / status icons* not yet in `brand/identity/` —
+  the bottom-nav icons (home, activity, holdings, more), the `↻`
+  cycle, and the `+` add are drawn inline in the mockups. For
+  this iteration, the SvelteKit `<Icon>` wrapper component can
+  inline these SVG paths internally with a TODO referencing the
+  upcoming brand-side icon-set iteration (per `brand/README.md`:
+  "next brand work is iconography beyond the brand mark +
+  Holding icons"). Consumers still use `<Icon name="home" />`
+  syntax. When the brand iteration ships the icons to
+  `identity/`, the wrapper swaps to imports with zero
+  consumer-side changes.
+- *Spacing / radii / shadows / type:* `var(--space-*)`,
+  `var(--radius-*)`, `var(--shadow-*)`, `var(--font-*)` from
+  `tokens.css`.
+
+**Small lockstep brand-side change in this iteration:**
+
+- Brand v1 → v2 bump for `tallykeep_wordmark_v1_lock.html`:
+  tighten the wordmark-icony viewBox at the source so the
+  mockup-level override (`viewBox="0 0 450 145"` vs source
+  `0 0 460 145`) becomes unnecessary. Regenerate
+  `brand/identity/wordmark-icony.svg` in lockstep. Update mockup
+  HTML to consume the source viewBox cleanly.
+- *Optional* (defer if not blocking): extend §5 of the brand
+  mark lock doc to sanction the wordmark-icony embedded Y as a
+  dynamic surface alongside the bare canonical icon. The
+  dynamic-mark behavior itself is deferred to
+  `future_iterations.md` "Dynamic brand mark on first-touch
+  surfaces" — for this iteration the wordmark is static. If the
+  Connect screen is going to land the dynamic interaction in
+  the same iteration as the SvelteKit build, the sanction
+  extension lives here; otherwise it lives with the dynamic-
+  mark iteration.
+
+#### Scope (out) — required
+
+- Add-Holding picker popup (the `+` button's destination). Next
+  iteration: Add Holding.
+- Per-Holding-type creation flows (Account / external-watch-only
+  Purse / TallyKeep-managed Purse / Strongbox / Vault). Next
+  iteration.
+- Home populated states (single Holding, multiple Holdings,
+  security-discrepancy banner, fiat-on with currency picker
+  sheet). Later iteration.
+- Send / Receive flows. Later iterations per roadmap.
+- Activity / Categorization. Later iteration.
+- Sweep Policy / Trading view. Later iteration.
+- Settings page. Deferred to its own iteration; "More" tab can
+  navigate to a placeholder or no-op.
+- Security health zone on Home (its own pre-shipping iteration
+  per `future_iterations.md` "Security-health system"). The
+  unacknowledged-principles flow has a known gap here until
+  that iteration ships — acceptable for personal-use phase.
+- Dynamic brand mark interaction on Connect (deferred to
+  `future_iterations.md` "Dynamic brand mark on first-touch
+  surfaces"). Mockup wordmark stays static for this iteration.
+- Hosted-tier onboarding screens (signup, backup-credentials
+  acknowledgment, modified deep-recovery copy). All post-public-
+  ship per `future_iterations.md` "Hosted tier infrastructure".
+- Multi-server per single client. Post-public-ship per
+  `future_iterations.md` "Multi-server per single client".
+- Capacitor wrap, native plugins, app-store distribution.
+  Separate private-ship-gate iteration after this one (per
+  `future_iterations.md` "Capacitor mobile wrapper").
+- Lightning. Deferred per spec module 08.
+- Currency picker sheet for "Show in fiat". Deferred unless it
+  surfaces naturally during Home implementation.
+- Desktop UI for the "Paired devices" panel (which calls
+  `/api/v1/devices/{id}` for revocation). Backend endpoint
+  ships here; UI lands with the desktop iteration.
+
+#### Affected canonical docs
+
+- `01_architecture.md` — `server_label` field already added
+  to §"Configuration model"; implementation must match. Auth-
+  layer-active state is reflected in §"Network security
+  posture" — this iteration ends the no-auth dev-phase
+  relaxation.
+- `04_api_conventions.md` — auth posture changes from no-auth
+  to device-credential-required. Verify cross-cutting
+  documentation matches the implementation.
+- `10_threat_model.md` — Mobile addendum and auth-related
+  sections; verify still consistent with the shipped model.
+- `UI/README.md` — flow inventory mentions Onboarding/Home;
+  verify nothing drifts.
+- `UI/mobile.md` — Onboarding + Daily Unlock + Home (empty)
+  sections already detail target state with §3 gauntlet
+  answers.
+- `decisions/0008-passphrase-and-recovery-model.md` —
+  Accepted; implementation must reflect.
+- `pre-implementation.md` — `pairing-handshake-crypto`
+  remains open with a leading direction. Sharpen specifics
+  during impl; ADR if a load-bearing call deviates.
+- `PROCESS.md §2.4` "Consumer discipline" — engineering rule
+  the coding agent must apply throughout (no hardcoded colors,
+  icons via wrapper, single source of truth).
+- `brand/tallykeep_palette_v2_lock.html` — canonical color
+  source. Read-only for the coding agent (consume via
+  `tokens.css`; canvas is supplementary).
+- `brand/identity/*.svg` — canonical icon sources. Read-only;
+  imported via `<Icon>` wrapper.
+
+#### Affected mockups (all validated 2026-05-10)
+
+- `mobile_onboarding_01_connect.html`
+- `mobile_onboarding_02_paired.html`
+- `mobile_onboarding_02_paired_biometric_done.html`
+- `mobile_onboarding_02_paired_skip_confirm.html`
+- `mobile_onboarding_02_paired_no_biometric.html`
+- `mobile_unlock_biometric.html`
+- `mobile_unlock_passphrase.html`
+- `mobile_home_empty.html`
+
+#### Tasks — required
+
+Backend (recommended order: smallest dependencies first):
+
+1. Add `server_label` to `configuration.toml` schema +
+   load-from-config + expose via `GET /api/v1/server/info` (or
+   reuse existing health/info endpoint if cleaner). Tests.
+2. Alembic migration: `paired_device` table.
+3. Implement `POST /api/v1/pairing/issue` (server-side token
+   emit) and `POST /api/v1/pairing/redeem` (phone-side token
+   exchange → credential issuance). Tests.
+4. Implement `POST /api/v1/auth/passphrase-validate` per
+   ADR-0008. Tests.
+5. Implement auth middleware on all previously-unauthed
+   endpoints (per `01_architecture.md` §"Network security
+   posture"). Tests.
+6. Implement `DELETE /api/v1/devices/{credential_id}`
+   (revocation). Tests.
+
+Frontend (SvelteKit, after backend endpoints exist):
+
+7. Scaffold `NativeBridge` interface + browser-dev stubs.
+8. `/onboarding/connect` from `mobile_onboarding_01_connect.html`.
+9. Wire pairing handshake: manual URL → `/api/v1/pairing/redeem`
+   → store device credential via `NativeBridge.secureStorage`.
+   Persist principles-card ack in user prefs.
+10. `/onboarding/paired` state machine (initial / biometric-done
+    / skip-confirm / no-biometric). Wire `biometric.unlock()`
+    for enable. Bottom sheet for skip-confirm.
+11. `/unlock` state machine (biometric default, passphrase
+    fallback). Wire `passphrase-validate` POST.
+12. `/home` from `mobile_home_empty.html`. Bottom nav. `+`
+    button = stub for next iteration. "Show in fiat" link =
+    stub.
+13. End-to-end smoke test: fresh install → pair manually →
+    biometric setup (browser-dev: stub) → unlock → home;
+    skipped-biometric path → unlock with passphrase → home.
+
+Brand:
+
+14. Brand v1 → v2 lock-doc bump for the wordmark-icony viewBox.
+    Regenerate `brand/identity/wordmark-icony.svg`. Update
+    mockup HTML to consume cleanly.
+
+Closeout (per PROCESS.md §2.7 stage 5, only on Rémy's
+greenlight after stage-4):
+
+15. Regenerate `api/openapi.yaml`.
+16. Run `tools/check-spec.ps1` (or `.sh`) — must pass.
+17. Edit this file: remove shipped scope, leave a brief
+    `## Shipped <date> (commit ...)` record under the iteration
+    block.
+18. Commit closeout in a single change. Message references
+    iteration name + Rémy-greenlight date.
+
+#### Acceptance / done-when — required
+
+*Frontend* (open SvelteKit dev server at 360×800):
+
+- `/onboarding/connect` matches `mobile_onboarding_01_connect.html`.
+  Principles card shows. `[I understand]` dismisses permanently
+  (re-visit confirms). Manual URL entry path posts to
+  `/api/v1/pairing/redeem` and stores the issued credential.
+- `/onboarding/paired` renders the variant matching
+  `canUseBiometric()`. All four mockup states reachable. State
+  transitions match the spec (initial → biometric-done OR
+  skip-confirm → confirmed-skip → `/home`).
+- `/unlock` matches `mobile_unlock_biometric.html` initially.
+  "Use passphrase instead" → `mobile_unlock_passphrase.html`.
+  Valid passphrase unlocks. Wrong passphrase shows inline
+  error; N failures trigger rate-limit feedback.
+- `/home` matches `mobile_home_empty.html`. Balance `0 sats`.
+  `↻` icon cycles to BTC (`0.00000000`). "Show in fiat" link
+  present, muted, stub on tap. `+` button stub. Bottom nav with
+  the correct active/disabled/enabled states.
+- Honest gates per ADR-0007 — visible "Capacitor needed" banner
+  on every Capacitor-only capability invocation in dev mode.
+
+*Backend* (Swagger UI walk-through + `.ps1` smoke tests):
+
+- `GET /api/v1/server/info` returns `{server_label}`.
+- `POST /api/v1/pairing/issue` returns a one-time token.
+- `POST /api/v1/pairing/redeem` with valid token → 200 + device
+  credential. Expired/invalid/redeemed token → 401.
+- `POST /api/v1/auth/passphrase-validate` — correct passphrase
+  → 200, wrong → 401, after N attempts → 429.
+- `DELETE /api/v1/devices/{id}` revokes; subsequent requests
+  with that credential → 401.
+- Auth middleware: un-credentialed request to a protected
+  endpoint → 401. Health/info/pairing endpoints stay un-authed.
+- `api/openapi.yaml` regenerated and committed with closeout.
+
+*Spec:*
+
+- `tools/check-spec.ps1` (or `.sh`) passes.
+- This file reflects shipped state after closeout.
+
+*Brand asset discipline (per `PROCESS.md §2.4` "Consumer
+discipline"):*
+
+- Grep across the SvelteKit source tree for hex color literals
+  (`#[0-9A-Fa-f]{3}\b` and `#[0-9A-Fa-f]{6}\b`) and inline
+  `<svg>` blocks. Only `tokens.css` declarations, brand identity
+  SVG sources, and the `<Icon>` wrapper's internal inline-icon
+  table match. No hardcoded color values or inline SVG paths in
+  feature component files.
+- Theme-swap mental check: pick one token (e.g.
+  `--color-primary`), change it in `tokens.css` only, rebuild,
+  confirm the change propagates everywhere it's used without any
+  other source edit needed.
+
+#### Dependencies
+
+- *`pre-implementation.md` `pairing-handshake-crypto`* — leading
+  direction is in place (endpoint URL + single-use ephemeral
+  token). Coding agent implements per that direction. If a
+  load-bearing call deviates (e.g. switch to PAKE-style
+  handshake), an ADR + Rémy arbitration is required mid-
+  iteration.
+- *ADR-0003* (private-ship gate) — locked. This iteration ships
+  part of the private-ship-gate auth-layer scope.
+- *ADR-0007* (browser-first with NativeBridge) — locked. Pattern
+  applies throughout.
+- *ADR-0008* (passphrase + recovery model) — locked.
+- *Security-health system* — known gap. The
+  unacknowledged-principles cycle doesn't fully close until
+  that iteration ships. Acceptable for personal-use phase
+  (Rémy as sole user); required before public-ship.
+- *Brand v1 wordmark-icony viewBox* — not blocking. Mockups
+  work with the override. Source fix is a small lockstep change
+  inside this iteration.
+
+#### Verification (Rémy)
+
+*Backend:* run the project's `.ps1` smoke-test suite against
+the running backend → all green. Then Swagger UI walk-through of
+the new endpoints (`server/info`, `pairing/issue`,
+`pairing/redeem`, `auth/passphrase-validate`, `devices/{id}`).
+Verify auth middleware on at least one previously-unauthed
+endpoint.
+
+*Frontend:* open SvelteKit dev server, set viewport to 360×800
+(mid Galaxy A baseline per `UI/mockups/README.md` §5), walk:
+
+1. Fresh install / cold state → `/onboarding/connect`. Confirm
+   visual match. Test manual URL entry path. Confirm principles
+   `[I understand]` persistence.
+2. Post-pair → `/onboarding/paired`. Confirm variant matches
+   `canUseBiometric()`. Test enable-biometric path (browser-dev
+   stubbed). Test skip path (bottom sheet appears, confirm
+   proceeds to home).
+3. Re-open app (credential present) → `/unlock`. Test biometric
+   path. Test passphrase fallback against backend. Confirm
+   wrong-passphrase + rate-limit behavior.
+4. `/home` renders empty. Visual check vs
+   `mobile_home_empty.html`. Confirm `↻` cycles sats / BTC.
+5. Honest gates: confirm each Capacitor-only capability shows
+   the dev-mode gate banner.
+
+#### Closeout
+
+The agent does **not** start closeout until Rémy gives an
+explicit greenlight after stage-4 validation. On greenlight:
+
+1. Regenerate `api/openapi.yaml` from the running backend (per
+   `PROCESS.md §2.2`). Manual edits forbidden.
+2. Run `tools/check-spec.ps1` (or `.sh`) — must pass.
+3. Edit this file: remove shipped scope items; leave a brief
+   `## Shipped <date> (commit ...)` record under this iteration
+   block.
+4. Collaboratively promote the next iteration from the roadmap
+   below (Rémy picks; do not pick alone). Sharpen the next
+   iteration block using the template.
+5. Commit closeout in a single change. Message references the
+   iteration name and the Rémy-greenlight date.
+
+Full sequence: `PROCESS.md §2.7` stages 3–6.
 
 ---
 
-### Current bottleneck — design iteration with Rémy
+### Pre-bagged for the next iteration (Add Holding)
 
-If you are an agent landing here expecting code work: there is none
-ready. The current bottleneck is **design conversations between Rémy
-and the agent**, screen by screen, that produce sharpened iteration
-scope plus mockups under `UI/mockups/`. Only after that does coding
-work appear in this file.
+**Transient.** Decisions sharpened in earlier sessions that
+belong to the Add Holding iteration, not to the currently active
+one. Fold into Scope (in) when the Add Holding iteration is
+sharpened. Remove from this section when folded.
 
-The previous Welcome + Home-empty draft was pulled back: sharpening
-individual screens before walking through the existing wireframes
-together would have skipped a step. Each iteration's scope is
-co-sharpened in conversation against the existing wireframes (bulked
-into multi-screen HTMLs in `archive/UI/`, with unclear validated
-state). The next session is that walk-through, not a pre-spec'd
-iteration.
-
-### What an arriving agent should do
-
-The boot sequence is in `PROCESS.md §6`. Don't duplicate it here.
-The thing specific to the current bottleneck:
-
-- If Rémy is in the conversation, ask which screen-flow he wants to
-  sharpen first (the roadmap below is the candidate list).
-- If Rémy is not in the conversation, do not invent scope. Report
-  the current state and stop.
-
-### Decisions already pre-bagged for the first iterations
-
-**Transient.** This section captures decisions sharpened during
-brainstorm sessions that haven't yet been folded into a concrete
-iteration. When the first Onboarding + Home iteration is
-sharpened using the template above, **these bullets fold into
-its Scope (in) section** and this transient block is removed.
-It's not canonical and shouldn't be referenced from outside this
-file.
-
-- Home empty's four Add affordances are a popup on Add-Holding
-  tap, not directly inline on the empty state.
-- Watch-only Purse onboarding accepts xpub or descriptor only,
-  not single addresses (per ADR-0006, slug `purse-flavors`).
+- Home empty's `+` button opens a popup with four type choices
+  (Account / Purse / Strongbox / Vault). The four affordances
+  are not inline on the empty Home — they live in the popup.
+- Watch-only Purse onboarding accepts **xpub or descriptor
+  only**, not single addresses (per ADR-0006, slug
+  `purse-flavors`).
 - TallyKeep-managed Purse creation: the "Create a TallyKeep
   wallet" affordance is gated client-side on the device's
   capability to generate and securely store a seed; browser
-  builds hide it with an install-the-app message (per ADR-0006).
-- Mobile baseline viewport: 360 × 800 (per `UI/mockups/README.md`).
-- *(Onboarding screen 1 — Connect)* Welcome screen killed; the
-  Connect screen is the first-touch surface. Single question:
-  "Connect to your TallyKeep" — QR scan primary, manual URL
-  entry secondary, "don't have one yet" ghost CTA opens external
-  docs link. Persistent acknowledgment-required principles card
-  with three lines (open source / no accounts / TallyKeep never
-  holds your keys) and an [I understand] button. Card appears
-  on Screen 1 only. If the user clicks [I understand], the
-  principles are dismissed permanently. If the user skips past
-  without acknowledging, the principles surface as an item in
-  the **Security health** zone on Home (per the corrected
-  acknowledgment flow sharpened 2026-05-10).
-- *(Cross-iteration dependency — Security health system)* The
-  full re-surface cycle for the principles acknowledgment (and
-  the seed-backup warning, Strongbox frequent-usage, Vault
-  mismatch, hosted-tier privacy ack, future Blueprint findings)
-  depends on the Security-health system landing — captured in
-  `future_iterations.md` "Security-health system", milestone
-  pre-shipping. For personal-use phase the gap is acceptable
-  (Rémy as sole user will acknowledge on first launch). Public-
-  ship requires the Security-health iteration to have shipped
-  for the unacknowledged-principles cycle to close cleanly.
-- *(Onboarding screen 1 — Connect)* Wordmark-icony at 280 px
-  is the brand surface; intended to land as the dynamic-mark
-  surface (tap-to-regenerate-grain) when implemented in
-  SvelteKit. Mockup is static per `UI/mockups/README.md`. The
-  brand v1 → v2 lock-doc bump that sanctions the wordmark-icony
-  embedded Y as a dynamic surface is part of this iteration's
-  scope (per `future_iterations.md` "Dynamic brand mark on
-  first-touch surfaces").
-- *(Onboarding screen 2 — Paired)* Single screen combining
-  pair-success confirmation + biometric setup. Initial state
-  shows green checkmark, "Paired with your TallyKeep", server
-  label, then a "Lock TallyKeep with your biometric" prompt
-  with [Enable biometric unlock] primary and [Skip for now]
-  text-link. Skip triggers a bottom-sheet modal asking for
-  explicit confirmation. Biometric is opt-in (not required) —
-  tradeoff per `pre-implementation.md` `traveling-user-recovery`.
-- *(Onboarding screen 2 — Paired)* Brand-strip continues with
-  the same 280-px wordmark; the dynamic-mark behavior is
-  Screen-1-only per the "first-touch only" sanctioning.
-- *(Backend, Onboarding screen 2)* `server_label` field added
-  to `01_architecture.md` §"Configuration model". Operator sets
-  it during stack installation; surfaced to clients on pairing.
-  Optional; absent ⇒ clients render endpoint or connection-ID
-  only.
-- *(Hosted-tier, deferred)* Connection-ID format favors
-  word-pair-encoded memorable strings (e.g. `crisp-river-7842`)
-  over raw UUID — non-predictable AND human-handleable. Captured
-  in `future_iterations.md` "Hosted tier infrastructure".
-- *(Auth-layer scope)* When this iteration sharpens for code, the
-  pairing-handshake crypto choice (`pre-implementation.md`
-  `pairing-handshake-crypto`) needs to be settled, because it
-  shapes the backend's pairing endpoints and the device-credential
-  format.
-- *(Unlock + recovery model — locked by ADR-0008, two-layer)*
-  Per `decisions/0008-passphrase-and-recovery-model.md`. Layer 1:
-  daily unlock = biometric default + "Use passphrase instead"
-  text-link fallback on the lock screen. Phone forwards the
-  typed passphrase to the backend for validation; phone never
-  stores the passphrase. Layer 2: deep recovery when the local
-  credential is fully lost = re-pair via QR (same flow as
-  initial pairing). One passphrase per stack — the user has one
-  secret to remember (the server's). Communicated on the
-  biometric-done onboarding screen via the facts card
-  ("Daily unlock: Biometric · passphrase fallback" /
-  "Deep recovery: Re-pair from desktop") plus a short explainer.
-  Iteration scope includes the daily-unlock mockups
-  (`mobile_unlock_biometric.html`, `mobile_unlock_passphrase.html`).
-- *(Backend, auth layer)* Backend exposes
-  `POST /api/v1/auth/passphrase-validate` (or equivalent) for the
-  phone to call during fallback unlock. Rate-limited to prevent
-  brute-force. Endpoint compares Argon2id of input against the
-  stored derivation; never stores or logs the raw passphrase.
-  Exact shape + comparison method + rate-limit policy sharpen
-  during the auth-layer iteration (private-ship gate per
-  ADR-0003).
-- *(Onboarding screen 2 — `no_biometric` variant)* When
-  `NativeBridge.canUseBiometric()` returns false at Screen 02
-  entry, render `mobile_onboarding_02_paired_no_biometric.html`
-  instead of the biometric-prompt variant. Single [Continue]
-  CTA; threat-model copy is honest about OS-lock-only protection
-  plus recovery path.
-- *(Screen 02 wording — warning placement)* The threat-model
-  explainer ("Without it, anyone who can unlock your phone...")
-  appears ONLY in the skip-confirm bottom sheet, not on the
-  initial Paired screen. Banking-grade discipline: warnings on
-  the path that warrants them, not on the default path.
-- *(Home empty — banking-grade structure)* Sharpened across
-  three passes 2026-05-10. First pass (centered hero + big
-  primary CTA) rejected as Phoenix-aesthetic. Second pass
-  (`+ Add` text-link) rejected on translation grounds. Final:
-  app-bar wordmark; hero on its own white surface, left-aligned
-  mono amount with a small single-arrow rotate icon stacked
-  above the `sats` label, subdued `Show in fiat` link below;
-  "Holdings" section header with right-aligned 28-px circular
-  filled `+` button (translation-free); empty list-card
-  placeholder ("No Holdings yet"); bottom nav. No tagline, no
-  explainer copy, no big shiny button. Section structure
-  preserved at zero state. The Add-Holding popup (four type
-  choices: Account / Purse / Strongbox / Vault) is its own
-  surface, sharpens during the Add-Holding iteration.
-- *(Affordance discipline — translation-free where unambiguous)*
-  Sharpened during Home-empty session 2026-05-10. Prefer icon-
-  only or symbol-only affordances over labeled buttons when
-  the meaning is unambiguous from context. Labels stay where
-  they carry semantic content that can't be reduced to a
-  symbol (primary CTAs: "Enable biometric unlock", "Continue",
-  "Unlock"). This compounds positively across LatAm/Africa
-  translation surfaces.
-- *(Bottom nav)* Present from the empty state per Rémy's call.
-  Four tabs: Home (active), Activity (greyed when empty),
-  Holdings (greyed when empty), More (enabled — Settings always
-  works). Exact tab set is not locked; sharpens with the
-  Settings + Activity iterations.
-- *(Unit + currency on Home)* Sats default, unit pill cycles
-  sats / BTC on tap. Show-fiat link opens a currency picker
-  sheet; once a fiat is selected, the fiat line appears below
-  the sats amount with source attribution per `UI/README.md`.
-  The picker sheet sharpens in the same iteration or with
-  Settings.
-
-When the next iteration is sharpened, this section gets filled
-in using the template above and the bullets above migrate into
-it.
+  builds hide it with an install-the-app message (per
+  ADR-0006).
 
 ---
 
