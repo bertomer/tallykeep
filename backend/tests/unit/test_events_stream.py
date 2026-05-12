@@ -59,6 +59,7 @@ def client_no_bus() -> Iterator[TestClient]:
     app = create_app()
     app.state.secret_store = store
     app.state.event_bus = None
+    app.state.auth_disabled = True
     with TestClient(app) as c:
         yield c
 

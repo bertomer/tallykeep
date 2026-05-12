@@ -341,10 +341,32 @@ removed.
 - **Status:** sharpened-ready-to-promote
 - **Milestone:** **pre-shipping (private-ship enabler).** Promotes
   to `next_iteration.md` once the mobile UI is fine-tuned in browser
-  to Rémy's satisfaction. Concrete iteration includes: integrate
-  Capacitor, swap NativeBridge stubs for real plugin calls, build
-  the authentication layer, build the security-health seed-backup
-  minimum for `seed-backup-disclosure`, sideload to Rémy's phone.
+  to Rémy's satisfaction. Concrete iteration includes:
+    - Integrate Capacitor; build pipeline for the wrapped app.
+    - Swap NativeBridge stubs for real plugin calls on the
+      Capacitor branch (Keychain/Keystore, biometric, camera,
+      share, clipboard).
+    - **Remove the dev-mode `localStorage` fallback for
+      `secureStorage`** that the Onboarding + Daily Unlock + Home
+      iteration's NativeBridge browser branch ships as a dev
+      crutch. Grep the codebase for
+      `// TODO(browser-pwa-auth-model)` markers and resolve each.
+    - **Implement the browser-PWA long-term auth model** per the
+      resolution of `pre-implementation.md` `browser-pwa-auth-model`
+      (leading direction: per-session passphrase login, no
+      pairing, no persistent credential, session token in memory
+      only). This includes simplifying or removing the Connect /
+      Paired flow from browser PWA routing and adding a
+      browser-PWA-specific entry screen.
+    - Build the authentication layer hardening for the
+      Capacitor side (the dev-phase auth layer shipped in the
+      Onboarding iteration is sufficient for personal-use; review
+      and harden as needed for sideload).
+    - Build the security-health seed-backup minimum for
+      `seed-backup-disclosure`.
+    - Sideload to Rémy's phone for private-ship.
+  Blocked by: arbitration on `browser-pwa-auth-model` in
+  `pre-implementation.md` (gates the browser-branch cleanup).
 
 ---
 
@@ -437,9 +459,20 @@ removed.
     - Vault metadata mismatch
     - Address reuse / dust / round-number outputs (Blueprint findings)
     - Hosted-tier privacy boundary not acknowledged
-    - Principles acknowledgment not yet given — informational, joins
-      after Onboarding screen 01 skip (per `UI/mobile.md` Onboarding
-      Notes 2026-05-10)
+    - Principles acknowledgment not yet given — informational,
+      joins after Onboarding screen 01 skip (per `UI/mobile.md`
+      Onboarding Notes 2026-05-10). **This iteration is the
+      first to need persistent stack-bound state for unack'd
+      items** — the Onboarding + Daily Unlock + Home (empty)
+      iteration deliberately deferred the persistence question
+      to here. Decide the model when sharpening: a generic
+      backend preferences endpoint
+      (`GET /api/v1/preferences` + `PUT /api/v1/preferences/{key}`)
+      vs an open-items table keyed by item-type (more aligned
+      with the Security-health surface). Latter is probably
+      cleaner because the items are heterogeneous (acks,
+      warnings, dismissals) and benefit from a uniform
+      schema.
 - **Sketch:** A dedicated section on Home (heading: **"Security
   health"**) and/or a dedicated tab showing all open security and
   acknowledgment items, severity-tagged where applicable,

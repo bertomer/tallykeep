@@ -15,6 +15,7 @@ class UserProfileResponse(BaseModel):
     feature_flags: dict[str, bool] = Field(default_factory=dict)
     base_currency: str
     locale: str
+    principles_acknowledged_at: datetime | None = None
     created_at: datetime
     updated_at: datetime
 
@@ -25,6 +26,7 @@ class UserProfileUpdate(BaseModel):
     feature_flags: dict[str, bool] | None = None
     base_currency: str | None = Field(default=None, min_length=3, max_length=3)
     locale: str | None = Field(default=None, min_length=2, max_length=10)
+    principles_acknowledged: bool | None = None
 
 
 class FeatureFlagsResponse(BaseModel):

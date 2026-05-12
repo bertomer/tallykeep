@@ -24,11 +24,11 @@ def get_secret_store(request: Request) -> SecretStore:
 
 
 def get_session_factory(request: Request) -> sessionmaker[Session]:
+    from fastapi import HTTPException
+
     factory = getattr(request.app.state, "session_factory", None)
     if factory is None:
-        raise RuntimeError(
-            "Database session factory not initialized on app.state"
-        )
+        raise HTTPException(status_code=503, detail="Database not configured")
     return factory
 
 

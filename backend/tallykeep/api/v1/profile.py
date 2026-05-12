@@ -37,6 +37,7 @@ async def patch_profile(
         body.feature_flags is None
         and body.base_currency is None
         and body.locale is None
+        and body.principles_acknowledged is None
     ):
         raise HTTPException(status_code=422, detail="empty update")
 
@@ -46,6 +47,7 @@ async def patch_profile(
             feature_flags=body.feature_flags,
             base_currency=body.base_currency,
             locale=body.locale,
+            principles_acknowledged=body.principles_acknowledged,
         )
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc

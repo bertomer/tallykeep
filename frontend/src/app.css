@@ -1,0 +1,68 @@
+/* Brand design tokens (PROCESS.md §2.4 — consumed directly, no parallel copy) */
+/* @import must precede @tailwind directives for postcss-import to inline correctly */
+@import '../../specs/UI/mockups/_shared/tokens.css';
+
+/* Tailwind base — layout utilities */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Mobile-first base styles */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-family: var(--font-sans);
+  font-size: var(--font-size-base);
+  line-height: var(--line-height-default);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Screen container — mobile viewport, centered in browser dev mode */
+.phone-screen {
+  display: flex;
+  flex-direction: column;
+  min-height: 100dvh;
+  max-width: var(--mobile-viewport-width);
+  margin: 0 auto;
+  background: var(--color-bg);
+  position: relative;
+  overflow: hidden;
+}
+
+/* Safe-area padding for devices with notches */
+.safe-top    { padding-top: var(--mobile-safe-top); }
+.safe-bottom { padding-bottom: var(--mobile-safe-bottom); }
+
+/* App-bar */
+.app-bar {
+  height: var(--mobile-app-bar);
+  display: flex;
+  align-items: center;
+  padding: 0 var(--space-4);
+  background: var(--color-surface);
+  border-bottom: 1px solid var(--color-border);
+  flex-shrink: 0;
+}
+
+/* Scrollable body */
+.screen-body {
+  flex: 1;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Bottom nav placeholder */
+.bottom-nav-spacer {
+  height: var(--mobile-bottom-nav);
+  flex-shrink: 0;
+}

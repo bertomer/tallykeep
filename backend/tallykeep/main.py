@@ -13,10 +13,12 @@ from fastapi import FastAPI
 import logging
 
 from tallykeep import __version__
+from tallykeep.api.auth_middleware import AuthMiddleware
 from tallykeep.api.lock_middleware import LockMiddleware
 from tallykeep.api.v1 import (
     addresses as addresses_routes,
     analysis as analysis_routes,
+    auth as auth_routes,
     banking as banking_routes,
     configuration as configuration_routes,
     custodial_providers as custodial_providers_routes,
@@ -29,7 +31,9 @@ from tallykeep.api.v1 import (
     jobs as jobs_routes,
     ledger_entries as ledger_entries_routes,
     lightning as lightning_routes,
+    pairing as pairing_routes,
     profile as profile_routes,
+    server_info as server_info_routes,
     trading as trading_routes,
     unlock,
     utxos as utxos_routes,
@@ -150,13 +154,18 @@ def create_app() -> FastAPI:
         lifespan=_lifespan,
     )
 
-    # 423-Locked middleware sits in front of every router so unlock state is
-    # enforced uniformly.
+    # Middleware registration order in Starlette: last registered = outermost
+    # (runs first on the way in). LockMiddleware is outermost: a locked server
+    # returns 423 before auth is checked. AuthMiddleware is inner.
+    app.add_middleware(AuthMiddleware)
     app.add_middleware(LockMiddleware)
 
     # Implemented in M0–M3.1
     app.include_router(health.router, prefix="/api/v1")
     app.include_router(unlock.router, prefix="/api/v1")
+    app.include_router(server_info_routes.router, prefix="/api/v1")
+    app.include_router(pairing_routes.router, prefix="/api/v1")
+    app.include_router(auth_routes.router, prefix="/api/v1")
     app.include_router(profile_routes.router, prefix="/api/v1")
     app.include_router(feature_flags_routes.router, prefix="/api/v1")
     app.include_router(configuration_routes.router, prefix="/api/v1")

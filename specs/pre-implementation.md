@@ -280,6 +280,88 @@ standalone iteration — fold it into a "brand stabilises" iteration.
 
 ---
 
+### `browser-pwa-auth-model`
+
+**Status:** open (must resolve before the Capacitor-mobile-wrapper
+iteration finishes; private-ship-event blocker per ADR-0003)
+
+**Item:** ADR-0007 establishes browser-first development with
+NativeBridge stubs and the "honest gates" principle ("the browser
+does not pretend to have capabilities it doesn't"). But the
+long-term auth model for the shipped browser PWA isn't fully
+specified. Current dev-mode practice: the NativeBridge browser
+branch implements `secureStorage` via a `localStorage` fallback so
+pairing + device-credential persistence + unlock flow can be
+iterated against in browser without a Capacitor build. **This is
+a dev crutch, not a shipped behavior** — `localStorage` is not a
+secure store, browsers do not have Keychain. The Capacitor-wrap
+iteration must remove this crutch and replace the browser branch
+with the long-term model. This item is what that long-term model
+needs to be.
+
+**Leading direction (Claude + Rémy, sharpened during
+onboarding-implementation feedback 2026-05-10):** browser PWA is a
+**per-session client**, not a paired device. Concretely:
+
+- No pairing concept in browser PWA. The Connect / Paired
+  onboarding screens are Capacitor-only flows. Browser PWA does
+  not show them.
+- No persistent device credential. No biometric. (Browser cannot
+  reliably integrate with platform biometric; WebAuthn is its own
+  separate decision.)
+- Each session: user enters the **server passphrase** at app
+  open → backend validates via the existing
+  `passphrase-validate` endpoint → backend issues a
+  **short-lived session token** held in browser memory only.
+  Token expires when the tab closes or its TTL elapses; next
+  visit, user re-authenticates.
+- Browser PWA's entry screen is a simplified
+  "Enter server URL + passphrase" form, not the Connect → Paired
+  flow.
+- All other flows (Home, Holding detail, Activity, etc.) work
+  the same as Capacitor against the same backend, authenticated
+  via the session token instead of the long-lived device
+  credential. Read-only operations are full-functional; write
+  operations that require signing (PSBT signing for Strongbox /
+  Vault, TallyKeep-managed Purse spends) remain Capacitor-only
+  per ADR-0006 / ADR-0007 gating.
+
+**Why this needs arbitration before the Capacitor-wrap iteration
+finishes:**
+
+- The Capacitor-wrap iteration swaps NativeBridge stubs for real
+  implementations on the Capacitor side. The browser branch must
+  also change, but to **what** depends on this decision.
+- If per-session-passphrase-login is the model, the browser
+  PWA's onboarding flow diverges from Capacitor's. Routing logic
+  in the SvelteKit build needs to know which client it's serving
+  and gate the Connect / Paired screens accordingly.
+- If we hard-gate the browser PWA out of secure operations
+  entirely (read-only viewing or nothing), the model is simpler
+  but the browser PWA becomes a very narrow surface — probably
+  too narrow for the LatAm/Africa target market that includes
+  users without a Capacitor-app distribution path.
+
+**Open part — full session needed:**
+
+- Confirm per-session-passphrase-login as the model, or consider
+  stronger gates (read-only browser PWA; no-browser-PWA-at-all
+  hardening; WebAuthn as a complementary mechanism).
+- Session token format + TTL + refresh policy.
+- Cross-cutting impact on `UI/README.md` flow inventory: which
+  flows are full-functional in browser PWA vs Capacitor-only? A
+  comprehensive matrix would help future-iteration scoping.
+- Coding-side hygiene: the dev-mode `localStorage` fallback in
+  the current iteration's NativeBridge implementation must
+  carry a `// TODO(browser-pwa-auth-model)` comment so this
+  slug is back-referenced from code. The Capacitor-wrap
+  iteration grep-audits these TODOs as part of its cleanup.
+
+**Decision:** ___ (pending session)
+**Decided on:** ___
+
+---
+
 ## Migration log (one-time, 2026-05)
 
 The previous "Decided" section of this file is removed under the

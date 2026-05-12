@@ -72,6 +72,7 @@ def client(monkeypatch: pytest.MonkeyPatch) -> Iterator[TestClient]:
 
     app = create_app()
     app.state.secret_store = store
+    app.state.auth_disabled = True  # tests don't carry device credentials
     with TestClient(app) as test_client:
         yield test_client
 
@@ -118,6 +119,7 @@ def app_with_db(
     app = create_app()
     app.state.secret_store = store
     app.state.session_factory = factory
+    app.state.auth_disabled = True  # integration tests use real pairing when needed
 
     with TestClient(app) as test_client:
         yield test_client, factory
@@ -170,6 +172,7 @@ def app_with_db_and_node(
     app.state.secret_store = store
     app.state.session_factory = factory
     app.state.node_adapter = node
+    app.state.auth_disabled = True
 
     with TestClient(app) as test_client:
         yield test_client, factory, node

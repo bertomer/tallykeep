@@ -20,6 +20,7 @@ class UserProfile:
     feature_flags: dict[str, bool] = field(default_factory=dict)  # overrides only
     base_currency: str = "EUR"
     locale: str = "en"
+    principles_acknowledged_at: datetime | None = None
     created_at: datetime | None = None
     updated_at: datetime | None = None
 

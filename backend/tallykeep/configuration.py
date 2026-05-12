@@ -25,6 +25,11 @@ class Settings(BaseSettings):
     api_host: str = Field(default="0.0.0.0")
     api_port: int = Field(default=8000)
 
+    # Human-readable label for this TallyKeep instance (spec 01 §"Configuration model").
+    # Operator sets it at stack deployment; surfaced to clients on pairing via
+    # GET /api/v1/server/info. Optional — absent means clients render the endpoint only.
+    server_label: str = Field(default="")
+
     # Network bindings reserved for later milestones; declared here so config tests
     # can assert their presence without forcing implementation now.
     database_url: str = Field(default="")

@@ -75,21 +75,49 @@ try {
 }
 
 
+# --- 2b. Pair smoke-test device -----------------------------------------------
+
+Section "2b. Pair smoke-test device (obtain device credential for auth)"
+$issueResp = Invoke-RestMethod -Method Post -Uri "$BaseUrl/api/v1/pairing/issue"
+$pairingToken = $issueResp.pairing_token
+$redeemBody = @{ pairing_token = $pairingToken; device_label = "smoke-test" } | ConvertTo-Json -Compress
+$redeemResp = Invoke-RestMethod -Method Post -Uri "$BaseUrl/api/v1/pairing/redeem" `
+    -ContentType 'application/json' -Body $redeemBody
+$deviceCredential = $redeemResp.device_credential
+$Headers = @{ Authorization = "Bearer $deviceCredential" }
+Show "device_id"   $redeemResp.device_id
+Show "credential"  ($deviceCredential.Substring(0, 8) + "...")
+
+
 # --- 3. Profile / feature-flags / configuration -------------------------------
 
 Section "3. Profile (auto-creates singleton on first GET)"
-$profile = Invoke-RestMethod -Uri "$BaseUrl/api/v1/profile"
+$profile = Invoke-RestMethod -Uri "$BaseUrl/api/v1/profile" -Headers $Headers
 Show "base_currency" $profile.base_currency
 Show "locale"        $profile.locale
+
+Section "3b. Principles acknowledgment (principles_acknowledged_at)"
+Show "acked_at before"   ($null -eq $profile.principles_acknowledged_at)
+$ackedProfile = Invoke-RestMethod -Method Patch -Uri "$BaseUrl/api/v1/profile" `
+    -ContentType 'application/json' `
+    -Body '{"principles_acknowledged":true}' `
+    -Headers $Headers
+Show "acked_at after"    ($null -ne $ackedProfile.principles_acknowledged_at)
+# Idempotency: second patch must not change the timestamp.
+$ackedProfile2 = Invoke-RestMethod -Method Patch -Uri "$BaseUrl/api/v1/profile" `
+    -ContentType 'application/json' `
+    -Body '{"principles_acknowledged":true}' `
+    -Headers $Headers
+Show "acked_at idempotent" ($ackedProfile.principles_acknowledged_at -eq $ackedProfile2.principles_acknowledged_at)
 
 Section "4. Set a feature-flag override"
 $body = @{ feature_flags = @{ "banking.rbf.enabled" = $true } } | ConvertTo-Json -Compress -Depth 3
 $profile = Invoke-RestMethod -Method Patch -Uri "$BaseUrl/api/v1/profile" `
-    -ContentType 'application/json' -Body $body
+    -ContentType 'application/json' -Body $body -Headers $Headers
 Show "rbf override stored" ($profile.feature_flags."banking.rbf.enabled" -eq $true)
 
 Section "5. Feature flags (defaults + override applied)"
-$flags = Invoke-RestMethod -Uri "$BaseUrl/api/v1/feature-flags"
+$flags = Invoke-RestMethod -Uri "$BaseUrl/api/v1/feature-flags" -Headers $Headers
 Show "trading.enabled"                          $flags.flags."trading.enabled"
 Show "banking.custom_fee_rate"                  $flags.flags."banking.custom_fee_rate.enabled"
 Show "banking.coin_selection_per_payment"       $flags.flags."banking.coin_selection_per_payment_override"
@@ -98,7 +126,7 @@ Show "banking.rbf (overridden to true)"         $flags.flags."banking.rbf.enable
 Section "6. Configuration -- set bitcoind RPC host"
 $body = @{ bitcoind = @{ rpc_host = "192.168.1.42"; rpc_port = 8332 } } | ConvertTo-Json -Compress -Depth 4
 $config = Invoke-RestMethod -Method Patch -Uri "$BaseUrl/api/v1/configuration" `
-    -ContentType 'application/json' -Body $body
+    -ContentType 'application/json' -Body $body -Headers $Headers
 Show "bitcoind.rpc_host" $config.bitcoind.rpc_host
 Show "bitcoind.rpc_port" $config.bitcoind.rpc_port
 
@@ -129,7 +157,7 @@ $body = @{
 } | ConvertTo-Json -Compress -Depth 6
 try {
     $purse = Invoke-RestMethod -Method Post -Uri "$BaseUrl/api/v1/holdings/purse" `
-        -ContentType 'application/json' -Body $body
+        -ContentType 'application/json' -Body $body -Headers $Headers
     Show "id"                $purse.id
     Show "holding_type"      $purse.holding_type
     Show "descriptor_ids[0]" $purse.descriptor_ids[0]
@@ -148,25 +176,25 @@ try {
 # --- 8. Inspect ----------------------------------------------------------------
 
 Section "8. List holdings"
-$list = Invoke-RestMethod -Uri "$BaseUrl/api/v1/holdings"
+$list = Invoke-RestMethod -Uri "$BaseUrl/api/v1/holdings" -Headers $Headers
 Show "count" $list.Count
 foreach ($h in $list) {
     Show ("  - " + $h.holding_type) $h.name
 }
 
 Section "9. Get one holding"
-$got = Invoke-RestMethod -Uri "$BaseUrl/api/v1/holdings/$purseId"
+$got = Invoke-RestMethod -Uri "$BaseUrl/api/v1/holdings/$purseId" -Headers $Headers
 Show "name"            $got.name
 Show "is_archived"     $got.is_archived
 Show "descriptor count" $got.descriptor_ids.Count
 
 Section "10. Descriptor + its derived addresses"
-$descriptor = Invoke-RestMethod -Uri "$BaseUrl/api/v1/descriptors/$descriptorId"
+$descriptor = Invoke-RestMethod -Uri "$BaseUrl/api/v1/descriptors/$descriptorId" -Headers $Headers
 Show "address_type"  $descriptor.address_type
 Show "network"       $descriptor.network
 Show "gap_limit"     $descriptor.gap_limit
 
-$addresses = Invoke-RestMethod -Uri "$BaseUrl/api/v1/descriptors/$descriptorId/addresses?limit=200"
+$addresses = Invoke-RestMethod -Uri "$BaseUrl/api/v1/descriptors/$descriptorId/addresses?limit=200" -Headers $Headers
 Show "address count" $addresses.addresses.Count
 $firstAddrObj = $addresses.addresses | Where-Object { -not $_.is_change } | Select-Object -First 1
 Show "first external" $firstAddrObj.address
@@ -177,17 +205,20 @@ $addrId = $firstAddrObj.id
 $labelResp = Invoke-RestMethod -Method Patch `
     -Uri "$BaseUrl/api/v1/addresses/$addrId" `
     -ContentType "application/json" `
-    -Body '{"label":"smoke-test-label"}'
+    -Body '{"label":"smoke-test-label"}' `
+    -Headers $Headers
 Show "address label set" $labelResp.label
 $clearResp = Invoke-RestMethod -Method Patch `
     -Uri "$BaseUrl/api/v1/addresses/$addrId" `
     -ContentType "application/json" `
-    -Body '{"label":null}'
+    -Body '{"label":null}' `
+    -Headers $Headers
 Show "address label cleared" ($null -eq $clearResp.label)
 
 Section "11. Next receiving address (lowest-index unused on external chain)"
 $next = Invoke-RestMethod -Method Post `
-    -Uri "$BaseUrl/api/v1/descriptors/$descriptorId/addresses/next-receiving"
+    -Uri "$BaseUrl/api/v1/descriptors/$descriptorId/addresses/next-receiving" `
+    -Headers $Headers
 Show "address"        $next.address
 Show "derivation_path" $next.derivation_path
 Show "index"          $next.derivation_index
@@ -198,14 +229,14 @@ Show "index"          $next.derivation_index
 Section "12. Patch the holding (rename + recolor)"
 $body = @{ name = "Smoke-test renamed"; display_color = "#abcdef" } | ConvertTo-Json -Compress
 $patched = Invoke-RestMethod -Method Patch -Uri "$BaseUrl/api/v1/holdings/$purseId" `
-    -ContentType 'application/json' -Body $body
+    -ContentType 'application/json' -Body $body -Headers $Headers
 Show "name"          $patched.name
 Show "display_color" $patched.display_color
 
 Section "13. Change Purse -> Strongbox (audit log written)"
 $body = @{ new_type = "strongbox"; reason = "Smoke test: migrated keys" } | ConvertTo-Json -Compress
 $changed = Invoke-RestMethod -Method Post -Uri "$BaseUrl/api/v1/holdings/$purseId/change-type" `
-    -ContentType 'application/json' -Body $body
+    -ContentType 'application/json' -Body $body -Headers $Headers
 Show "holding_type"  $changed.holding_type
 
 
@@ -236,12 +267,12 @@ $regtestBody = @{
 $regtestSkipped = $false
 try {
     $regtestPurse = Invoke-RestMethod -Method Post -Uri "$BaseUrl/api/v1/holdings/purse" `
-        -ContentType 'application/json' -Body $regtestBody
+        -ContentType 'application/json' -Body $regtestBody -Headers $Headers
     $regtestDescId = $regtestPurse.descriptor_ids[0]
     $regtestHoldingId = $regtestPurse.id
     Show "regtest descriptor" $regtestDescId
 
-    $firstAddr = (Invoke-RestMethod -Uri "$BaseUrl/api/v1/descriptors/$regtestDescId/addresses?limit=1").addresses[0].address
+    $firstAddr = (Invoke-RestMethod -Uri "$BaseUrl/api/v1/descriptors/$regtestDescId/addresses?limit=1" -Headers $Headers).addresses[0].address
     Show "first address"  $firstAddr
 
     # Fund the address from a fresh bitcoind-side faucet wallet via bitcoin-cli.
@@ -264,15 +295,15 @@ try {
     docker compose exec -T bitcoind bitcoin-cli @rpcAuth generatetoaddress 1 $minerAddr | Out-Null
     Show "funded txid" $sendTxid
 
-    $rescan = Invoke-RestMethod -Method Post -Uri "$BaseUrl/api/v1/descriptors/$regtestDescId/rescan"
+    $rescan = Invoke-RestMethod -Method Post -Uri "$BaseUrl/api/v1/descriptors/$regtestDescId/rescan" -Headers $Headers
     Show "utxos_discovered"      $rescan.utxos_discovered
     Show "ledger_entries"        $rescan.ledger_entries_created
     Show "height_at_scan"        $rescan.height_at_scan
 
-    $balance = Invoke-RestMethod -Uri "$BaseUrl/api/v1/descriptors/$regtestDescId/balance"
+    $balance = Invoke-RestMethod -Uri "$BaseUrl/api/v1/descriptors/$regtestDescId/balance" -Headers $Headers
     Show "confirmed_sats"        $balance.confirmed_sats
 
-    $crossList = Invoke-RestMethod -Uri "$BaseUrl/api/v1/utxos?holding_id=$regtestHoldingId&limit=200"
+    $crossList = Invoke-RestMethod -Uri "$BaseUrl/api/v1/utxos?holding_id=$regtestHoldingId&limit=200" -Headers $Headers
     Show "/utxos for holding"    $crossList.utxos.Count
 } catch {
     if ($_.Exception.Response.StatusCode -eq 409) {
@@ -293,7 +324,8 @@ if ($regtestSkipped) {
     # Take the next unused address on the same descriptor so we can distinguish
     # the auto-detection from the prior /rescan persistence.
     $newAddrResp = Invoke-RestMethod -Method Post `
-        -Uri "$BaseUrl/api/v1/descriptors/$regtestDescId/addresses/next-receiving"
+        -Uri "$BaseUrl/api/v1/descriptors/$regtestDescId/addresses/next-receiving" `
+        -Headers $Headers
     $liveAddr = $newAddrResp.address
     Show "fresh address" $liveAddr
 
@@ -307,7 +339,7 @@ if ($regtestSkipped) {
     $deadline = (Get-Date).AddSeconds(30)
     $found = $false
     while ((Get-Date) -lt $deadline) {
-        $list = Invoke-RestMethod -Uri "$BaseUrl/api/v1/utxos?holding_id=$regtestHoldingId&limit=200"
+        $list = Invoke-RestMethod -Uri "$BaseUrl/api/v1/utxos?holding_id=$regtestHoldingId&limit=200" -Headers $Headers
         $match = $list.utxos | Where-Object { $_.txid -eq $liveTxid -and $_.value_sats -eq 2000 }
         if ($match) { $found = $true; break }
         Start-Sleep -Milliseconds 300
@@ -354,7 +386,7 @@ try {
     } | ConvertTo-Json -Compress -Depth 6
 
     $bankPurse     = Invoke-RestMethod -Method Post -Uri "$BaseUrl/api/v1/holdings/purse" `
-        -ContentType 'application/json' -Body $bankPurseBody
+        -ContentType 'application/json' -Body $bankPurseBody -Headers $Headers
     $bankDescId    = $bankPurse.descriptor_ids[0]
     $bankHoldingId = $bankPurse.id
     Show "bank holding id" $bankHoldingId
@@ -368,12 +400,13 @@ try {
     docker compose exec -T bitcoind bitcoin-cli @rpcAuth generatetoaddress 150 $bankFunderAddr | Out-Null
 
     $bankRecvAddr = (Invoke-RestMethod `
-        -Uri "$BaseUrl/api/v1/descriptors/$bankDescId/addresses?limit=1").addresses[0].address
+        -Uri "$BaseUrl/api/v1/descriptors/$bankDescId/addresses?limit=1" `
+        -Headers $Headers).addresses[0].address
     (docker compose exec -T bitcoind bitcoin-cli @rpcAuth $bankFunderFlag sendtoaddress $bankRecvAddr 0.00050000).Trim() | Out-Null
     $bankMinerAddr = (docker compose exec -T bitcoind bitcoin-cli @rpcAuth $bankFunderFlag getnewaddress).Trim()
     docker compose exec -T bitcoind bitcoin-cli @rpcAuth generatetoaddress 1 $bankMinerAddr | Out-Null
 
-    $bankRescan = Invoke-RestMethod -Method Post -Uri "$BaseUrl/api/v1/descriptors/$bankDescId/rescan"
+    $bankRescan = Invoke-RestMethod -Method Post -Uri "$BaseUrl/api/v1/descriptors/$bankDescId/rescan" -Headers $Headers
     Show "utxos_discovered" $bankRescan.utxos_discovered
 } catch {
     if ($_.Exception.Response.StatusCode -eq 409) {
@@ -388,7 +421,8 @@ if (-not $bankingSkipped) {
     # -- 1. Fee estimate --
     $feeResp = Invoke-RestMethod -Method Post -Uri "$BaseUrl/api/v1/banking/fee-estimate" `
         -ContentType 'application/json' `
-        -Body (@{ strategy = "normal" } | ConvertTo-Json -Compress)
+        -Body (@{ strategy = "normal" } | ConvertTo-Json -Compress) `
+        -Headers $Headers
     Show "normal fee sat/vB" $feeResp.sat_per_vbyte
     Show "is_fallback"       $feeResp.is_fallback
 
@@ -405,17 +439,18 @@ if (-not $bankingSkipped) {
             amount_sats  = 10000
             fee_strategy = "normal"
             description  = "Smoke test send"
-        } | ConvertTo-Json -Compress)
+        } | ConvertTo-Json -Compress) `
+        -Headers $Headers
     $prId = $pr.id
     Show "payment_request.status"   $pr.status
     Show "psbt_base64 length (b64)" $pr.psbt_base64.Length
 
     # PSBT download — JSON form (binary form tested in integration tests)
-    $psbtJson = Invoke-RestMethod -Uri "$BaseUrl/api/v1/banking/payment-requests/$prId/psbt"
+    $psbtJson = Invoke-RestMethod -Uri "$BaseUrl/api/v1/banking/payment-requests/$prId/psbt" -Headers $Headers
     Show "psbt filename"  $psbtJson.filename
 
     # List + get by id
-    $prList = Invoke-RestMethod -Uri "$BaseUrl/api/v1/banking/payment-requests?holding_id=$bankHoldingId"
+    $prList = Invoke-RestMethod -Uri "$BaseUrl/api/v1/banking/payment-requests?holding_id=$bankHoldingId" -Headers $Headers
     Show "payment_requests count" $prList.payment_requests.Count
 
     # -- 3. Invoice --
@@ -425,7 +460,8 @@ if (-not $bankingSkipped) {
             holding_id  = $bankHoldingId
             amount_sats = 25000
             description = "Smoke test invoice"
-        } | ConvertTo-Json -Compress)
+        } | ConvertTo-Json -Compress) `
+        -Headers $Headers
     $invId = $inv.id
     Show "invoice.status"         $inv.status
     Show "invoice.recv_address"   $inv.receiving_address
@@ -434,26 +470,29 @@ if (-not $bankingSkipped) {
     Show "invoice.bip21"          $bip21Preview
 
     # QR code
-    $qrResp = Invoke-WebRequest -Uri "$BaseUrl/api/v1/banking/invoices/$invId/qr"
+    $qrResp = Invoke-WebRequest -Uri "$BaseUrl/api/v1/banking/invoices/$invId/qr" -Headers $Headers
     Show "invoice QR content-type" ($qrResp.Headers.'Content-Type')
 
     # List invoices
-    $invList = Invoke-RestMethod -Uri "$BaseUrl/api/v1/banking/invoices?holding_id=$bankHoldingId"
+    $invList = Invoke-RestMethod -Uri "$BaseUrl/api/v1/banking/invoices?holding_id=$bankHoldingId" -Headers $Headers
     Show "invoices count" $invList.invoices.Count
 
     # -- 4. Cancel both --
     $cancelledPr  = Invoke-RestMethod -Method Post `
-        -Uri "$BaseUrl/api/v1/banking/payment-requests/$prId/cancel"
+        -Uri "$BaseUrl/api/v1/banking/payment-requests/$prId/cancel" `
+        -Headers $Headers
     Show "payment_request after cancel" $cancelledPr.status
 
     $cancelledInv = Invoke-RestMethod -Method Post `
-        -Uri "$BaseUrl/api/v1/banking/invoices/$invId/cancel"
+        -Uri "$BaseUrl/api/v1/banking/invoices/$invId/cancel" `
+        -Headers $Headers
     Show "invoice after cancel" $cancelledInv.status
 
     # Double-cancel must return 409 (already cancelled)
     try {
         Invoke-RestMethod -Method Post `
-            -Uri "$BaseUrl/api/v1/banking/payment-requests/$prId/cancel" | Out-Null
+            -Uri "$BaseUrl/api/v1/banking/payment-requests/$prId/cancel" `
+            -Headers $Headers | Out-Null
         Show "double-cancel" "(unexpected 200!)"
     } catch {
         $sc = $_.Exception.Response.StatusCode.value__
@@ -491,7 +530,7 @@ $vaultBody = @{
     )
 } | ConvertTo-Json -Depth 5 -Compress
 $vaultHolding = Invoke-RestMethod -Method Post -Uri "$BaseUrl/api/v1/holdings/vault" `
-    -ContentType 'application/json' -Body $vaultBody
+    -ContentType 'application/json' -Body $vaultBody -Headers $Headers
 $vaultId = $vaultHolding.id
 Show "vault holding id" $vaultId
 
@@ -508,30 +547,32 @@ $spBody = @{
     is_dry_run = $false
 } | ConvertTo-Json -Compress
 $sp = Invoke-RestMethod -Method Post -Uri "$BaseUrl/api/v1/sweep-policies" `
-    -ContentType 'application/json' -Body $spBody
+    -ContentType 'application/json' -Body $spBody -Headers $Headers
 $spId = $sp.id
 Show "policy.id"         $spId
 Show "policy.is_enabled" $sp.is_enabled
 Show "warnings"          $sp.safety_warnings.Count
 
 # 15.2 List sweep policies
-$spList = Invoke-RestMethod -Uri "$BaseUrl/api/v1/sweep-policies"
+$spList = Invoke-RestMethod -Uri "$BaseUrl/api/v1/sweep-policies" -Headers $Headers
 Show "total policies"   $spList.Count
 
 # 15.3 Get sweep policy
-$spGet = Invoke-RestMethod -Uri "$BaseUrl/api/v1/sweep-policies/$spId"
+$spGet = Invoke-RestMethod -Uri "$BaseUrl/api/v1/sweep-policies/$spId" -Headers $Headers
 Show "get.name"          $spGet.name
 
 # 15.4 Patch sweep policy
 $spPatch = Invoke-RestMethod -Method Patch -Uri "$BaseUrl/api/v1/sweep-policies/$spId" `
     -ContentType 'application/json' `
-    -Body (@{ name = "Smoke sweep (patched)"; maximum_per_period_sats = 3000000 } | ConvertTo-Json -Compress)
+    -Body (@{ name = "Smoke sweep (patched)"; maximum_per_period_sats = 3000000 } | ConvertTo-Json -Compress) `
+    -Headers $Headers
 Show "patched.name"              $spPatch.name
 Show "patched.max_per_period"    $spPatch.maximum_per_period_sats
 
 # 15.5 Attempt enable before acknowledging — must 409
 try {
-    Invoke-RestMethod -Method Post -Uri "$BaseUrl/api/v1/sweep-policies/$spId/enable" | Out-Null
+    Invoke-RestMethod -Method Post -Uri "$BaseUrl/api/v1/sweep-policies/$spId/enable" `
+        -Headers $Headers | Out-Null
     Show "enable before ack" "(unexpected 200!)"
 } catch {
     $sc = $_.Exception.Response.StatusCode.value__
@@ -539,31 +580,33 @@ try {
 }
 
 # 15.6 Acknowledge warnings
-$acked = Invoke-RestMethod -Method Post -Uri "$BaseUrl/api/v1/sweep-policies/$spId/acknowledge-warnings"
+$acked = Invoke-RestMethod -Method Post -Uri "$BaseUrl/api/v1/sweep-policies/$spId/acknowledge-warnings" `
+    -Headers $Headers
 $allAcked = ($acked.safety_warnings | Where-Object { -not $_.user_acknowledged }).Count -eq 0
 Show "all warnings acked" $allAcked
 
 # 15.7 Enable
-$enabled = Invoke-RestMethod -Method Post -Uri "$BaseUrl/api/v1/sweep-policies/$spId/enable"
+$enabled = Invoke-RestMethod -Method Post -Uri "$BaseUrl/api/v1/sweep-policies/$spId/enable" `
+    -Headers $Headers
 Show "enabled.is_enabled"  $enabled.is_enabled
 
 # 15.8 Pause-all / resume-all
-$paused = Invoke-RestMethod -Method Post -Uri "$BaseUrl/api/v1/sweep-policies/pause-all"
+$paused = Invoke-RestMethod -Method Post -Uri "$BaseUrl/api/v1/sweep-policies/pause-all" -Headers $Headers
 Show "pause-all.paused"   $paused.paused
-$resumed = Invoke-RestMethod -Method Post -Uri "$BaseUrl/api/v1/sweep-policies/resume-all"
+$resumed = Invoke-RestMethod -Method Post -Uri "$BaseUrl/api/v1/sweep-policies/resume-all" -Headers $Headers
 Show "resume-all.resumed" $resumed.resumed
 
 # 15.9 Disable then delete
-Invoke-RestMethod -Method Post -Uri "$BaseUrl/api/v1/sweep-policies/$spId/disable" | Out-Null
-$del = Invoke-WebRequest -Method Delete -Uri "$BaseUrl/api/v1/sweep-policies/$spId"
+Invoke-RestMethod -Method Post -Uri "$BaseUrl/api/v1/sweep-policies/$spId/disable" -Headers $Headers | Out-Null
+$del = Invoke-WebRequest -Method Delete -Uri "$BaseUrl/api/v1/sweep-policies/$spId" -Headers $Headers
 Show "delete policy status" $del.StatusCode
 
 # 15.10 Sweep executions list (empty)
-$execs = Invoke-RestMethod -Uri "$BaseUrl/api/v1/sweep-executions"
+$execs = Invoke-RestMethod -Uri "$BaseUrl/api/v1/sweep-executions" -Headers $Headers
 Show "executions count" $execs.Count
 
 # 15.11 Supported custodial adapters
-$supported = Invoke-RestMethod -Uri "$BaseUrl/api/v1/custodial-providers/supported"
+$supported = Invoke-RestMethod -Uri "$BaseUrl/api/v1/custodial-providers/supported" -Headers $Headers
 Show "supported adapters" ($supported.supported -join ", ")
 
 
@@ -572,12 +615,13 @@ Show "supported adapters" ($supported.supported -join ", ")
 Section "16. Jobs endpoints"
 
 # GET /jobs — empty list at start
-$jobsList = Invoke-RestMethod -Uri "$BaseUrl/api/v1/jobs"
+$jobsList = Invoke-RestMethod -Uri "$BaseUrl/api/v1/jobs" -Headers $Headers
 Show "initial jobs count" $jobsList.Count
 
 # GET /jobs/{unknown} — 404
 try {
-    Invoke-RestMethod -Uri "$BaseUrl/api/v1/jobs/00000000-0000-0000-0000-000000000001" | Out-Null
+    Invoke-RestMethod -Uri "$BaseUrl/api/v1/jobs/00000000-0000-0000-0000-000000000001" `
+        -Headers $Headers | Out-Null
     Show "unknown job" "(unexpected 200!)"
 } catch {
     $sc = $_.Exception.Response.StatusCode.value__
@@ -586,7 +630,8 @@ try {
 
 # DELETE /jobs/{unknown} — 404
 try {
-    Invoke-WebRequest -Method Delete -Uri "$BaseUrl/api/v1/jobs/00000000-0000-0000-0000-000000000001" | Out-Null
+    Invoke-WebRequest -Method Delete -Uri "$BaseUrl/api/v1/jobs/00000000-0000-0000-0000-000000000001" `
+        -Headers $Headers | Out-Null
     Show "delete unknown" "(unexpected 200!)"
 } catch {
     $sc = $_.Exception.Response.StatusCode.value__
@@ -601,14 +646,16 @@ Section "16b. Analysis recompute"
 $recompAll = Invoke-RestMethod -Method Post `
     -Uri "$BaseUrl/api/v1/analysis/recompute" `
     -ContentType "application/json" `
-    -Body '{}'
+    -Body '{}' `
+    -Headers $Headers
 Show "recompute job_id"       $recompAll.job_id
 Show "recompute holding_count" $recompAll.holding_count
 
 $recompOne = Invoke-RestMethod -Method Post `
     -Uri "$BaseUrl/api/v1/analysis/recompute" `
     -ContentType "application/json" `
-    -Body "{`"holding_id`":`"$purseId`"}"
+    -Body "{`"holding_id`":`"$purseId`"}" `
+    -Headers $Headers
 Show "single recompute count" $recompOne.holding_count
 
 
@@ -621,7 +668,7 @@ foreach ($pair in @(
     $method = $pair[0]
     $path = $pair[1]
     try {
-        Invoke-RestMethod -Method $method -Uri "$BaseUrl$path" | Out-Null
+        Invoke-RestMethod -Method $method -Uri "$BaseUrl$path" -Headers $Headers | Out-Null
         Show ("$method $path") "(unexpected 200!)"
     } catch {
         $resp = $_.Exception.Response
@@ -638,14 +685,14 @@ foreach ($pair in @(
 # --- 18. Archive & cleanup ----------------------------------------------------
 
 Section "18. Archive the smoke-test holdings"
-$resp = Invoke-WebRequest -Method Post -Uri "$BaseUrl/api/v1/holdings/$purseId/archive"
+$resp = Invoke-WebRequest -Method Post -Uri "$BaseUrl/api/v1/holdings/$purseId/archive" -Headers $Headers
 Show "purse status" $resp.StatusCode
-$resp2 = Invoke-WebRequest -Method Post -Uri "$BaseUrl/api/v1/holdings/$vaultId/archive"
+$resp2 = Invoke-WebRequest -Method Post -Uri "$BaseUrl/api/v1/holdings/$vaultId/archive" -Headers $Headers
 Show "vault status" $resp2.StatusCode
 
 Section "19. Verify archived holdings are hidden by default, visible with include_archived"
-$default = Invoke-RestMethod -Uri "$BaseUrl/api/v1/holdings"
-$archived = Invoke-RestMethod -Uri "$BaseUrl/api/v1/holdings?include_archived=true"
+$default = Invoke-RestMethod -Uri "$BaseUrl/api/v1/holdings" -Headers $Headers
+$archived = Invoke-RestMethod -Uri "$BaseUrl/api/v1/holdings?include_archived=true" -Headers $Headers
 Show "without archived" $default.Count
 Show "with archived"    $archived.Count
 

@@ -12,6 +12,7 @@ from tallykeep.models.holding import HoldingRow, HoldingTypeChangeLogRow
 from tallykeep.models.invoice import InvoiceRow
 from tallykeep.models.ledger_entry import LedgerEntryHoldingLinkRow, LedgerEntryRow
 from tallykeep.models.onchain_transaction import OnChainTransactionRow
+from tallykeep.models.paired_device import PairedDeviceRow
 from tallykeep.models.payment_request import BroadcastAttemptRow, PaymentRequestRow
 from tallykeep.models.sweep import SweepExecutionRow, SweepPolicyRow
 from tallykeep.models.user_profile import (
@@ -46,4 +47,5 @@ __all__ = [
     "InvoiceRow",
     "SweepPolicyRow",
     "SweepExecutionRow",
+    "PairedDeviceRow",
 ]

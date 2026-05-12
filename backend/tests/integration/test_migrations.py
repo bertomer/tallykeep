@@ -33,6 +33,7 @@ EXPECTED_TABLES = {
     "ledger_entry",
     "ledger_entry_holding_link",
     "onchain_transaction",
+    "paired_device",
     "payment_request",
     "runtime_configuration",
     "secret",

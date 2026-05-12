@@ -16,6 +16,7 @@ def _row_to_domain(row: UserProfileRow) -> UserProfile:
         feature_flags=dict(row.feature_flags or {}),
         base_currency=row.base_currency,
         locale=row.locale,
+        principles_acknowledged_at=row.principles_acknowledged_at,
         created_at=row.created_at,
         updated_at=row.updated_at,
     )
@@ -47,6 +48,7 @@ def update(
     feature_flags: dict[str, bool] | None = None,
     base_currency: str | None = None,
     locale: str | None = None,
+    principles_acknowledged: bool | None = None,
 ) -> UserProfile:
     """Apply a partial update to the singleton."""
     row = session.get(UserProfileRow, USER_PROFILE_SINGLETON_ID)
@@ -61,6 +63,8 @@ def update(
         row.base_currency = base_currency
     if locale is not None:
         row.locale = locale
+    if principles_acknowledged is True and row.principles_acknowledged_at is None:
+        row.principles_acknowledged_at = datetime.now(UTC)
 
     row.updated_at = datetime.now(UTC)
     session.commit()

@@ -17,6 +17,8 @@ from starlette.middleware.base import BaseHTTPMiddleware
 ALWAYS_ALLOWED_PREFIXES = (
     "/api/v1/health",
     "/api/v1/unlock",
+    "/api/v1/server/info",
+    "/api/v1/pairing",
     "/openapi.json",
     "/docs",
 )

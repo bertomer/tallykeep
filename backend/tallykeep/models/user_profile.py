@@ -44,6 +44,9 @@ class UserProfileRow(Base):
     locale: Mapped[str] = mapped_column(
         String(10), nullable=False, server_default=text("'en'")
     )
+    principles_acknowledged_at: Mapped[datetime | None] = mapped_column(
+        TIMESTAMP(timezone=True), nullable=True
+    )
     created_at: Mapped[datetime] = mapped_column(
         TIMESTAMP(timezone=True), nullable=False, server_default=text("NOW()")
     )

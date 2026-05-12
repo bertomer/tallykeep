@@ -76,6 +76,8 @@ class SecretStore(ABC):
          in process memory.
       4. lock() — discards the in-memory key.
       5. set/get/delete operate only while unlocked.
+      6. validate_passphrase(passphrase) — check passphrase WITHOUT changing
+         lock state. Used by the phone-side passphrase-validate endpoint.
     """
 
     @abstractmethod
@@ -92,6 +94,15 @@ class SecretStore(ABC):
 
     @abstractmethod
     def is_unlocked(self) -> bool: ...
+
+    @abstractmethod
+    def validate_passphrase(self, passphrase: str) -> bool:
+        """Check passphrase WITHOUT changing lock state.
+
+        Returns True if correct, False if wrong. Raises NotInitializedError
+        if the store has never been initialized.
+        """
+        ...
 
     @abstractmethod
     def set_secret(self, reference: str, value: bytes) -> None: ...
@@ -194,6 +205,26 @@ class _SecretStoreBase(SecretStore):
 
         with self._lock:
             self._key = key
+
+    def validate_passphrase(self, passphrase: str) -> bool:
+        """Check passphrase correctness WITHOUT storing the derived key."""
+        params = self._load_kdf_parameters()
+        if params is None:
+            raise NotInitializedError("Secret store has not been initialized")
+
+        key = derive_key(passphrase, params)
+
+        canary = self._load_encrypted(CANARY_REFERENCE)
+        if canary is None:
+            raise NotInitializedError(
+                "Crypto parameters are present but the canary is missing"
+            )
+
+        try:
+            decrypted = decrypt(canary, key)
+        except InvalidTag:
+            return False
+        return decrypted == CANARY_PLAINTEXT
 
     # --- secret CRUD --------------------------------------------------------------
 
