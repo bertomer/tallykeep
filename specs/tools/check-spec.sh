@@ -122,7 +122,7 @@ broken=0
 # intentionally don't resolve to a file (naming-convention examples,
 # template placeholders, retired-file references kept for historical
 # context in ADRs).
-allow_list='^(\.\.\._v[0-9]+_lock\.html|\.\.\._fiat_(off|on)\.html|colors\.md|typography\.md|tallykeep_<.+>_v<N>_<status>\.(html|md)|<artifact>_v<N>_<status>\.(html|md)|<voice-piece>_v<N>_<status>\.md|mobile_<flow>_<state>\.html|UI/backend_deltas\.md|backend_deltas\.md|backlog\.md|NNNN-title\.md|NNNN-short-title\.md|09_profiles_and_flags\.md|11_ux_flows\.md|12_roadmap\.md|13_open_questions\.md|14_context_handoff\.md|design_decisions\.md|mobile_form_factor_decision\.md|spec_amendments\.md|handoff\.md|mobile_v1\.md|UI/design_decisions\.md|UI/handoff\.md|UI/mobile_form_factor_decision\.md|UI/drafts/spec_amendments\.md|specs/.+|drafts/spec_amendments\.md|04_api_surface\.md)$'
+allow_list='^(\.\.\._v([0-9]+|N)_lock\.html|\.\.\._fiat_(off|on)\.html|colors\.md|typography\.md|tallykeep_<.+>_v<N>_<status>\.(html|md)|<artifact>_v<N>_<status>\.(html|md)|<voice-piece>_v<N>_<status>\.md|mobile_<flow>_<state>\.html|UI/backend_deltas\.md|backend_deltas\.md|backlog\.md|NNNN-title\.md|NNNN-short-title\.md|09_profiles_and_flags\.md|11_ux_flows\.md|12_roadmap\.md|13_open_questions\.md|14_context_handoff\.md|design_decisions\.md|mobile_form_factor_decision\.md|spec_amendments\.md|handoff\.md|mobile_v1\.md|UI/design_decisions\.md|UI/handoff\.md|UI/mobile_form_factor_decision\.md|UI/drafts/spec_amendments\.md|specs/.+|drafts/spec_amendments\.md|04_api_surface\.md)$'
 while IFS= read -r f; do
   while IFS= read -r ref; do
     # strip backticks

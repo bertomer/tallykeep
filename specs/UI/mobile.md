@@ -981,3 +981,414 @@ the populated home rendering. This decouples backend
 correctness testing from wizard UX work, and means each
 wizard's coding session focuses purely on the per-type UI
 rather than re-discovering backend shapes.
+
+---
+
+## Add Holding — Purse wizard
+
+Promoted from `future_iterations.md` as the first per-type
+wizard (canonical descriptor-wizard pattern carrying the shared
+wizard shell into the codebase; Strongbox and Vault wizards
+derive). Design pass closed 2026-05-13; lands after the Add
+Holding scaffolding iteration closes.
+
+The Purse wizard covers both seed-origin modes Purse supports
+per ADR-0006: `EXTERNAL_WATCH_ONLY` (the user pastes a descriptor
+exported from an existing wallet) and `TALLYKEEP_MANAGED` (the
+user asks TallyKeep to generate a fresh seed on-device). Mode 2
+(`EXTERNAL_IMPORTED` — user pastes a seed/xprv from another
+wallet to make their existing Purse spendable from TallyKeep)
+is **not** part of this wizard — it lands as a separate Purse-
+detail "upgrade to spending" feature once `purse-upgrade-path`
+in `pre-implementation.md` resolves.
+
+### Vocabulary lock
+
+Locked during the 2026-05-13 design pass:
+
+- **"Recovery phrase"** is the user-facing term for the 12-word
+  BIP39 mnemonic. Matches Trezor / Ledger conventions. Used in
+  screen copy, button labels, ARIA labels.
+- **"Keys"** is the user-facing abstract term for spending
+  capability. Used when the location of the signing material is
+  what matters ("on this device", "TallyKeep holds the keys",
+  "import the keys from another wallet").
+- **"Seed phrase"** retires from user-facing copy — overlapping
+  vocabulary that the user shouldn't have to disambiguate.
+- **"Seed"** survives only in internal contexts (CSS class
+  names, technical comments, the DEV MODE banner's pre-Capacitor
+  copy uses "keys" too — `seed-vault` etc. CSS classes are
+  internal identifiers, not user-facing).
+
+### Wizard shell (introduced here, reused by Strongbox and Vault)
+
+The shared wizard-shell pattern lands with this iteration since
+the Purse wizard is its first consumer. Splitting the shell into
+its own iteration would have produced a no-consumer artifact —
+the anti-pattern §2 of `PROCESS.md` warns against.
+
+**Header.** 3-cell grid `[back chevron 44 px] [step counter
+centered] [empty 44 px]`. The step counter renders as
+"STEP 1 OF 3" in small caps (`font-size-xs`, `--color-text-muted`,
+letter-spacing 0.08em). Wizard runs 3 steps: step 1 is the
+entry surface (with two paths — Generate or Import), step 2 is
+parse-back with the auto-name preview, step 3 is success.
+Back chevron at step 1 returns to Home (picker dismissed); at
+step 2 returns to step 1; step 3 (success) hides the back
+chevron — only path forward is "Done".
+
+**Sensitive-screen flag.** The shell component carries a
+`sensitive-screen={boolean}` flag on each step. When true, the
+Capacitor layer wires it to:
+
+- *Android:* `FLAG_SECURE` on the activity window — prevents
+  screenshots and screen recording at the OS level. Standard
+  pattern across Trezor / Bitkey / BitBox apps.
+- *iOS:* `UIApplication.userDidTakeScreenshotNotification` — iOS
+  doesn't expose screenshot *prevention*, only post-hoc
+  detection. The wizard shows a warning after the fact if the
+  user took a screenshot of the recovery phrase.
+- *Browser (current iteration target):* No-op. Browsers do not
+  expose screenshot prevention APIs. The DEV MODE banner is
+  the honest signal that the surface isn't shipped-quality
+  privacy.
+
+The Generate-path mockups
+(`mobile_add_holding_purse_generate.html`,
+`mobile_add_holding_purse_generate_revealed.html`) carry
+`sensitive-screen={true}`.
+All others carry `false`. The Capacitor-wrap iteration owns the
+platform-side wiring; the current iteration ships the component
+API and the no-op browser implementation.
+
+**Body.** Per-step content scrolls inside the body region.
+Padding `var(--space-5) var(--space-4)` by convention.
+
+**Footer.** Pinned to the bottom of the screen. Contains an
+error region (rendered only when an error is active — see
+*Error states* below) and a full-width primary CTA. The CTA
+label is step-specific: "Continue" (step 1 Import path; step 1
+Generate alt path) → "Looks right" (step 2) → "Done" (step 3).
+The CTA is disabled when the step has invalid input (empty
+textarea at step 1 Import); enabled in step 1 Generate
+(regardless of reveal) and step 2 (post-parse) and step 3.
+
+**Bottom nav is hidden during the wizard.** Banking convention
+for focused multi-step flows (Wise add-recipient, Revolut
+add-account, N26 add-payee). The wizard owns the screen; nav
+distractions return when the user lands back on Home via the
+step-3 "Done" CTA.
+
+### Screens
+
+Mode 1 (watch-only / imported) flow path: Input → Parse-back →
+Success (imported).
+
+Mode 3 (TallyKeep-generated) flow path: Generate (pre-reveal +
+revealed) → Parse-back → Success (generated). Same step counter
+on both modes (3 steps each); step 1 has two distinct surfaces
+the user navigates between via the Generate accent card.
+
+**Step 1 entry — `mobile_add_holding_purse_input.html`.** The
+two-paths-from-the-top layout: a verdigris-tinted Generate
+accent card at the top (sparkle icon + "Let TallyKeep generate
+a fresh Purse" + sub-line "Privately and securely stored on
+this device" + chevron), an "— or —" separator, then an
+**Import from another wallet** labelled section grouping the
+source dropdown + wallet-tips hint banner + descriptor textarea.
+Source dropdown values (alphabetical): BlueWallet · Electrum ·
+Mutiny · Nunchuk · Phoenix · Sparrow · Specter · Other · Don't
+specify. List is broad on purpose — provenance is a bookkeeping
+label, not a capability filter. Tapping a source surfaces a
+wallet-specific hint banner inline; the same source pick
+populates the auto-name on step 2. The "Paste" button inside
+the textarea's top-right consumes `NativeBridge.clipboard.
+paste()`. Primary CTA "Continue" disabled until textarea
+non-empty.
+
+The two-paths layout puts Generate at the top because it's a
+self-contained one-tap action; Import below is a multi-field
+form. Visual hierarchy doesn't map to brand priority (import is
+still the assumed default for most users) — it maps to UI
+coherence (Generate stands alone; source + descriptor belong
+together).
+
+**Step 1 error states.**
+
+- `mobile_add_holding_purse_input_error_inline.html` — inline
+  error pattern. Used for single-address rejection, unparseable
+  text, duplicate-descriptor (the duplicate case adds a
+  secondary "Open it instead" CTA in the error region linking
+  to the existing Holding). Error region in the footer above
+  the CTA, danger palette, textarea border tinted danger.
+- `mobile_add_holding_purse_input_error_redirect.html` —
+  redirect error pattern (multisig rejection). Warning palette
+  (not danger — input is structurally valid, just belongs in
+  Vault). Error block carries a "Set up as Vault" secondary
+  CTA that routes the user out of the wizard back to the
+  picker, then into the Vault wizard. Primary "Continue" stays
+  present but disabled. Pattern locks for sibling wizards'
+  cross-flow rejections (Vault rejecting single-key, etc.).
+
+**Step 1 Generate alt path.** Reached via the Generate accent
+card on the input screen.
+
+- `mobile_add_holding_purse_generate.html` — pre-reveal state.
+  A 12-word recovery phrase has been generated client-side and
+  stored in secure storage (Capacitor: Keychain/Keystore;
+  browser dev-mode: localStorage stub with the DEV MODE banner
+  visible). The words are NOT shown by default — a centered
+  accent button "Reveal my recovery phrase" gates the visual
+  exposure. Privacy-first reveal pattern (Trezor Suite,
+  Coldcard, BitBox, 1Password secret reveal). Below the reveal
+  area, a loss-of-funds warning paragraph is visible regardless
+  of reveal state (the recovery phrase exists either way — the
+  warning shouldn't be conditional on the user looking). A
+  later-note points the user to where they can return to the
+  view: "You can also reveal them later from Holdings → Purse
+  → Information" — forward-reference to the Purse-detail
+  iteration's Information section.
+  Continue CTA is **always enabled** in this state. Reveal is
+  optional; the user can write the words down later from Purse
+  Detail. No backup-acknowledgement checkbox — per the leading
+  direction in `pre-implementation.md` `seed-backup-disclosure`,
+  the persistent-warning model lives on Home in the
+  security-health system (private-ship gate iteration), not as
+  a hard gate at seed-generation time.
+  No "Copy" button. Clipboard is a known seed-leak vector
+  (Windows Clipboard History, Apple Universal Clipboard,
+  Microsoft Cloud Clipboard, Gboard suggestions all persist or
+  sync clipboard content past the user's awareness). The user
+  can manually select text if they insist; we do not provide
+  the affordance.
+  Back chevron returns to the Import view at step 1 (not Home);
+  the user can switch back to descriptor paste from there.
+- `mobile_add_holding_purse_generate_revealed.html` — post-
+  reveal state. Same shell. The 12 words render in a 3×4
+  numbered grid (numbered so the user can write in order). A
+  "Hide" affordance above the grid lets the user re-obscure
+  without leaving the screen (useful if someone walks up).
+  Same loss-of-funds warning and same later-note as pre-reveal.
+
+**Step 2 — `mobile_add_holding_purse_parseback.html`.** Trust
+handoff moment: TallyKeep shows what it parsed (or what it
+generated) so the user verifies. The screen lands with the
+**auto-name preview at the top**, directly under the heading:
+"Will be named '{auto-name}' [Rename]" — the name-preview row
+carries the 4 px brass left stripe (`--color-holding-purse`)
+that the picker and populated-home rows use. Tap Rename to
+edit inline.
+
+Auto-name derivation:
+
+- Mode 1 + source picked: "{Source} Purse" (e.g. "Phoenix
+  Purse", "BlueWallet Purse"). 90% of users accept — most
+  users have one wallet per source.
+- Mode 1 + source = "Don't specify": script-type fallback —
+  "Native SegWit Purse" / "Taproot Purse" / etc.
+- Mode 3 (generated): "TallyKeep Purse" — parallel construction
+  to "Phoenix Purse" / "BlueWallet Purse". Increments if a
+  TallyKeep Purse already exists ("TallyKeep Purse 2").
+
+Below the name-preview: the parse-card (script type, derivation
+path, master-key summary truncated) and the addresses-card
+(first three derived addresses with tap-to-copy). The parse-
+card no longer carries a left stripe (would compete with the
+name-preview's stripe). CTA label "Looks right" — names the
+verification action.
+
+Generated variant (mode 3) reuses the component with heading
+copy adapted to "Here's what we generated for you" and a small
+"Generated by TallyKeep · keys on this device" badge.
+
+**Step 3 success.**
+
+- `mobile_add_holding_purse_success_imported.html` — watch-only
+  variant. Confirmation-honesty (gauntlet 4): the screen
+  acknowledges Holding *registration* only, not balance load.
+  Green success indicator, heading "Purse added", sub-copy
+  about the chain scan, spinner-row "Scanning… · balance will
+  appear on Home shortly". CTA: "Done". Returns to Home where
+  the new row appears with the populated-home "Scanning…"
+  status indicator; row updates to show balance when scan
+  completes. No auto-redirect.
+- `mobile_add_holding_purse_success_generated.html` — generated
+  variant. Fresh wallet has zero history — nothing to scan that
+  would reveal funds. Honest framing: "Purse ready" + "no funds
+  yet" pill. A disabled "Show a receive address" affordance
+  hints at the next iteration (Receive). CTA: "Done".
+
+### Reconcilability gauntlet answers
+
+1. **Trust boundary.** Phone screen (UI). The descriptor textarea
+   and the name (auto-derived, optionally edited inline on
+   step 2) are local UI state until step 2's "Looks right" tap.
+   Backend interactions at:
+   - Step 1 Import path *Continue*: `POST /api/v1/descriptors/
+     validate` to parse the descriptor and detect single-address
+     / multisig / unparseable cases. Pure parser — no state
+     mutation.
+   - Step 2 *Looks right*: `POST /api/v1/holdings/purse` to
+     create the Holding (with the auto-derived or user-renamed
+     name) and kick off the chain-scan job.
+   - Mode 3 (generated): seed generation happens **on device**
+     (BIP39 mnemonic), then the derived descriptor is sent to
+     the backend. The seed never crosses to the backend.
+   The DEV MODE banner makes browser-build localStorage storage
+   visible until Capacitor secure storage replaces the stub
+   (`browser-pwa-auth-model` and the Capacitor-wrap iteration).
+
+2. **Keys and secrets.** Mode 1: **none** — the user pastes a
+   public descriptor or xpub. No spending material crosses any
+   boundary. Mode 3: a fresh BIP39 mnemonic is generated and
+   stored in the device's secure storage (Capacitor: Keychain
+   / Keystore; browser dev-mode: localStorage with the DEV MODE
+   banner). The seed is **never** sent to the backend; only the
+   derived descriptor is registered. Future *upgrade-path*
+   feature (Purse-detail) will introduce a third surface where
+   the user pastes a seed phrase from another wallet — that
+   surface inherits this same boundary discipline. Resolution
+   of the security-health surface for backup acknowledgement
+   stays open in `pre-implementation.md` under
+   `seed-backup-disclosure`.
+
+3. **Self-hosted vs hosted.** Identical phone-side flow on both
+   deployment models. The Holding-create and descriptor-validate
+   endpoints behave identically. The hosted-tier privacy
+   boundary (TallyKeep operators can see descriptors at rest)
+   is disclosed at hosted-tier onboarding, not at Add Purse
+   time — that's a one-time boundary acknowledgement, not a
+   per-Holding one.
+
+4. **Confirmation honesty.** Three deliberate honesty beats in
+   the flow:
+   - Step 2 *parse-back* frames itself as "Here's what **we
+     read**" and invites the user to verify against their other
+     wallet. The user does the verification; TallyKeep shows
+     its work.
+   - Step 3 *success (imported)* acknowledges Holding
+     registration, **not** balance load. The "Scanning…" hint
+     and the populated-home row treatment carry the truth across
+     the boundary — the Holding exists, the chain scan is still
+     running.
+   - Step 3 *success (generated)* names the empty state honestly
+     — "no funds yet · fresh wallet". No "balance loaded" copy;
+     the user did not expect a balance and TallyKeep does not
+     fake one.
+   Plus the privacy-first reveal on step 1 Generate alt-path:
+   recovery phrase isn't shown until the user explicitly taps
+   to reveal, and the loss-of-funds warning + "you can reveal
+   later from Holdings → Purse → Information" are visible in
+   both pre-reveal and revealed states.
+   No "Sent ✓" / "Confirmed" semantics in this wizard — those
+   come with Send / Receive iterations.
+
+5. **Browser-only fallback.** Watch-only mode is fully browser-
+   compatible — no keys, no secure storage, all backend
+   endpoints reachable via fetch. Generated mode in browser
+   relies on the localStorage soft-fallback per ADR-0007 with
+   the DEV MODE banner making the fallback visible. Capacitor
+   builds replace the fallback with platform Keychain/Keystore
+   and the banner disappears. The generate path remains
+   reachable in both builds — gauntlet #5 forbids silent
+   capability degradation, not feature gating. (The pre-
+   implementation item `browser-pwa-auth-model` covers the
+   long-term browser-PWA authentication model; the dev-mode
+   localStorage stub is a personal-shipping crutch, not the
+   shipped behaviour.)
+
+6. **Open-source and reproducibility.** No closed-source
+   dependency. Descriptor parsing (BIP 380 + miniscript) lives
+   in-tree on the backend. BIP39 mnemonic generation runs in
+   JavaScript with an audited library (selection deferred to
+   the coding agent; constraint is "audited, MIT-compatible,
+   no remote calls during generation"). Brand icons inline
+   from `brand/identity/`. Tokens-only styling per PROCESS §2.4.
+
+### Notes
+
+**Mode 2 (`EXTERNAL_IMPORTED`) is deliberately out of scope.**
+The Purse-detail "upgrade to spending" surface (paste a seed
+phrase or master xprv from another wallet to make an existing
+watch-only Purse spendable from TallyKeep) is a separate
+feature that lands in a follow-up iteration once
+`purse-upgrade-path` resolves. Rationale: a user who has imported
+watch-only and later wants to spend doesn't go back through the
+Add wizard — they reach for the affordance from the Purse's
+detail page. Keeping mode 2 out of the wizard preserves the
+"one shape, all three wizards" principle (Strongbox and Vault
+inherit cleanly) and pushes the load-bearing seed-disclosure
+work to where the user actually triggers it.
+
+**Wallet-specific tips — surfaced inline when a source is
+picked.** The source dropdown drives a wallet-tips banner that
+appears between the dropdown and the descriptor textarea
+(superseded the earlier help-link + bottom-sheet pattern during
+the 2026-05-13 design pass). Locked copy for the source-dropdown
+wallets:
+
+- *BlueWallet:* Settings → Wallet → Export / Backup → Copy the
+  Master Public Key (xpub).
+- *Electrum:* Wallet → Information → Master Public Key.
+- *Mutiny:* From the (self-hosted or Emergency Kit) export,
+  copy the master public key or recover the 12-word seed in
+  Sparrow to derive a descriptor.
+- *Nunchuk:* Wallet → Settings → Wallet Configuration → Copy
+  Wallet Descriptor.
+- *Phoenix:* Settings → Wallet info → Wallet final → Copy the
+  master public key (`zpub...`, path `m/84'/0'/0`). The swap-in
+  wallet descriptors are for LN-onchain bridging and aren't
+  supported here yet — paste the "Wallet final" zpub instead.
+- *Sparrow:* File → Wallet Settings → Export → Output Descriptor.
+- *Specter:* Wallet Settings → Advanced → Export → Public Key
+  (output descriptor).
+- *Other:* paste any standard xpub / ypub / zpub or BIP 380
+  output descriptor. Single Bitcoin addresses (`bc1q...`,
+  `1...`, `3...`) are rejected.
+
+The Phoenix entry deserves the explicit "swap-in descriptors
+aren't supported yet" callout because the Phoenix wallet info
+screen surfaces three exports (legacy swap-in descriptor,
+Taproot swap-in descriptor, Wallet final master public key) and
+the user could reasonably try any of them. Coding-agent task:
+verify the descriptor-validate endpoint either accepts Phoenix-
+shape miniscript fragments (`wsh(and_v(v:pk([...]xpu...)))`)
+gracefully or returns a typed error mapping to a "Use the
+Wallet final key instead" message — pure miniscript handling
+is a backend parser-scope decision.
+
+**Source dropdown — provenance label, not capability filter.**
+The same dropdown serves users who exported a descriptor
+directly (BlueWallet, Sparrow, Electrum) and users who derived
+externally from a seed phrase (Mutiny refugee, Phoenix user
+who recovered from words). Both are valid Purse origins; both
+deserve a label. The dropdown does not advise "from this
+wallet you can / cannot import" — that's the help bottom-sheet's
+job.
+
+**Step 3 deliberately does not surface gap-limit / "scan more
+addresses" affordances.** The first-time Purse adder doesn't
+have the context to make that call. Gap-limit tooling lands in
+Holding Detail / Settings → Scan, scoped out of the wizard
+per `next_iteration.md` 2026-05-13 sharpening.
+
+**No "Cancel / X" in the wizard header in this iteration.** Back
+chevron alone handles navigation; user taps back to retrace.
+Banking apps differ (Wise has X, Revolut doesn't); we ship
+without and add the X if dev-phase usage surfaces a friction.
+
+**No "Copy" affordance on the recovery phrase display, and no
+hard backup-acknowledgement gate.** Clipboard is a known seed-
+leak vector (system clipboard managers, cross-device sync
+clipboards). Per the leading direction in
+`seed-backup-disclosure`, persistent acknowledgement lives in
+the security-health system on Home, not a one-shot checkbox at
+generation time. The wizard ships honest forward-references
+("you can return to this view from Holdings → Purse →
+Information") to the Purse-detail iteration's Information
+section.
+
+**Mockup-tier inline SVG.** All icons and per-step graphics
+inline directly into the mockup HTML for static-file review.
+SvelteKit components consume from `brand/identity/` via the
+`<Icon name="..." />` wrapper per PROCESS.md §2.4.

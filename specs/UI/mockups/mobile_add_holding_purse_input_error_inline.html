@@ -1,0 +1,400 @@
+<!--
+  Title: Mobile — Add Purse · step 1 · inline error (single address)
+  Status: validated  (Rémy greenlight 2026-05-13 closing the
+                      Purse-wizard design pass)
+  Date last touched: 2026-05-13
+  Replaces: superseded earlier 4-step variant.
+
+  Design notes:
+  - Same wizard shell + screen layout as
+    mobile_add_holding_purse_input.html. This file shows the
+    INLINE-ERROR pattern: user pasted content that failed
+    validation, the error region in the wizard footer surfaces a
+    red banner above the CTA, the textarea shows the bad input.
+  - Specifically renders the single-Bitcoin-address case. Pattern
+    locks for: unparseable text, duplicate descriptor (with a
+    secondary "Open it instead" CTA in the error region).
+  - Source dropdown shown as "Don't specify" since the user
+    fumbled paste; no wallet hint banner. (Production would
+    render whatever the user picked — this is the most common
+    bad-paste case.)
+  - Step counter "STEP 1 OF 3".
+-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>TallyKeep — Mobile — Add Purse · 1 of 3 · Single-address error</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="_shared/tokens.css">
+<link rel="stylesheet" href="_shared/shell.css">
+<style>
+  .phone-screen { background: var(--color-bg); }
+
+  .app-bar {
+    height: var(--mobile-app-bar);
+    flex-shrink: 0;
+    display: grid;
+    grid-template-columns: 44px 1fr 44px;
+    align-items: center;
+    padding: 0 var(--space-2);
+    background: var(--color-surface);
+    border-bottom: 1px solid var(--color-border);
+  }
+  .app-bar .back-btn {
+    width: 36px; height: 36px;
+    display: inline-flex; align-items: center; justify-content: center;
+    background: transparent; border: 0;
+    border-radius: var(--radius-md);
+    color: var(--color-text);
+    cursor: pointer;
+    justify-self: start;
+    margin-left: var(--space-2);
+  }
+  .app-bar .back-btn:hover { background: var(--color-bg); }
+  .app-bar .back-btn svg {
+    width: 22px; height: 22px;
+    stroke: currentColor; fill: none;
+    stroke-width: 2; stroke-linecap: round; stroke-linejoin: round;
+  }
+  .step-counter {
+    text-align: center;
+    font-size: var(--font-size-xs);
+    font-weight: var(--font-weight-semibold);
+    color: var(--color-text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    line-height: 1;
+  }
+
+  .scroll-area {
+    flex: 1;
+    overflow-y: auto;
+    padding: var(--space-4) var(--space-4) var(--space-5);
+  }
+
+  .step-head { margin-bottom: var(--space-4); }
+  .step-heading {
+    font-size: var(--font-size-lg);
+    font-weight: var(--font-weight-semibold);
+    color: var(--color-text);
+    line-height: var(--line-height-tight);
+    margin: 0;
+    letter-spacing: -0.01em;
+  }
+  .step-sub {
+    font-size: var(--font-size-sm);
+    color: var(--color-text-muted);
+    line-height: var(--line-height-default);
+    margin: var(--space-2) 0 0;
+  }
+
+  .import-block { margin-top: var(--space-2); }
+  .section-header {
+    font-size: var(--font-size-xs);
+    color: var(--color-text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    font-weight: var(--font-weight-semibold);
+    margin: 0 0 var(--space-3);
+  }
+  .source-block { margin-bottom: var(--space-4); }
+  .field-label {
+    font-size: var(--font-size-xs);
+    color: var(--color-text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    font-weight: var(--font-weight-semibold);
+    display: block;
+    margin: var(--space-2) 0 var(--space-2);
+  }
+  .field-label .optional {
+    text-transform: none;
+    color: var(--color-text-dim);
+    font-weight: var(--font-weight-normal);
+    letter-spacing: 0;
+    margin-left: var(--space-2);
+  }
+  .select-wrap { position: relative; }
+  .select-wrap select {
+    width: 100%;
+    padding: var(--space-3);
+    background: var(--color-surface);
+    border: 1px solid var(--color-border-strong);
+    border-radius: var(--radius-md);
+    font-family: inherit;
+    font-size: var(--font-size-base);
+    color: var(--color-text);
+    appearance: none;
+    cursor: pointer;
+  }
+  .select-wrap::after {
+    content: '';
+    position: absolute;
+    top: 50%; right: var(--space-3);
+    width: 8px; height: 8px;
+    border-right: 2px solid var(--color-text-muted);
+    border-bottom: 2px solid var(--color-text-muted);
+    transform: translateY(-75%) rotate(45deg);
+    pointer-events: none;
+  }
+
+  .or-separator {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    margin: var(--space-4) 0 var(--space-3);
+    color: var(--color-text-dim);
+    font-size: var(--font-size-xs);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    font-weight: var(--font-weight-semibold);
+  }
+  .or-separator::before,
+  .or-separator::after {
+    content: ''; flex: 1; height: 1px;
+    background: var(--color-border);
+  }
+  .generate-btn {
+    width: 100%;
+    display: grid;
+    grid-template-columns: 36px 1fr 18px;
+    align-items: center;
+    gap: var(--space-3);
+    padding: var(--space-3) var(--space-4);
+    background: var(--color-primary-soft);
+    border: 1.5px solid var(--color-primary);
+    border-radius: var(--radius-md);
+    font-family: inherit;
+    font-size: var(--font-size-base);
+    color: var(--color-text);
+    cursor: pointer;
+    text-align: left;
+  }
+  .generate-btn .gen-icon-wrap {
+    width: 36px; height: 36px;
+    display: inline-flex; align-items: center; justify-content: center;
+    background: var(--color-surface);
+    border-radius: var(--radius-md);
+    color: var(--color-primary-strong);
+  }
+  .generate-btn .gen-icon-wrap svg {
+    width: 22px; height: 22px;
+    stroke: currentColor; fill: none;
+    stroke-width: 2; stroke-linecap: round; stroke-linejoin: round;
+  }
+  .generate-btn .gen-label {
+    font-weight: var(--font-weight-semibold);
+    color: var(--color-primary-strong);
+  }
+  .generate-btn .gen-sub {
+    display: block;
+    font-size: var(--font-size-xs);
+    color: var(--color-text-muted);
+    font-weight: var(--font-weight-normal);
+    margin-top: 2px;
+  }
+  .generate-btn .gen-chevron {
+    width: 18px; height: 18px;
+    stroke: var(--color-primary-strong); fill: none;
+    stroke-width: 2; stroke-linecap: round; stroke-linejoin: round;
+  }
+
+  .descriptor-block { margin-top: var(--space-3); }
+  .descriptor-input-wrap { position: relative; }
+  .descriptor-textarea {
+    width: 100%;
+    min-height: 120px;
+    padding: var(--space-3);
+    padding-right: 72px;
+    background: var(--color-surface);
+    border: 1px solid var(--color-danger-border);
+    border-radius: var(--radius-md);
+    font-family: var(--font-mono);
+    font-size: var(--font-size-sm);
+    color: var(--color-text);
+    line-height: 1.5;
+    resize: vertical;
+  }
+  .descriptor-textarea:focus {
+    outline: none;
+    border-color: var(--color-danger);
+    box-shadow: 0 0 0 2px var(--color-danger-soft);
+  }
+  .paste-btn {
+    position: absolute;
+    top: var(--space-2);
+    right: var(--space-2);
+    padding: var(--space-1) var(--space-3);
+    background: var(--color-surface);
+    border: 1px solid var(--color-border-strong);
+    border-radius: var(--radius-pill);
+    font-family: inherit;
+    font-size: var(--font-size-xs);
+    font-weight: var(--font-weight-semibold);
+    color: var(--color-text);
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+  }
+  .paste-btn svg { width: 12px; height: 12px; stroke: currentColor; fill: none; stroke-width: 2; }
+
+  /* ---------- Wizard footer with error region ---------- */
+  .wizard-footer {
+    flex-shrink: 0;
+    padding: var(--space-3) var(--space-4) var(--space-4);
+    background: var(--color-surface);
+    border-top: 1px solid var(--color-border);
+  }
+  .wizard-error {
+    margin-bottom: var(--space-3);
+    padding: var(--space-3);
+    background: var(--color-danger-soft);
+    border: 1px solid var(--color-danger-border);
+    border-radius: var(--radius-md);
+    color: var(--color-danger-text-on-soft);
+    font-size: var(--font-size-sm);
+    line-height: var(--line-height-default);
+    display: flex;
+    gap: var(--space-2);
+    align-items: flex-start;
+  }
+  .wizard-error .error-icon {
+    width: 18px; height: 18px; flex-shrink: 0;
+    stroke: currentColor; fill: none;
+    stroke-width: 2; stroke-linecap: round; stroke-linejoin: round;
+    margin-top: 1px;
+  }
+  .wizard-error .error-title { font-weight: var(--font-weight-semibold); margin: 0 0 2px; }
+  .wizard-error .error-body { margin: 0; }
+  .wizard-cta {
+    width: 100%;
+    padding: var(--space-3) var(--space-4);
+    background: var(--color-primary);
+    color: var(--color-on-primary);
+    border: 0;
+    border-radius: var(--radius-md);
+    font-family: inherit;
+    font-size: var(--font-size-base);
+    font-weight: var(--font-weight-semibold);
+    cursor: pointer;
+  }
+  .wizard-cta:hover { background: var(--color-primary-strong); }
+</style>
+</head>
+<body>
+
+<div class="mockup-meta">
+  <strong>Mobile — Add Purse · 1 of 3 · Inline error (single address)</strong> ·
+  <span class="status-validated">validated</span> ·
+  2026-05-13 · 360×800
+</div>
+
+<div class="phone-frame">
+  <div class="phone-screen">
+
+    <div class="app-bar">
+      <button class="back-btn" aria-label="Back to Home">
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <polyline points="15 6 9 12 15 18"/>
+        </svg>
+      </button>
+      <div class="step-counter">Step 1 of 3</div>
+      <div></div>
+    </div>
+
+    <div class="scroll-area">
+
+      <div class="step-head">
+        <h1 class="step-heading">Add a Purse</h1>
+      </div>
+
+      <button class="generate-btn" type="button">
+        <span class="gen-icon-wrap" aria-hidden="true">
+          <svg viewBox="0 0 24 24">
+            <path d="M 12 3 L 13.5 9 L 19.5 10.5 L 13.5 12 L 12 18 L 10.5 12 L 4.5 10.5 L 10.5 9 Z"/>
+            <line x1="18" y1="3" x2="18" y2="6"/>
+            <line x1="19.5" y1="4.5" x2="16.5" y2="4.5"/>
+            <line x1="6" y1="16" x2="6" y2="20"/>
+            <line x1="8" y1="18" x2="4" y2="18"/>
+          </svg>
+        </span>
+        <span>
+          <span class="gen-label">Let TallyKeep generate a fresh Purse</span>
+          <span class="gen-sub">Privately and securely stored on this device</span>
+        </span>
+        <svg class="gen-chevron" viewBox="0 0 24 24" aria-hidden="true">
+          <polyline points="9 6 15 12 9 18"/>
+        </svg>
+      </button>
+
+      <div class="or-separator" aria-hidden="true">or</div>
+
+      <div class="import-block">
+        <p class="section-header">Import from another wallet</p>
+
+        <div class="source-block">
+          <label class="field-label" for="source-pick">
+            Source <span class="optional">optional</span>
+          </label>
+          <div class="select-wrap">
+            <select id="source-pick">
+              <option value="" selected>Don't specify</option>
+              <option value="bluewallet">BlueWallet</option>
+              <option value="electrum">Electrum</option>
+              <option value="mutiny">Mutiny</option>
+              <option value="nunchuk">Nunchuk</option>
+              <option value="phoenix">Phoenix</option>
+              <option value="sparrow">Sparrow</option>
+              <option value="specter">Specter</option>
+              <option value="other">Other…</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="descriptor-block">
+          <label class="field-label" for="descriptor-input">Descriptor or xpub</label>
+          <div class="descriptor-input-wrap">
+            <textarea id="descriptor-input" class="descriptor-textarea"
+                      aria-label="Descriptor or xpub"
+                      aria-invalid="true">bc1qxy2kgdygjrsqtzq2n0yrf2493p83kkfjhx0wlh</textarea>
+            <button class="paste-btn" type="button" aria-label="Paste from clipboard">
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <rect x="9" y="3"  width="6"  height="4"  rx="1"/>
+                <rect x="5" y="5"  width="14" height="16" rx="2"/>
+              </svg>
+              Paste
+            </button>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <div class="wizard-footer">
+      <div class="wizard-error" role="alert">
+        <svg class="error-icon" viewBox="0 0 24 24" aria-hidden="true">
+          <circle cx="12" cy="12" r="10"/>
+          <line x1="12" y1="8"  x2="12" y2="13"/>
+          <line x1="12" y1="16" x2="12" y2="16.5"/>
+        </svg>
+        <div>
+          <p class="error-title">That's a single Bitcoin address.</p>
+          <p class="error-body">
+            TallyKeep tracks wallets, not isolated addresses — paste
+            the wallet's xpub or output descriptor instead.
+          </p>
+        </div>
+      </div>
+      <button class="wizard-cta" type="button">Continue</button>
+    </div>
+
+  </div>
+</div>
+
+</body>
+</html>

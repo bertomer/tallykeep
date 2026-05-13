@@ -1,0 +1,215 @@
+<!--
+  Title: Mobile — Add Purse · step 4 · Success (TallyKeep-generated)
+  Status: validated  (Rémy greenlight 2026-05-13 closing the
+                      Purse-wizard design pass)
+  Date last touched: 2026-05-13
+  Replaces: nothing on disk.
+
+  Design notes:
+  - Step 4 of the wizard, generated variant. The user reached this
+    state via the generate path (step 1 alt → wrote down seed →
+    parse-back → labelled). Same shell as the imported variant.
+  - Copy adapts: a freshly generated Purse has zero history and
+    zero balance. There's nothing to scan that would reveal
+    funds. The honest copy framing is "the Purse is ready,
+    receive your first deposit when you're ready" rather than the
+    "Scanning…" framing of the imported variant.
+  - We DO still call /holdings/purse on the backend to register
+    the descriptor and trigger a baseline scan (which finishes
+    near-instantly on an empty wallet). The user just doesn't
+    need to wait visually.
+  - Secondary nudge: a small "Receive" affordance below the
+    success copy directs the user to the Receive flow if they
+    want their first deposit address right now. (Receive ships in
+    its own iteration; the affordance is provisional and may
+    revert to just "Done" if Receive isn't yet wired up. For the
+    Purse-wizard iteration, this affordance can land disabled
+    with a "Receive ships in the next iteration" tooltip — same
+    discipline as the rest of the dev-phase work.)
+  - "Done" CTA returns to Home.
+-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>TallyKeep — Mobile — Add Purse · 3 of 3 · Success (generated)</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="_shared/tokens.css">
+<link rel="stylesheet" href="_shared/shell.css">
+<style>
+  .phone-screen { background: var(--color-bg); }
+
+  .app-bar {
+    height: var(--mobile-app-bar);
+    flex-shrink: 0;
+    display: grid;
+    grid-template-columns: 44px 1fr 44px;
+    align-items: center;
+    padding: 0 var(--space-2);
+    background: var(--color-surface);
+    border-bottom: 1px solid var(--color-border);
+  }
+  .app-bar .placeholder { width: 44px; }
+  .step-counter {
+    text-align: center;
+    font-size: var(--font-size-xs);
+    font-weight: var(--font-weight-semibold);
+    color: var(--color-text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    line-height: 1;
+  }
+
+  .scroll-area {
+    flex: 1;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+  }
+  .success-body {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: var(--space-7) var(--space-5);
+    gap: var(--space-3);
+    text-align: center;
+  }
+  .success-heading {
+    font-size: var(--font-size-lg);
+    font-weight: var(--font-weight-semibold);
+    color: var(--color-text);
+    line-height: var(--line-height-tight);
+    margin: var(--space-3) 0 0;
+  }
+  .success-sub {
+    font-size: var(--font-size-sm);
+    color: var(--color-text-muted);
+    line-height: var(--line-height-default);
+    max-width: 280px;
+    margin: 0;
+  }
+  .balance-row {
+    margin-top: var(--space-4);
+    padding: var(--space-3) var(--space-4);
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-left: 4px solid var(--color-holding-purse);
+    border-radius: var(--radius-md);
+    display: inline-flex;
+    align-items: baseline;
+    gap: var(--space-2);
+    font-size: var(--font-size-sm);
+  }
+  .balance-row .amount {
+    font-family: var(--font-sans);
+    font-size: var(--font-size-md);
+    font-weight: var(--font-weight-semibold);
+    color: var(--color-text);
+    font-variant-numeric: tabular-nums;
+  }
+  .balance-row .unit {
+    color: var(--color-text-muted);
+    font-size: var(--font-size-sm);
+  }
+  .balance-row .hint {
+    color: var(--color-text-muted);
+    margin-left: var(--space-2);
+  }
+  .receive-link {
+    margin-top: var(--space-3);
+    background: transparent;
+    border: 1px solid var(--color-border-strong);
+    border-radius: var(--radius-md);
+    padding: var(--space-3) var(--space-5);
+    font-family: inherit;
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-weight-medium);
+    color: var(--color-text);
+    cursor: not-allowed;
+    opacity: 0.6;
+  }
+  .receive-link .future {
+    font-size: var(--font-size-xs);
+    color: var(--color-text-dim);
+    margin-left: var(--space-2);
+  }
+
+  /* ---------- Wizard footer ---------- */
+  .wizard-footer {
+    flex-shrink: 0;
+    padding: var(--space-3) var(--space-4) var(--space-4);
+    background: var(--color-surface);
+    border-top: 1px solid var(--color-border);
+  }
+  .wizard-cta {
+    width: 100%;
+    padding: var(--space-3) var(--space-4);
+    background: var(--color-primary);
+    color: var(--color-on-primary);
+    border: 0;
+    border-radius: var(--radius-md);
+    font-family: inherit;
+    font-size: var(--font-size-base);
+    font-weight: var(--font-weight-semibold);
+    cursor: pointer;
+  }
+  .wizard-cta:hover { background: var(--color-primary-strong); }
+</style>
+</head>
+<body>
+
+<div class="mockup-meta">
+  <strong>Mobile — Add Purse · 3 of 3 · Success (generated)</strong> ·
+  <span class="status-validated">validated</span> ·
+  2026-05-13 · 360×800
+</div>
+
+<div class="phone-frame">
+  <div class="phone-screen">
+
+    <div class="app-bar">
+      <div class="placeholder"></div>
+      <div class="step-counter">Step 3 of 3</div>
+      <div class="placeholder"></div>
+    </div>
+
+    <div class="scroll-area">
+      <div class="success-body">
+
+        <div class="success-indicator lg" aria-hidden="true">✓</div>
+
+        <h1 class="success-heading">Purse ready</h1>
+        <p class="success-sub">
+          Your new Purse is set up. The keys live on this device.
+          It has no funds yet — receive your first deposit when
+          you're ready.
+        </p>
+
+        <div class="balance-row">
+          <span class="amount">0</span>
+          <span class="unit">sats</span>
+          <span class="hint">· fresh wallet</span>
+        </div>
+
+        <button class="receive-link" type="button" disabled aria-disabled="true">
+          Show a receive address
+          <span class="future">· next iteration</span>
+        </button>
+
+      </div>
+    </div>
+
+    <div class="wizard-footer">
+      <button class="wizard-cta" type="button">Done</button>
+    </div>
+
+  </div>
+</div>
+
+</body>
+</html>

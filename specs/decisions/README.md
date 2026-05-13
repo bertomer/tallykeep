@@ -60,4 +60,5 @@ iteration-done sanity sweep (`PROCESS.md §2.9`) checks it.
 - [0005 — Feature flags replace named user profiles](0005-feature-flags-replace-presets.md) — Accepted
 - [0006 — Purse seed origin and per-client signing capability](0006-purse-seed-origin.md) — Accepted
 - [0007 — Browser-first development with NativeBridge stubs](0007-browser-first-with-nativebridge.md) — Accepted
+- [0008 — Key custody model](0008-key-custody-model.md) — Accepted; refines principle #6 of 00_README
 - [0008 — Passphrase and recovery model (two-layer unlock)](0008-passphrase-and-recovery-model.md) — Accepted

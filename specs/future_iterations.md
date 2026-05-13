@@ -51,53 +51,29 @@ removed.
 
 ---
 
-## Open
+## Promoted
+
+Brief breadcrumbs for iterations whose full entries have moved
+to `next_iteration.md`. Removed from this file when the iteration
+ships and the next_iteration block becomes a `## Shipped <date>`
+record.
 
 ### Add Holding — Purse wizard
 
-- **Captured:** 2026-05 (split from the original "Add Holding
-  (descriptor-based)" iteration during sharpening 2026-05-13 —
-  see `next_iteration.md` re-scoping note on the Add Holding
-  scaffolding block).
-- **Motivation:** Purse is the user's daily wallet — the
-  sovereignty-first surface that the brand pitches as the user's
-  point of contact. Until this ships, the dev-phase app can
-  display Holdings (via Swagger-seeded fixture data) but the
-  user can't actually onboard a descriptor-based Holding from
-  inside the app. Also serves as the canonical descriptor-wizard
-  pattern that Strongbox and Vault then derive from.
-- **Sketch:** 4-step wizard, watch-only path only.
-    1. *Descriptor input* — multiline accepting xpub OR BIP 380
-       descriptor. Paste affordance via the NativeBridge clipboard
-       shipped in the scaffolding iteration. Single-address
-       rejection with explicit error.
-    2. *Parse-back* — script-type, derivation, first 3 derived
-       addresses, tap-to-copy.
-    3. *Label* — default suggestion derived from script-type +
-       optional source-name dropdown (Phoenix / BlueWallet /
-       Mutiny / Sparrow / Other → free-text).
-    4. *Success* — Holding created, scan kicked off, return to
-       Home populated with "Scanning…" banner on the new row.
-  Brings the **shared wizard shell** (step counter, back chevron,
-  primary CTA pinned to bottom, error region) into the codebase
-  since Purse is its first consumer. Capability-branch step 1
-  (managed flavor) stays deferred to the Capacitor-wrap iteration.
-- **Touches:** `UI/mobile.md` Add-Holding Purse section,
-  `UI/README.md` flow inventory, four new mockup files
-  (`mobile_add_holding_purse_{input,parseback,label,success}.html`),
-  frontend wizard implementation. Backend descriptor-validate +
-  purse-create endpoints already shipped by the scaffolding
-  iteration. No new NativeBridge surface (clipboard already lands
-  in scaffolding).
-- **Status:** sharpened-ready-to-promote
-- **Milestone:** pre-shipping (private-ship enabler)
-- **Notes:** Promote **first** among the three wizard iterations.
-  The shared wizard shell lands here and is reused by Strongbox
-  and Vault iterations — splitting the shell out into its own
-  iteration would create a no-consumer artifact, which is the
-  anti-pattern the scaffolding-split was designed to avoid. Both
-  the design pass (4 mockups, Purse-first as the canonical
-  wizard) and the coding pass live in this iteration.
+- **Promoted:** 2026-05-13 (after the design-pass close).
+- **Full entry:** see `next_iteration.md` "Active iteration ·
+  Add Holding — Purse wizard". 8 validated mockups in
+  `UI/mockups/`, `UI/mobile.md` Purse-wizard section locked,
+  `pre-implementation.md` `purse-upgrade-path` arbitration
+  drafted as the related future-feature breadcrumb.
+- **Next in the wizard lineup after this ships:** Strongbox
+  wizard (copy + framing variant on the Purse pattern,
+  reuses the shared wizard-shell that lands here), then
+  Vault wizard, then Account wizard.
+
+---
+
+## Open
 
 ### Add Holding — Strongbox wizard
 
@@ -1458,65 +1434,4 @@ removed.
   holds an AISP license itself, there's a real wedge for the
   sourcing-router's EU-fiat-input path.
 - **Sketch:**
-    - For the EU sourcing-router path on P2P venues: when the user
-      receives fiat into their connected IBAN as part of a P2P
-      sell-side leg, the AISP integration verifies receipt
-      automatically and releases the BTC leg from escrow without
-      arbitrator involvement.
-    - Two licensing paths: (a) partner with an existing AISP —
-      lower regulatory cost, dependency on the partner; (b) become
-      AISP-licensed under ACPR — higher cost, fewer dependencies,
-      real moat.
-    - Honest disclosure: AISP + bank are trust anchors; the
-      "atomicity" here is regulatory-grade, not cryptographic.
-- **Touches:** trading layer, sourcing-router (blocks on the
-  router entry above), regulatory posture (AISP licensing is a
-  real regime change), threat model, new external dependency
-- **Status:** idea
-- **Milestone:** post-shipping
-- **Notes:**
-    - **Hostage to the sourcing-router entry sharpening + a
-      separate regulatory analysis** of AISP licensing cost (PSD2
-      AIS under ACPR in France — the lighter end of the payment-
-      services regime; PSP authorization is heavier and not the
-      target here). Verify current ACPR / PSD2 framework before
-      committing.
-    - Why no P2P platform has built it: most are non-EU or pre-
-      EU-presence, and the AISP path is real work. This entry is
-      what "EU domicile is a wedge instead of a tax" looks like
-      for TallyKeep on the sourcing side.
-
-### Taproot Assets on Lightning sourcing (wait-and-watch)
-
-- **Captured:** 2026-05 (same sparring session; archive file as above)
-- **Motivation:** Per source notes (verify before relying), USDT
-  went live on Lightning mainnet Q1 2026 via Taproot Assets. RFQ-
-  based atomic conversion at edge nodes — sender pays USDT,
-  receiver gets BTC (or any combination). Settlement on actual
-  Bitcoin, open protocol, multiple implementations possible, no
-  federation (vs Liquid). Plausibly the future BTC-native trading
-  infrastructure; production-grade orderbook flows estimated 12–24
-  months from capture time. When mature, becomes a sourcing path
-  preferable to Liquid because of the trust model.
-- **Sketch:** Future integration in the sourcing-router. As
-  *consumer* first (RFQ to existing edge nodes). Operating our own
-  Taproot Assets edge node is a separate, larger commitment that
-  overlaps market-making territory — apply the "don't build
-  market-making" guardrail from the target-price-accumulation entry.
-- **Touches:** trading layer, sourcing-router (blocks on the
-  router entry above), Lightning integration (blocks on the
-  Lightning entry)
-- **Status:** idea
-- **Milestone:** post-shipping — wait-and-watch
-- **Notes:** Re-verify Taproot Assets maturity annually. Bitcoin
-  trading infrastructure is currently roughly Lightning circa 2018
-  per source notes — primitives work, network forming, UX poor,
-  liquidity thin. Production-grade infrastructure estimated 2–4
-  years out from capture time.
-
----
-
-## Promoted
-
-(items moved to `next_iteration.md`, kept here as breadcrumbs with a
-date until the iteration ships, then can be removed)
+    - For the EU

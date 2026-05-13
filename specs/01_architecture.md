@@ -1,16 +1,84 @@
 # 01 — Architecture
 
+This module describes TallyKeep's architecture at the level the
+spec needs to lock: surfaces, trust zones, key custody, the
+backend's internal layering, and the runtime patterns
+(persistence-first, event bus, request shapes). Implementation
+detail — the directory tree, exact event-topic strings, specific
+worker-component file names — lives in code, not here. Cross-refs
+into `decisions/` for foundational calls.
+
+## Surfaces and trust zones
+
+TallyKeep is **not** a backend-only product. Several surfaces
+participate at runtime, each with different capabilities and
+different trust posture. An agent reasoning about any feature
+should first locate which surface is responsible.
+
+| Surface | What it runs | What it can do | What it cannot do |
+|---|---|---|---|
+| **Backend** | FastAPI app, Postgres, Redis, worker process. Docker Compose stack on the user's host (or hosted-tier infrastructure when that ships). | Observe the chain via bitcoind. Construct PSBTs. Persist Holdings, Descriptors, LedgerEntries. Call custodial-provider APIs. Emit and consume domain events. Encrypt and decrypt third-party credentials with the user's passphrase. | **Hold spending keys.** Sign anything. Create user accounts on TallyKeep infrastructure. |
+| **Capacitor client** | The mobile app (Capacitor wrap of the SvelteKit PWA), distributed via app store / sideload. | Hold spending keys for `TALLYKEEP_MANAGED` and `EXTERNAL_IMPORTED` Purses, in OS Keychain/Keystore, biometric-gated. Sign with the on-device key via NativeBridge. Read camera (QR). Subscribe to push notifications. | Transmit spending keys to the backend. Sign for Holdings whose keys live elsewhere (a Strongbox's hardware wallet, an external-watch-only Purse's source wallet). |
+| **Browser PWA client** | The SvelteKit PWA in any browser (desktop Chrome / Safari / Firefox, mobile browsers, or installed-as-PWA). Same SvelteKit code as the Capacitor client; the `NativeBridge` interface stubs out. | Observe Holdings. Render flows. Compose PSBTs server-side and download the file. | Hold spending keys (no OS-grade secure storage primitive). Sign with on-device keys. Operations requiring keys gate honestly with "install the app / sign externally". |
+| **bitcoind** | Bitcoin Core node, pruned or full, running on the user's host (or shared in the hosted tier — see `future_iterations.md`). | Serve chain data via JSON-RPC. Push live events via ZeroMQ. Hold the source-of-truth view of the chain. | Sign anything. The backend never sends keys to bitcoind for signing. |
+| **Custodial provider** | Third-party exchange / broker API (Kraken, Bitstamp; future Lemon, Buenbit, Belo, Coinbase Advanced, Swissquote). | Hold custody of the user's BTC (and stablecoin) balances at the provider. Accept withdrawals to whitelisted addresses. | Anything TallyKeep is responsible for. TallyKeep owns the API credentials encrypted at rest; the provider owns the funds. |
+| **Hardware wallet** | The user's external signing device (Coldcard, Trezor, Ledger, Jade, BitBox, airgapped laptop). | Hold the spending key for Strongbox or Vault Holdings. Sign PSBTs offered to it by file / USB / QR. | Reach TallyKeep directly. The user is the bridge — they export a PSBT, walk it to the hardware wallet, walk the signed PSBT back. |
+
+**Backend network binding (dev / personal-use phase):** all
+services bind to `127.0.0.1` only. Docker Compose maps ports to
+`127.0.0.1:PORT`, never `0.0.0.0`. No public listener. The
+security boundary is the OS user account. The authentication
+layer (passphrase + biometric on Capacitor) is a private-ship
+requirement (per ADR-0003); the public-ship event hardens it
+further. Remote access for self-hosters is documented in
+`future_iterations.md` "Remote access for self-hosters" and is
+opt-in.
+
+**Hosted-tier surface:** when the hosted tier ships (per
+`future_iterations.md`), the backend moves from "user's host" to
+"TallyKeep infrastructure" but the trust zones do **not** change:
+the backend still never holds spending keys. The Capacitor
+client's key-holding model is identical between self-hosted and
+hosted tiers — the seed lives on the user's phone, never on the
+server, regardless of which backend the phone talks to.
+
+## Key custody model
+
+Per **ADR-0008**, key custody splits into four zones. The spec
+states it once here; per-Holding modules reference back rather
+than restating.
+
+1. **Backend** — never holds spending keys, ever. Holds
+   descriptors, custodial credentials (encrypted at rest with
+   the user's passphrase), configuration.
+2. **Capacitor client** — holds spending keys for
+   `TALLYKEEP_MANAGED` and `EXTERNAL_IMPORTED` Purses, in OS
+   secure storage, biometric-gated, never transmitted to the
+   backend. Per-client signing-capability check (per ADR-0006)
+   is local: a different Capacitor instance reaching the same
+   backend will see the Holding as view-only.
+3. **Hardware wallet** — holds Strongbox / Vault keys. TallyKeep
+   choreographs (PSBT export → external sign → re-import →
+   broadcast); never sees the key.
+4. **Custodial provider** — holds Account keys server-side; the
+   user manages keys with the provider.
+
+The browser PWA never holds spending keys (no OS-grade secure
+storage primitive). Operations requiring local keys present
+honest gates ("install the app / sign externally"), not
+fake-signing.
+
 ## Service topology
 
-The deployment is a Docker Compose stack with the following services:
+The backend deployment is a Docker Compose stack:
 
 ```
 ┌──────────────────────────────────────────────────────────────────────────┐
 │                         User's host (localhost)                          │
 │                                                                          │
 │  ┌──────────────┐                                                        │
-│  │   Frontend   │  SvelteKit PWA, talks to Backend over HTTP and SSE     │
-│  │  SvelteKit   │                                                        │
+│  │   Frontend   │  SvelteKit PWA (browser) or Capacitor wrap (mobile).   │
+│  │  SvelteKit   │  Talks to Backend over HTTP and SSE.                   │
 │  └──────┬───────┘                                                        │
 │         │ HTTP + SSE                                                     │
 │         ▼                                                                │
@@ -28,32 +96,38 @@ The deployment is a Docker Compose stack with the following services:
 │  └──────────────┘                        ▼                ▼              │
 │                                   ┌────────────────────────────┐         │
 │                                   │     Worker process(es)     │         │
-│                                   │                            │         │
-│                                   │  • ChainListener (ZMQ)     │         │
-│                                   │  • CustodialPoller (cron)  │         │
-│                                   │  • SweepEngine (subscriber)│         │
-│                                   │  • Categorizer (subscriber)│         │
-│                                   │  • LightningListener (1.5) │         │
+│                                   │  listeners / schedulers /  │         │
+│                                   │  subscribers (see below)   │         │
 │                                   └────────────────────────────┘         │
 │                                                                          │
 │       Network binding: ALL services on 127.0.0.1 only.                   │
-│       No service listens on a public interface in the dev or            │
-│       personal-use phase (per ADR-0003).                                 │
 └──────────────────────────────────────────────────────────────────────────┘
 ```
 
 ### Services
 
-- **bitcoind** — Official Bitcoin Core image. Runs in pruned or full mode (user choice). RPC and ZeroMQ both exposed only on the Docker internal network. The app is the only client.
-- **backend** — FastAPI application. Handles HTTP API and Server-Sent Events stream. Talks to `bitcoind` (RPC), Postgres, Redis (publish events, enqueue jobs), and ccxt-wrapped custodial provider APIs. Does not run scheduled tasks itself.
-- **worker** — Same Python codebase, separate entry point. Runs three kinds of components: listeners (consume external feeds and translate to events), schedulers (emit events on a timer), and subscribers (react to events from the bus).
-- **postgres** — Persistent state. Schema managed via Alembic.
-- **redis** — Two roles: event bus (publish/subscribe) and job queue (RQ). One service, two uses; we may split if it ever becomes a bottleneck.
-- **frontend** — SvelteKit PWA served as static files by a lightweight nginx, or by the backend itself in the dev phase.
+- **bitcoind** — Bitcoin Core image. Pruned or full (user choice).
+  RPC and ZeroMQ on the Docker internal network only. Backend is
+  the sole client.
+- **backend** — FastAPI application. HTTP API + Server-Sent
+  Events. Talks to bitcoind (RPC), Postgres, Redis (events + job
+  queue), and ccxt-wrapped custodial-provider APIs. Does not run
+  scheduled tasks itself.
+- **worker** — same Python codebase, separate entry point. Runs
+  three component kinds: listeners (consume external feeds →
+  events), schedulers (emit events on a timer), subscribers
+  (react to events).
+- **postgres** — persistent state. Schema managed via Alembic.
+- **redis** — two roles: event bus (publish/subscribe) and job
+  queue (RQ). One service, two uses; may split if it ever
+  bottlenecks.
+- **frontend** — SvelteKit PWA static files served by a
+  lightweight nginx, or by the backend itself in the dev phase.
 
-## The three-layer separation: ACL, queue, bus
+## Internal layering: ACL, queue, bus
 
-External systems and our domain are separated by three distinct layers, each with a single job.
+External systems and the domain are separated by three distinct
+layers, each with a single job:
 
 ```
 ┌──────────────────────────────────────────────────────────────┐
@@ -65,8 +139,7 @@ External systems and our domain are separated by three distinct layers, each wit
 │  Adapters (Anti-Corruption Layer)                            │
 │  Translate foreign data shapes into domain types.            │
 │  Pure functions and classes. No timing, no retries.          │
-│                                                              │
-│   • CustodialProviderAdapter (Kraken, Bitstamp via ccxt)     │
+│   • CustodialProviderAdapter (ccxt: Kraken, Bitstamp, …)     │
 │   • NodeAdapter (bitcoind RPC)                               │
 │   • ChainEventAdapter (bitcoind ZeroMQ)                      │
 │   • LightningProviderAdapter (Lightning iteration)           │
@@ -75,269 +148,193 @@ External systems and our domain are separated by three distinct layers, each wit
                        ▼
 ┌──────────────────────────────────────────────────────────────┐
 │  Job queue (RQ on Redis)                                     │
-│  Adds: scheduling, retries, timeouts, persistence,           │
-│  rate-limit handling, error capture.                         │
-│  Knows nothing about external data shapes.                   │
+│  Scheduling, retries, timeouts, persistence, rate-limit      │
+│  handling, error capture. Knows nothing about data shapes.   │
 └──────────────────────┬───────────────────────────────────────┘
                        │ publishes results to
                        ▼
 ┌──────────────────────────────────────────────────────────────┐
 │  Event bus (Redis pub/sub, abstracted behind an interface)   │
-│  Domain events: BalanceChanged, BlockSeen, SweepCompleted... │
-│  Many subscribers, no coupling between producer and consumer.│
+│  Domain events. Many subscribers, no producer↔consumer       │
+│  coupling.                                                   │
 └──────────────────────────────────────────────────────────────┘
 ```
 
-The three layers protect against three different failure modes:
+Each layer protects against a different failure mode:
 
-- The **adapter layer** protects the domain's vocabulary. If Kraken renames a field tomorrow, only one file changes.
-- The **job queue** protects runtime reliability. If a custodial provider call takes five seconds, no user-facing request blocks.
-- The **event bus** protects coupling. New subscribers can be added without touching producers.
+- The **adapter layer** protects the domain's vocabulary. If
+  Kraken renames a field, one file changes.
+- The **job queue** protects runtime reliability. A slow
+  custodial API call doesn't block a user-facing request.
+- The **event bus** protects coupling. New subscribers attach
+  without touching producers.
 
 ## Persistence-first for non-losable events
 
-Events are not durable in Redis pub/sub. If a subscriber is down when an event fires, it is lost. This is acceptable for ephemeral notifications (UI live updates, "now categorize this transaction") but not for state transitions where loss would mean wrong information about reality.
+Redis pub/sub is not durable. A subscriber that's down when an
+event fires loses it. Acceptable for ephemeral notifications
+(UI live updates, "categorize this transaction"); **not**
+acceptable for state transitions where loss means wrong
+information about reality.
 
-The pattern: **persist first, emit second.** Whenever a non-losable event happens, the producer:
+The pattern: **persist first, emit second.** When a non-losable
+event happens, the producer:
 
-1. Writes a row to a domain-specific audit table (e.g., `sweep_execution`, `payment_request`, `broadcast_attempt`).
+1. Writes a row to a domain-specific audit table
+   (`sweep_execution`, `payment_request`, `broadcast_attempt`).
 2. Then publishes the event on the bus.
 
-If step 2 fails or no one is listening, step 1 is the source of truth. A periodic reconciler scans recent audit-table rows and re-emits events for anything that has not been acknowledged. This pattern means the system tolerates restarts, transient Redis problems, and subscriber outages without losing state.
+If step 2 fails or no subscriber is listening, step 1 is the
+source of truth. A periodic reconciler scans recent audit-table
+rows and re-emits events for anything not acknowledged. The
+system tolerates restarts, transient Redis problems, and
+subscriber outages without losing state.
 
 ## Event taxonomy
 
-The bus topics are stable. Producers and subscribers both speak this taxonomy. The Lightning iteration adds the `lightning.*` topics shown below; later iterations may add more, but existing topics never change shape without a version bump.
+Event topics are stable. Producers and subscribers both speak
+this taxonomy. Topics are namespaced by domain area:
 
-```
-# Chain events (live via bitcoind ZeroMQ)
-chain.block.new                          { height, block_hash }
-chain.tx.mempool                         { txid, raw_tx, affected_descriptor_ids }
-chain.tx.confirmed                       { txid, height, affected_descriptor_ids }
+- `chain.*` — chain events from bitcoind ZeroMQ
+- `holding.*` — Holding-level derived events (balance changed,
+  UTXO received/spent)
+- `banking.*` — PaymentRequest and Invoice lifecycle events
+- `trading.*` — custodial balance and sweep events
+- `ledger_entry.*` — categorization events
+- `analysis.*` — declared-vs-observable discrepancy events
+- `lightning.*` — defined now; emitted once the Lightning
+  iteration ships
+- `system.*` — startup, unlock, external service connectivity
 
-# Holding-level derived events
-holding.balance.changed                  { holding_id, old_sats, new_sats }
-holding.utxo.received                    { holding_id, descriptor_id, utxo_id, value_sats }
-holding.utxo.spent                       { holding_id, descriptor_id, utxo_id }
-
-# Banking events
-banking.payment_request.created          { id, holding_id }
-banking.payment_request.signed           { id }
-banking.payment_request.broadcast        { id, txid }
-banking.payment_request.confirmed        { id, txid, height }
-banking.invoice.created                  { id, holding_id }
-banking.invoice.paid                     { id, txid, ledger_entry_id }
-
-# Trading events
-trading.custodial.balance_changed        { custodial_provider_id, old_sats, new_sats }
-trading.sweep.triggered                  { sweep_policy_id, reason }
-trading.sweep.executed                   { sweep_policy_id, withdrawal_id, amount_sats }
-trading.sweep.failed                     { sweep_policy_id, error }
-
-# Categorization events
-ledger_entry.requires_categorization     { ledger_entry_id }
-ledger_entry.categorized                 { ledger_entry_id, category }
-
-# Security analysis events
-analysis.discrepancy.detected            { holding_id, declared, observed, severity }
-
-# Lightning events (defined now; emitted once the Lightning iteration ships)
-lightning.invoice.paid                   { invoice_id, payment_hash, amount_sats }
-lightning.payment.sent                   { payment_id, payment_hash }
-lightning.channel.state_changed          { channel_id, old_state, new_state }
-
-# System events
-system.unlocked                          { }
-system.bitcoind.disconnected             { last_seen }
-system.bitcoind.reconnected              { height }
-system.custodial.auth_failed             { custodial_provider_id }
-```
+Existing topics never change shape without a version bump. The
+exhaustive topic list with payload shapes lives in code (event
+constants module); the spec promises only stability of names and
+the namespace prefixes above.
 
 ## Worker components
 
-The worker process runs the following components, each registered at startup. A single Docker container runs all of them; in larger deployments they could be split across multiple worker containers, but the current shipped layout keeps them together.
+The worker process runs three component kinds:
 
-### Listeners (translate external feeds to events)
+- **Listeners** translate external feeds into events. Current:
+  `ChainListener` (bitcoind ZMQ). Lightning iteration adds
+  `LightningListener` (CLN / LND gRPC).
+- **Schedulers** emit events on a timer. Current:
+  `CustodialPollScheduler`, `SweepScheduler`, `AnalysisScheduler`.
+- **Subscribers** react to events. Current: `CustodialPoller`,
+  `SweepEngine`, `CategorizerSuggester`, `LiveUpdateBridge`,
+  `AuditReconciler`.
 
-- **ChainListener** — subscribes to bitcoind ZeroMQ topics (`rawblock`, `rawtx`). For each notification, looks up which Descriptors are affected and emits `chain.tx.mempool` or `chain.tx.confirmed` events.
-- **LightningListener** (Lightning iteration) — subscribes to CLN or LND streaming gRPC for invoice and payment events.
-
-### Schedulers (emit events on a timer)
-
-- **CustodialPollScheduler** — every N minutes (default 10), emits `trading.custodial.poll_requested` for each active CustodialProvider. The CustodialPoller subscriber reacts.
-- **SweepScheduler** — at cron times defined by SweepPolicies, emits `trading.sweep.triggered`.
-- **AnalysisScheduler** — periodically requests fresh security-discrepancy analysis on changed Holdings.
-
-### Subscribers (react to events)
-
-- **CustodialPoller** — subscribes to `trading.custodial.poll_requested`, calls the relevant CustodialProviderAdapter, persists balance, emits `trading.custodial.balance_changed` if delta detected.
-- **SweepEngine** — subscribes to `trading.sweep.triggered` and `trading.custodial.balance_changed` (for threshold-triggered policies), evaluates whether to act, runs the sweep, persists to `sweep_execution`, emits `trading.sweep.executed` or `trading.sweep.failed`.
-- **CategorizerSuggester** — subscribes to `ledger_entry.requires_categorization`, runs heuristics, attaches non-binding suggestions visible in the UI.
-- **LiveUpdateBridge** — subscribes to all topics, forwards filtered events to connected SSE clients (the frontend).
-- **AuditReconciler** — periodic; scans audit tables for rows whose corresponding event was apparently lost, re-emits.
+Specific component file names and exact responsibilities live in
+the codebase; the spec promises only that the three kinds exist
+and that adding a new component fits one of them.
 
 ## Request shape
 
 ### Synchronous endpoints (default)
-- Read operations against local state (balances, transactions, Holdings, configuration)
-- Node-local operations (derive an address, get mempool state, build a PSBT)
+- Read operations against local state (balances, transactions,
+  Holdings, configuration).
+- Node-local operations (derive an address, get mempool state,
+  build a PSBT).
 
 ### Asynchronous endpoints (job queue)
-- Custodial provider API calls (balance fetch, withdrawal initiation)
-- Multi-step operations (e.g., "sweep all custodials now")
-- Long-running blockchain scans
+- Custodial-provider API calls (balance fetch, withdrawal
+  initiation).
+- Multi-step operations ("sweep all custodials now").
+- Long-running blockchain scans.
 
-The async pattern:
-```
-POST /api/v1/trading/sweep        → 202 Accepted { job_id }
-GET  /api/v1/jobs/{job_id}        → 200 OK       { status, result | error }
-```
-
-For long jobs the frontend can either poll `GET /jobs/{id}` or subscribe to events on the SSE stream filtered to that job.
+The async pattern: a POST returns `202 Accepted` with a `job_id`;
+the client polls a `GET /jobs/{id}` endpoint or subscribes to
+the SSE stream filtered to that job. Specific endpoint paths
+live in `api/openapi.yaml`.
 
 ### Live updates (Server-Sent Events)
-The backend exposes a single SSE endpoint that streams events from the bus to the frontend, filtered by topic and by Holdings the user is viewing. This replaces frontend polling for fresh data.
-
-```
-GET /api/v1/events/stream?topics=chain.*,holding.*,banking.*
-  → text/event-stream
-  → events arrive as { topic, payload, timestamp }
-```
+The backend exposes a single SSE endpoint that streams events
+from the bus to the frontend, filtered by topic and by Holdings
+the user is viewing. Replaces frontend polling. Endpoint shape
+in `api/openapi.yaml`.
 
 ## Network security posture (dev / personal-use phase)
 
-- **All services bind to 127.0.0.1.** Docker Compose explicitly maps ports to `127.0.0.1:PORT`, never `0.0.0.0`.
-- **No TLS** — everything is on localhost. Adding TLS later (when remote access via WireGuard or Tailscale is added — see `future_iterations.md` "Remote access for self-hosters") is a configuration change, not an architectural one.
-- **No authentication layer on the API in the dev phase.** The security boundary is the operating system user account. The authentication layer is a private-ship requirement (per ADR-0003); the public-ship event hardens it further. Documented in the threat model.
-- **CORS** — the backend accepts requests only from the local frontend origin.
+- All services bind to `127.0.0.1`.
+- No TLS — everything is on localhost. Adding TLS later (with
+  WireGuard / Tailscale for remote access — see
+  `future_iterations.md`) is a configuration change, not an
+  architectural one.
+- No authentication layer on the API in the dev phase. Security
+  boundary is the OS user account. The auth layer (passphrase +
+  biometric on Capacitor) is a private-ship requirement (per
+  ADR-0003); the public-ship event hardens it further.
+- CORS — backend accepts requests only from the local frontend
+  origin.
 
 ## Configuration model
 
-- All configuration is in a single `configuration.toml` mounted into the backend container.
-- Secrets (custodial provider credentials, node RPC password, future Lightning macaroons) are stored encrypted; see module 03 for the cryptography details.
-- Development mode uses the OS keyring; Docker mode uses an encrypted Postgres table unlocked by a passphrase the user enters at startup.
-- **The passphrase is never stored.** If the user restarts the container, they re-enter it. Until unlock, all endpoints that require a secret return `423 Locked`.
-- `server_label` — a free-form human-readable name the operator sets during stack installation (e.g. "Rémy's home stack", "Argentina parents' Umbrel"). Surfaced to clients on pairing and on subsequent connection sanity-checks. Optional; absent value means clients render only the connection endpoint or hosted-tier connection-ID. Sharpened during the onboarding-screen-2 session 2026-05.
-
-## Project layout
-
-```
-btc-app/
-├── backend/
-│   ├── app/
-│   │   ├── main.py                  # FastAPI entry point
-│   │   ├── worker.py                # Worker entry point (registers listeners/subscribers/schedulers)
-│   │   │
-│   │   ├── api/
-│   │   │   └── v1/
-│   │   │       ├── holdings.py
-│   │   │       ├── descriptors.py
-│   │   │       ├── ledger_entries.py
-│   │   │       ├── banking.py
-│   │   │       ├── trading.py
-│   │   │       ├── analysis.py
-│   │   │       ├── jobs.py
-│   │   │       ├── events_stream.py
-│   │   │       ├── configuration.py
-│   │   │       └── unlock.py
-│   │   │
-│   │   ├── domain/                  # Pure domain types (dataclasses)
-│   │   │   ├── holding.py           # Holding, Account, Purse, Strongbox, Vault
-│   │   │   ├── descriptor.py
-│   │   │   ├── ledger_entry.py
-│   │   │   ├── payment_request.py
-│   │   │   ├── invoice.py
-│   │   │   ├── custodial_provider.py
-│   │   │   ├── sweep_policy.py
-│   │   │   ├── job.py
-│   │   │   ├── user_profile.py
-│   │   │   └── enums.py
-│   │   │
-│   │   ├── adapters/                # Anti-Corruption Layer
-│   │   │   ├── node_adapter.py      # bitcoind JSON-RPC
-│   │   │   ├── chain_event_adapter.py  # bitcoind ZeroMQ
-│   │   │   ├── custodial_adapter.py # ccxt wrapper, normalizes per-provider quirks
-│   │   │   └── lightning_adapter.py # Lightning iteration
-│   │   │
-│   │   ├── services/                # Business logic
-│   │   │   ├── holding_service.py
-│   │   │   ├── banking_service.py
-│   │   │   ├── trading_service.py
-│   │   │   ├── policy_validator.py  # warns about risky sweep configurations
-│   │   │   ├── analysis_service.py  # declared-vs-observable security checks
-│   │   │   ├── blueprint_analyzer.py
-│   │   │   └── lightning_provider.py  # Lightning iteration interface
-│   │   │
-│   │   ├── workers/
-│   │   │   ├── listeners/
-│   │   │   │   └── chain_listener.py
-│   │   │   ├── schedulers/
-│   │   │   │   ├── custodial_poll_scheduler.py
-│   │   │   │   ├── sweep_scheduler.py
-│   │   │   │   └── analysis_scheduler.py
-│   │   │   └── subscribers/
-│   │   │       ├── custodial_poller.py
-│   │   │       ├── sweep_engine.py
-│   │   │       ├── categorizer_suggester.py
-│   │   │       ├── live_update_bridge.py
-│   │   │       └── audit_reconciler.py
-│   │   │
-│   │   ├── infrastructure/
-│   │   │   ├── event_bus.py         # interface + Redis impl
-│   │   │   ├── job_queue.py         # RQ wrapper
-│   │   │   ├── secrets.py           # keyring + encrypted-db backends
-│   │   │   └── cryptography.py      # Argon2id + AES-256-GCM helpers
-│   │   │
-│   │   ├── repositories/            # DAO / DB access
-│   │   ├── models/                  # SQLAlchemy ORM
-│   │   ├── schemas/                 # Pydantic schemas for the API
-│   │   ├── migrations/              # Alembic
-│   │   └── configuration.py
-│   │
-│   ├── tests/
-│   ├── pyproject.toml
-│   └── Dockerfile
-│
-├── frontend/
-│   ├── src/
-│   │   ├── routes/
-│   │   ├── lib/
-│   │   │   ├── api/                 # Typed API client (generated from OpenAPI)
-│   │   │   ├── components/
-│   │   │   ├── stores/
-│   │   │   └── events/              # SSE consumer
-│   │   └── app.html
-│   ├── static/
-│   │   └── manifest.json
-│   ├── package.json
-│   ├── svelte.config.js
-│   └── Dockerfile
-│
-├── docker-compose.yml
-├── .env.example
-└── README.md
-```
+- All configuration in a single `configuration.toml` mounted into
+  the backend container.
+- Secrets (custodial-provider credentials, node RPC password,
+  future Lightning macaroons) stored encrypted — see module 03
+  for the cryptography details.
+- Dev mode uses the OS keyring; Docker mode uses an encrypted
+  Postgres table unlocked by a passphrase the user enters at
+  startup.
+- **The passphrase is never stored.** On container restart the
+  user re-enters it. Until unlock, all endpoints that require a
+  secret return `423 Locked`.
+- `server_label` — free-form human-readable name the operator
+  sets during stack installation ("Rémy's home stack",
+  "Argentina parents' Umbrel"). Surfaced to clients on pairing
+  and connection sanity-checks. Optional; absent value means
+  clients render only the connection endpoint or hosted-tier
+  connection-ID.
 
 ## Dependency discipline
 
-- All Python dependencies pinned via `pyproject.toml` with exact versions.
-- All npm dependencies pinned via `package-lock.json`.
+- Python dependencies pinned via `pyproject.toml` with exact
+  versions.
+- npm dependencies pinned via `package-lock.json`.
 - Dependency updates reviewed manually, not auto-merged.
-- No dependency that requires an account, paid tier, or phone-home license check.
+- No dependency that requires an account, paid tier, or
+  phone-home license check.
 
 ## Testing strategy
 
-- **Unit tests** for all services, the policy validator, the blueprint analyzer, and the cryptography helpers.
-- **Integration tests** for API endpoints, using a test Postgres and a `regtest` `bitcoind`.
-- **Adapter tests** with recorded fixtures for ccxt responses (Kraken, Bitstamp), so we can detect upstream changes.
-- **Event-flow tests** that publish events on a test bus and assert subscribers behave correctly.
-- **End-to-end tests** (Playwright or Cypress) are post-shipping. Not a current gate.
-- **Target coverage**: 80% on backend `services/`, `domain/`, and `adapters/`. Coverage on API routes and frontend is not a current gate.
+- **Unit tests** for services, the policy validator, the
+  blueprint analyzer, the cryptography helpers.
+- **Integration tests** for API endpoints, using a test Postgres
+  and a `regtest` `bitcoind`.
+- **Adapter tests** with recorded fixtures for ccxt responses
+  (Kraken, Bitstamp), so upstream changes surface.
+- **Event-flow tests** that publish events on a test bus and
+  assert subscribers behave correctly.
+- **End-to-end tests** (Playwright / Cypress) are post-shipping.
+  Not a current gate.
+- **Smoke tests** — a `.ps1` suite run against the running
+  backend at iteration handoff (per PROCESS.md §2.7 stage 4).
+- **Target coverage**: 80% on backend `services/`, `domain/`,
+  `adapters/`. Coverage on API routes and frontend is not a
+  current gate.
 
 ## Observability (current minimum)
 
 - Structured JSON logging to stdout (captured by Docker).
 - Log levels configurable per module via configuration.
-- Sensitive data redacted at the log layer (any field name matching a denylist of `key|secret|passphrase|token|cookie` is replaced with `***`).
-- No metrics endpoint, no tracing, no external log shipping. (Per `00_README.md` "Out of scope": no telemetry, ever.)
-- A `/api/v1/health` endpoint returns service health (database reachable, `bitcoind` reachable, Redis reachable, last custodial poll time, unlock state).
+- Sensitive data redacted at the log layer — any field name
+  matching the denylist `key|secret|passphrase|token|cookie` is
+  replaced with `***`.
+- No metrics endpoint, no tracing, no external log shipping.
+  (Per `00_README.md` "Out of scope": no telemetry, ever.)
+- A health endpoint (path in `api/openapi.yaml`) reports service
+  health: database reachable, bitcoind reachable, Redis reachable,
+  last custodial poll time, unlock state.
+
+## What lives in code, not here
+
+- Directory tree of `backend/` and `frontend/` — lives in the
+  repo; reading it costs zero. The spec doesn't restate it.
+- Exact event-topic strings with payload shapes — the event
+  constants module is the source of truth.
+- Specific worker-component file names and responsibilities —
+  see the worker module.
+- Endpoint paths, request and response shapes — `api/openapi.yaml`.
+- SQL DDL for tables — Alembic migrations; module 03 documents
+  the invariants and secret-storage cryptography.

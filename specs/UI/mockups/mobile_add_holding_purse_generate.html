@@ -1,0 +1,349 @@
+<!--
+  Title: Mobile — Add Purse · step 1 (alt path · pre-reveal) · Generate
+  Status: validated  (Rémy greenlight 2026-05-13 closing the
+                      Purse-wizard design pass — privacy-first
+                      reveal, no Copy button, no backup-ack
+                      checkbox, warning visible in both states,
+                      Continue enabled regardless of reveal,
+                      "see later from Holdings → Purse →
+                      Information" forward-reference to the
+                      Purse-detail iteration)
+  Date last touched: 2026-05-13
+  Replaces: superseded earlier "words always visible + checkbox"
+            variant — retired to archive/UI/drafts/ via the index.
+
+  Design notes — this is the PRE-REVEAL state:
+  - Step 1 alternate path. Reached when the user taps the
+    "Let TallyKeep generate a fresh Purse" button on the default
+    step-1 input screen. Step counter stays "STEP 1 OF 3".
+  - The 12 words are NOT shown by default. The user has to
+    deliberately tap a center-positioned accent button — "Reveal
+    my recovery phrase" — before the words appear. Privacy-first
+    discipline: the user might be on a bus, in a café, at a
+    desk visible to colleagues. The wizard does not surface a
+    sensitive secret without an explicit gesture.
+  - Pattern reference: Trezor Suite, Coldcard, BitBox, 1Password
+    secret reveal. All require an explicit reveal action.
+  - Post-reveal state is rendered in
+    mobile_add_holding_purse_generate_revealed.html.
+  - Copy button DROPPED entirely vs. the prior version. Clipboard
+    for seeds is a known footgun (Windows Clipboard History,
+    Apple Universal Clipboard, Microsoft Cloud Clipboard, Gboard
+    suggestions all persist or sync clipboard content past the
+    user's awareness). The user can manually select text if they
+    insist; we do not provide the affordance.
+  - Backup-acknowledgement checkbox DROPPED entirely vs. the
+    prior version. Per the leading direction in
+    pre-implementation.md `seed-backup-disclosure`, the
+    persistent-warning model handles backup acknowledgement via
+    the security-health system on Home — not a one-shot hard gate
+    at seed-generation time. Continue is always enabled
+    post-reveal. The security-health system ships at the
+    private-ship gate; until then, a small italic note signals
+    the deferral honestly.
+  - Sensitive-screen flag (Capacitor-wrap iteration concern):
+    the wizard-shell component carries a `sensitive-screen={true}`
+    flag on this step and on the revealed step. Capacitor Android
+    wires it to FLAG_SECURE (prevents screenshots and screen
+    recording at the OS level). Capacitor iOS wires it to
+    UIApplication.userDidTakeScreenshotNotification (detect-and-
+    warn — iOS doesn't expose prevention). Browser builds (this
+    iteration) cannot prevent screenshots — the DEV MODE banner
+    is the honest signal.
+  - DEV MODE banner stays at the top in browser builds (suppressed
+    in Capacitor with real Keychain/Keystore storage).
+  - Back-chevron returns to the default step-1 input view (not
+    Home), so the user can switch back to descriptor paste.
+-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>TallyKeep — Mobile — Add Purse · 1 of 3 · Generate (pre-reveal)</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="_shared/tokens.css">
+<link rel="stylesheet" href="_shared/shell.css">
+<style>
+  .phone-screen { background: var(--color-bg); }
+
+  .app-bar {
+    height: var(--mobile-app-bar);
+    flex-shrink: 0;
+    display: grid;
+    grid-template-columns: 44px 1fr 44px;
+    align-items: center;
+    padding: 0 var(--space-2);
+    background: var(--color-surface);
+    border-bottom: 1px solid var(--color-border);
+  }
+  .app-bar .back-btn {
+    width: 36px; height: 36px;
+    display: inline-flex; align-items: center; justify-content: center;
+    background: transparent; border: 0;
+    border-radius: var(--radius-md);
+    color: var(--color-text);
+    cursor: pointer;
+    justify-self: start;
+    margin-left: var(--space-2);
+  }
+  .app-bar .back-btn:hover { background: var(--color-bg); }
+  .app-bar .back-btn svg {
+    width: 22px; height: 22px;
+    stroke: currentColor; fill: none;
+    stroke-width: 2; stroke-linecap: round; stroke-linejoin: round;
+  }
+  .step-counter {
+    text-align: center;
+    font-size: var(--font-size-xs);
+    font-weight: var(--font-weight-semibold);
+    color: var(--color-text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    line-height: 1;
+  }
+
+  .scroll-area {
+    flex: 1;
+    overflow-y: auto;
+    padding: var(--space-4) var(--space-4) var(--space-5);
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* ---------- DEV MODE banner ---------- */
+  .dev-mode-banner {
+    margin-bottom: var(--space-4);
+    padding: var(--space-3);
+    background: var(--color-danger-soft);
+    border: 1px solid var(--color-danger-border);
+    border-left: 4px solid var(--color-danger);
+    border-radius: var(--radius-sm);
+    color: var(--color-danger-text-on-soft);
+    font-size: var(--font-size-xs);
+    line-height: var(--line-height-default);
+  }
+  .dev-mode-banner strong {
+    display: block;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    margin-bottom: 2px;
+    font-weight: var(--font-weight-bold);
+  }
+
+  .step-head { margin-bottom: var(--space-4); }
+  .step-heading {
+    font-size: var(--font-size-lg);
+    font-weight: var(--font-weight-semibold);
+    color: var(--color-text);
+    line-height: var(--line-height-tight);
+    margin: 0;
+    letter-spacing: -0.01em;
+  }
+  .step-sub {
+    font-size: var(--font-size-sm);
+    color: var(--color-text-muted);
+    line-height: var(--line-height-default);
+    margin: var(--space-2) 0 0;
+  }
+
+  /* ---------- Pre-reveal: obscured seed area with center reveal CTA ---------- */
+  .seed-vault {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: var(--space-4) 0;
+    padding: var(--space-5) var(--space-4);
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-left: 4px solid var(--color-holding-purse);
+    border-radius: var(--radius-md);
+    min-height: 280px;
+    position: relative;
+  }
+  .seed-vault::before {
+    content: '';
+    position: absolute;
+    inset: 12px;
+    background:
+      repeating-linear-gradient(
+        45deg,
+        transparent 0,
+        transparent 12px,
+        rgba(0,0,0,0.03) 12px,
+        rgba(0,0,0,0.03) 24px
+      );
+    border-radius: var(--radius-sm);
+    pointer-events: none;
+  }
+  .reveal-btn {
+    position: relative;
+    z-index: 1;
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-3);
+    padding: var(--space-4) var(--space-5);
+    background: var(--color-primary);
+    color: var(--color-on-primary);
+    border: 0;
+    border-radius: var(--radius-md);
+    font-family: inherit;
+    font-size: var(--font-size-base);
+    font-weight: var(--font-weight-semibold);
+    cursor: pointer;
+    box-shadow: var(--shadow-md);
+  }
+  .reveal-btn:hover { background: var(--color-primary-strong); }
+  .reveal-btn svg {
+    width: 20px; height: 20px;
+    stroke: currentColor; fill: none;
+    stroke-width: 2; stroke-linecap: round; stroke-linejoin: round;
+  }
+  .reveal-note {
+    position: relative;
+    z-index: 1;
+    margin-top: var(--space-3);
+    font-size: var(--font-size-xs);
+    color: var(--color-text-muted);
+    text-align: center;
+    line-height: var(--line-height-default);
+    max-width: 240px;
+  }
+  .seed-vault-content {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+  }
+
+  /* Loss-of-funds warning, visible in BOTH pre-reveal and
+     revealed states (the recovery phrase exists either way —
+     the warning shouldn't be conditional on the user choosing
+     to look at it). */
+  .warning-block {
+    margin: var(--space-3) 0 0;
+    padding: var(--space-3);
+    background: var(--color-warning-soft);
+    border: 1px solid var(--color-warning-border);
+    border-radius: var(--radius-md);
+    color: var(--color-warning-text-on-soft);
+    font-size: var(--font-size-sm);
+    line-height: var(--line-height-default);
+  }
+  .warning-block strong { font-weight: var(--font-weight-semibold); }
+
+  .later-note {
+    font-size: var(--font-size-xs);
+    color: var(--color-text-muted);
+    line-height: var(--line-height-default);
+    text-align: center;
+    margin: var(--space-3) 0 0;
+  }
+  .later-note strong { color: var(--color-text); font-weight: var(--font-weight-semibold); }
+
+  /* ---------- Wizard footer ---------- */
+  .wizard-footer {
+    flex-shrink: 0;
+    padding: var(--space-3) var(--space-4) var(--space-4);
+    background: var(--color-surface);
+    border-top: 1px solid var(--color-border);
+  }
+  .wizard-cta {
+    width: 100%;
+    padding: var(--space-3) var(--space-4);
+    background: var(--color-primary);
+    color: var(--color-on-primary);
+    border: 0;
+    border-radius: var(--radius-md);
+    font-family: inherit;
+    font-size: var(--font-size-base);
+    font-weight: var(--font-weight-semibold);
+    cursor: pointer;
+  }
+  .wizard-cta:hover { background: var(--color-primary-strong); }
+</style>
+</head>
+<body>
+
+<div class="mockup-meta">
+  <strong>Mobile — Add Purse · 1 of 3 · Generate (pre-reveal)</strong> ·
+  <span class="status-validated">validated</span> ·
+  2026-05-13 · 360×800
+</div>
+
+<div class="phone-frame">
+  <div class="phone-screen">
+
+    <div class="app-bar">
+      <button class="back-btn" aria-label="Back to descriptor input">
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <polyline points="15 6 9 12 15 18"/>
+        </svg>
+      </button>
+      <div class="step-counter">Step 1 of 3</div>
+      <div></div>
+    </div>
+
+    <div class="scroll-area">
+
+      <!-- DEV MODE banner — browser fallback only. Capacitor build
+           suppresses this. -->
+      <div class="dev-mode-banner" role="note">
+        <strong>Dev mode</strong>
+        Browser builds store these keys in localStorage — fine for
+        testing with trivial amounts. Real value belongs on the
+        Capacitor app (Keychain / Keystore).
+      </div>
+
+      <div class="step-head">
+        <h1 class="step-heading">Your new Purse is ready</h1>
+        <p class="step-sub">
+          Twelve recovery words have been generated and stored
+          privately on this device. Reveal them now to write them
+          down — or come back to it later.
+        </p>
+      </div>
+
+      <div class="seed-vault" aria-label="Recovery phrase, hidden until revealed">
+        <div class="seed-vault-content">
+          <button class="reveal-btn" type="button">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M 1 12 C 4 5 8 3 12 3 C 16 3 20 5 23 12 C 20 19 16 21 12 21 C 8 21 4 19 1 12 Z"/>
+              <circle cx="12" cy="12" r="3.5"/>
+            </svg>
+            Reveal my recovery phrase
+          </button>
+          <p class="reveal-note">
+            Make sure you're somewhere private — no shoulder-surfers,
+            no shared screens, no recording.
+          </p>
+        </div>
+      </div>
+
+      <div class="warning-block">
+        <strong>Losing these words means losing this Purse and any
+        funds in it.</strong> TallyKeep can't recover them. Write
+        them on paper and store the paper somewhere only you can find.
+      </div>
+
+      <p class="later-note">
+        You can also reveal them later from
+        <strong>Holdings → Purse → Information</strong>.
+      </p>
+
+    </div>
+
+    <div class="wizard-footer">
+      <button class="wizard-cta" type="button">Continue</button>
+    </div>
+
+  </div>
+</div>
+
+</body>
+</html>

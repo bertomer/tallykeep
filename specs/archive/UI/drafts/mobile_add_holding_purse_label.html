@@ -1,0 +1,254 @@
+<!--
+  Title: Mobile — Add Purse · step 3 · Label
+  Status: draft
+  Date last touched: 2026-05-13
+  Replaces: nothing on disk.
+
+  Design notes:
+  - Step 3 of the wizard. Step counter reads "STEP 3 OF 4".
+  - Two inputs:
+      1. Name (required). Default suggestion derived from
+         script-type or source-wallet pick — pre-filled but
+         editable. Production: "Native SegWit Purse" by default,
+         updated to "{source} Purse" if source dropdown selection
+         changes (e.g. "BlueWallet Purse").
+      2. Source (optional). Dropdown for provenance / bookkeeping.
+         Values: BlueWallet · Electrum · Mutiny · Nunchuk · Phoenix
+         · Sparrow · Specter · Other (free text) · Don't specify.
+         Alphabetical. The list is broad on purpose — provenance
+         is a bookkeeping label, not a capability filter.
+  - The source-dropdown is HIDDEN when the wizard is in the
+    generated path (mode 3 — no external source to label).
+    Production parameterises by seedOrigin; this mockup renders
+    the watch-only variant.
+  - "Other (free text)" expands into a small text field below the
+    dropdown when selected. Not mocked here — common dropdown
+    pattern.
+  - No "Add" CTA on the dropdown row — selection is direct.
+  - Field grouping: Name + Source on the same card (banking
+    pattern: related metadata fields share a container).
+  - CTA label: "Add Purse" — names the action. CTA enabled when
+    Name is non-empty. (Source is optional; doesn't gate the CTA.)
+-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>TallyKeep — Mobile — Add Purse · 3 of 4 · Label</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="_shared/tokens.css">
+<link rel="stylesheet" href="_shared/shell.css">
+<style>
+  .phone-screen { background: var(--color-bg); }
+
+  .app-bar {
+    height: var(--mobile-app-bar);
+    flex-shrink: 0;
+    display: grid;
+    grid-template-columns: 44px 1fr 44px;
+    align-items: center;
+    padding: 0 var(--space-2);
+    background: var(--color-surface);
+    border-bottom: 1px solid var(--color-border);
+  }
+  .app-bar .back-btn {
+    width: 36px; height: 36px;
+    display: inline-flex; align-items: center; justify-content: center;
+    background: transparent; border: 0;
+    border-radius: var(--radius-md);
+    color: var(--color-text);
+    cursor: pointer;
+    justify-self: start;
+    margin-left: var(--space-2);
+  }
+  .app-bar .back-btn:hover { background: var(--color-bg); }
+  .app-bar .back-btn svg {
+    width: 22px; height: 22px;
+    stroke: currentColor; fill: none;
+    stroke-width: 2; stroke-linecap: round; stroke-linejoin: round;
+  }
+  .step-counter {
+    text-align: center;
+    font-size: var(--font-size-xs);
+    font-weight: var(--font-weight-semibold);
+    color: var(--color-text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    line-height: 1;
+  }
+
+  .scroll-area {
+    flex: 1;
+    overflow-y: auto;
+    padding: var(--space-5) var(--space-4);
+  }
+
+  .step-head { margin-bottom: var(--space-4); }
+  .step-heading {
+    font-size: var(--font-size-lg);
+    font-weight: var(--font-weight-semibold);
+    color: var(--color-text);
+    line-height: var(--line-height-tight);
+    margin: 0;
+    letter-spacing: -0.01em;
+  }
+  .step-sub {
+    font-size: var(--font-size-sm);
+    color: var(--color-text-muted);
+    line-height: var(--line-height-default);
+    margin: var(--space-2) 0 0;
+  }
+
+  /* ---------- Form card ---------- */
+  .form-card {
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    padding: var(--space-2) var(--space-4) var(--space-3);
+  }
+  .field {
+    padding: var(--space-3) 0;
+  }
+  .field + .field { border-top: 1px solid var(--color-border); }
+  .field .field-label {
+    font-size: var(--font-size-xs);
+    color: var(--color-text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    font-weight: var(--font-weight-semibold);
+    display: block;
+    margin-bottom: var(--space-2);
+  }
+  .field .field-label .optional {
+    text-transform: none;
+    color: var(--color-text-dim);
+    font-weight: var(--font-weight-normal);
+    letter-spacing: 0;
+    margin-left: var(--space-2);
+  }
+  .field input[type="text"],
+  .field select {
+    width: 100%;
+    padding: var(--space-3);
+    background: var(--color-bg);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    font-family: inherit;
+    font-size: var(--font-size-base);
+    color: var(--color-text);
+    appearance: none;
+  }
+  .field input[type="text"]:focus,
+  .field select:focus {
+    outline: none;
+    border-color: var(--color-border-focus);
+    box-shadow: 0 0 0 2px var(--color-primary-soft);
+  }
+  .select-wrap {
+    position: relative;
+  }
+  .select-wrap::after {
+    content: '';
+    position: absolute;
+    top: 50%; right: var(--space-3);
+    width: 8px; height: 8px;
+    border-right: 2px solid var(--color-text-muted);
+    border-bottom: 2px solid var(--color-text-muted);
+    transform: translateY(-75%) rotate(45deg);
+    pointer-events: none;
+  }
+
+  /* ---------- Wizard footer ---------- */
+  .wizard-footer {
+    flex-shrink: 0;
+    padding: var(--space-3) var(--space-4) var(--space-4);
+    background: var(--color-surface);
+    border-top: 1px solid var(--color-border);
+  }
+  .wizard-cta {
+    width: 100%;
+    padding: var(--space-3) var(--space-4);
+    background: var(--color-primary);
+    color: var(--color-on-primary);
+    border: 0;
+    border-radius: var(--radius-md);
+    font-family: inherit;
+    font-size: var(--font-size-base);
+    font-weight: var(--font-weight-semibold);
+    cursor: pointer;
+  }
+  .wizard-cta:hover { background: var(--color-primary-strong); }
+</style>
+</head>
+<body>
+
+<div class="mockup-meta">
+  <strong>Mobile — Add Purse · 3 of 4 · Label</strong> ·
+  <span class="status-draft">draft</span> ·
+  2026-05-13 · 360×800
+</div>
+
+<div class="phone-frame">
+  <div class="phone-screen">
+
+    <div class="app-bar">
+      <button class="back-btn" aria-label="Back to parse-back">
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <polyline points="15 6 9 12 15 18"/>
+        </svg>
+      </button>
+      <div class="step-counter">Step 3 of 4</div>
+      <div></div>
+    </div>
+
+    <div class="scroll-area">
+
+      <div class="step-head">
+        <h1 class="step-heading">Name this Purse</h1>
+        <p class="step-sub">
+          Pick a name you'll recognise on Home. The source dropdown
+          is optional — it's just a label so you remember where the
+          keys live.
+        </p>
+      </div>
+
+      <div class="form-card">
+        <div class="field">
+          <label class="field-label" for="purse-name">Name</label>
+          <input type="text" id="purse-name" value="Native SegWit Purse" autocomplete="off">
+        </div>
+        <div class="field">
+          <label class="field-label" for="purse-source">
+            Source
+            <span class="optional">optional</span>
+          </label>
+          <div class="select-wrap">
+            <select id="purse-source">
+              <option value="">Don't specify</option>
+              <option value="bluewallet">BlueWallet</option>
+              <option value="electrum">Electrum</option>
+              <option value="mutiny">Mutiny</option>
+              <option value="nunchuk">Nunchuk</option>
+              <option value="phoenix">Phoenix</option>
+              <option value="sparrow">Sparrow</option>
+              <option value="specter">Specter</option>
+              <option value="other">Other…</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <div class="wizard-footer">
+      <button class="wizard-cta" type="button">Add Purse</button>
+    </div>
+
+  </div>
+</div>
+
+</body>
+</html>

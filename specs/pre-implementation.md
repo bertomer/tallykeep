@@ -34,6 +34,102 @@ decision slot.
 
 ## Open
 
+### `purse-upgrade-path`
+
+**Status:** open (sharpened 2026-05-13 during the Purse-wizard
+design pass; resolution feeds the next Purse-detail iteration
+and informs the Capacitor-wrap iteration)
+
+**Item:** When a Purse is added watch-only
+(`seed_origin=EXTERNAL_WATCH_ONLY`, the user pasted a descriptor
+from another wallet), can the user later add the seed phrase /
+master xprv from that same source wallet to TallyKeep to make
+this existing Purse spendable from TallyKeep? Or is "spending
+from TallyKeep" only available by creating a fresh, separate
+`TALLYKEEP_MANAGED` Purse and migrating funds?
+
+This is the seed-origin mode the domain doesn't currently name:
+**`EXTERNAL_IMPORTED`** — TallyKeep holds the spending key
+(stored in Capacitor secure storage on a specific device, same
+mechanic as `TALLYKEEP_MANAGED`) but **TallyKeep is not the
+original creator of the seed**. The user already has a backup
+elsewhere (from the source wallet); the disclosure copy and
+the security-health surface differ accordingly.
+
+**Why this matters now.** Surfaced during the Purse-wizard
+brainstorm 2026-05-13. Rémy's framing: "if a user wants to
+load their Mutiny / Phoenix seed into TallyKeep to keep
+spending after the source wallet's service degrades, that
+should work — it's even better for the brand." The wizard
+deliberately ships watch-only-only on step 1 (paste descriptor)
+plus generate-only on step 1's alt path; the seed-import path
+lives elsewhere because it doesn't fit "add Purse" — it fits
+"upgrade an existing watch-only Purse to spendable."
+
+**Leading direction:** the affordance lives on the **Purse
+Detail page**, not in the Add wizard. Watch-only Purses surface
+a discoverable but greyed-out Send control on their detail
+page; tapping it presents the upgrade flow ("Add the keys to
+this Purse so you can spend from TallyKeep"). That flow is its
+own micro-iteration with:
+
+- A textarea accepting BIP39 mnemonic (12 / 24 words) or master
+  xprv. Inline validation against the wallet whose descriptor
+  is already imported — refuses pastes that don't derive to the
+  same descriptor.
+- Capacitor-only at ship; browser-fallback gating per ADR-0007
+  (the DEV MODE localStorage stub from the Purse-wizard
+  iteration is reusable here).
+- Disclosure copy specific to the imported-seed case:
+  "TallyKeep now stores a copy of these keys on this device.
+  You already have a backup from where you exported the seed —
+  keep it safe. Spending from both apps on the same wallet
+  without coordinating can cause failed broadcasts (the
+  protocol prevents double-spend; the UX gets confusing)."
+- Security-health surface registers the imported Purse with
+  copy distinct from generated Purses (no "TallyKeep gave you
+  this seed" framing — the user got it elsewhere).
+
+**Open part — full session needed:**
+
+- Domain model: is `seed_origin` a mutable field (a watch-only
+  Purse becomes `EXTERNAL_IMPORTED` on upgrade)? Or do we
+  preserve the original origin and add a separate
+  `spending_capability` flag on the Holding? ADR-0006
+  preceded this discussion; revisit.
+- Disclosure copy lockstep with `seed-backup-disclosure`
+  — the imported-seed case is a meaningful variant.
+- Double-spend UX disclosure — text + when it surfaces (only
+  at upgrade time, or also at first Send on an imported
+  wallet?).
+- Capacitor gate posture: is the upgrade affordance hidden
+  in the browser build (gauntlet 5 absence-of-affordance) or
+  shown-with-banner (gauntlet 5 honest gate)? Probably the
+  former — the localStorage stub is acceptable for
+  Rémy-only personal-shipping but not the right shape for a
+  user-facing affordance.
+- Naming for the third `seed_origin` enum value — `EXTERNAL_
+  IMPORTED` is the working name; alternatives: `USER_IMPORTED`,
+  `EXTERNAL_SPENDABLE`.
+
+**Why this is preferable to baking the upgrade into the Add
+wizard:** the wizard's job is registering a new Purse. The
+upgrade is a transformation of an existing Purse. Different
+verbs, different mental model, different navigational entry
+point ("I'm here on this Purse's page" vs. "I'm here adding a
+Holding"). Forcing both verbs through the same wizard would
+either (a) make the wizard's step 1 a three-way fork (paste
+descriptor / paste seed / generate), which fragments the
+"name + source" step 3 because the source semantics differ
+across modes, or (b) require a fourth step asking "are you
+upgrading or registering?", which is a bizarre question to
+the user.
+
+**Decision:** ___ (pending session)
+**Decided on:** ___
+
+---
+
 ### `seed-backup-disclosure`
 
 **Status:** open (leading direction; full session pending to

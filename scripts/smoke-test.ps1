@@ -298,6 +298,73 @@ foreach ($h in $summary.holdings) {
 }
 
 
+# --- 13d. Purse wizard path coverage (Add Holding — Purse wizard iteration) ---
+
+Section "13d. Purse wizard — regtest tpub validation + tallykeep_managed creation"
+
+# Validate a regtest tpub — exercises frontend's "tpub prefix → regtest" detection.
+$tpubRegtest = "wpkh(tpubD6NzVbkrYhZ4XHndKkuB8FifXm8r5FQHwrN6oZuWCz13qb93rtgKvD4PQsqC4HP4yhV3tA2fqr2RbY5mNXfM7RxXUoeABoDtsFUq2zJq6YK/900/*)"
+$validateRegtest = @{ input = $tpubRegtest; network = "regtest" } | ConvertTo-Json -Compress
+$validatedRegtest = Invoke-RestMethod -Method Post -Uri "$BaseUrl/api/v1/descriptors/validate" `
+    -ContentType 'application/json' -Body $validateRegtest -Headers $Headers
+Show "regtest script_type"    $validatedRegtest.script_type
+Show "regtest is_multisig"    $validatedRegtest.is_multisig
+Show "regtest first_addr[0]"  ($validatedRegtest.first_addresses | Select-Object -First 1)
+
+# Create a tallykeep_managed Purse — exercises the generate mode path.
+# Uses branch /901/* to avoid conflicting with other smoke sections.
+$tpubGenerated = "wpkh(tpubD6NzVbkrYhZ4XHndKkuB8FifXm8r5FQHwrN6oZuWCz13qb93rtgKvD4PQsqC4HP4yhV3tA2fqr2RbY5mNXfM7RxXUoeABoDtsFUq2zJq6YK/901/*)"
+$managedPurseBody = @{
+    name        = "Smoke TallyKeep Purse"
+    purpose     = "spending"
+    seed_origin = "tallykeep_managed"
+    declared_security = @{
+        custody_model = "self_single"
+        signing_model = "software_hot"
+    }
+    descriptors = @(
+        @{
+            name       = "main"
+            expression = $tpubGenerated
+            network    = "regtest"
+            gap_limit  = 20
+        }
+    )
+} | ConvertTo-Json -Compress -Depth 6
+try {
+    $managedPurse = Invoke-RestMethod -Method Post -Uri "$BaseUrl/api/v1/holdings/purse" `
+        -ContentType 'application/json' -Body $managedPurseBody -Headers $Headers
+    Show "managed seed_origin"   $managedPurse.seed_origin
+    Show "managed holding_type"  $managedPurse.holding_type
+    $managedPurseId = $managedPurse.id
+    # Archive immediately so it doesn't interfere with section 14 counts.
+    Invoke-WebRequest -Method Post -Uri "$BaseUrl/api/v1/holdings/$managedPurseId/archive" `
+        -Headers $Headers | Out-Null
+    Show "managed archived"      "ok"
+} catch {
+    if ($_.Exception.Response.StatusCode -eq 409) {
+        Show "managed skipped" "already imported (run dev-reset.ps1)"
+    } else { throw }
+}
+
+# Phoenix miniscript graceful rejection — verify the backend returns a typed
+# error (not a 500) when a miniscript fragment is submitted.
+# Frontend shows the error text; the server must not crash.
+try {
+    $phoenixMiniscript = 'wsh(and_v(v:pk([deadbeef/84h/0h/0h]tpubD6NzVbkrYhZ4XHndKkuB8FifXm8r5FQHwrN6oZuWCz13qb93rtgKvD4PQsqC4HP4yhV3tA2fqr2RbY5mNXfM7RxXUoeABoDtsFUq2zJq6YK/0/*),older(144)))'
+    $phoenixBody = @{ input = $phoenixMiniscript; network = "regtest" } | ConvertTo-Json -Compress
+    Invoke-RestMethod -Method Post -Uri "$BaseUrl/api/v1/descriptors/validate" `
+        -ContentType 'application/json' -Body $phoenixBody -Headers $Headers | Out-Null
+    Show "phoenix miniscript" "200 — backend accepted it (unexpected but not fatal)"
+} catch {
+    $sc = $_.Exception.Response.StatusCode.value__
+    Show "phoenix miniscript rejection" "status=$sc (not 500 = $($sc -ne 500))"
+    if ($sc -eq 500) {
+        throw "Phoenix miniscript returned 500 — backend must return a typed error, not crash"
+    }
+}
+
+
 # --- 14. Chain scan against regtest (M5.2) -----------------------------------
 
 Section "14. Chain scan: create regtest Purse, fund, /rescan, balance"

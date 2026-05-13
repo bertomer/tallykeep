@@ -29,7 +29,12 @@ Marketing voice should foreground the first two layers — concrete utility for 
 3. **Declared security versus observable security.** The user declares what each Holding is supposed to be; the analyzer continuously checks whether the on-chain reality matches the declaration. Discrepancies are surfaced.
 4. **Minimum-exposure trading.** Custodial providers are pass-through liquidity, not storage. Funds leave them as fast as policy allows.
 5. **Generalized SweepPolicy.** Not just "exchange to cold." Any Holding to any Holding, with a safety validator that warns about risky configurations but never blocks. The user is the final authority; the validator just makes sure they know what they are doing before they do it.
-6. **No custody, no accounts, no signing keys held by the app.** The app is a tool the user drives; it never owns user funds or identity material. Only third-party access credentials are stored, encrypted at rest.
+6. **No custody of funds. Key custody is bounded and explicit.** TallyKeep never custodies user funds and never creates user accounts on TallyKeep infrastructure. Where signing keys live is a four-zone model (per ADR-0008):
+   - *Backend:* never holds spending keys, ever. Holds descriptors (public-key info), custodial-provider API credentials (encrypted at rest with the user's passphrase), configuration.
+   - *Capacitor client:* holds spending keys only for `TALLYKEEP_MANAGED` and `EXTERNAL_IMPORTED` Purses, in OS secure storage (iOS Keychain / Android Keystore), biometric-gated, never transmitted to the backend.
+   - *Hardware wallet:* Strongbox and Vault keys live on the user's external signing device. TallyKeep choreographs PSBTs; never sees keys.
+   - *Custodial provider:* Account keys are held by the third party (Kraken, Bitstamp, etc.). TallyKeep reads balances and triggers withdrawals via API.
+   The browser PWA explicitly never holds spending keys (no OS-grade secure storage); operations requiring local keys gate honestly.
 7. **Internal API-first.** The frontend is one consumer of the backend API. External or public API exposure is explicitly out of scope through the personal-use phase. The architecture stays ready for future external exposure (institutional reuse, third-party services) without designing for it now.
 8. **Event-driven where appropriate, persistent where loss is unacceptable.** Domain events flow on a bus for live UI updates and decoupled subscribers; critical state transitions are also written to audit tables so nothing is lost if a subscriber misses an event.
 9. **Non-requirement discipline.** Anything that brings regulatory or compliance surface is rejected by default.

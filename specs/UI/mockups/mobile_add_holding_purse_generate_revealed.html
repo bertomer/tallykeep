@@ -1,0 +1,314 @@
+<!--
+  Title: Mobile — Add Purse · step 1 (alt path · revealed) · Generate
+  Status: validated  (Rémy greenlight 2026-05-13 closing the
+                      Purse-wizard design pass)
+  Date last touched: 2026-05-13
+  Replaces: nothing on disk.
+
+  Design notes — this is the POST-REVEAL state:
+  - Same wizard shell as the pre-reveal mockup. After the user
+    taps "Reveal my recovery phrase" in the pre-reveal state, the
+    obscured area disappears and the 12 words render in a 3×4
+    numbered grid.
+  - Above the grid: a small "Hide phrase" link lets the user
+    re-obscure without leaving the screen (useful if someone
+    walks up). Same gesture as Trezor Suite.
+  - No Copy button. Clipboard is a known seed-leak vector.
+  - No backup-acknowledgement checkbox. Continue is always
+    enabled here.
+  - Warning paragraph below the grid carries the loss-of-funds
+    reminder.
+  - Italic note about the future security-health system stays
+    visible.
+  - DEV MODE banner stays at the top in browser builds.
+  - Sensitive-screen flag still set (Capacitor: FLAG_SECURE
+    on Android, screenshot-detection on iOS; browser: no
+    prevention, banner is the honest signal).
+  - Example seed shown is the canonical BIP39 test-vector
+    sequence ("abandon abandon ... about") so no one mistakes
+    the mockup for a real seed leak.
+-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>TallyKeep — Mobile — Add Purse · 1 of 3 · Generate (revealed)</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="_shared/tokens.css">
+<link rel="stylesheet" href="_shared/shell.css">
+<style>
+  .phone-screen { background: var(--color-bg); }
+
+  .app-bar {
+    height: var(--mobile-app-bar);
+    flex-shrink: 0;
+    display: grid;
+    grid-template-columns: 44px 1fr 44px;
+    align-items: center;
+    padding: 0 var(--space-2);
+    background: var(--color-surface);
+    border-bottom: 1px solid var(--color-border);
+  }
+  .app-bar .back-btn {
+    width: 36px; height: 36px;
+    display: inline-flex; align-items: center; justify-content: center;
+    background: transparent; border: 0;
+    border-radius: var(--radius-md);
+    color: var(--color-text);
+    cursor: pointer;
+    justify-self: start;
+    margin-left: var(--space-2);
+  }
+  .app-bar .back-btn:hover { background: var(--color-bg); }
+  .app-bar .back-btn svg {
+    width: 22px; height: 22px;
+    stroke: currentColor; fill: none;
+    stroke-width: 2; stroke-linecap: round; stroke-linejoin: round;
+  }
+  .step-counter {
+    text-align: center;
+    font-size: var(--font-size-xs);
+    font-weight: var(--font-weight-semibold);
+    color: var(--color-text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    line-height: 1;
+  }
+
+  .scroll-area {
+    flex: 1;
+    overflow-y: auto;
+    padding: var(--space-4) var(--space-4) var(--space-5);
+  }
+
+  .dev-mode-banner {
+    margin-bottom: var(--space-4);
+    padding: var(--space-3);
+    background: var(--color-danger-soft);
+    border: 1px solid var(--color-danger-border);
+    border-left: 4px solid var(--color-danger);
+    border-radius: var(--radius-sm);
+    color: var(--color-danger-text-on-soft);
+    font-size: var(--font-size-xs);
+    line-height: var(--line-height-default);
+  }
+  .dev-mode-banner strong {
+    display: block;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    margin-bottom: 2px;
+    font-weight: var(--font-weight-bold);
+  }
+
+  .step-head { margin-bottom: var(--space-3); }
+  .step-heading {
+    font-size: var(--font-size-lg);
+    font-weight: var(--font-weight-semibold);
+    color: var(--color-text);
+    line-height: var(--line-height-tight);
+    margin: 0;
+    letter-spacing: -0.01em;
+  }
+  .step-sub {
+    font-size: var(--font-size-sm);
+    color: var(--color-text-muted);
+    line-height: var(--line-height-default);
+    margin: var(--space-2) 0 0;
+  }
+
+  /* ---------- Seed phrase card ---------- */
+  .seed-card {
+    margin: var(--space-3) 0;
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-left: 4px solid var(--color-holding-purse);
+    border-radius: var(--radius-md);
+    padding: var(--space-3) var(--space-4) var(--space-4);
+  }
+  .seed-aux-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: var(--space-3);
+  }
+  .seed-aux-top .label {
+    font-size: var(--font-size-xs);
+    color: var(--color-text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    font-weight: var(--font-weight-semibold);
+  }
+  .hide-btn {
+    background: transparent; border: 0; padding: 0;
+    font-family: inherit; font-size: var(--font-size-xs);
+    font-weight: var(--font-weight-semibold);
+    color: var(--color-primary-strong);
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+  }
+  .hide-btn svg { width: 12px; height: 12px; stroke: currentColor; fill: none; stroke-width: 2; }
+
+  .seed-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: var(--space-2) var(--space-3);
+  }
+  .seed-word {
+    display: flex;
+    align-items: baseline;
+    gap: var(--space-2);
+    padding: var(--space-2);
+    background: var(--color-bg);
+    border-radius: var(--radius-sm);
+  }
+  .seed-word .num {
+    font-size: var(--font-size-xs);
+    color: var(--color-text-dim);
+    font-variant-numeric: tabular-nums;
+    width: 14px;
+    flex-shrink: 0;
+  }
+  .seed-word .word {
+    font-family: var(--font-mono);
+    font-size: var(--font-size-sm);
+    color: var(--color-text);
+    font-weight: var(--font-weight-medium);
+  }
+
+  .warning-block {
+    margin: var(--space-3) 0;
+    padding: var(--space-3);
+    background: var(--color-warning-soft);
+    border: 1px solid var(--color-warning-border);
+    border-radius: var(--radius-md);
+    color: var(--color-warning-text-on-soft);
+    font-size: var(--font-size-sm);
+    line-height: var(--line-height-default);
+  }
+  .warning-block strong { font-weight: var(--font-weight-semibold); }
+
+  .future-note {
+    font-size: var(--font-size-xs);
+    color: var(--color-text-muted);
+    line-height: var(--line-height-default);
+    text-align: center;
+    margin: var(--space-3) 0 0;
+  }
+  .future-note strong { color: var(--color-text); font-weight: var(--font-weight-semibold); }
+
+  .wizard-footer {
+    flex-shrink: 0;
+    padding: var(--space-3) var(--space-4) var(--space-4);
+    background: var(--color-surface);
+    border-top: 1px solid var(--color-border);
+  }
+  .wizard-cta {
+    width: 100%;
+    padding: var(--space-3) var(--space-4);
+    background: var(--color-primary);
+    color: var(--color-on-primary);
+    border: 0;
+    border-radius: var(--radius-md);
+    font-family: inherit;
+    font-size: var(--font-size-base);
+    font-weight: var(--font-weight-semibold);
+    cursor: pointer;
+  }
+  .wizard-cta:hover { background: var(--color-primary-strong); }
+</style>
+</head>
+<body>
+
+<div class="mockup-meta">
+  <strong>Mobile — Add Purse · 1 of 3 · Generate (revealed)</strong> ·
+  <span class="status-validated">validated</span> ·
+  2026-05-13 · 360×800
+</div>
+
+<div class="phone-frame">
+  <div class="phone-screen">
+
+    <div class="app-bar">
+      <button class="back-btn" aria-label="Back to descriptor input">
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <polyline points="15 6 9 12 15 18"/>
+        </svg>
+      </button>
+      <div class="step-counter">Step 1 of 3</div>
+      <div></div>
+    </div>
+
+    <div class="scroll-area">
+
+      <div class="dev-mode-banner" role="note">
+        <strong>Dev mode</strong>
+        Browser builds store these keys in localStorage — fine for
+        testing with trivial amounts. Real value belongs on the
+        Capacitor app (Keychain / Keystore).
+      </div>
+
+      <div class="step-head">
+        <h1 class="step-heading">Your recovery phrase</h1>
+        <p class="step-sub">
+          Write these 12 words down on paper, in order.
+        </p>
+      </div>
+
+      <div class="seed-card">
+        <div class="seed-aux-top">
+          <span class="label">12-word recovery phrase</span>
+          <button class="hide-btn" type="button" aria-label="Hide the phrase">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M 3 3 L 21 21"/>
+              <path d="M 9.88 9.88 A 3.5 3.5 0 0 0 14.12 14.12"/>
+              <path d="M 6 6 C 4 7.5 2.5 9.5 1 12 C 4 19 8 21 12 21 C 13.5 21 14.9 20.75 16.2 20.3"/>
+              <path d="M 18 18 C 20 16.5 21.5 14.5 23 12 C 20 5 16 3 12 3 C 10.5 3 9.1 3.25 7.8 3.7"/>
+            </svg>
+            Hide
+          </button>
+        </div>
+        <div class="seed-grid" aria-label="12-word recovery phrase">
+          <div class="seed-word"><span class="num">1</span><span class="word">abandon</span></div>
+          <div class="seed-word"><span class="num">2</span><span class="word">abandon</span></div>
+          <div class="seed-word"><span class="num">3</span><span class="word">abandon</span></div>
+          <div class="seed-word"><span class="num">4</span><span class="word">abandon</span></div>
+          <div class="seed-word"><span class="num">5</span><span class="word">abandon</span></div>
+          <div class="seed-word"><span class="num">6</span><span class="word">abandon</span></div>
+          <div class="seed-word"><span class="num">7</span><span class="word">abandon</span></div>
+          <div class="seed-word"><span class="num">8</span><span class="word">abandon</span></div>
+          <div class="seed-word"><span class="num">9</span><span class="word">abandon</span></div>
+          <div class="seed-word"><span class="num">10</span><span class="word">abandon</span></div>
+          <div class="seed-word"><span class="num">11</span><span class="word">abandon</span></div>
+          <div class="seed-word"><span class="num">12</span><span class="word">about</span></div>
+        </div>
+      </div>
+
+      <div class="warning-block">
+        <strong>Losing these words means losing this Purse and any
+        funds in it.</strong> TallyKeep can't recover them. Write
+        them on paper and store the paper somewhere only you can find.
+      </div>
+
+      <p class="future-note">
+        You can return to this view anytime from
+        <strong>Holdings → Purse → Information</strong>.
+      </p>
+
+    </div>
+
+    <div class="wizard-footer">
+      <button class="wizard-cta" type="button">Continue</button>
+    </div>
+
+  </div>
+</div>
+
+</body>
+</html>

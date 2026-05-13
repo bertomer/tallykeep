@@ -77,6 +77,31 @@ Anything not in canonical, path-to-target, or `decisions/` is
 either a working draft or archived history. The next agent should
 never need to read `archive/` to do its job.
 
+**Three universes of state, three homes.** Because the spec is
+read by agents who need to know not just *what TallyKeep is* but
+*where it is right now*:
+
+- **Target state** — the canonical specs above. Describes the
+  product we are building toward. Features marked "deferred"
+  here are target behavior that hasn't shipped yet, with a
+  pointer to where the work is tracked.
+- **Current state** — the **code**, plus the OpenAPI export from
+  the running backend. The code is what is actually live. Reading
+  current state means reading code and the OpenAPI YAML; the spec
+  does not redundantly describe "what ships today."
+- **Open decisions** — `pre-implementation.md` (must-decide,
+  blocking) and `future_iterations.md` (parked ideas). The
+  decisions not yet made; what TallyKeep *might* be.
+
+The bridge between target and current is the **"deferred" marker**
+in canonical specs and the iteration cycle (§2.7). An iteration
+implements a slice of target → current; on closeout, the slice's
+"deferred" marker comes out of the canonical specs and the
+feature is live. The spec never describes "what's live today"
+separately from "what's target" — that would require
+sync-discipline we know we can't maintain. Code is the truth for
+current; spec is the truth for target.
+
 ---
 
 ## 2. Core rules

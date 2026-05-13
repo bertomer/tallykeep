@@ -1,0 +1,397 @@
+<!--
+  Title: Mobile — Add Purse · ALTERNATIVE step 1 (source-first layout)
+  Status: draft  (alternative for Rémy's review against
+                  mobile_add_holding_purse_input.html — pick one,
+                  the other archives)
+  Date last touched: 2026-05-13
+  Replaces: nothing on disk; competes with
+            mobile_add_holding_purse_input.html.
+
+  Design notes — why this exists:
+  - During the brainstorm 2026-05-13, Rémy pushed back on the
+    "From a specific wallet?" help link as too quiet for something
+    that could shape the input UX. He proposed merging source onto
+    step 1 (chips above the textarea), letting the source pick
+    drive (a) wallet-specific input hints AND (b) the default
+    Purse name. With name auto-derived from source, the dedicated
+    step 3 (name + source) disappears and the wizard collapses
+    from 4 to 3 steps.
+  - This file shows that proposal. The trade-offs against the
+    original 4-step layout are visible side-by-side via the
+    mockup index.
+
+  What changes vs. the 4-step layout:
+  - Step counter reads "STEP 1 OF 3" (not 4).
+  - "From a specific wallet?" help link is GONE — chips ARE the
+    affordance. No second click needed to surface guidance.
+  - Source chip row above the textarea. 8 chips, 2 wrapping rows
+    at the 360 px baseline: BlueWallet · Electrum · Mutiny ·
+    Nunchuk · Phoenix · Sparrow · Specter · Other. Default
+    state: nothing selected.
+  - When a chip is selected, a small wallet-specific hint banner
+    appears above the textarea (Phoenix is shown here as the
+    example — "Wallet final" zpub guidance).
+  - Auto-name (from source pick or script-type fallback) is set
+    silently. NOT surfaced on step 1 — confirmation moves to step
+    2's parse-back screen where it appears inline with an edit
+    affordance (the user has by then verified the descriptor
+    is correct and can name with that context).
+  - "Don't have an existing wallet? Generate a new Purse instead"
+    secondary affordance stays below the textarea, unchanged.
+  - Bottom-nav still hidden per wizard convention.
+
+  What does NOT change vs. the 4-step layout:
+  - Header pattern (back chevron · step counter · empty slot).
+  - Textarea + Paste button shape.
+  - Error states (single-address inline, multisig redirect) still
+    apply — the inline-error and redirect-error mockups would be
+    updated in lockstep with whichever step-1 layout wins.
+  - Step 2 (parse-back) — same component, plus an auto-name
+    preview row added: "Will be named 'Phoenix Purse' · Rename".
+  - Step 3 in this layout = Success (no Label step).
+
+  Open question for Rémy:
+  - Are 8 chips wrapping at 360 the right shape, or would a
+    select-button ("Source: Phoenix ▾") opening a bottom-sheet
+    be more banking-grade? Chips show all options at a glance;
+    select-button is denser. This mockup renders the chip
+    variant — say the word and I'll mock the select-button
+    variant too.
+-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>TallyKeep — Mobile — Add Purse · 1 of 3 · Source-first (alt)</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="_shared/tokens.css">
+<link rel="stylesheet" href="_shared/shell.css">
+<style>
+  .phone-screen { background: var(--color-bg); }
+
+  /* ---------- Wizard header ---------- */
+  .app-bar {
+    height: var(--mobile-app-bar);
+    flex-shrink: 0;
+    display: grid;
+    grid-template-columns: 44px 1fr 44px;
+    align-items: center;
+    padding: 0 var(--space-2);
+    background: var(--color-surface);
+    border-bottom: 1px solid var(--color-border);
+  }
+  .app-bar .back-btn {
+    width: 36px; height: 36px;
+    display: inline-flex; align-items: center; justify-content: center;
+    background: transparent; border: 0;
+    border-radius: var(--radius-md);
+    color: var(--color-text);
+    cursor: pointer;
+    justify-self: start;
+    margin-left: var(--space-2);
+  }
+  .app-bar .back-btn:hover { background: var(--color-bg); }
+  .app-bar .back-btn svg {
+    width: 22px; height: 22px;
+    stroke: currentColor; fill: none;
+    stroke-width: 2; stroke-linecap: round; stroke-linejoin: round;
+  }
+  .step-counter {
+    text-align: center;
+    font-size: var(--font-size-xs);
+    font-weight: var(--font-weight-semibold);
+    color: var(--color-text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    line-height: 1;
+  }
+
+  /* ---------- Wizard body ---------- */
+  .scroll-area {
+    flex: 1;
+    overflow-y: auto;
+    padding: var(--space-4) var(--space-4) var(--space-5);
+  }
+
+  .step-head { margin-bottom: var(--space-3); }
+  .step-heading {
+    font-size: var(--font-size-lg);
+    font-weight: var(--font-weight-semibold);
+    color: var(--color-text);
+    line-height: var(--line-height-tight);
+    margin: 0;
+    letter-spacing: -0.01em;
+  }
+  .step-sub {
+    font-size: var(--font-size-sm);
+    color: var(--color-text-muted);
+    line-height: var(--line-height-default);
+    margin: var(--space-2) 0 0;
+  }
+
+  /* ---------- Source chip row ---------- */
+  .chip-section { margin-bottom: var(--space-4); }
+  .chip-section .label {
+    font-size: var(--font-size-xs);
+    color: var(--color-text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    font-weight: var(--font-weight-semibold);
+    display: block;
+    margin: var(--space-2) 0 var(--space-2);
+  }
+  .chip-section .label .optional {
+    text-transform: none;
+    color: var(--color-text-dim);
+    font-weight: var(--font-weight-normal);
+    letter-spacing: 0;
+    margin-left: var(--space-2);
+  }
+  .chip-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+  }
+  .chip {
+    padding: var(--space-2) var(--space-3);
+    background: var(--color-surface);
+    border: 1px solid var(--color-border-strong);
+    border-radius: var(--radius-pill);
+    font-family: inherit;
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-weight-medium);
+    color: var(--color-text);
+    cursor: pointer;
+    transition: background 0.12s ease, border-color 0.12s ease, color 0.12s ease;
+  }
+  .chip:hover {
+    background: var(--color-bg);
+    border-color: var(--color-text-muted);
+  }
+  .chip.selected {
+    background: var(--color-primary);
+    border-color: var(--color-primary);
+    color: var(--color-on-primary);
+    font-weight: var(--font-weight-semibold);
+  }
+
+  /* ---------- Wallet-specific hint banner ---------- */
+  .wallet-hint {
+    margin-top: var(--space-3);
+    padding: var(--space-3);
+    background: var(--color-info-soft);
+    border: 1px solid var(--color-info-border);
+    border-radius: var(--radius-md);
+    color: var(--color-info-text-on-soft);
+    font-size: var(--font-size-sm);
+    line-height: var(--line-height-default);
+    display: flex;
+    gap: var(--space-2);
+    align-items: flex-start;
+  }
+  .wallet-hint .hint-icon {
+    width: 18px; height: 18px; flex-shrink: 0;
+    stroke: currentColor; fill: none;
+    stroke-width: 2; stroke-linecap: round; stroke-linejoin: round;
+    margin-top: 1px;
+  }
+  .wallet-hint .hint-title {
+    font-weight: var(--font-weight-semibold);
+    margin: 0 0 2px;
+  }
+  .wallet-hint .hint-body { margin: 0; }
+
+  /* ---------- Descriptor textarea ---------- */
+  .descriptor-input-wrap {
+    position: relative;
+    margin-bottom: var(--space-3);
+  }
+  .descriptor-textarea {
+    width: 100%;
+    min-height: 120px;
+    padding: var(--space-3);
+    padding-right: 72px;
+    background: var(--color-surface);
+    border: 1px solid var(--color-border-strong);
+    border-radius: var(--radius-md);
+    font-family: var(--font-mono);
+    font-size: var(--font-size-sm);
+    color: var(--color-text);
+    line-height: 1.5;
+    resize: vertical;
+  }
+  .descriptor-textarea::placeholder { color: var(--color-text-dim); }
+  .descriptor-textarea:focus {
+    outline: none;
+    border-color: var(--color-border-focus);
+    box-shadow: 0 0 0 2px var(--color-primary-soft);
+  }
+  .paste-btn {
+    position: absolute;
+    top: var(--space-2);
+    right: var(--space-2);
+    padding: var(--space-1) var(--space-3);
+    background: var(--color-surface);
+    border: 1px solid var(--color-border-strong);
+    border-radius: var(--radius-pill);
+    font-family: inherit;
+    font-size: var(--font-size-xs);
+    font-weight: var(--font-weight-semibold);
+    color: var(--color-text);
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+  }
+  .paste-btn:hover { background: var(--color-bg); }
+  .paste-btn svg { width: 12px; height: 12px; stroke: currentColor; fill: none; stroke-width: 2; }
+
+  .descriptor-label {
+    font-size: var(--font-size-xs);
+    color: var(--color-text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    font-weight: var(--font-weight-semibold);
+    display: block;
+    margin: var(--space-2) 0 var(--space-2);
+  }
+
+  /* ---------- Generate alternative link ---------- */
+  .generate-link-row { text-align: center; padding: var(--space-3) 0; }
+  .generate-link {
+    background: transparent; border: 0; padding: 0;
+    font-family: inherit; font-size: var(--font-size-sm);
+    color: var(--color-text-muted); cursor: pointer;
+  }
+  .generate-link strong {
+    color: var(--color-primary-strong);
+    font-weight: var(--font-weight-semibold);
+    text-decoration: underline;
+    text-underline-offset: 2px;
+  }
+
+  /* ---------- Wizard footer ---------- */
+  .wizard-footer {
+    flex-shrink: 0;
+    padding: var(--space-3) var(--space-4) var(--space-4);
+    background: var(--color-surface);
+    border-top: 1px solid var(--color-border);
+  }
+  .wizard-cta {
+    width: 100%;
+    padding: var(--space-3) var(--space-4);
+    background: var(--color-primary);
+    color: var(--color-on-primary);
+    border: 0;
+    border-radius: var(--radius-md);
+    font-family: inherit;
+    font-size: var(--font-size-base);
+    font-weight: var(--font-weight-semibold);
+    cursor: pointer;
+  }
+  .wizard-cta:hover { background: var(--color-primary-strong); }
+  .wizard-cta:disabled {
+    background: var(--color-border);
+    color: var(--color-text-dim);
+    cursor: not-allowed;
+  }
+</style>
+</head>
+<body>
+
+<div class="mockup-meta">
+  <strong>Mobile — Add Purse · 1 of 3 · Source-first (ALT layout)</strong> ·
+  <span class="status-draft">draft</span> ·
+  2026-05-13 · 360×800
+</div>
+
+<div class="phone-frame">
+  <div class="phone-screen">
+
+    <div class="app-bar">
+      <button class="back-btn" aria-label="Back to Home">
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <polyline points="15 6 9 12 15 18"/>
+        </svg>
+      </button>
+      <div class="step-counter">Step 1 of 3</div>
+      <div></div>
+    </div>
+
+    <div class="scroll-area">
+
+      <div class="step-head">
+        <h1 class="step-heading">Where are these coins from?</h1>
+        <p class="step-sub">
+          Pick where the wallet lives today — we'll show you exactly
+          what to paste.
+        </p>
+      </div>
+
+      <div class="chip-section">
+        <span class="label">Source <span class="optional">optional</span></span>
+        <div class="chip-row" role="radiogroup" aria-label="Source wallet">
+          <button class="chip" type="button" role="radio" aria-checked="false">BlueWallet</button>
+          <button class="chip" type="button" role="radio" aria-checked="false">Electrum</button>
+          <button class="chip" type="button" role="radio" aria-checked="false">Mutiny</button>
+          <button class="chip" type="button" role="radio" aria-checked="false">Nunchuk</button>
+          <button class="chip selected" type="button" role="radio" aria-checked="true">Phoenix</button>
+          <button class="chip" type="button" role="radio" aria-checked="false">Sparrow</button>
+          <button class="chip" type="button" role="radio" aria-checked="false">Specter</button>
+          <button class="chip" type="button" role="radio" aria-checked="false">Other…</button>
+        </div>
+
+        <!-- Wallet-specific hint, shown when a chip is selected.
+             Phoenix is the example case rendered here. -->
+        <div class="wallet-hint" role="note">
+          <svg class="hint-icon" viewBox="0 0 24 24" aria-hidden="true">
+            <circle cx="12" cy="12" r="10"/>
+            <line x1="12" y1="8"  x2="12" y2="13"/>
+            <line x1="12" y1="16" x2="12" y2="16.5"/>
+          </svg>
+          <div>
+            <p class="hint-title">From Phoenix — paste the "Wallet final" key.</p>
+            <p class="hint-body">
+              In Phoenix, open Settings → Wallet info → Wallet final
+              and copy the master public key (<code>zpub…</code>).
+              The swap-in wallet descriptors are for LN-onchain
+              bridging — not supported here yet.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <label class="descriptor-label" for="descriptor-input">Descriptor or xpub</label>
+      <div class="descriptor-input-wrap">
+        <textarea id="descriptor-input" class="descriptor-textarea"
+                  placeholder="zpub6qzFBjei3eNpX9mGgyg34W31urPhC..."
+                  aria-label="Descriptor or xpub"></textarea>
+        <button class="paste-btn" type="button" aria-label="Paste from clipboard">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <rect x="9" y="3"  width="6"  height="4"  rx="1"/>
+            <rect x="5" y="5"  width="14" height="16" rx="2"/>
+          </svg>
+          Paste
+        </button>
+      </div>
+
+      <div class="generate-link-row">
+        <button class="generate-link" type="button">
+          Don't have an existing wallet? <strong>Generate a new Purse instead</strong>
+        </button>
+      </div>
+
+    </div>
+
+    <div class="wizard-footer">
+      <button class="wizard-cta" type="button" disabled>Continue</button>
+    </div>
+
+  </div>
+</div>
+
+</body>
+</html>
