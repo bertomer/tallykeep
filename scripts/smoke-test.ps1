@@ -1,4 +1,4 @@
-# Smoke-test the live local stack -- exercises every M0..M4 endpoint and a few
+﻿# Smoke-test the live local stack -- exercises every M0..M4 endpoint and a few
 # of the still-501 stubs to confirm the API surface.
 #
 # Prereqs:
