@@ -178,7 +178,7 @@ holds a seed; the result is a Holding nobody can spend from, which
 is a UX nuisance, not a security risk.
 
 This model is reflected in the threat model
-(`10_threat_model.md` §Mobile addendum) and the UX specifications in
+(`concerns/threat_model.md` §Mobile addendum) and the UX specifications in
 `UI/README.md` (Add-Holding, Send, Receive sections).
 
 ### Mutability rules
@@ -322,7 +322,7 @@ class ProviderPermissions:
 ```
 
 Rules:
-- The app refuses to register a CustodialProvider whose API credential has trade permissions enabled. The check is done against the provider's API at registration time. This is locked by the "no order placement" principle (see module 07 §"Regulatory distance posture").
+- The app refuses to register a CustodialProvider whose API credential has trade permissions enabled. The check is done against the provider's API at registration time. This is locked by the "no order placement" principle (see `holdings/01_account.md` §"Regulatory posture (locked)").
 - `whitelist_address` must be derivable from a Descriptor whose Holding is **not** an Account (you cannot whitelist to another custodial Account; that would defeat the point).
 - The validator strongly recommends the whitelist destination be an offline-signed Holding (Strongbox or Vault); see SweepPolicy section for the sweep-destination rule.
 
@@ -634,7 +634,7 @@ Singleton per installation.
 @dataclass
 class UserProfile:
     id: UUID                            # always the same singleton id
-    feature_flags: dict[str, bool]      # see module 09
+    feature_flags: dict[str, bool]      # see concerns/feature_flags.md
     base_currency: str                  # display only
     locale: str
     created_at: datetime
@@ -649,7 +649,7 @@ configuration.
 
 ### Declared vs observable security
 
-The analyzer (module 05) computes an `ObservableSecurity` record per Holding from the on-chain reality and the configured Descriptors. This is **not** a stored field on Holding; it is a derived view, recomputed on demand.
+The analyzer (`concerns/observation.md`) computes an `ObservableSecurity` record per Holding from the on-chain reality and the configured Descriptors. This is **not** a stored field on Holding; it is a derived view, recomputed on demand.
 
 ```python
 @dataclass

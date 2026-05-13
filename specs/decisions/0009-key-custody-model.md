@@ -1,4 +1,4 @@
-# ADR-0008 — Key custody model
+# ADR-0009 — Key custody model
 
 - **Date:** 2026-05
 - **Status:** Accepted
@@ -82,10 +82,10 @@ custody facts:
   user retains the seed backup, controls the device, controls
   access, and can revoke the device. The framing is honest about
   what TallyKeep does, which is what the brand requires.
-- The threat-model "Mobile addendum" in `10_threat_model.md`
-  already captures most of this; that section's relationship to
-  the README's principle becomes coherent rather than
-  contradictory.
+- The threat-model "Mobile addendum" in
+  `concerns/threat_model.md` already captures most of this;
+  that section's relationship to the README's principle
+  becomes coherent rather than contradictory.
 - The Capacitor-client zone is what enables a UX that doesn't
   force the user to use an external wallet for every payment.
   This is a real product value. The trade-off (Capacitor client
@@ -108,8 +108,8 @@ custody facts:
   to record the foundational decision)
 - `01_architecture.md` — gains an explicit "Key custody model"
   section that mirrors this ADR
-- `10_threat_model.md` — Mobile addendum's framing updated to
-  reference this ADR
+- `concerns/threat_model.md` — Mobile addendum's framing updated
+  to reference this ADR
 - `holdings/` chapters (when the restructure lands per the spec
   reshape) — each Holding type's chapter cites the relevant zone
 - `02_domain_model.md` — `seed_origin` documentation cross-refs

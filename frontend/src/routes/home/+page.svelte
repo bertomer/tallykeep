@@ -63,18 +63,33 @@
 
   onMount(async () => {
     if (!auth.loaded) await auth.load();
+    if (!auth.isPaired) { goto('/'); return; }
     serverUrl = (await secureStorage.get('server_url')) ?? '';
 
+    // Probe the backend directly — auth.unlocked resets on every browser
+    // refresh (it's in-memory only), so we use the API response as ground
+    // truth rather than redirecting on every reload.
     try {
       const resp = await fetch(`${serverUrl}/api/v1/holdings/summary/global`, {
         headers: authHeaders(),
       });
       if (resp.ok) {
+        auth.markUnlocked();
         const data = await resp.json();
         totalSats = data.total_sats ?? 0;
         holdings = data.holdings ?? [];
+      } else if (resp.status === 401) {
+        const errData = await resp.json().catch(() => ({}));
+        const msg = (errData?.detail ?? '').toLowerCase();
+        if (msg.includes('locked') || msg.includes('unlock')) {
+          goto('/unlock');
+        } else {
+          await auth.clearCredential();
+          goto('/');
+        }
       }
-    } catch { /* offline or not yet paired — show zeros */ }
+      // Other errors (5xx, offline): keep showing empty state
+    } catch { /* offline — show zeros */ }
   });
 </script>
 

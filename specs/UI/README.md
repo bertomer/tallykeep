@@ -352,7 +352,7 @@ prompts and timed in-app popups are captured in
 
 ### Custodial accounts and sweep policies
 
-The Trading layer (per spec module 07) covers two related things:
+The custodial / sweep surface covers two related things:
 
 **Custodial accounts (Account Holdings).** For users who connect a
 CustodialProvider (Kraken, Bitstamp): connection status, balance,
@@ -360,7 +360,7 @@ whitelist target, recent activity. Specific affordances (panel
 layout, controls, kill switches) are designed in the Trading-view
 iteration.
 
-**Sweep policies — generalized.** Per spec module 07, a SweepPolicy
+**Sweep policies — generalized.** Per `concerns/sweep_policies.md`, a SweepPolicy
 moves funds from any Holding to any Holding, with a safety validator
 that warns about risky configurations but never blocks (the user is
 the final authority). Specific UI for sweep-policy creation and
@@ -412,7 +412,7 @@ Rémy 2026-05:
 
 - **Blueprint analysis** — the four hygiene flags (address reuse,
   dust UTXOs, round-number outputs, suspected consolidation) plus
-  later UTXO clustering graph. Backend logic per module 05 is
+  later UTXO clustering graph. Backend logic per `concerns/observation.md` is
   implemented; UI surface deferred. Captured in
   `future_iterations.md` as a public-product differentiator candidate
   to ship as a feature update post-launch.
@@ -429,4 +429,4 @@ Rémy 2026-05:
   posture; finalized at ship-gate.
 - Future iterations and parked ideas — see `future_iterations.md`.
 - The threat-model implications of mobile and the Capacitor build
-  — see `10_threat_model.md` §Mobile addendum.
+  — see `concerns/threat_model.md` §Mobile addendum.

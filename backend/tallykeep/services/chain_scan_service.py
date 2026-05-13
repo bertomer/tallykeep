@@ -27,7 +27,7 @@ from uuid import UUID, uuid4
 
 from sqlalchemy.orm import Session
 
-from tallykeep.adapters.node_adapter import NodeAdapter, ScanUtxo
+from tallykeep.adapters.node_adapter import NodeAdapter, NodeRpcError, ScanUtxo
 from tallykeep.domain.descriptor import Descriptor
 from tallykeep.domain.enums import (
     Direction,
@@ -100,7 +100,14 @@ class ChainScanService:
         height_at_scan = 0
 
         for is_change, expression in branches:
-            scan_result = self._node.scan_descriptors([expression])
+            try:
+                scan_result = self._node.scan_descriptors([expression])
+            except NodeRpcError:
+                # Node rejected this descriptor (e.g. mainnet xpub on regtest).
+                # Not a connectivity failure — mark height ≥1 so scan_status
+                # can settle to "scanned" instead of looping forever.
+                height_at_scan = max(height_at_scan, 1)
+                continue
             height_at_scan = max(height_at_scan, scan_result.height_at_scan)
 
             for unspent in scan_result.utxos:
@@ -153,21 +160,26 @@ class ChainScanService:
                     utxos_pre_existing += 1
 
         # Update last_scanned_height on the descriptor.
+        # Use max(height_at_scan, 1) as a sentinel: regtest nodes at genesis
+        # return height=0, which would leave last_scanned_height=0 and keep
+        # scan_status="scanning" forever even though the scan ran successfully.
+        # Any value ≥1 tells the summary endpoint "this descriptor was scanned".
         from tallykeep.models import DescriptorRow
 
         descriptor_row = session.get(DescriptorRow, descriptor.id)
+        effective_height = max(height_at_scan, 1)
         if (
             descriptor_row is not None
-            and height_at_scan > descriptor_row.last_scanned_height
+            and effective_height > descriptor_row.last_scanned_height
         ):
-            descriptor_row.last_scanned_height = height_at_scan
+            descriptor_row.last_scanned_height = effective_height
 
         return ScanReport(
             descriptor_id=descriptor.id,
             utxos_discovered=utxos_discovered,
             utxos_pre_existing=utxos_pre_existing,
             ledger_entries_created=ledger_entries_created,
-            height_at_scan=height_at_scan,
+            height_at_scan=effective_height,
         )
 
     # --- helpers --------------------------------------------------------------

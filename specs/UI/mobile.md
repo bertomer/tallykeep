@@ -352,7 +352,7 @@ deferred to subsequent iterations once their drivers ship.
 4. **Confirmation honesty.** Balance shown is the latest
    confirmed value from the backend (which the backend
    computed from confirmed UTXOs only — pending UTXOs surface
-   on Activity or in per-Holding detail per spec module 05,
+   on Activity or in per-Holding detail per `concerns/observation.md`,
    not on the consolidated total). At zero state there's
    nothing to confuse.
 5. **Browser-only fallback.** Per ADR-0007. The Home screen
@@ -556,7 +556,7 @@ icon-border), not on the icon's body fill.
    begin to hold a device credential in its Keychain/Keystore. The
    phone never sees signing material; signing material lives only
    on devices that hold it (per the locked architecture in
-   `01_architecture.md` and `10_threat_model.md`).
+   `01_architecture.md` and `concerns/threat_model.md`).
 2. **Keys and secrets.** None on this screen. The QR carries an
    endpoint URL plus a single-use ephemeral pairing token (per
    `pre-implementation.md` `pairing-handshake-crypto`'s leading

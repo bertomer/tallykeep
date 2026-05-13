@@ -300,7 +300,7 @@ record.
   Mobile-only spending path (Capacitor); desktop read-only for
   hosted-tier users; both surfaces for self-hosted users running
   CLN/LND.
-- **Touches:** module 08 placeholder, mobile spec, UI send/receive,
+- **Touches:** `concerns/lightning_placeholder.md`, mobile spec, UI send/receive,
   threat model
 - **Status:** sketched
 - **Milestone:** TBD — Rémy explicitly flagged this as needing
@@ -376,7 +376,7 @@ record.
 - **Motivation:** Privacy / hygiene analyzer surfacing address reuse,
   dust UTXOs, round-number outputs, suspected consolidation. Strong
   public-product differentiator (most Bitcoin apps don't help users
-  see these patterns). Backend logic per spec module 05 is already
+  see these patterns). Backend logic per `concerns/observation.md` is already
   implemented; what's deferred is the UI surface.
 - **Sketch:**
     - Three summary tiles (address reuse, dust UTXOs,
@@ -391,7 +391,7 @@ record.
   Blueprint section in nav
 - **Status:** idea
 - **Milestone:** post-shipping
-- **Notes:** Backend module 05 logic implemented and stays. UI
+- **Notes:** Backend logic per `concerns/observation.md` implemented and stays. UI
   surface deferred. The clustering graph is further deferred and
   likely desktop-only when it lands. During pre-shipping Rémy works
   without Blueprint surfaced; post-shipping users get it as a
@@ -420,7 +420,7 @@ record.
 - **Milestone:** post-shipping
 - **Notes:** Requires fresh regulatory evaluation before commit.
   Custody-adjacent territory; the rationale for keeping it out of
-  pre-shipping is in the (retiring) module 07.
+  pre-shipping is in `holdings/01_account.md` §"Regulatory posture (locked)".
 
 ### Capacitor mobile wrapper
 
@@ -540,6 +540,39 @@ record.
   infrastructure; self-hosted does it via the user's own backend.
   Privacy implications worth surfacing in onboarding for hosted-tier.
 
+### Live scan-status push (Redis → SSE → frontend)
+
+- **Captured:** 2026-05-14 (surfaced during Purse wizard hand-test — home page
+  showed "Scanning…" indefinitely because the frontend only fetches once on mount
+  and the backend never pushes the completed state).
+- **Motivation:** The backend already has Redis and an async worker stack.
+  Descriptor imports trigger a background chain scan; when the scan completes the
+  `scan_status` field updates in the DB. The frontend has no way to know this
+  happened — it has to be told. A one-shot page-load fetch is not enough.
+- **Sketch:**
+    - Backend emits a Redis pub/sub event when scan_status transitions
+      (`scanning → synced`, `scanning → error`).
+    - A thin SSE endpoint (`GET /api/v1/events/holdings`) streams those events
+      to the connected client (same auth as REST calls).
+    - Frontend `home/+page.svelte` subscribes to the SSE stream after mount;
+      on a `holding.scan_status_changed` event, updates the matching holding in
+      the local list reactively without a full refetch.
+    - Graceful degradation: if SSE is unavailable (offline, proxy strips
+      keep-alive), the page shows the last-known state. A manual pull-to-refresh
+      is acceptable fallback.
+- **Touches:** backend event emitter (Redis pub/sub hook in the scan worker),
+  new SSE endpoint, frontend home page reactive state, auth middleware (SSE
+  needs the same Bearer-token guard as REST)
+- **Status:** sketched
+- **Milestone:** pre-shipping — "Scanning…" that never resolves is a confusing
+  UX for any user who imports a wallet and waits for their balance to appear.
+  Low implementation cost given Redis is already running.
+- **Notes:** The broader "Push-driven categorization workflow" entry (below)
+  uses the same SSE channel — coordinate so both events flow through one
+  `EventSource` connection, not two. This entry is the simpler first step:
+  no push notification, no Capacitor plugin — just a browser SSE stream to
+  the already-connected backend.
+
 ### Security-health system
 
 - **Captured:** 2026-05 (pre-implementation item
@@ -637,7 +670,7 @@ record.
 ### Holding-to-Holding sweeps beyond Account-originated
 
 - **Captured:** 2026-05 (custodial-and-sweeps review)
-- **Motivation:** Per spec module 07, SweepPolicy is generalized:
+- **Motivation:** Per `concerns/sweep_policies.md`, SweepPolicy is generalized:
   any Holding to any Holding with a safety validator. Pre-shipping
   surfaces Account-originated sweeps (minimum-exposure trading
   pattern). Other Holding-to-Holding sweeps are architecturally
@@ -656,7 +689,7 @@ record.
   system, threat model
 - **Status:** idea
 - **Milestone:** TBD — best guess: post-shipping. Architecture is in
-  place per module 07; only UI surface and reminder workflow are
+  place per `concerns/sweep_policies.md`; only UI surface and reminder workflow are
   deferred. Pick up after primary sweep flows are stable.
 
 ### Receive in static / merchant mode
@@ -979,7 +1012,7 @@ record.
   First) with current data — fee landscape, privacy implications,
   expected wallet sizes for target users. Decide the default plus
   per-profile overrides. If the default changes, document with an
-  ADR and update module 06.
+  ADR and update `concerns/outflow.md`.
 - **Touches:** banking layer (coin selection), profiles + flags,
   threat model (privacy implications), tx composition tests
 - **Status:** sketched

@@ -96,7 +96,7 @@ locked principle is "no signing keys to backend, ever").
   `purse`
 - `UI/README.md` — Add-Holding, Send, Receive sections per
   Holding type
-- `10_threat_model.md` Mobile addendum — S13 (browser-build
+- `concerns/threat_model.md` Mobile addendum — S13 (browser-build
   pretending to sign)
 - `09_feature_flags.md` — no flag implications, but documented
   as runtime capability rather than user preference

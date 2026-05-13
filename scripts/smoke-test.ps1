@@ -336,7 +336,14 @@ try {
         -ContentType 'application/json' -Body $managedPurseBody -Headers $Headers
     Show "managed seed_origin"   $managedPurse.seed_origin
     Show "managed holding_type"  $managedPurse.holding_type
-    $managedPurseId = $managedPurse.id
+    $managedPurseId   = $managedPurse.id
+    $managedDescId    = $managedPurse.descriptor_ids[0]
+    # Mirror the frontend wizard: rescan immediately after creation so
+    # scan_status transitions from "scanning" -> "scanned" before success screen.
+    $managedRescan = Invoke-RestMethod -Method Post `
+        -Uri "$BaseUrl/api/v1/descriptors/$managedDescId/rescan" -Headers $Headers
+    Show "managed rescan utxos"  $managedRescan.utxos_discovered
+    Show "managed rescan height" $managedRescan.height_at_scan
     # Archive immediately so it doesn't interfere with section 14 counts.
     Invoke-WebRequest -Method Post -Uri "$BaseUrl/api/v1/holdings/$managedPurseId/archive" `
         -Headers $Headers | Out-Null

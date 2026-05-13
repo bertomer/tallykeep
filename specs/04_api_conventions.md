@@ -28,7 +28,7 @@ as if an external caller would consume it later.
 None in the dev phase. Localhost binding is the security boundary.
 App-level authentication (passphrase + biometric) is a private-ship
 requirement per ADR-0003; the public-ship event hardens it further.
-The threat model (`10_threat_model.md`) documents this.
+The threat model (`concerns/threat_model.md`) documents this.
 
 ## Format
 

@@ -171,7 +171,7 @@ devices, with small amounts:
 - `future_iterations.md` — entries tagged with `Milestone:`
   pre-shipping / post-shipping / TBD; the "Ship-gate
   meta-iteration" entry refines into the public-ship event bundle.
-- `10_threat_model.md` Mobile addendum — JS-signing-relaxation
+- `concerns/threat_model.md` Mobile addendum — JS-signing-relaxation
   applies through the personal-use phase, not just dev phase.
 - `UI/README.md` — "ship-gate" references continue to mean the
   public-ship event work bundle.

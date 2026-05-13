@@ -5,8 +5,10 @@
   "Return to Home" CTA: goto('/home') → home without picker.
 -->
 <script lang="ts">
+  import { onMount } from 'svelte';
   import { page } from '$app/stores';
   import { goto } from '$app/navigation';
+  import { auth } from '$lib/stores/auth.svelte';
   import BottomNav from '$lib/components/BottomNav.svelte';
   import HoldingIcon from '$lib/components/HoldingIcon.svelte';
 
@@ -19,6 +21,12 @@
 
   let holdingType = $derived($page.params.type ?? '');
   let meta = $derived(TYPE_META[holdingType] ?? { name: holdingType, colorClass: '' });
+
+  onMount(async () => {
+    if (!auth.loaded) await auth.load();
+    if (!auth.isPaired) { goto('/'); return; }
+    if (!auth.unlocked) { goto('/unlock'); return; }
+  });
 </script>
 
 <div class="phone-screen safe-top safe-bottom">

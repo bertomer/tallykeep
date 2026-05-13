@@ -67,7 +67,7 @@ land before touching UI work.
   shell separation
 - `PROCESS.md §4` — "Browser fine-tuning (no Capacitor yet)"
 - `PROCESS.md §3 question 5` — browser-only fallback
-- `10_threat_model.md` Mobile addendum
+- `concerns/threat_model.md` Mobile addendum
 - `UI/README.md` — Send / Receive flows reflecting NativeBridge
   gating
 - `decisions/0003-personal-use-phase.md` — phase model that this

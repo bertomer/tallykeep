@@ -5,7 +5,7 @@
 A self-hosted, Bitcoin-first application that integrates three personal-finance domains under one user interface and one internal API:
 
 - **Savings** — watch-only multi-Holding view over user-controlled Bitcoin, with UTXO hygiene flags, transaction categorization, and security-claim verification (declared vs observable).
-- **Banking** — on-chain Bitcoin payments and receipts via PSBT (signed on an external device). Lightning support is deferred to a future iteration behind a defined interface (see module 08).
+- **Banking** — on-chain Bitcoin payments and receipts via PSBT (signed on an external device, or on the Capacitor client for TallyKeep-managed Purses per ADR-0009). Lightning support is deferred to a future iteration behind a defined interface (see `concerns/lightning_placeholder.md`).
 - **Trading** — read-only balance aggregation across custodial providers (centralized exchanges and brokers), plus policy-driven auto-sweep between any two Holdings ("minimum-exposure trading").
 
 The app is designed for a single self-hosted user. It does not custody keys, does not hold funds, does not create user accounts, and exposes no public network surface in the dev or personal-use phase.
@@ -29,7 +29,7 @@ Marketing voice should foreground the first two layers — concrete utility for 
 3. **Declared security versus observable security.** The user declares what each Holding is supposed to be; the analyzer continuously checks whether the on-chain reality matches the declaration. Discrepancies are surfaced.
 4. **Minimum-exposure trading.** Custodial providers are pass-through liquidity, not storage. Funds leave them as fast as policy allows.
 5. **Generalized SweepPolicy.** Not just "exchange to cold." Any Holding to any Holding, with a safety validator that warns about risky configurations but never blocks. The user is the final authority; the validator just makes sure they know what they are doing before they do it.
-6. **No custody of funds. Key custody is bounded and explicit.** TallyKeep never custodies user funds and never creates user accounts on TallyKeep infrastructure. Where signing keys live is a four-zone model (per ADR-0008):
+6. **No custody of funds. Key custody is bounded and explicit.** TallyKeep never custodies user funds and never creates user accounts on TallyKeep infrastructure. Where signing keys live is a four-zone model (per ADR-0009):
    - *Backend:* never holds spending keys, ever. Holds descriptors (public-key info), custodial-provider API credentials (encrypted at rest with the user's passphrase), configuration.
    - *Capacitor client:* holds spending keys only for `TALLYKEEP_MANAGED` and `EXTERNAL_IMPORTED` Purses, in OS secure storage (iOS Keychain / Android Keystore), biometric-gated, never transmitted to the backend.
    - *Hardware wallet:* Strongbox and Vault keys live on the user's external signing device. TallyKeep choreographs PSBTs; never sees keys.
@@ -92,20 +92,21 @@ See `future_iterations.md` for the full backlog with `pre-shipping` /
 
 ## Module map
 
-The specification is split into the following modules. Read in order.
+The specification splits into four numbered modules at the root,
+plus two subfolders: `holdings/` (per-Holding-type chapters)
+and `concerns/` (cross-cutting capabilities). Reorganized
+2026-05 in the spec reshape — the previous layered split
+(Savings / Banking / Trading) retired because layer-named
+modules fought the user's mental model.
 
-| # | File | Purpose |
-|---|------|---------|
-| 01 | `01_architecture.md` | Service topology, event-bus design, stack choices, deployment model |
+| Slot | File | Purpose |
+|---|---|---|
+| 01 | `01_architecture.md` | Surfaces, trust zones, key custody model, internal layering, runtime patterns |
 | 02 | `02_domain_model.md` | Holdings hierarchy, Descriptor, LedgerEntry, CustodialProvider, generalized SweepPolicy |
 | 03 | `03_data_model.md` | Database schema, secret storage, cryptographic parameters, migration strategy |
 | 04 | `04_api_conventions.md` | API cross-cutting conventions (auth, errors, pagination, SSE pattern, async-job pattern). Endpoint shapes live in `api/openapi.yaml`. |
-| 05 | `05_savings_layer.md` | Watch-only Holdings, UTXO hygiene, declared-vs-observable security analysis |
-| 06 | `06_banking_layer.md` | PSBT flow, fee user experience, on-chain send and receive |
-| 07 | `07_trading_layer.md` | Custodial provider integration, generalized sweep policy engine |
-| 08 | `08_lightning_placeholder.md` | Interface for the deferred Lightning integration |
-| 09 | `09_feature_flags.md` | Feature-flag catalog, onboarding-driven defaults, resolution rules |
-| 10 | `10_threat_model.md` | Security scope, blast radius, what is defended and what is not |
+| — | `holdings/` | Per-Holding-type chapters: Account, Purse, Strongbox, Vault |
+| — | `concerns/` | Cross-cutting capabilities: observation, outflow, sweep policies, feature flags, lightning placeholder, threat model |
 
 UI specs live in `UI/` (cross-platform decisions in `UI/README.md`,
 platform-specific in `UI/mobile.md` and `UI/desktop.md`, page-per-file
@@ -139,23 +140,22 @@ are described in `PROCESS.md`.
 
 ## How to use this spec
 
-This is the canonical product description. The original
-module-by-module implementation order has shipped through module 10
-(backend layers); UI work is currently iteration-driven against the
-real backend. Working process — iteration cycle, ADR routing, mockup
-conventions, working agreement for new agents — lives in
-`PROCESS.md`. The active iteration's scope lives in
-`next_iteration.md`.
+This is the canonical product description, describing the
+**target state** (per `PROCESS.md §1` three-universe framing).
+Modules 00–04 hold the foundations (vision, architecture,
+domain, data, API conventions). The `holdings/` subfolder
+describes each Holding type end-to-end (Account, Purse,
+Strongbox, Vault). The `concerns/` subfolder describes
+cross-cutting capabilities (observation, outflow, sweep
+policies, feature flags, lightning placeholder, threat model).
+UI work is iteration-driven against the real backend. Working
+process — iteration cycle, ADR routing, mockup conventions,
+working agreement for new agents — lives in `PROCESS.md`. The
+active iteration's scope lives in `next_iteration.md`.
 
 ## Vocabulary primer
 
 Because vocabulary matters in this spec, the four user-facing Holding types and their meanings are introduced here and used consistently throughout:
 
 - **Account** — a balance held by a custodial provider on the user's behalf. The provider holds the keys. Examples: a Kraken balance, a Bitstamp balance, a Swissquote crypto position. An Account is *what someone owes you*, not what you own.
-- **Purse** — a wallet whose private keys are on a connected, day-to-day device (mobile wallet, hot software wallet on the user's phone or laptop). The user holds the keys; signing is light (PIN, biometric, app prompt). Suited to small-value daily spending.
-- **Strongbox** — a wallet whose private keys are on an offline or hardware signing device (Coldcard, Trezor, Ledger, Jade, an airgapped laptop). The user holds the keys; signing requires deliberate action with the external device.
-- **Vault** — a wallet under additional structural protection: multisig, timelocks, geographic key separation, inheritance setup. The user holds the keys but accessing the funds requires a ceremony involving multiple steps or co-signers.
-
-The technical primitive that backs Purse, Strongbox, and Vault is called a **Descriptor** (from BIP 380). A Holding may reference one or more Descriptors. Account has no Descriptor — it has a CustodialProvider connection instead.
-
-A movement of value, whether on-chain, on Lightning (when that iteration ships), or a custodial-provider event, is recorded as a **LedgerEntry**. The on-chain transaction itself, when applicable, is the **OnChainTransaction** that the LedgerEntry references.
+- **Purse** — a wallet whose private keys are on a connected

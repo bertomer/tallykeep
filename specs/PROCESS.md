@@ -11,16 +11,24 @@ before doing any work.
 ```
 specs/
 ├── 00_README.md ............ product overview, motivations, scope, principles
-├── 01_architecture.md
-├── 02_domain_model.md
-├── 03_data_model.md
-├── 04_api_conventions.md
-├── 05_savings_layer.md
-├── 06_banking_layer.md
-├── 07_trading_layer.md
-├── 08_lightning_placeholder.md
-├── 09_feature_flags.md
-├── 10_threat_model.md
+├── 01_architecture.md ...... surfaces, trust zones, key custody, internal layering
+├── 02_domain_model.md ...... vocabulary contract (Holding, Descriptor, …)
+├── 03_data_model.md ........ schema invariants, secret storage
+├── 04_api_conventions.md ... cross-cutting API rules
+├── holdings/ ............... per-Holding-type chapters (target behavior)
+│   ├── README.md
+│   ├── 01_account.md ....... custodial Holdings
+│   ├── 02_purse.md ......... light-spending Holdings (three seed origins)
+│   ├── 03_strongbox.md ..... hardware-wallet Holdings
+│   └── 04_vault.md ......... multisig / timelock Holdings
+├── concerns/ ............... cross-cutting capabilities
+│   ├── README.md
+│   ├── observation.md ...... chain monitoring, hygiene, declared-vs-observable
+│   ├── outflow.md .......... PSBT machinery, broadcast, payment-request lifecycle
+│   ├── sweep_policies.md ... cross-Holding sweep model
+│   ├── feature_flags.md .... flag catalog, onboarding-driven defaults
+│   ├── lightning_placeholder.md ... LightningProvider interface, deferred
+│   └── threat_model.md ..... security posture + Mobile addendum
 ├── PROCESS.md .............. this file (working agreement)
 ├── pre-implementation.md ... items needing dedicated arbitration session
 ├── next_iteration.md ....... sharpened scope of the active iteration
@@ -52,19 +60,24 @@ specs/
 │       │   └── shell.css ... phone-frame and common layout
 │       └── mobile_<flow>_<state>.html ... one page per file
 ├── tools/
-│   └── check-spec.sh ....... iteration-done sanity sweep (see §2.9)
+│   └── check-spec.ps1 ...... iteration-done sanity sweep (see §2.9)
+│   └── check-spec.sh ....... portable sibling for Linux/Mac
 └── archive/ ................ historical iterations, never source of truth
 ```
 
 Modules 11–14 of the original spec retired in the consolidation
-merge. Their content redistributes per ADR-0002. Modules 00–10
-remain canonical product description.
+merge per ADR-0002. Modules 05–10 retired in the 2026-05 spec
+reshape; their content redistributed into `holdings/` (per-type
+chapters) and `concerns/` (cross-cutting capabilities). Modules
+00–04 remain canonical product description; everything else
+lives in the two subfolders.
 
 **Three doc roles, one job each:**
 
-- **Target-product canon** (`00`–`10`, `UI/`, `api/openapi.yaml`,
-  `brand/`) — what TallyKeep IS. Edited in lockstep with every
-  brainstorm decision. Never describes process.
+- **Target-product canon** (`00`–`04`, `holdings/`, `concerns/`,
+  `UI/`, `api/openapi.yaml`, `brand/`) — what TallyKeep IS.
+  Edited in lockstep with every brainstorm decision. Never
+  describes process.
 - **Path-to-target** (`next_iteration.md`, `future_iterations.md`,
   `pre-implementation.md`) — what's being worked, what's open,
   what's deferred. Never describes the canonical product.

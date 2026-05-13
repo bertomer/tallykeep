@@ -88,8 +88,10 @@
 
   // Shared
   let error = $state<ErrorState | null>(null);
+  let errorDetailsOpen = $state(false);
   let loading = $state(false);
   let serverUrl = $state('');
+  let autoWrapNote = $state<string | null>(null);
 
   // -------------------------------------------------------------------------
   // Constants
@@ -130,6 +132,84 @@
   // Helpers
   // -------------------------------------------------------------------------
 
+  // ── Base58check version-byte conversion ────────────────────────────────────
+  // BDK only accepts standard xpub/tpub version bytes inside descriptors.
+  // zpub/ypub/vpub/upub must be re-encoded with the standard bytes first.
+
+  const B58 = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
+
+  function b58decode(s: string): Uint8Array {
+    let n = 0n;
+    for (const c of s) { const d = B58.indexOf(c); if (d < 0) throw new Error('bad b58'); n = n * 58n + BigInt(d); }
+    let lead = 0; for (const c of s) { if (c === '1') lead++; else break; }
+    const out: number[] = [];
+    while (n > 0n) { out.unshift(Number(n & 0xffn)); n >>= 8n; }
+    return new Uint8Array([...new Array(lead).fill(0), ...out]);
+  }
+
+  function b58encode(bytes: Uint8Array): string {
+    let n = 0n; for (const b of bytes) n = n * 256n + BigInt(b);
+    let s = ''; while (n > 0n) { s = B58[Number(n % 58n)] + s; n /= 58n; }
+    for (const b of bytes) { if (b === 0) s = '1' + s; else break; }
+    return s;
+  }
+
+  async function convertKeyVersion(key: string, ver: number[]): Promise<string> {
+    const full = b58decode(key);              // 82 bytes: 78 payload + 4 checksum
+    const payload = new Uint8Array(full.slice(0, 78));
+    payload[0] = ver[0]; payload[1] = ver[1]; payload[2] = ver[2]; payload[3] = ver[3];
+    const h1 = new Uint8Array(await crypto.subtle.digest('SHA-256', payload));
+    const h2 = new Uint8Array(await crypto.subtle.digest('SHA-256', h1));
+    return b58encode(new Uint8Array([...payload, ...h2.slice(0, 4)]));
+  }
+
+  // ── Auto-wrap helpers ───────────────────────────────────────────────────────
+
+  function isBareExtendedKey(raw: string): boolean {
+    if (!raw || /[([/]/.test(raw)) return false;
+    const lo = raw.toLowerCase();
+    return ['xpub','ypub','zpub','tpub','upub','vpub'].some(p => lo.startsWith(p));
+  }
+
+  interface AutoWrap { expression: string; changeExpression: string; note: string; }
+
+  async function buildAutoWrapDescriptor(raw: string): Promise<AutoWrap | null> {
+    if (!isBareExtendedKey(raw)) return null;
+    const lo = raw.toLowerCase();
+    // zpub → xpub version bytes, then wpkh()
+    if (lo.startsWith('zpub')) {
+      const k = await convertKeyVersion(raw, [0x04,0x88,0xB2,0x1E]);
+      return { expression: `wpkh(${k}/0/*)`, changeExpression: `wpkh(${k}/1/*)`,
+               note: 'Native SegWit (P2WPKH) — auto-detected from zpub' };
+    }
+    // vpub → tpub version bytes, then wpkh()
+    if (lo.startsWith('vpub')) {
+      const k = await convertKeyVersion(raw, [0x04,0x35,0x87,0xCF]);
+      return { expression: `wpkh(${k}/0/*)`, changeExpression: `wpkh(${k}/1/*)`,
+               note: 'Native SegWit (P2WPKH) — auto-detected from vpub' };
+    }
+    // ypub → xpub version bytes, then sh(wpkh())
+    if (lo.startsWith('ypub')) {
+      const k = await convertKeyVersion(raw, [0x04,0x88,0xB2,0x1E]);
+      return { expression: `sh(wpkh(${k}/0/*))`, changeExpression: `sh(wpkh(${k}/1/*))`,
+               note: 'Wrapped SegWit (P2SH-P2WPKH) — auto-detected from ypub' };
+    }
+    // upub → tpub version bytes, then sh(wpkh())
+    if (lo.startsWith('upub')) {
+      const k = await convertKeyVersion(raw, [0x04,0x35,0x87,0xCF]);
+      return { expression: `sh(wpkh(${k}/0/*))`, changeExpression: `sh(wpkh(${k}/1/*))`,
+               note: 'Wrapped SegWit (P2SH-P2WPKH) — auto-detected from upub' };
+    }
+    // xpub / tpub — already standard bytes, just wrap
+    if (lo.startsWith('xpub'))
+      return { expression: `wpkh(${raw}/0/*)`, changeExpression: `wpkh(${raw}/1/*)`,
+               note: 'Native SegWit (P2WPKH) — auto-detected from xpub' };
+    if (lo.startsWith('tpub'))
+      return { expression: `wpkh(${raw}/0/*)`, changeExpression: `wpkh(${raw}/1/*)`,
+               note: 'Native SegWit (P2WPKH) — auto-detected from tpub' };
+    return null;
+  }
+
   function detectNetwork(input: string): 'mainnet' | 'regtest' {
     if (/tpub|tprv|upub|uprv|vpub|vprv|Upub|Uprv|Vpub|Vprv/.test(input)) return 'regtest';
     return 'mainnet';
@@ -137,6 +217,19 @@
 
   function formatScriptType(raw: string): string {
     return SCRIPT_TYPE_LABELS[raw] ?? raw;
+  }
+
+  function extractApiError(err: Record<string, unknown>): string {
+    function flatten(val: unknown): string {
+      if (typeof val === 'string') return val;
+      if (Array.isArray(val)) return val.map(flatten).filter(Boolean).join('; ');
+      if (val && typeof val === 'object') {
+        const o = val as Record<string, unknown>;
+        return flatten(o.msg ?? o.message ?? o.detail ?? o.error ?? '') || JSON.stringify(o);
+      }
+      return String(val ?? '');
+    }
+    return flatten(err?.message ?? err?.detail ?? err?.error ?? '').toLowerCase();
   }
 
   function extractDescriptorMeta(descriptor: string): { derivation: string; xpub: string } {
@@ -161,7 +254,9 @@
   }
 
   function deriveAutoName(m: Mode, src: string, sType: string): string {
-    if (m === 'generate') return 'TallyKeep Purse';
+    if (m === 'generate') {
+      return 'TallyKeep Purse';
+    }
     if (src && src !== '') return `${SOURCE_LABELS[src] ?? src} Purse`;
     const scriptName = SCRIPT_TYPE_LABELS[sType];
     return scriptName ? scriptName.split('·')[0].trim() + ' Purse' : 'Purse';
@@ -175,7 +270,7 @@
     });
     if (!res.ok) {
       const data = await res.json().catch(() => ({}));
-      throw data;
+      throw { ...data, _status: res.status };
     }
     return res.json();
   }
@@ -187,6 +282,8 @@
   let inputCtaDisabled = $derived(
     descriptorText.trim() === '' || error?.kind === 'multisig'
   );
+
+  let bareKeyDetected = $derived(isBareExtendedKey(descriptorText.trim()));
 
   // -------------------------------------------------------------------------
   // Event handlers
@@ -228,18 +325,25 @@
     const raw = descriptorText.trim();
     if (!raw) return;
     error = null;
+    errorDetailsOpen = false;
+    autoWrapNote = null;
     loading = true;
     try {
+      const wrapped = await buildAutoWrapDescriptor(raw);
+      const expression = wrapped ? wrapped.expression : raw;
+      const changeExpr = wrapped ? wrapped.changeExpression : null;
       const network = detectNetwork(raw);
-      const result = await validateDescriptor(raw, network);
+      const result = await validateDescriptor(expression, network);
       if (result.is_multisig) {
         error = { kind: 'multisig' };
         return;
       }
       parseResult = result;
-      derivedExpression = raw;
+      derivedExpression = expression;
+      derivedChangeExpression = changeExpr;
       derivedNetwork = network;
-      const meta = extractDescriptorMeta(raw);
+      if (wrapped) autoWrapNote = wrapped.note;
+      const meta = extractDescriptorMeta(expression);
       derivationPath = meta.derivation;
       masterKeyTrunc = truncateKey(meta.xpub);
       scriptTypeLabel = formatScriptType(result.script_type);
@@ -247,8 +351,12 @@
       nameDraft = holdingName;
       step = 'parseback';
     } catch (e: unknown) {
-      const err = e as Record<string, string>;
-      const msg = (err?.message ?? err?.detail ?? err?.error ?? '').toLowerCase();
+      const err = e as Record<string, unknown>;
+      const msg = extractApiError(err);
+      if (err?._status === 401) {
+        if (msg.includes('locked') || msg.includes('unlock')) { goto('/unlock'); return; }
+        await auth.clearCredential(); goto('/'); return;
+      }
       if (msg.includes('address') || msg.includes('single') || msg.includes('bech32')) {
         error = { kind: 'single-address' };
       } else if (msg) {
@@ -271,9 +379,13 @@
       nameDraft = holdingName;
       step = 'parseback';
     } catch (e: unknown) {
-      const err = e as Record<string, string>;
-      const msg = err?.message ?? err?.detail ?? err?.error ?? 'Could not validate the generated descriptor.';
-      error = { kind: 'parse', message: msg };
+      const err = e as Record<string, unknown>;
+      const msg = extractApiError(err);
+      if (err?._status === 401) {
+        if (msg.includes('locked') || msg.includes('unlock')) { goto('/unlock'); return; }
+        await auth.clearCredential(); goto('/'); return;
+      }
+      error = { kind: 'parse', message: msg || 'Could not validate the generated descriptor.' };
     } finally {
       loading = false;
     }
@@ -308,11 +420,31 @@
         headers: { ...authHeaders(), 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
       });
+      const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        error = { kind: 'create', message: data?.message ?? data?.detail ?? 'Could not create the Purse. Try again.' };
+        const msg = (data?.message ?? data?.detail ?? '').toLowerCase();
+        if (res.status === 401) {
+          if (msg.includes('locked') || msg.includes('unlock')) { goto('/unlock'); return; }
+          await auth.clearCredential(); goto('/'); return;
+        }
+        const rawMsg: string = data?.message ?? data?.detail ?? '';
+        const friendlyMsg = rawMsg.toLowerCase().includes('already exists')
+          ? 'A Purse with this descriptor already exists.'
+          : rawMsg || 'Could not create the Purse. Try again.';
+        error = { kind: 'create', message: friendlyMsg };
         return;
       }
+      // Trigger initial scan for each descriptor — synchronous on the backend,
+      // so by the time we reach the success screen the holding shows "scanned".
+      const descriptorIds: string[] = data?.descriptor_ids ?? [];
+      await Promise.all(
+        descriptorIds.map((id: string) =>
+          fetch(`${serverUrl}/api/v1/descriptors/${id}/rescan`, {
+            method: 'POST',
+            headers: authHeaders(),
+          }).catch(() => { /* non-critical — home will show "scanning" if bitcoind is unreachable */ })
+        )
+      );
       if (nameEditing) { holdingName = finalName; nameEditing = false; }
       step = 'success';
     } catch {
@@ -328,6 +460,7 @@
 
   function handleBackFromParseback() {
     error = null;
+    autoWrapNote = null;
     step = mode === 'generate' ? 'generate' : 'input';
   }
 
@@ -342,6 +475,8 @@
 
   onMount(async () => {
     if (!auth.loaded) await auth.load();
+    if (!auth.isPaired) { goto('/'); return; }
+    if (!auth.unlocked) { goto('/unlock'); return; }
     serverUrl = (await secureStorage.get('server_url')) ?? '';
   });
 </script>
@@ -409,13 +544,12 @@
             <option value="phoenix">Phoenix</option>
             <option value="sparrow">Sparrow</option>
             <option value="specter">Specter</option>
-            <option value="other">Other…</option>
           </select>
         </div>
       </div>
 
       <!-- Wallet tip banner — appears when source is selected -->
-      {#if source && WALLET_TIPS[source]}
+      {#if WALLET_TIPS[source] || !source}
         <div class="wallet-tip" role="note">
           <svg class="tip-icon" viewBox="0 0 24 24" aria-hidden="true" fill="none"
                stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -423,7 +557,7 @@
             <line x1="12" y1="8" x2="12" y2="12"/>
             <line x1="12" y1="16" x2="12" y2="16.5"/>
           </svg>
-          <span>{WALLET_TIPS[source]}</span>
+          <span>{WALLET_TIPS[source] ?? WALLET_TIPS['other']}</span>
         </div>
       {/if}
 
@@ -439,7 +573,7 @@
             aria-invalid={!!error}
             placeholder="Paste your xpub or output descriptor here…"
             bind:value={descriptorText}
-            oninput={() => { error = null; }}
+            oninput={() => { error = null; errorDetailsOpen = false; }}
           ></textarea>
           <button class="paste-btn" type="button" aria-label="Paste from clipboard"
                   onclick={handlePaste}>
@@ -451,6 +585,12 @@
           </button>
         </div>
       </div>
+
+      {#if bareKeyDetected}
+        <p class="auto-wrap-hint">
+          Looks like a bare extended key — we'll try building a descriptor from it automatically.
+        </p>
+      {/if}
     </div>
 
   </div>
@@ -473,7 +613,7 @@
           </p>
         </div>
       </div>
-    {:else if error?.kind === 'parse' || error?.kind === 'network'}
+    {:else if error?.kind === 'network'}
       <div class="wizard-error" role="alert">
         <svg class="error-icon" viewBox="0 0 24 24" aria-hidden="true" fill="none"
              stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -484,6 +624,26 @@
         <div>
           <p class="error-title">Couldn't read that descriptor.</p>
           <p class="error-body">{error.message}</p>
+        </div>
+      </div>
+    {:else if error?.kind === 'parse'}
+      <div class="wizard-error" role="alert">
+        <svg class="error-icon" viewBox="0 0 24 24" aria-hidden="true" fill="none"
+             stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="10"/>
+          <line x1="12" y1="8" x2="12" y2="13"/>
+          <line x1="12" y1="16" x2="12" y2="16.5"/>
+        </svg>
+        <div class="error-content">
+          <p class="error-title">Couldn't read that descriptor.</p>
+          <p class="error-body">Check it came from a compatible wallet and try again.</p>
+          <button class="error-details-toggle" type="button"
+                  onclick={() => { errorDetailsOpen = !errorDetailsOpen; }}>
+            {errorDetailsOpen ? 'Hide details' : 'Show details'}
+          </button>
+          {#if errorDetailsOpen}
+            <p class="error-details-text">{error.message}</p>
+          {/if}
         </div>
       </div>
     {:else if error?.kind === 'multisig'}
@@ -666,6 +826,19 @@
         </p>
       {/if}
     </div>
+
+    <!-- Auto-wrap notice -->
+    {#if autoWrapNote}
+      <div class="auto-wrap-notice" role="note">
+        <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor"
+             stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="10"/>
+          <line x1="12" y1="8" x2="12" y2="12"/>
+          <line x1="12" y1="16" x2="12" y2="16.5"/>
+        </svg>
+        <span><strong>Auto-detected:</strong> {autoWrapNote}. Verify the first addresses match your wallet before continuing.</span>
+      </div>
+    {/if}
 
     <!-- Auto-name preview row -->
     <div class="name-preview" aria-label="Purse name preview">
@@ -1037,6 +1210,31 @@
   .paste-btn:hover { background: var(--color-bg); }
   .paste-btn svg { width: 12px; height: 12px; }
 
+  /* ---------- Auto-wrap hint (below textarea) ---------- */
+  .auto-wrap-hint {
+    margin: var(--space-2) 0 0;
+    font-size: var(--font-size-xs);
+    color: var(--color-text-muted);
+    line-height: var(--line-height-default);
+  }
+
+  /* ---------- Auto-wrap notice (parseback) ---------- */
+  .auto-wrap-notice {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--space-2);
+    margin-bottom: var(--space-3);
+    padding: var(--space-3);
+    background: var(--color-info-soft);
+    border: 1px solid var(--color-info-border);
+    border-radius: var(--radius-md);
+    color: var(--color-info-text-on-soft);
+    font-size: var(--font-size-sm);
+    line-height: var(--line-height-default);
+  }
+  .auto-wrap-notice svg { width: 16px; height: 16px; flex-shrink: 0; margin-top: 1px; }
+  .auto-wrap-notice strong { font-weight: var(--font-weight-semibold); }
+
   /* ---------- Footer error regions ---------- */
   .wizard-error {
     margin-bottom: var(--space-3);
@@ -1060,9 +1258,10 @@
     width: 18px; height: 18px; flex-shrink: 0;
     margin-top: 1px;
   }
-  .error-content { flex: 1; }
+  .error-content { flex: 1; min-width: 0; }
+  .wizard-error > div { min-width: 0; }
   .error-title { font-weight: var(--font-weight-semibold); margin: 0 0 2px; }
-  .error-body  { margin: 0 0 var(--space-3); }
+  .error-body  { margin: 0 0 var(--space-3); overflow-wrap: break-word; }
   .error-body:last-child { margin-bottom: 0; }
   .redirect-cta {
     display: inline-flex;
@@ -1079,6 +1278,30 @@
     cursor: pointer;
   }
   .redirect-cta svg { width: 14px; height: 14px; }
+
+  .error-details-toggle {
+    background: transparent;
+    border: none;
+    padding: 0;
+    font-family: var(--font-sans);
+    font-size: var(--font-size-xs);
+    font-weight: var(--font-weight-semibold);
+    color: var(--color-danger-text-on-soft);
+    cursor: pointer;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+    margin-top: var(--space-1);
+  }
+  .error-details-text {
+    margin: var(--space-2) 0 0;
+    font-family: var(--font-mono);
+    font-size: var(--font-size-xs);
+    color: var(--color-danger-text-on-soft);
+    line-height: 1.5;
+    overflow-wrap: break-word;
+    word-break: break-word;
+    opacity: 0.8;
+  }
 
   /* ---------- STEP 1 generate — scroll area ---------- */
   .gen-scroll {
