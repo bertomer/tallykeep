@@ -1,0 +1,429 @@
+<!--
+  Title: Mobile — Home (populated, one row per Holding type)
+  Status: validated (Rémy greenlight 2026-05-13 — custody-tier sort,
+                     source-name meta lines (Kraken / Phoenix / Coldcard
+                     Mk4 / 2-of-3 multisig), brass Vault stripe per
+                     palette v2 lock §4 update, filled-primary + button,
+                     2 px verdigris top-indicator on active nav, amounts
+                     in Manrope tabular-nums)
+  Date last touched: 2026-05-13
+  Replaces: nothing on disk; first mockup of the populated state.
+
+  Design notes:
+  - Inherits chrome from mobile_home_empty.html (app bar, hero,
+    bottom nav). Where this state differs: section body becomes
+    a list-card of Holdings rows instead of the "No Holdings yet"
+    empty placeholder.
+  - Sample data: one row per type — Account, Purse, Strongbox,
+    Vault — sorted by **custody tier**, same direction as the
+    Add-Holding picker (least sovereign → most sovereign). Within
+    a tier with multiple Holdings (not visualised here — one per
+    type for now), secondary sort is **creation date ascending**
+    (oldest first). Locked per Rémy 2026-05-13. Sort options
+    (toggle to by-amount, by-recency) are a polish concern for a
+    follow-up iteration if the default doesn't hold for real use.
+  - Row anatomy: 4 px stripe in --color-holding-{type} on the
+    left edge, then name (semibold), meta (one line — script-type
+    or provider), amount right-aligned in mono with a small "sats"
+    unit. Same row pattern is reused for the picker's icon-bordered
+    affordance — the stripe is the calmer per-row variant once
+    Holdings are in the list.
+  - Hero totals across all four sample rows: 4 358 921 sats.
+    Hero unit cycler (↻) is unchanged; tap toggles sats / BTC
+    (BTC view shows 0.04358921 BTC). Show-in-fiat link unchanged.
+  - Meta copy uses **source-name** rather than script-type
+    jargon (working sketch, per Rémy 2026-05-13). Rationale:
+    target-market users don't know what P2WPKH means but do know
+    "Phoenix" / "Coldcard Mk4" / "Kraken". Source is captured as
+    an optional field in the wizard's label step (with a per-type
+    dropdown + Other → free-text). When the user skips the
+    source field, meta falls back to a friendlier script-type
+    label ("Native segwit", "Taproot", "Multi-sig"). Vault is
+    the exception — multi-sig structure IS the identity, no
+    single device name captures it, so meta stays technical
+    ("2-of-3 multisig", optionally extended with timelock info).
+  - Sample names are deliberately neutral and short — they're
+    user-set in the wizard's label step. Long labels truncate via
+    text-overflow ellipsis (verified at 360 px width with this
+    sample data; longer labels need a follow-up smoke test).
+  - The "Scanning…" meta state (newly added Holding waiting on
+    its first scan) isn't shown here. That's a transient state
+    for the post-add transition; covered in the success-state
+    mockup of each wizard.
+  - All amounts use --font-sans with font-variant-numeric:
+    tabular-nums so digits in a column align (per brand/README.md
+    §"Typography conventions" — locked 2026-05-13). Earlier draft
+    used --font-mono; Manrope-vs-Consolas mismatch on Windows
+    triggered the swap. Manrope's tabular numerals hold the
+    column without the mono look.
+-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>TallyKeep — Mobile — Home (populated)</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="_shared/tokens.css">
+<link rel="stylesheet" href="_shared/shell.css">
+<style>
+  .phone-screen {
+    padding-top: var(--mobile-safe-top);
+    padding-bottom: var(--mobile-safe-bottom);
+    background: var(--color-bg);
+  }
+
+  /* ---------- App bar (same as empty) ---------- */
+  .app-bar {
+    height: var(--mobile-app-bar);
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    padding: 0 var(--space-4);
+    background: var(--color-surface);
+    border-bottom: 1px solid var(--color-border);
+  }
+  .app-bar svg.wordmark-icony { width: 120px; height: auto; display: block; }
+
+  /* ---------- Hero (same as empty, non-zero amount) ---------- */
+  .hero {
+    flex-shrink: 0;
+    padding: var(--space-5) var(--space-4) var(--space-4);
+    background: var(--color-surface);
+    border-bottom: 1px solid var(--color-border);
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--space-2);
+  }
+  .hero .label-line {
+    font-size: var(--font-size-xs);
+    color: var(--color-text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    font-weight: var(--font-weight-semibold);
+  }
+  .amount-line { display: flex; align-items: baseline; gap: var(--space-3); }
+  .amount {
+    font-family: var(--font-sans);
+    font-size: 36px;
+    font-weight: var(--font-weight-semibold);
+    color: var(--color-text);
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+  }
+  .unit-label {
+    font-size: var(--font-size-md);
+    color: var(--color-text-muted);
+    font-weight: var(--font-weight-medium);
+    line-height: 1;
+  }
+  .unit-toggle {
+    background: transparent; border: 0;
+    padding: 0 0 0 2px; margin: 0;
+    font-size: 0.7em; vertical-align: super; line-height: 1;
+    color: var(--color-text-muted);
+    cursor: pointer; font-family: inherit;
+  }
+  .show-fiat-link {
+    background: transparent; border: 0; padding: 0;
+    color: var(--color-text-dim); font-size: var(--font-size-xs);
+    cursor: pointer; margin-top: var(--space-1);
+  }
+
+  /* ---------- Section head (same as empty) ---------- */
+  .section-head {
+    padding: var(--space-3) var(--space-4) var(--space-2);
+    display: flex; align-items: baseline; justify-content: space-between;
+  }
+  .section-head .title {
+    font-size: var(--font-size-xs);
+    font-weight: var(--font-weight-semibold);
+    color: var(--color-text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+  .section-head .add-btn {
+    width: 28px; height: 28px;
+    border-radius: var(--radius-md);
+    border: 0;
+    background: var(--color-primary); color: var(--color-on-primary);
+    display: inline-flex; align-items: center; justify-content: center;
+    cursor: pointer; padding: 0;
+  }
+  .section-head .add-btn:hover { background: var(--color-primary-strong); }
+  .section-head .add-btn svg { width: 14px; height: 14px; }
+
+  /* ---------- Holdings list-card ---------- */
+  .holding-list {
+    margin: 0 var(--space-4) var(--space-3);
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    overflow: hidden;
+  }
+  /* Row is a <button> — strip native chrome (border, background, padding,
+     font, color, text-align) so only our grid + border-bottom shape it.
+     Without this reset, each row gets a stray button-default border that
+     reads as a second outlined card on top of the list-card's outer ring;
+     earlier draft hit exactly that. */
+  .holding-row {
+    display: grid;
+    grid-template-columns: 4px 1fr auto;
+    align-items: stretch;
+    width: 100%;
+    border: 0;
+    border-bottom: 1px solid var(--color-border);
+    background: transparent;
+    padding: 0;
+    font-family: inherit;
+    color: inherit;
+    text-align: left;
+    cursor: pointer;
+  }
+  .holding-row:last-child { border-bottom: 0; }
+  .holding-row:hover { background: var(--color-surface-raised); }
+
+  .holding-stripe { align-self: stretch; }
+  .holding-row.account   .holding-stripe { background: var(--color-holding-account); }
+  .holding-row.purse     .holding-stripe { background: var(--color-holding-purse); }
+  .holding-row.strongbox .holding-stripe { background: var(--color-holding-strongbox); }
+  .holding-row.vault     .holding-stripe { background: var(--color-holding-vault); }
+
+  .holding-body {
+    padding: var(--space-3) var(--space-4);
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+  .holding-name {
+    font-size: var(--font-size-base);
+    font-weight: var(--font-weight-semibold);
+    color: var(--color-text);
+    line-height: var(--line-height-tight);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .holding-meta {
+    font-size: var(--font-size-xs);
+    color: var(--color-text-dim);
+    line-height: var(--line-height-tight);
+  }
+  .holding-amt {
+    padding: var(--space-3) var(--space-4);
+    text-align: right;
+    font-family: var(--font-sans);
+    font-variant-numeric: tabular-nums;
+    font-size: var(--font-size-base);
+    font-weight: var(--font-weight-medium);
+    color: var(--color-text);
+    white-space: nowrap;
+    align-self: center;
+  }
+  .holding-amt .unit {
+    color: var(--color-text-dim);
+    font-size: 10px;
+    margin-left: var(--space-1);
+    font-family: var(--font-sans);
+    font-weight: var(--font-weight-normal);
+  }
+
+  /* ---------- Scroll spacer ---------- */
+  .scroll-area { flex: 1; overflow-y: auto; }
+
+  /* ---------- Bottom nav (same as empty) ---------- */
+  .bottom-nav {
+    height: var(--mobile-bottom-nav);
+    flex-shrink: 0;
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    background: var(--color-surface);
+    border-top: 1px solid var(--color-border);
+  }
+  .nav-item {
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    gap: 2px;
+    padding: var(--space-2) 0;
+    font-size: 10px;
+    color: var(--color-text-dim);
+    background: transparent; border: 0; cursor: pointer;
+  }
+  .nav-item .nav-ico { width: 22px; height: 22px; color: currentColor; }
+  .nav-item.active {
+    color: var(--color-primary-strong);
+    font-weight: var(--font-weight-semibold);
+    position: relative;
+  }
+  .nav-item.active::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 20%;
+    right: 20%;
+    height: 2px;
+    background: var(--color-primary);
+    border-radius: 0 0 var(--radius-sm) var(--radius-sm);
+  }
+  .nav-item.disabled { color: var(--color-text-dim); opacity: 0.4; cursor: not-allowed; }
+  .nav-item.enabled-inactive { color: var(--color-text-muted); }
+</style>
+</head>
+<body>
+
+<div class="mockup-meta">
+  <strong>Mobile — Home (populated)</strong> ·
+  <span class="status-review">review</span> ·
+  2026-05-13 · 360×800
+</div>
+
+<div class="phone-frame">
+  <div class="phone-screen">
+
+    <div class="app-bar">
+      <svg class="wordmark-icony" viewBox="0 0 450 145" xmlns="http://www.w3.org/2000/svg" aria-label="tallykeep" role="img">
+        <text x="0" y="92" font-family="Manrope, system-ui, sans-serif" font-weight="600" font-size="92" letter-spacing="-2" class="mark-text">tall</text>
+        <svg x="143" y="42" width="76" height="84" viewBox="36.43 27.79 131.9 146.43">
+          <defs>
+            <clipPath id="wm-stock-clip"><path d="M 168.33 42.19 L 54.27 174.22 L 36.43 139.77 L 54.47 118.86 L 65.07 128.02 L 151.67 27.81 Z"/></clipPath>
+            <clipPath id="wm-foil-clip"><polygon points="40.68,42.21 79.68,87.21 96.32,72.79 57.32,27.79"/></clipPath>
+          </defs>
+          <path d="M 168.33 42.19 L 54.27 174.22 L 36.43 139.77 L 54.47 118.86 L 65.07 128.02 L 151.67 27.81 Z" class="mark-wood"/>
+          <polygon points="40.68,42.21 79.68,87.21 96.32,72.79 57.32,27.79" class="mark-wood"/>
+          <g class="mark-grain" stroke-width="1.4" stroke-linecap="butt" opacity="0.6">
+            <line x1="163.79" y1="38.27" x2="46.07" y2="174.53" clip-path="url(#wm-stock-clip)"/>
+            <line x1="156.22" y1="31.73" x2="38.50" y2="167.99" clip-path="url(#wm-stock-clip)"/>
+            <line x1="45.22"  y1="38.27" x2="84.52" y2="83.64"  clip-path="url(#wm-foil-clip)"/>
+            <line x1="52.78"  y1="31.73" x2="92.08" y2="77.09"  clip-path="url(#wm-foil-clip)"/>
+          </g>
+          <circle cx="53.76" cy="147.31" r="2.8" class="mark-carving"/>
+          <polygon points="-3,12 3,12 2,5 -2,5"     class="mark-carving" transform="translate(147 50) rotate(130.82)"/>
+          <polygon points="-4,12 4,12 2,4 -2,4"     class="mark-carving" transform="translate(140 58) rotate(130.82)"/>
+          <polygon points="-3,12 3,12 2,5 -2,5"     class="mark-carving" transform="translate(133 66) rotate(130.82)"/>
+          <polygon points="-3,-12 3,-12 2,-5 -2,-5" class="mark-carving" transform="translate(62 50)  rotate(49.18)"/>
+          <polygon points="-4,-12 4,-12 2,-4 -2,-4" class="mark-carving" transform="translate(69 58)  rotate(49.18)"/>
+          <polygon points="-3,-12 3,-12 2,-5 -2,-5" class="mark-carving" transform="translate(76 66)  rotate(49.18)"/>
+        </svg>
+        <text x="228" y="92" font-family="Manrope, system-ui, sans-serif" font-weight="600" font-size="92" letter-spacing="-2" class="mark-text">keep</text>
+      </svg>
+    </div>
+
+    <div class="scroll-area">
+
+      <!-- Hero — non-zero balance, same shape as empty -->
+      <div class="hero">
+        <div class="label-line">Total balance</div>
+        <div class="amount-line">
+          <span class="amount">4 358 921</span>
+          <span class="unit-label">sats<button class="unit-toggle" aria-label="Cycle unit: sats / BTC">↻</button></span>
+        </div>
+        <button class="show-fiat-link">Show in fiat</button>
+      </div>
+
+      <!-- Holdings section -->
+      <div class="section-head">
+        <span class="title">Holdings</span>
+        <button class="add-btn" aria-label="Add a Holding">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+            <line x1="12" y1="5" x2="12" y2="19"/>
+            <line x1="5" y1="12" x2="19" y2="12"/>
+          </svg>
+        </button>
+      </div>
+
+      <div class="holding-list" role="list">
+
+        <!-- Account — Kraken, 250k sats -->
+        <button class="holding-row account" type="button" role="listitem">
+          <span class="holding-stripe" aria-hidden="true"></span>
+          <span class="holding-body">
+            <span class="holding-name">EUR account</span>
+            <span class="holding-meta">Kraken</span>
+          </span>
+          <span class="holding-amt">
+            250 000<span class="unit">sats</span>
+          </span>
+        </button>
+
+        <!-- Purse — Phoenix (hot wallet app), ~360k sats -->
+        <button class="holding-row purse" type="button" role="listitem">
+          <span class="holding-stripe" aria-hidden="true"></span>
+          <span class="holding-body">
+            <span class="holding-name">Phone wallet</span>
+            <span class="holding-meta">Phoenix</span>
+          </span>
+          <span class="holding-amt">
+            358 921<span class="unit">sats</span>
+          </span>
+        </button>
+
+        <!-- Strongbox — Coldcard Mk4 (hardware signer), 1.5M sats -->
+        <button class="holding-row strongbox" type="button" role="listitem">
+          <span class="holding-stripe" aria-hidden="true"></span>
+          <span class="holding-body">
+            <span class="holding-name">My Coldcard</span>
+            <span class="holding-meta">Coldcard Mk4</span>
+          </span>
+          <span class="holding-amt">
+            1 500 000<span class="unit">sats</span>
+          </span>
+        </button>
+
+        <!-- Vault — multisig structure as identity, 2.25M sats -->
+        <button class="holding-row vault" type="button" role="listitem">
+          <span class="holding-stripe" aria-hidden="true"></span>
+          <span class="holding-body">
+            <span class="holding-name">Family reserve</span>
+            <span class="holding-meta">2-of-3 multisig</span>
+          </span>
+          <span class="holding-amt">
+            2 250 000<span class="unit">sats</span>
+          </span>
+        </button>
+
+      </div>
+
+    </div>
+
+    <nav class="bottom-nav" aria-label="Primary navigation">
+      <button class="nav-item active" aria-current="page">
+        <svg class="nav-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M 3 12 L 12 3 L 21 12 M 6 10 L 6 21 L 18 21 L 18 10"/>
+        </svg>
+        Home
+      </button>
+      <button class="nav-item enabled-inactive">
+        <svg class="nav-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+          <line x1="5" y1="7"  x2="19" y2="7"/>
+          <line x1="5" y1="12" x2="19" y2="12"/>
+          <line x1="5" y1="17" x2="19" y2="17"/>
+        </svg>
+        Activity
+      </button>
+      <button class="nav-item enabled-inactive">
+        <svg class="nav-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="4" y="6"  width="16" height="4" rx="1"/>
+          <rect x="4" y="12" width="16" height="4" rx="1"/>
+          <rect x="4" y="18" width="16" height="2" rx="1"/>
+        </svg>
+        Holdings
+      </button>
+      <button class="nav-item enabled-inactive">
+        <svg class="nav-ico" viewBox="0 0 24 24" fill="currentColor">
+          <circle cx="6"  cy="12" r="2"/>
+          <circle cx="12" cy="12" r="2"/>
+          <circle cx="18" cy="12" r="2"/>
+        </svg>
+        More
+      </button>
+    </nav>
+
+  </div>
+</div>
+
+</body>
+</html>

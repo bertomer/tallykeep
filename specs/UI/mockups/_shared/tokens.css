@@ -43,7 +43,13 @@
   lockstep rule).
 
   Status: TEST OVERRIDE — not a brand revision
-  Last touched: 2026-05-10 (palette v2 — Holding-type accents)
+  Last touched: 2026-05-13 (Vault accent #6c7682 → #b89968 brass +
+                            amount typography sans + tabular-nums,
+                            mono dropped for amounts; lockstep with
+                            palette v2 lock §4 + §6 + brand/README.md
+                            §"Typography conventions".
+                            Wordmark v1 lock viewBox 460→450 reviewed:
+                            no token values changed, lockstep confirmed.)
 */
 
 :root {
@@ -145,13 +151,32 @@
   --color-holding-account:   #9c9388; /* limestone — institutional warm-grey */
   --color-holding-purse:     #80452f; /* auburn leather — daily wallet       */
   --color-holding-strongbox: #4a4d4f; /* iron — cold storage                 */
-  --color-holding-vault:     #6c7682; /* brushed steel — ceremonial          */
+  --color-holding-vault:     #b89968; /* brass — ceremonial multi-key hold.
+                                         Vault icon body stays brushed-steel
+                                         internally; the row-stripe and the
+                                         picker icon-border use brass to
+                                         echo the brass hub in the icon and
+                                         the brass cord in watch-only Purse
+                                         — same brand-cohesion thread per
+                                         palette v2 lock §"brand-cohesion". */
 
   /* ---------------- Type ---------------- */
   /* Source: wordmark lock §2 "Typeface · Manrope 600".     */
   --font-sans: "Manrope", ui-sans-serif, system-ui, -apple-system,
                "Segoe UI", Roboto, sans-serif;
   --font-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+
+  /* Usage convention (locked 2026-05-13 — see brand/README.md
+     §"Typography conventions"):
+     - Amounts (hero balance, per-row balances, sweep thresholds,
+       fee displays, anything read as a quantity) use --font-sans
+       with `font-variant-numeric: tabular-nums`. Manrope supports
+       tabular numerals; digits align in a column without the
+       mono look. Banking-grade ergonomics, not Bitcoin-native feel.
+     - --font-mono is reserved for code-shaped content: BIP 380
+       descriptors, addresses, transaction IDs, BIP identifiers,
+       passphrase entry, raw API output. The .mono helper in
+       shell.css remains the canonical accessor for those. */
 
   --font-size-xs:   11px;
   --font-size-sm:   12px;

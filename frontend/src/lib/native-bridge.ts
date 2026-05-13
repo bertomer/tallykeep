@@ -150,3 +150,24 @@ export const qrScanner = {
     throw new Error('qrScanner.scan: Capacitor not available');
   },
 };
+
+// ---------------------------------------------------------------------------
+// Clipboard
+// Browser-dev: navigator.clipboard.readText() (works natively in secure contexts).
+// Capacitor: swap for @capacitor/clipboard at private-ship.
+// ---------------------------------------------------------------------------
+
+export const clipboard = {
+  /** Read the current clipboard text. Returns null on permission denial or empty. */
+  async paste(): Promise<string | null> {
+    if (DEV_MODE) {
+      try {
+        return await navigator.clipboard.readText();
+      } catch {
+        return null; // permission denied or unavailable in this context
+      }
+    }
+    _notifyGate('clipboard.paste');
+    throw new Error('clipboard.paste: Capacitor not available');
+  },
+};

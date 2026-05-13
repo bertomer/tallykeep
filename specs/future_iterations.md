@@ -53,6 +53,124 @@ removed.
 
 ## Open
 
+### Add Holding — Purse wizard
+
+- **Captured:** 2026-05 (split from the original "Add Holding
+  (descriptor-based)" iteration during sharpening 2026-05-13 —
+  see `next_iteration.md` re-scoping note on the Add Holding
+  scaffolding block).
+- **Motivation:** Purse is the user's daily wallet — the
+  sovereignty-first surface that the brand pitches as the user's
+  point of contact. Until this ships, the dev-phase app can
+  display Holdings (via Swagger-seeded fixture data) but the
+  user can't actually onboard a descriptor-based Holding from
+  inside the app. Also serves as the canonical descriptor-wizard
+  pattern that Strongbox and Vault then derive from.
+- **Sketch:** 4-step wizard, watch-only path only.
+    1. *Descriptor input* — multiline accepting xpub OR BIP 380
+       descriptor. Paste affordance via the NativeBridge clipboard
+       shipped in the scaffolding iteration. Single-address
+       rejection with explicit error.
+    2. *Parse-back* — script-type, derivation, first 3 derived
+       addresses, tap-to-copy.
+    3. *Label* — default suggestion derived from script-type +
+       optional source-name dropdown (Phoenix / BlueWallet /
+       Mutiny / Sparrow / Other → free-text).
+    4. *Success* — Holding created, scan kicked off, return to
+       Home populated with "Scanning…" banner on the new row.
+  Brings the **shared wizard shell** (step counter, back chevron,
+  primary CTA pinned to bottom, error region) into the codebase
+  since Purse is its first consumer. Capability-branch step 1
+  (managed flavor) stays deferred to the Capacitor-wrap iteration.
+- **Touches:** `UI/mobile.md` Add-Holding Purse section,
+  `UI/README.md` flow inventory, four new mockup files
+  (`mobile_add_holding_purse_{input,parseback,label,success}.html`),
+  frontend wizard implementation. Backend descriptor-validate +
+  purse-create endpoints already shipped by the scaffolding
+  iteration. No new NativeBridge surface (clipboard already lands
+  in scaffolding).
+- **Status:** sharpened-ready-to-promote
+- **Milestone:** pre-shipping (private-ship enabler)
+- **Notes:** Promote **first** among the three wizard iterations.
+  The shared wizard shell lands here and is reused by Strongbox
+  and Vault iterations — splitting the shell out into its own
+  iteration would create a no-consumer artifact, which is the
+  anti-pattern the scaffolding-split was designed to avoid. Both
+  the design pass (4 mockups, Purse-first as the canonical
+  wizard) and the coding pass live in this iteration.
+
+### Add Holding — Strongbox wizard
+
+- **Captured:** 2026-05 (split 2026-05-13, see Purse-wizard
+  entry above).
+- **Motivation:** Buffer layer between hot Purse and ceremonial
+  Vault. Required for the declared-vs-observable security
+  analysis to operate on real cold-storage Holdings in dev phase.
+  Rémy specifically uses one personally, so it lands during
+  personal-use phase.
+- **Sketch:** 4-step wizard, parser shared with Purse watch-only.
+    1. *Descriptor input* — framing copy reads "Export an xpub
+       from your hardware wallet (Coldcard / Trezor / Ledger /
+       Jade) and paste it here. The hardware wallet keeps the
+       spending key." Single-address rejected.
+    2. *Parse-back* — same component as Purse.
+    3. *Label* — default suggestion + optional device-name
+       dropdown (Coldcard Mk4 / Trezor T / Trezor Safe 3 / Ledger
+       Nano / Jade / Other → free-text).
+    4. *Success* — "Signing happens on your hardware wallet when
+       you spend. The spending flow ships in a later iteration."
+  Reuses the shared wizard shell brought in by the Purse-wizard
+  iteration.
+- **Touches:** `UI/mobile.md` Add-Holding Strongbox section,
+  four new mockup files derived from Purse with adapted copy,
+  frontend wizard implementation. Backend already shipped by
+  scaffolding iteration. No new shell or bridge work.
+- **Status:** sharpened-ready-to-promote
+- **Milestone:** pre-shipping
+- **Notes:** Promote **second**. Most of the work is copy +
+  framing variants on top of the Purse pattern. Per-device export-
+  instruction cards (Coldcard / Trezor / etc. step-by-step guides)
+  are nice-to-have but deferred to a post-shipping polish
+  iteration — the dev-phase user is assumed to know how to export
+  an xpub from their hardware.
+
+### Add Holding — Vault wizard
+
+- **Captured:** 2026-05 (split 2026-05-13, see Purse-wizard
+  entry above).
+- **Motivation:** Long-term ceremonial multi-key hold. Designed
+  as the default destination for auto-sweep policies once the
+  SweepPolicy iteration lands. Completes the four-Holding-type
+  onboarding surface in dev phase.
+- **Sketch:** 5-step wizard. Same parser as Purse / Strongbox
+  but with multisig-only validation and a pre-card framing.
+    1. *Framing pre-card* — "Vault is for amounts you rarely
+       touch — long-term reserve, family savings, future income.
+       Several keys are required to move funds. Vault will become
+       the default destination for auto-sweeps from your other
+       Holdings. Today, you can import the descriptor; spending
+       and auto-sweep land in later iterations." Primary CTA:
+       "Continue".
+    2. *Descriptor input* — multisig only. Bare xpubs and
+       single-key descriptors rejected with "Vault requires a
+       multisig descriptor — `wsh(multi(...))` or similar."
+    3. *Parse-back* — M-of-N, co-signer count, any timelocks
+       present, first three derived addresses.
+    4. *Label* — default suggestion "My Vault".
+    5. *Success* — "Vault is set up. Spending ceremony and the
+       auto-sweep destination feature ship in later iterations."
+  Reuses the shared wizard shell.
+- **Touches:** `UI/mobile.md` Add-Holding Vault section, five new
+  mockup files, frontend wizard implementation. Backend already
+  shipped. No new shell or bridge work.
+- **Status:** sharpened-ready-to-promote
+- **Milestone:** pre-shipping
+- **Notes:** Promote **third**. Vault's framing pre-card is the
+  key design difference from Purse / Strongbox; the rest of the
+  wizard reuses the pattern. Operational features (signing
+  ceremony, blueprint analysis, declared-vs-observable mismatch
+  warnings) stay deferred to the Vault-detail iteration.
+
 ### Hosted tier infrastructure
 
 - **Captured:** 2026-05 (from `design_decisions.md` §11, pre-merge);

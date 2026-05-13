@@ -70,7 +70,10 @@ def _purse_body(
 
 
 def _vault_body() -> dict:
-    external, change = _next_descriptor_pair()
+    base = _NEXT_BRANCH["value"]
+    _NEXT_BRANCH["value"] += 4
+    external = f"wsh(sortedmulti(2,{_BASE_XPUB}/{base}/*,{_BASE_XPUB}/{base + 1}/*))"
+    change = f"wsh(sortedmulti(2,{_BASE_XPUB}/{base + 2}/*,{_BASE_XPUB}/{base + 3}/*))"
     return {
         "name": f"Vault {secrets.token_hex(2)}",
         "purpose": "long_term",
@@ -80,6 +83,8 @@ def _vault_body() -> dict:
         },
         "display_color": "#10b981",
         "display_order": 0,
+        "required_signers": 2,
+        "total_signers": 2,
         "descriptors": [
             {
                 "name": "main",
@@ -272,7 +277,7 @@ def test_vault_long_term_returns_confirmation_required_first_time(
 
     confirmed_body = {**body, "confirmed": True}
     second = client.post("/api/v1/banking/payment-requests", json=confirmed_body)
-    assert second.status_code == 201
+    assert second.status_code == 201, second.text
 
 
 def test_get_and_list_payment_requests(app_with_db_and_node) -> None:

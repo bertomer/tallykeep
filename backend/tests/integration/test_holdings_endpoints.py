@@ -25,6 +25,14 @@ WPKH_MAINNET_CHANGE = (
 WPKH_TESTNET = (
     "wpkh(tpubD6NzVbkrYhZ4XHndKkuB8FifXm8r5FQHwrN6oZuWCz13qb93rtgKvD4PQsqC4HP4yhV3tA2fqr2RbY5mNXfM7RxXUoeABoDtsFUq2zJq6YK/0/*)"
 )
+# 2-of-3 WSH sortedmulti on mainnet — used for Vault creation tests.
+WSH_MULTISIG_MAINNET = (
+    "wsh(sortedmulti(2,"
+    "xpub6BosfCnifzxcFwrSzQiqu2DBVTshkCXacvNsWGYJVVhhawA7d4R5WSWGFNbi8Aw6ZRc1brxMyWMzG3DSSSSoekkudhUd9yLb6qx39T9nMdj/0/*,"
+    "xpub6BosfCnifzxcFwrSzQiqu2DBVTshkCXacvNsWGYJVVhhawA7d4R5WSWGFNbi8Aw6ZRc1brxMyWMzG3DSSSSoekkudhUd9yLb6qx39T9nMdj/1/*,"
+    "xpub6BosfCnifzxcFwrSzQiqu2DBVTshkCXacvNsWGYJVVhhawA7d4R5WSWGFNbi8Aw6ZRc1brxMyWMzG3DSSSSoekkudhUd9yLb6qx39T9nMdj/2/*"
+    "))"
+)
 
 
 def _purse_body(
@@ -81,8 +89,8 @@ def _strongbox_body() -> dict:
 def _vault_body() -> dict:
     body = _purse_body(
         name="Long-term holdings",
-        expression=WPKH_TESTNET,
-        network="testnet",
+        expression=WSH_MULTISIG_MAINNET,
+        network="mainnet",
     )
     body["purpose"] = "long_term"
     body.pop("seed_origin", None)
@@ -190,7 +198,7 @@ class TestCreatePurse:
         body = _purse_body(expression=multisig)
         response = client.post("/api/v1/holdings/purse", json=body)
         assert response.status_code == 422
-        assert "not supported in v1" in response.text
+        assert "multisig" in response.text.lower()
 
 
 class TestCreateStrongbox:
@@ -241,6 +249,17 @@ class TestCreateVault:
         body["total_signers"] = 3
         response = client.post("/api/v1/holdings/vault", json=body)
         assert response.status_code == 422
+
+    def test_create_vault_with_single_key_descriptor_rejected(
+        self, app_with_db
+    ) -> None:
+        client, _ = app_with_db
+        body = _vault_body()
+        # Replace multisig descriptor with a single-key WPKH — must be rejected.
+        body["descriptors"][0]["expression"] = WPKH_MAINNET
+        response = client.post("/api/v1/holdings/vault", json=body)
+        assert response.status_code == 422
+        assert "multisig" in response.text.lower()
 
 
 class TestCreateAccount:

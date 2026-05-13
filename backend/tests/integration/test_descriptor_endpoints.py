@@ -286,3 +286,78 @@ def test_next_receiving_unknown_descriptor_returns_404(app_with_db) -> None:
         "/api/v1/descriptors/00000000-0000-0000-0000-0000000000ff/addresses/next-receiving"
     )
     assert response.status_code == 404
+
+
+# --- validate (pure parser, no state mutation) --------------------------------
+
+_WSH_MULTISIG = (
+    "wsh(sortedmulti(2,"
+    "xpub6BosfCnifzxcFwrSzQiqu2DBVTshkCXacvNsWGYJVVhhawA7d4R5WSWGFNbi8Aw6ZRc1brxMyWMzG3DSSSSoekkudhUd9yLb6qx39T9nMdj/0/*,"
+    "xpub6BosfCnifzxcFwrSzQiqu2DBVTshkCXacvNsWGYJVVhhawA7d4R5WSWGFNbi8Aw6ZRc1brxMyWMzG3DSSSSoekkudhUd9yLb6qx39T9nMdj/1/*"
+    "))"
+)
+_TR_MAINNET = (
+    "tr(xpub6BosfCnifzxcFwrSzQiqu2DBVTshkCXacvNsWGYJVVhhawA7d4R5WSWGFNbi8Aw6ZRc1brxMyWMzG3DSSSSoekkudhUd9yLb6qx39T9nMdj/0/*)"
+)
+
+
+def test_validate_p2wpkh_descriptor(app_with_db) -> None:
+    client, _ = app_with_db
+    response = client.post(
+        "/api/v1/descriptors/validate",
+        json={"input": WPKH_MAINNET, "network": "mainnet"},
+    )
+    assert response.status_code == 200, response.text
+    data = response.json()
+    assert data["script_type"] == "p2wpkh"
+    assert data["is_multisig"] is False
+    assert data["required_signers"] is None
+    assert len(data["first_addresses"]) == 3
+
+
+def test_validate_p2tr_descriptor(app_with_db) -> None:
+    client, _ = app_with_db
+    response = client.post(
+        "/api/v1/descriptors/validate",
+        json={"input": _TR_MAINNET, "network": "mainnet"},
+    )
+    assert response.status_code == 200, response.text
+    data = response.json()
+    assert data["script_type"] == "p2tr"
+    assert data["is_multisig"] is False
+
+
+def test_validate_wsh_multisig_descriptor(app_with_db) -> None:
+    client, _ = app_with_db
+    response = client.post(
+        "/api/v1/descriptors/validate",
+        json={"input": _WSH_MULTISIG, "network": "mainnet"},
+    )
+    assert response.status_code == 200, response.text
+    data = response.json()
+    assert data["script_type"] == "p2wsh"
+    assert data["is_multisig"] is True
+    assert data["required_signers"] == 2
+    assert data["total_signers"] == 2
+
+
+def test_validate_bare_address_returns_typed_error(app_with_db) -> None:
+    client, _ = app_with_db
+    response = client.post(
+        "/api/v1/descriptors/validate",
+        json={"input": "bc1qar0srrr7xfkvy5l643lydnw9re59gtzzwf5mdq", "network": "mainnet"},
+    )
+    assert response.status_code == 422
+    detail = response.json()["detail"]
+    assert detail["error_code"] == "SINGLE_ADDRESS_INPUT"
+
+
+def test_validate_invalid_expression_returns_parse_error(app_with_db) -> None:
+    client, _ = app_with_db
+    response = client.post(
+        "/api/v1/descriptors/validate",
+        json={"input": "not-a-descriptor-at-all", "network": "mainnet"},
+    )
+    assert response.status_code == 422
+    detail = response.json()["detail"]
+    assert detail["error_code"] == "PARSE_ERROR"

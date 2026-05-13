@@ -51,6 +51,7 @@ def _import_descriptor(
     holding_id: UUID,
     spec: DescriptorInput,
     adapter: DescriptorAdapter,
+    allow_multisig: bool = False,
 ) -> tuple[Descriptor, list[Address]]:
     """Validate, persist, and pre-derive addresses for one descriptor.
 
@@ -58,13 +59,17 @@ def _import_descriptor(
     external chain (and on change if a change_expression is supplied).
     """
     try:
-        parsed_external = adapter.parse(spec.expression, spec.network)
+        parsed_external = adapter.parse(
+            spec.expression, spec.network, allow_multisig=allow_multisig
+        )
     except (DescriptorParseError, UnsupportedDescriptorError) as exc:
         raise HoldingServiceError(f"external descriptor: {exc}") from exc
 
     if spec.change_expression is not None:
         try:
-            parsed_change = adapter.parse(spec.change_expression, spec.network)
+            parsed_change = adapter.parse(
+                spec.change_expression, spec.network, allow_multisig=allow_multisig
+            )
         except (DescriptorParseError, UnsupportedDescriptorError) as exc:
             raise HoldingServiceError(f"change descriptor: {exc}") from exc
         if parsed_change.address_type != parsed_external.address_type:
@@ -93,7 +98,7 @@ def _import_descriptor(
 
     addresses: list[Address] = []
     derived_external = adapter.derive_addresses(
-        spec.expression, spec.network, count=spec.gap_limit
+        spec.expression, spec.network, count=spec.gap_limit, allow_multisig=allow_multisig
     )
     for d in derived_external:
         addresses.append(
@@ -113,7 +118,8 @@ def _import_descriptor(
 
     if spec.change_expression is not None:
         derived_change = adapter.derive_addresses(
-            spec.change_expression, spec.network, count=spec.gap_limit
+            spec.change_expression, spec.network, count=spec.gap_limit,
+            allow_multisig=allow_multisig,
         )
         for d in derived_change:
             addresses.append(
@@ -166,6 +172,7 @@ def _create_holding_with_descriptors(
     adapter: DescriptorAdapter,
     subtype_data: dict,
     extra_holding_kwargs: dict | None = None,
+    allow_multisig: bool = False,
 ) -> Holding:
     """Shared lifecycle for Purse / Strongbox / Vault creation.
 
@@ -195,7 +202,8 @@ def _create_holding_with_descriptors(
     descriptor_ids: list[UUID] = []
     for spec in descriptors:
         descriptor, _ = _import_descriptor(
-            session, holding_id=holding_id, spec=spec, adapter=adapter
+            session, holding_id=holding_id, spec=spec, adapter=adapter,
+            allow_multisig=allow_multisig,
         )
         descriptor_ids.append(descriptor.id)
 
@@ -296,6 +304,17 @@ def create_vault(
     timelock_blocks: int | None,
     recovery_setup_notes: str | None,
 ) -> Holding:
+    for spec in descriptors:
+        try:
+            parsed = adapter.parse(spec.expression, spec.network, allow_multisig=True)
+        except (DescriptorParseError, UnsupportedDescriptorError) as exc:
+            raise HoldingServiceError(str(exc)) from exc
+        if not parsed.is_multisig:
+            raise HoldingServiceError(
+                "Vault holdings require multisig descriptors. "
+                f"Descriptor '{spec.name}' is a single-key descriptor and is not accepted here."
+            )
+
     subtype_data: dict = {}
     if required_signers is not None:
         subtype_data["required_signers"] = required_signers
@@ -317,6 +336,7 @@ def create_vault(
         descriptors=descriptors,
         adapter=adapter,
         subtype_data=subtype_data,
+        allow_multisig=True,
         extra_holding_kwargs={
             "required_signers": required_signers,
             "total_signers": total_signers,

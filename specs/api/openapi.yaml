@@ -1,8 +1,4 @@
-WARNING: Running pip as the 'root' user can result in broken permissions and conflicting behaviour with the system package manager. It is recommended to use a virtual environment instead: https://pip.pypa.io/warnings/venv
-
-[notice] A new release of pip is available: 24.0 -> 26.1.1
-[notice] To update, run: pip install --upgrade pip
-openapi: 3.1.0
+﻿openapi: 3.1.0
 info:
   title: TallyKeep
   version: 0.1.0-dev
@@ -70,6 +66,143 @@ paths:
                 $ref: '#/components/schemas/InitializeResponse'
         '409':
           description: Already initialized
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/server/info:
+    get:
+      tags:
+      - server
+      summary: Get Server Info
+      operationId: get_server_info_api_v1_server_info_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ServerInfoResponse'
+  /api/v1/pairing/issue:
+    post:
+      tags:
+      - pairing
+      summary: Post Pairing Issue
+      description: 'Generate a one-time pairing token.
+
+
+        Called by the server operator (CLI or future desktop UI) to display as a QR
+
+        or plain token. Exempt from auth because it''s a server-admin operation that
+
+        runs before any device is paired (or when adding a second device later).'
+      operationId: post_pairing_issue_api_v1_pairing_issue_post
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PairingIssueResponse'
+  /api/v1/pairing/redeem:
+    post:
+      tags:
+      - pairing
+      summary: Post Pairing Redeem
+      description: 'Exchange a one-time pairing token for a long-lived device credential.
+
+
+        Phone-side endpoint. After this call the phone stores the returned
+
+        device_credential via NativeBridge.secureStorage. The credential is
+
+        returned exactly once; if lost, re-pair.'
+      operationId: post_pairing_redeem_api_v1_pairing_redeem_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PairingRedeemRequest'
+        required: true
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PairingRedeemResponse'
+        '401':
+          description: Invalid, expired, or already-redeemed token
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/auth/passphrase-validate:
+    post:
+      tags:
+      - auth
+      summary: Post Passphrase Validate
+      description: 'Phone-side passphrase validation for fallback unlock.
+
+
+        The phone forwards the typed passphrase; this endpoint validates against
+
+        the server''s Argon2id-derived canary. Rate-limited per ADR-0008.'
+      operationId: post_passphrase_validate_api_v1_auth_passphrase_validate_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PassphraseValidateRequest'
+        required: true
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PassphraseValidateResponse'
+        '401':
+          description: Wrong passphrase
+        '429':
+          description: Too many failed attempts
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/devices/{device_id}:
+    delete:
+      tags:
+      - auth
+      summary: Delete Device
+      description: 'Revoke a paired device credential.
+
+
+        After revocation, subsequent requests from that device return 401.
+
+        The device-list UI (desktop iteration) calls this; the endpoint ships now
+
+        so the backend contract is in place.'
+      operationId: delete_device_api_v1_devices__device_id__delete
+      parameters:
+      - name: device_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Device Id
+      responses:
+        '204':
+          description: Successful Response
+        '404':
+          description: Device not found
         '422':
           description: Validation Error
           content:
@@ -314,16 +447,14 @@ paths:
       tags:
       - holdings
       summary: Global Holdings Summary
-      description: 'Fortune view: per-Holding summary plus cross-Holding rollups.
-
-
-        Spec module 05: "the global view always shows the per-Holding
-
-        breakdown alongside the total. No silent consolidation." We honour
-
-        that — the response includes the full summary list, not just the
-
-        totals.'
+      description: "Fortune view: per-Holding summary plus cross-Holding rollups.\n\
+        \nSpec module 05: \"the global view always shows the per-Holding\nbreakdown\
+        \ alongside the total. No silent consolidation.\" We honour\nthat — the response\
+        \ includes the full summary list, not just the\ntotals.\n\nHoldings are sorted\
+        \ by custody tier (Account → Purse → Strongbox → Vault),\nthen by display_order\
+        \ within each tier. Each entry carries:\n  - meta: type-specific label (provider\
+        \ name / device label / m-of-n)\n  - scan_status: \"n/a\" | \"scanning\" |\
+        \ \"scanned\""
       operationId: global_holdings_summary_api_v1_holdings_summary_global_get
       parameters:
       - name: include_archived
@@ -486,6 +617,39 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HoldingResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/descriptors/validate:
+    post:
+      tags:
+      - descriptors
+      summary: Validate a BIP 380 descriptor — pure parser, no state mutation.
+      description: 'Validate a descriptor expression and return its parsed properties.
+
+
+        Accepts single-key and multisig BIP 380 descriptors.
+
+        Returns a typed 422 error when given a bare bitcoin address instead of
+
+        a descriptor (error_code: SINGLE_ADDRESS_INPUT).'
+      operationId: validate_descriptor_api_v1_descriptors_validate_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ValidateDescriptorRequest'
+        required: true
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidateDescriptorResponse'
         '422':
           description: Validation Error
           content:
@@ -2766,6 +2930,9 @@ components:
       - nested_segwit
       - native_segwit
       - taproot
+      - p2sh_multisig
+      - p2wsh
+      - p2sh_p2wsh
       title: AddressType
     AnalysisConfiguration:
       properties:
@@ -3929,6 +4096,69 @@ components:
       - inferred_timelock_blocks
       - last_computed_at
       title: ObservableSecurityOut
+    PairingIssueResponse:
+      properties:
+        pairing_token:
+          type: string
+          title: Pairing Token
+        expires_at:
+          type: string
+          title: Expires At
+      type: object
+      required:
+      - pairing_token
+      - expires_at
+      title: PairingIssueResponse
+    PairingRedeemRequest:
+      properties:
+        pairing_token:
+          type: string
+          maxLength: 256
+          minLength: 1
+          title: Pairing Token
+        device_label:
+          anyOf:
+          - type: string
+            maxLength: 200
+          - type: 'null'
+          title: Device Label
+      type: object
+      required:
+      - pairing_token
+      title: PairingRedeemRequest
+    PairingRedeemResponse:
+      properties:
+        device_id:
+          type: string
+          title: Device Id
+        device_credential:
+          type: string
+          title: Device Credential
+      type: object
+      required:
+      - device_id
+      - device_credential
+      title: PairingRedeemResponse
+    PassphraseValidateRequest:
+      properties:
+        passphrase:
+          type: string
+          maxLength: 4096
+          minLength: 1
+          title: Passphrase
+      type: object
+      required:
+      - passphrase
+      title: PassphraseValidateRequest
+    PassphraseValidateResponse:
+      properties:
+        valid:
+          type: boolean
+          title: Valid
+      type: object
+      required:
+      - valid
+      title: PassphraseValidateResponse
     PatchCustodialProviderRequest:
       properties:
         display_name:
@@ -4278,6 +4508,15 @@ components:
       - geographic_distribution
       - inheritance_configured
       title: SecurityClaimResponse
+    ServerInfoResponse:
+      properties:
+        server_label:
+          type: string
+          title: Server Label
+      type: object
+      required:
+      - server_label
+      title: ServerInfoResponse
     SigningModel:
       type: string
       enum:
@@ -4642,6 +4881,12 @@ components:
         locale:
           type: string
           title: Locale
+        principles_acknowledged_at:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: Principles Acknowledged At
         created_at:
           type: string
           format: date-time
@@ -4681,6 +4926,11 @@ components:
             minLength: 2
           - type: 'null'
           title: Locale
+        principles_acknowledged:
+          anyOf:
+          - type: boolean
+          - type: 'null'
+          title: Principles Acknowledged
       additionalProperties: false
       type: object
       title: UserProfileUpdate
@@ -4769,6 +5019,53 @@ components:
       - is_spent
       - hygiene_flags
       title: UtxoSummary
+    ValidateDescriptorRequest:
+      properties:
+        input:
+          type: string
+          maxLength: 4096
+          minLength: 1
+          title: Input
+        network:
+          $ref: '#/components/schemas/Network'
+      additionalProperties: false
+      type: object
+      required:
+      - input
+      - network
+      title: ValidateDescriptorRequest
+    ValidateDescriptorResponse:
+      properties:
+        script_type:
+          type: string
+          title: Script Type
+        is_multisig:
+          type: boolean
+          title: Is Multisig
+        required_signers:
+          anyOf:
+          - type: integer
+          - type: 'null'
+          title: Required Signers
+        total_signers:
+          anyOf:
+          - type: integer
+          - type: 'null'
+          title: Total Signers
+        timelocks:
+          type: 'null'
+          title: Timelocks
+        first_addresses:
+          items:
+            type: string
+          type: array
+          title: First Addresses
+      type: object
+      required:
+      - script_type
+      - is_multisig
+      - first_addresses
+      title: ValidateDescriptorResponse
     ValidationError:
       properties:
         loc:
@@ -4883,4 +5180,3 @@ components:
       - address
       - is_whitelisted
       title: WhitelistVerificationOut
-

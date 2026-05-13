@@ -29,6 +29,33 @@ revise; until then, these are canonical.
 | Tagline | In consideration | (inside the wordmark lock doc, §9) |
 | Palette v1 | Superseded by v2 | `tallykeep_palette_v1_superseded.html` |
 
+## Typography conventions
+
+The wordmark and all UI body type use **Manrope** (400 / 500 / 600 / 700,
+full weight set loaded from Google Fonts). Role assignments at the
+wordmark level (which weight for the wordmark itself, casing, tracking)
+live in `tallykeep_wordmark_v1_lock.html`.
+
+One application-level rule lives here, not in the wordmark doc, because
+it spans the whole app rather than a specific brand artifact:
+
+- **Amounts use sans with tabular numerals.** `font-family:
+  var(--font-sans); font-variant-numeric: tabular-nums`. Never mono.
+  Hero balances, per-row Holding balances, sweep thresholds, fee
+  displays, anything that reads as a quantity goes sans + tabular.
+  Manrope supports tabular numerals so digits in a column align
+  cleanly without the mono look. Locked 2026-05-13 after side-by-side
+  review (earlier drafts used `--font-mono`; the Manrope-vs-Consolas
+  contrast read as a typography mismatch on the populated home).
+  Rationale: banking-grade ergonomics is the brand direction;
+  mono pushes toward Bitcoin-native-feel which is the wrong end of
+  the spectrum.
+- **Mono is reserved for code-shaped content.** BIP 380 descriptors,
+  Bitcoin addresses, transaction IDs, BIP identifiers, passphrase
+  entry, raw API output. The `.mono` helper in `_shared/shell.css`
+  and the `--font-mono` token in `_shared/tokens.css` remain in
+  place for these uses.
+
 **Tokens are in sync.** `UI/mockups/_shared/tokens.css` is sourced
 from the palette v2 lock doc. The wood (Aged Oak, Grain, Cream)
 mirrors the mark and wordmark. The semantic palette (success /

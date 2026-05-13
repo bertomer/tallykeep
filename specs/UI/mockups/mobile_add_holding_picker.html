@@ -1,0 +1,585 @@
+<!--
+  Title: Mobile — Add Holding picker (bottom sheet open over Home empty)
+  Status: validated (Rémy greenlight 2026-05-13 after the design pass —
+                     real Holding-type icons from brand/identity/, locked
+                     copy from next_iteration.md, filled-primary + button,
+                     2 px verdigris top-indicator on active nav, hero
+                     amount in Manrope tabular-nums)
+  Date last touched: 2026-05-13
+  Replaces: nothing on disk; the design-tool prototype
+    "Holdings Home _standalone_.html" is archive material once this
+    validates (1.4 MB bundle, not a page-per-file mockup).
+
+  Design notes:
+  - Page-per-file convention (PROCESS.md §2.3): this file shows ONE
+    state — Home empty content visible (scrimmed) plus the Add-Holding
+    bottom sheet open over it. The base Home empty is
+    mobile_home_empty.html.
+  - Row layout (single column). The cards-variant from the earlier
+    design-tool prototype is dropped: 4 options earn rows, not a
+    2x2 grid — banking-grade single-column read, no eye-darting,
+    description text never crops.
+  - Row order: Account → Purse → Strongbox → Vault. Custody-progression
+    / lifecycle order (hot to cold, least sovereign to most sovereign).
+    Tells the user-money-flow story: where the money typically starts
+    → daily wallet → short-term cold → long-term ceremonial.
+  - Per-row color stripe: 4px in --color-holding-{type} on the left
+    edge of the icon's bordered square. Same convention will carry to
+    populated Holdings list rows.
+  - Icons are placeholder inline SVGs. brand/identity/ has no Holding-
+    type icons yet; proper iconography is a brand-pass concern. The
+    2px colored border around each icon (per the matching --color-
+    holding-* token) carries the type identity until icons land.
+  - No "Recommended" pill in this iteration. The pill requires the
+    managed-Purse capability check, which lands in the Capacitor-wrap
+    iteration together with the consumer surface. In dev-phase
+    browser the honest gate is the absence of the affordance.
+  - Account row remains visible in the picker but its target is a
+    one-screen "Add Account ships next iteration" stub
+    (mobile_add_holding_account_stub.html). Keeping the IA honest
+    about what's coming costs one nav dead-end and avoids
+    re-explaining a missing tile.
+  - Copy verbatim from next_iteration.md "Add Holding (descriptor-
+    based)" iteration block.
+-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>TallyKeep — Mobile — Add Holding picker</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="_shared/tokens.css">
+<link rel="stylesheet" href="_shared/shell.css">
+<style>
+  /* phone-screen comes from shell.css (position: absolute; inset: 0;
+     display: flex; flex-direction: column; overflow: hidden) — DO NOT
+     override `position` here, or the scrim and sheet lose their
+     positioning context and the home content collapses out of view.
+     Earlier draft made that mistake; this rule is intentionally empty. */
+
+  /* ---------- App bar (same as Home empty) ---------- */
+  .app-bar {
+    height: var(--mobile-app-bar);
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    padding: 0 var(--space-4);
+    background: var(--color-surface);
+    border-bottom: 1px solid var(--color-border);
+  }
+  .app-bar svg.wordmark-icony { width: 120px; height: auto; display: block; }
+
+  /* ---------- Hero (same as Home empty) ---------- */
+  .hero {
+    flex-shrink: 0;
+    padding: var(--space-5) var(--space-4) var(--space-4);
+    background: var(--color-surface);
+    border-bottom: 1px solid var(--color-border);
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--space-2);
+  }
+  .hero .label-line {
+    font-size: var(--font-size-xs);
+    color: var(--color-text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    font-weight: var(--font-weight-semibold);
+  }
+  .amount-line { display: flex; align-items: baseline; gap: var(--space-3); }
+  .amount {
+    font-family: var(--font-sans);
+    font-size: 36px;
+    font-weight: var(--font-weight-semibold);
+    color: var(--color-text);
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+  }
+  .unit-label {
+    font-size: var(--font-size-md);
+    color: var(--color-text-muted);
+    font-weight: var(--font-weight-medium);
+    line-height: 1;
+  }
+  .unit-toggle {
+    background: transparent; border: 0;
+    padding: 0 0 0 2px; margin: 0;
+    font-size: 0.7em; vertical-align: super; line-height: 1;
+    color: var(--color-text-muted);
+    cursor: pointer; font-family: inherit;
+  }
+  .show-fiat-link {
+    background: transparent; border: 0; padding: 0;
+    color: var(--color-text-dim); font-size: var(--font-size-xs);
+    cursor: pointer; margin-top: var(--space-1);
+  }
+
+  /* ---------- Section head + empty-card (same as Home empty) ---------- */
+  .section-head {
+    padding: var(--space-3) var(--space-4) var(--space-2);
+    display: flex; align-items: baseline; justify-content: space-between;
+  }
+  .section-head .title {
+    font-size: var(--font-size-xs);
+    font-weight: var(--font-weight-semibold);
+    color: var(--color-text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+  .section-head .add-btn {
+    width: 28px; height: 28px;
+    border-radius: var(--radius-md);
+    border: 0;
+    background: var(--color-primary); color: var(--color-on-primary);
+    display: inline-flex; align-items: center; justify-content: center;
+    cursor: pointer; padding: 0;
+  }
+  .section-head .add-btn:hover { background: var(--color-primary-strong); }
+  .section-head .add-btn svg { width: 14px; height: 14px; }
+  .list-card-empty {
+    margin: 0 var(--space-4) var(--space-3);
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    padding: var(--space-5) var(--space-4);
+    text-align: center;
+    font-size: var(--font-size-sm);
+    color: var(--color-text-dim);
+  }
+
+  .scroll-area { flex: 1; overflow-y: auto; }
+
+  /* ---------- Bottom nav (same as Home empty) ---------- */
+  .bottom-nav {
+    height: var(--mobile-bottom-nav);
+    flex-shrink: 0;
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    background: var(--color-surface);
+    border-top: 1px solid var(--color-border);
+  }
+  .nav-item {
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    gap: 2px;
+    padding: var(--space-2) 0;
+    font-size: 10px;
+    color: var(--color-text-dim);
+    background: transparent; border: 0; cursor: pointer;
+  }
+  .nav-item .nav-ico { width: 22px; height: 22px; color: currentColor; }
+  .nav-item.active {
+    color: var(--color-primary-strong);
+    font-weight: var(--font-weight-semibold);
+    position: relative;
+  }
+  .nav-item.active::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 20%;
+    right: 20%;
+    height: 2px;
+    background: var(--color-primary);
+    border-radius: 0 0 var(--radius-sm) var(--radius-sm);
+  }
+  .nav-item.disabled { color: var(--color-text-dim); opacity: 0.4; cursor: not-allowed; }
+  .nav-item.enabled-inactive { color: var(--color-text-muted); }
+
+  /* ---------- Scrim (over everything behind the sheet) ---------- */
+  .scrim {
+    position: absolute;
+    inset: 0;
+    background: var(--color-overlay);
+    z-index: 20;
+    animation: fade-in 0.15s ease;
+  }
+  @keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
+
+  /* ---------- Bottom sheet ---------- */
+  .sheet {
+    position: absolute;
+    left: 0; right: 0; bottom: 0;
+    background: var(--color-surface);
+    border-radius: var(--radius-xl) var(--radius-xl) 0 0;
+    padding: var(--space-2) var(--space-4) var(--space-5);
+    z-index: 21;
+    display: flex;
+    flex-direction: column;
+    max-height: 88%;
+    animation: slide-up 0.22s ease;
+    box-shadow: 0 -8px 24px rgba(26, 26, 26, 0.08);
+  }
+  @keyframes slide-up {
+    from { transform: translateY(100%); }
+    to { transform: translateY(0); }
+  }
+  .sheet-handle {
+    width: 38px; height: 4px;
+    background: var(--color-border-strong);
+    border-radius: var(--radius-pill);
+    margin: var(--space-2) auto var(--space-4);
+    flex-shrink: 0;
+  }
+  .sheet-head { flex-shrink: 0; margin-bottom: var(--space-4); }
+  .sheet-head h2 {
+    font-size: var(--font-size-md);
+    font-weight: var(--font-weight-semibold);
+    color: var(--color-text);
+    margin: 0 0 var(--space-1);
+    letter-spacing: -0.01em;
+  }
+  .sheet-head .sheet-sub {
+    font-size: var(--font-size-sm);
+    color: var(--color-text-muted);
+    line-height: var(--line-height-default);
+    margin: 0;
+  }
+
+  /* ---------- Option rows ---------- */
+  .add-options {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+  }
+  .add-option {
+    display: grid;
+    grid-template-columns: 44px 1fr 16px;
+    align-items: center;
+    gap: var(--space-3);
+    padding: var(--space-3);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+    background: var(--color-surface);
+    cursor: pointer;
+    text-align: left;
+    font-family: inherit;
+    color: var(--color-text);
+    transition: border-color 0.15s ease, background 0.15s ease, transform 0.12s ease;
+  }
+  .add-option:hover {
+    background: var(--color-surface-raised);
+    border-color: var(--color-border-strong);
+  }
+  .add-option:active { transform: scale(0.99); }
+
+  .ao-icon-wrap {
+    width: 44px; height: 44px;
+    display: flex; align-items: center; justify-content: center;
+    background: var(--color-surface);
+    border: 2px solid var(--ao-border, var(--color-border));
+    border-radius: var(--radius-md);
+    flex-shrink: 0;
+  }
+  .ao-icon-wrap svg {
+    width: 32px; height: 32px;
+    display: block;
+  }
+
+  .ao-text { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+  .ao-name {
+    font-size: var(--font-size-base);
+    font-weight: var(--font-weight-semibold);
+    line-height: var(--line-height-tight);
+    color: var(--color-text);
+  }
+  .ao-desc {
+    font-size: var(--font-size-sm);
+    color: var(--color-text-muted);
+    line-height: 1.4;
+  }
+  .ao-arrow {
+    color: var(--color-text-dim);
+    display: inline-flex;
+    align-items: center;
+  }
+  .ao-arrow svg { width: 16px; height: 16px; }
+
+  /* Per-row token bindings — `--ao-border` is consumed by .ao-icon-wrap */
+  .add-option.account   { --ao-border: var(--color-holding-account); }
+  .add-option.purse     { --ao-border: var(--color-holding-purse); }
+  .add-option.strongbox { --ao-border: var(--color-holding-strongbox); }
+  .add-option.vault     { --ao-border: var(--color-holding-vault); }
+
+  /* ---------- Cancel ---------- */
+  /* Cancel — secondary surface, findable but not CTA-prominent.
+     Earlier draft used --color-border + --color-text-muted on a
+     transparent bg; the button read as flush with the sheet
+     surface. Bumped 2026-05-13 to --color-border-strong (one step
+     deeper) and --color-text (full ink). Sits clearly below the
+     picker rows visually; not pushy. Swipe-down on the grab-handle
+     and tap-outside (on the scrim) also dismiss the sheet. */
+  .sheet-cancel {
+    margin-top: var(--space-4);
+    width: 100%;
+    padding: var(--space-3) var(--space-4);
+    background: transparent;
+    border: 1px solid var(--color-border-strong);
+    border-radius: var(--radius-md);
+    font-family: inherit;
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-weight-medium);
+    color: var(--color-text);
+    cursor: pointer;
+  }
+  .sheet-cancel:hover { background: var(--color-bg); }
+</style>
+</head>
+<body>
+
+<div class="mockup-meta">
+  <strong>Mobile — Add Holding picker</strong> ·
+  <span class="status-review">review</span> ·
+  2026-05-13 · 360×800
+</div>
+
+<div class="phone-frame">
+  <div class="phone-screen">
+
+    <!-- ============================================================ -->
+    <!--  Home empty content (scrimmed behind the sheet)              -->
+    <!-- ============================================================ -->
+
+    <div class="app-bar">
+      <svg class="wordmark-icony" viewBox="0 0 450 145" xmlns="http://www.w3.org/2000/svg" aria-label="tallykeep" role="img">
+        <text x="0" y="92" font-family="Manrope, system-ui, sans-serif" font-weight="600" font-size="92" letter-spacing="-2" class="mark-text">tall</text>
+        <svg x="143" y="42" width="76" height="84" viewBox="36.43 27.79 131.9 146.43">
+          <defs>
+            <clipPath id="wm-stock-clip"><path d="M 168.33 42.19 L 54.27 174.22 L 36.43 139.77 L 54.47 118.86 L 65.07 128.02 L 151.67 27.81 Z"/></clipPath>
+            <clipPath id="wm-foil-clip"><polygon points="40.68,42.21 79.68,87.21 96.32,72.79 57.32,27.79"/></clipPath>
+          </defs>
+          <path d="M 168.33 42.19 L 54.27 174.22 L 36.43 139.77 L 54.47 118.86 L 65.07 128.02 L 151.67 27.81 Z" class="mark-wood"/>
+          <polygon points="40.68,42.21 79.68,87.21 96.32,72.79 57.32,27.79" class="mark-wood"/>
+          <g class="mark-grain" stroke-width="1.4" stroke-linecap="butt" opacity="0.6">
+            <line x1="163.79" y1="38.27" x2="46.07" y2="174.53" clip-path="url(#wm-stock-clip)"/>
+            <line x1="156.22" y1="31.73" x2="38.50" y2="167.99" clip-path="url(#wm-stock-clip)"/>
+            <line x1="45.22"  y1="38.27" x2="84.52" y2="83.64"  clip-path="url(#wm-foil-clip)"/>
+            <line x1="52.78"  y1="31.73" x2="92.08" y2="77.09"  clip-path="url(#wm-foil-clip)"/>
+          </g>
+          <circle cx="53.76" cy="147.31" r="2.8" class="mark-carving"/>
+          <polygon points="-3,12 3,12 2,5 -2,5"     class="mark-carving" transform="translate(147 50) rotate(130.82)"/>
+          <polygon points="-4,12 4,12 2,4 -2,4"     class="mark-carving" transform="translate(140 58) rotate(130.82)"/>
+          <polygon points="-3,12 3,12 2,5 -2,5"     class="mark-carving" transform="translate(133 66) rotate(130.82)"/>
+          <polygon points="-3,-12 3,-12 2,-5 -2,-5" class="mark-carving" transform="translate(62 50)  rotate(49.18)"/>
+          <polygon points="-4,-12 4,-12 2,-4 -2,-4" class="mark-carving" transform="translate(69 58)  rotate(49.18)"/>
+          <polygon points="-3,-12 3,-12 2,-5 -2,-5" class="mark-carving" transform="translate(76 66)  rotate(49.18)"/>
+        </svg>
+        <text x="228" y="92" font-family="Manrope, system-ui, sans-serif" font-weight="600" font-size="92" letter-spacing="-2" class="mark-text">keep</text>
+      </svg>
+    </div>
+
+    <div class="scroll-area">
+      <div class="hero">
+        <div class="label-line">Total balance</div>
+        <div class="amount-line">
+          <span class="amount">0</span>
+          <span class="unit-label">sats<button class="unit-toggle" aria-label="Cycle unit: sats / BTC">↻</button></span>
+        </div>
+        <button class="show-fiat-link">Show in fiat</button>
+      </div>
+
+      <div class="section-head">
+        <span class="title">Holdings</span>
+        <button class="add-btn" aria-label="Add a Holding">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+            <line x1="12" y1="5" x2="12" y2="19"/>
+            <line x1="5" y1="12" x2="19" y2="12"/>
+          </svg>
+        </button>
+      </div>
+      <div class="list-card-empty">No Holdings yet</div>
+    </div>
+
+    <nav class="bottom-nav" aria-label="Primary navigation">
+      <button class="nav-item active" aria-current="page">
+        <svg class="nav-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M 3 12 L 12 3 L 21 12 M 6 10 L 6 21 L 18 21 L 18 10"/>
+        </svg>
+        Home
+      </button>
+      <button class="nav-item disabled" disabled aria-disabled="true">
+        <svg class="nav-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+          <line x1="5" y1="7"  x2="19" y2="7"/>
+          <line x1="5" y1="12" x2="19" y2="12"/>
+          <line x1="5" y1="17" x2="19" y2="17"/>
+        </svg>
+        Activity
+      </button>
+      <button class="nav-item disabled" disabled aria-disabled="true">
+        <svg class="nav-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="4" y="6"  width="16" height="4" rx="1"/>
+          <rect x="4" y="12" width="16" height="4" rx="1"/>
+          <rect x="4" y="18" width="16" height="2" rx="1"/>
+        </svg>
+        Holdings
+      </button>
+      <button class="nav-item enabled-inactive">
+        <svg class="nav-ico" viewBox="0 0 24 24" fill="currentColor">
+          <circle cx="6"  cy="12" r="2"/>
+          <circle cx="12" cy="12" r="2"/>
+          <circle cx="18" cy="12" r="2"/>
+        </svg>
+        More
+      </button>
+    </nav>
+
+    <!-- ============================================================ -->
+    <!--  Scrim                                                       -->
+    <!-- ============================================================ -->
+    <div class="scrim" aria-hidden="true"></div>
+
+    <!-- ============================================================ -->
+    <!--  Add Holding bottom sheet                                    -->
+    <!-- ============================================================ -->
+    <div class="sheet" role="dialog" aria-labelledby="sheet-title" aria-modal="true">
+      <div class="sheet-handle" aria-hidden="true"></div>
+
+      <div class="sheet-head">
+        <h2 id="sheet-title">Add a Holding</h2>
+        <p class="sheet-sub">Each holds your keys differently.</p>
+      </div>
+
+      <div class="add-options">
+
+        <!-- Account — limestone, custodial -->
+        <button class="add-option account" type="button">
+          <span class="ao-icon-wrap">
+            <!-- Source: brand/identity/holding-account.svg (mockup-tier inline per PROCESS §2.4) -->
+            <svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+              <rect x="4" y="50" width="56" height="6" fill="#9c9388"/>
+              <rect x="12" y="22" width="8" height="28" fill="#9c9388"/>
+              <rect x="28" y="22" width="8" height="28" fill="#9c9388"/>
+              <rect x="44" y="22" width="8" height="28" fill="#9c9388"/>
+              <rect x="4" y="20" width="56" height="2" fill="#9c9388"/>
+              <polygon points="32,4 4,20 60,20" fill="#9c9388"/>
+              <polygon points="32,8 12,20 52,20" fill="#7d7568" opacity="0.35"/>
+            </svg>
+          </span>
+          <span class="ao-text">
+            <span class="ao-name">Account</span>
+            <span class="ao-desc">Held at an exchange or broker. They hold the keys; you see balances.</span>
+          </span>
+          <span class="ao-arrow" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="9 6 15 12 9 18"/>
+            </svg>
+          </span>
+        </button>
+
+        <!-- Purse — auburn leather, daily wallet -->
+        <button class="add-option purse" type="button">
+          <span class="ao-icon-wrap">
+            <!-- Source: brand/identity/holding-purse-watch-only.svg
+                 (canonical default per palette v2 lock §4 "Default canonical
+                 SVG uses brass"). The brass cord encodes external watch-only;
+                 the managed variant swaps cord to dark and lands when
+                 Capacitor-managed Purse ships. -->
+            <svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+              <path d="M 22 28 Q 12 30 8 42 L 8 54 Q 8 60 14 60 L 50 60 Q 56 60 56 54 L 56 42 Q 52 30 42 28 Z" fill="#80452f"/>
+              <ellipse cx="32" cy="24" rx="11" ry="2" fill="#3a1a10"/>
+              <path d="M 22 28 Q 24 14 28 24 Q 30 16 32 24 Q 34 16 36 24 Q 40 14 42 28 Z" fill="#80452f"/>
+              <ellipse cx="32" cy="28" rx="13" ry="3" fill="#b89968"/>
+              <path d="M 21 27 L 24 29 M 25 27 L 28 29 M 29 27 L 32 29 M 33 27 L 36 29 M 37 27 L 40 29 M 41 27 L 44 29" stroke="#8a6e3e" stroke-width="0.7" opacity="0.85" fill="none" stroke-linecap="round"/>
+              <path d="M 44 27 Q 50 32 52 38" stroke="#b89968" stroke-width="2" fill="none" stroke-linecap="round"/>
+              <circle cx="52" cy="38" r="2.2" fill="#b89968"/>
+              <ellipse cx="22" cy="44" rx="3.5" ry="8" fill="#9a5a40" opacity="0.5"/>
+              <path d="M 22 38 L 22 56" stroke="#5e2f1f" stroke-width="0.7" opacity="0.35" fill="none"/>
+              <path d="M 42 38 L 42 56" stroke="#5e2f1f" stroke-width="0.7" opacity="0.35" fill="none"/>
+              <line x1="32" y1="32" x2="32" y2="58" stroke="#5e2f1f" stroke-width="0.5" opacity="0.25"/>
+            </svg>
+          </span>
+          <span class="ao-text">
+            <span class="ao-name">Purse</span>
+            <span class="ao-desc">On your phone. For daily spending.</span>
+          </span>
+          <span class="ao-arrow" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="9 6 15 12 9 18"/>
+            </svg>
+          </span>
+        </button>
+
+        <!-- Strongbox — iron, cold storage -->
+        <button class="add-option strongbox" type="button">
+          <span class="ao-icon-wrap">
+            <!-- Source: brand/identity/holding-strongbox.svg -->
+            <svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+              <rect x="10" y="30" width="44" height="24" fill="#4a4d4f"/>
+              <path d="M 10 30 L 10 22 Q 32 16 54 22 L 54 30 Z" fill="#4a4d4f"/>
+              <rect x="8" y="28" width="48" height="3" fill="#6a6a6a"/>
+              <rect x="28" y="34" width="8" height="10" fill="#6a6a6a"/>
+              <circle cx="32" cy="38" r="1.5" fill="#1a1a1a"/>
+              <rect x="31" y="39" width="2" height="3" fill="#1a1a1a"/>
+              <rect x="8" y="50" width="6" height="4" fill="#6a6a6a"/>
+              <rect x="50" y="50" width="6" height="4" fill="#6a6a6a"/>
+              <circle cx="14" cy="33" r="1" fill="#6a6a6a"/>
+              <circle cx="32" cy="25" r="1" fill="#6a6a6a"/>
+              <circle cx="50" cy="33" r="1" fill="#6a6a6a"/>
+            </svg>
+          </span>
+          <span class="ao-text">
+            <span class="ao-name">Strongbox</span>
+            <span class="ao-desc">On a hardware wallet. For amounts you spend rarely.</span>
+          </span>
+          <span class="ao-arrow" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="9 6 15 12 9 18"/>
+            </svg>
+          </span>
+        </button>
+
+        <!-- Vault — brushed steel, ceremonial multisig -->
+        <button class="add-option vault" type="button">
+          <span class="ao-icon-wrap">
+            <!-- Source: brand/identity/holding-vault.svg. Body stays brushed
+                 steel internally; the brass hub at the centre and the brass
+                 ring around the door echo --color-holding-vault (now brass
+                 per palette v2 lock §4 update 2026-05-13). -->
+            <svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+              <rect x="4" y="4" width="56" height="56" rx="4" fill="#5c6470"/>
+              <circle cx="32" cy="32" r="22" fill="#7a8189"/>
+              <circle cx="32" cy="32" r="22" fill="none" stroke="#b89968" stroke-width="2.5"/>
+              <line x1="32" y1="32" x2="12" y2="32" stroke="#5c6470" stroke-width="3.5" stroke-linecap="round"/>
+              <line x1="32" y1="32" x2="42" y2="14.68" stroke="#5c6470" stroke-width="3.5" stroke-linecap="round"/>
+              <line x1="32" y1="32" x2="42" y2="49.32" stroke="#5c6470" stroke-width="3.5" stroke-linecap="round"/>
+              <line x1="12" y1="29" x2="12" y2="35" stroke="#5c6470" stroke-width="3" stroke-linecap="round"/>
+              <line x1="39.4" y1="13.18" x2="44.6" y2="16.18" stroke="#5c6470" stroke-width="3" stroke-linecap="round"/>
+              <line x1="39.4" y1="50.82" x2="44.6" y2="47.82" stroke="#5c6470" stroke-width="3" stroke-linecap="round"/>
+              <line x1="32" y1="28" x2="32" y2="20" stroke="#5c6470" stroke-width="1.5" stroke-linecap="round"/>
+              <line x1="28.54" y1="30" x2="21.6" y2="26" stroke="#5c6470" stroke-width="1.5" stroke-linecap="round"/>
+              <line x1="28.54" y1="34" x2="21.6" y2="38" stroke="#5c6470" stroke-width="1.5" stroke-linecap="round"/>
+              <line x1="32" y1="36" x2="32" y2="44" stroke="#5c6470" stroke-width="1.5" stroke-linecap="round"/>
+              <line x1="35.46" y1="34" x2="42.4" y2="38" stroke="#5c6470" stroke-width="1.5" stroke-linecap="round"/>
+              <line x1="35.46" y1="30" x2="42.4" y2="26" stroke="#5c6470" stroke-width="1.5" stroke-linecap="round"/>
+              <circle cx="32" cy="32" r="4" fill="#b89968"/>
+              <circle cx="10" cy="10" r="1.5" fill="#3e4650"/>
+              <circle cx="54" cy="10" r="1.5" fill="#3e4650"/>
+              <circle cx="10" cy="54" r="1.5" fill="#3e4650"/>
+              <circle cx="54" cy="54" r="1.5" fill="#3e4650"/>
+            </svg>
+          </span>
+          <span class="ao-text">
+            <span class="ao-name">Vault</span>
+            <span class="ao-desc">Multiple keys required. For amounts you rarely touch — years, not days.</span>
+          </span>
+          <span class="ao-arrow" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="9 6 15 12 9 18"/>
+            </svg>
+          </span>
+        </button>
+
+      </div>
+
+      <button class="sheet-cancel" type="button">Cancel</button>
+    </div>
+
+  </div>
+</div>
+
+</body>
+</html>

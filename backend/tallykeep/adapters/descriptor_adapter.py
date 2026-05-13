@@ -3,8 +3,10 @@
 Spec module 01: adapters translate foreign data shapes into domain types. Domain
 code never imports `bdkpython`; it goes through `DescriptorAdapter` here.
 
-v1 supports only single-key descriptors (PKH, WPKH, SH_WPKH, TR-single).
-Multisig descriptors parse but are rejected at import — see spec module 13 / Q11.
+Single-key descriptors (PKH, WPKH, SH_WPKH, TR-single) are accepted by default.
+Multisig descriptors (WSH_SORTED_MULTI, SH_SORTED_MULTI, SH_WSH_SORTED_MULTI) are
+accepted when `allow_multisig=True` is passed to `parse()`. Vault creation uses
+this; Purse and Strongbox creation do not.
 
 A note on the `Network` mapping: bdkpython exposes `Network.BITCOIN` for
 mainnet; our domain enum uses the more conventional `MAINNET`. The translation
@@ -14,11 +16,18 @@ values without first sending one in).
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+import re
+from dataclasses import dataclass, field
 
 import bdkpython as bdk
 
 from tallykeep.domain.enums import AddressType, Network
+
+
+# Regex to extract the threshold from sortedmulti / multi / multi_a expressions.
+_MULTISIG_THRESHOLD_RE = re.compile(r'(?:sorted)?multi(?:_a)?\(\s*(\d+)\s*,')
+# Extended public key pattern — covers xpub/tpub/ypub/zpub and capital variants.
+_XPUB_RE = re.compile(r'[a-zA-Z]{1,4}pub[a-zA-Z0-9]+')
 
 
 # --- network mapping ---------------------------------------------------------
@@ -35,9 +44,6 @@ _NETWORK_TO_BDK: dict[Network, bdk.Network] = {
 # --- descriptor type mapping --------------------------------------------------
 
 
-# Single-key descriptor types accepted in v1. Multisig variants (SH_SORTED_MULTI,
-# WSH_SORTED_MULTI, SH_WSH_SORTED_MULTI) and bare/script variants land in v2 per
-# spec module 13.
 _SINGLE_KEY_TYPES: frozenset[bdk.DescriptorType] = frozenset(
     {
         bdk.DescriptorType.PKH,
@@ -47,12 +53,22 @@ _SINGLE_KEY_TYPES: frozenset[bdk.DescriptorType] = frozenset(
     }
 )
 
+_MULTISIG_TYPES: frozenset[bdk.DescriptorType] = frozenset(
+    {
+        bdk.DescriptorType.SH_SORTED_MULTI,
+        bdk.DescriptorType.WSH_SORTED_MULTI,
+        bdk.DescriptorType.SH_WSH_SORTED_MULTI,
+    }
+)
 
 _BDK_TYPE_TO_ADDRESS_TYPE: dict[bdk.DescriptorType, AddressType] = {
     bdk.DescriptorType.PKH: AddressType.LEGACY,
     bdk.DescriptorType.SH_WPKH: AddressType.NESTED_SEGWIT,
     bdk.DescriptorType.WPKH: AddressType.NATIVE_SEGWIT,
     bdk.DescriptorType.TR: AddressType.TAPROOT,
+    bdk.DescriptorType.SH_SORTED_MULTI: AddressType.P2SH_MULTISIG,
+    bdk.DescriptorType.WSH_SORTED_MULTI: AddressType.P2WSH,
+    bdk.DescriptorType.SH_WSH_SORTED_MULTI: AddressType.P2SH_P2WSH,
 }
 
 
@@ -77,6 +93,9 @@ class ParsedDescriptor:
     The original `expression` is the input string. `canonical_expression` is what
     bdkpython echoes back, with the standard `#checksum` suffix; we persist the
     canonical form so future re-imports normalize to the same value.
+
+    For multisig descriptors `is_multisig` is True and `required_signers` /
+    `total_signers` carry the m-of-n extracted from the expression.
     """
 
     expression: str
@@ -84,6 +103,9 @@ class ParsedDescriptor:
     address_type: AddressType
     descriptor_id: str  # bdk's stable id, useful as a dedup key in tests
     is_multipath: bool
+    is_multisig: bool = False
+    required_signers: int | None = None
+    total_signers: int | None = None
 
 
 @dataclass(frozen=True)
@@ -95,16 +117,42 @@ class DerivedAddress:
 # --- adapter -----------------------------------------------------------------
 
 
+def _extract_multisig_params(expression: str) -> tuple[int | None, int | None]:
+    """Extract (required_signers, total_signers) from a multisig expression.
+
+    Uses regex heuristics on the raw expression string — BDK does not expose
+    m-of-n counts as structured fields. Accurate for standard BIP 380
+    sortedmulti/multi expressions; exotic or non-standard forms may return None.
+    """
+    m = _MULTISIG_THRESHOLD_RE.search(expression)
+    if m is None:
+        return None, None
+    required = int(m.group(1))
+    total = len(_XPUB_RE.findall(expression))
+    return required, total if total > 0 else None
+
+
 class DescriptorAdapter:
     """Stateless adapter — every method takes everything it needs as arguments."""
 
-    def parse(self, expression: str, network: Network) -> ParsedDescriptor:
+    def parse(
+        self,
+        expression: str,
+        network: Network,
+        *,
+        allow_multisig: bool = False,
+    ) -> ParsedDescriptor:
         """Parse a BIP 380 expression and return its canonical form + address type.
+
+        Pass `allow_multisig=True` to accept multisig descriptor types
+        (WSH_SORTED_MULTI, SH_SORTED_MULTI, SH_WSH_SORTED_MULTI). Vault creation
+        uses this; Purse and Strongbox creation do not.
 
         Raises:
             DescriptorParseError: bdkpython rejected the expression.
             UnsupportedDescriptorError: the descriptor parses but uses a
-                construct v1 does not support (e.g. multisig, BARE, multipath).
+                construct not accepted in this context (e.g. multisig when
+                allow_multisig=False, BARE, multipath).
         """
         if not expression or len(expression) > 4096:
             raise DescriptorParseError(
@@ -130,11 +178,31 @@ class DescriptorAdapter:
             )
 
         desc_type = descriptor.desc_type()
+
+        if desc_type in _MULTISIG_TYPES:
+            if not allow_multisig:
+                raise UnsupportedDescriptorError(
+                    f"Descriptor type {desc_type.name} is a multisig descriptor "
+                    "and is not accepted here. Multisig descriptors are only "
+                    "valid for Vault holdings."
+                )
+            address_type = _BDK_TYPE_TO_ADDRESS_TYPE[desc_type]
+            required_signers, total_signers = _extract_multisig_params(expression)
+            return ParsedDescriptor(
+                expression=expression,
+                canonical_expression=str(descriptor),
+                address_type=address_type,
+                descriptor_id=str(descriptor.descriptor_id()),
+                is_multipath=False,
+                is_multisig=True,
+                required_signers=required_signers,
+                total_signers=total_signers,
+            )
+
         if desc_type not in _SINGLE_KEY_TYPES:
             raise UnsupportedDescriptorError(
-                f"Descriptor type {desc_type.name} is not supported in v1. "
-                "Multisig (sh / wsh / tr-multi) and bare scripts are deferred "
-                "to v2 per spec module 13."
+                f"Descriptor type {desc_type.name} is not supported. "
+                "Bare scripts and other exotic forms are not accepted."
             )
 
         return ParsedDescriptor(
@@ -143,6 +211,7 @@ class DescriptorAdapter:
             address_type=_BDK_TYPE_TO_ADDRESS_TYPE[desc_type],
             descriptor_id=str(descriptor.descriptor_id()),
             is_multipath=False,
+            is_multisig=False,
         )
 
     def derive_addresses(
@@ -152,6 +221,7 @@ class DescriptorAdapter:
         *,
         start_index: int = 0,
         count: int = 20,
+        allow_multisig: bool = False,
     ) -> list[DerivedAddress]:
         """Derive `count` addresses from `start_index` onwards.
 
@@ -159,6 +229,8 @@ class DescriptorAdapter:
         to keep this method usable without a prior `parse()` call (some flows
         only need derivation, not the full validation). Validation still runs
         — invalid descriptors fail fast before any derivation happens.
+
+        Pass `allow_multisig=True` when deriving from multisig descriptors (Vault).
         """
         if count < 0:
             raise ValueError("count must be >= 0")
@@ -168,7 +240,7 @@ class DescriptorAdapter:
         # Run parse() so unsupported descriptor types fail early. We discard the
         # result; the descriptor object itself is recreated below so we don't
         # have to thread it through.
-        self.parse(expression, network)
+        self.parse(expression, network, allow_multisig=allow_multisig)
 
         descriptor = bdk.Descriptor(expression, _NETWORK_TO_BDK[network])
         results: list[DerivedAddress] = []
@@ -183,11 +255,13 @@ class DescriptorAdapter:
         expression: str,
         network: Network,
         index: int,
+        *,
+        allow_multisig: bool = False,
     ) -> str:
         """Convenience: derive a single address at `index`."""
         if index < 0:
             raise ValueError("index must be >= 0")
-        self.parse(expression, network)
+        self.parse(expression, network, allow_multisig=allow_multisig)
         descriptor = bdk.Descriptor(expression, _NETWORK_TO_BDK[network])
         return str(descriptor.derive_address(index, _NETWORK_TO_BDK[network]))
 
@@ -331,4 +405,5 @@ __all__ = [
     "ParsedDescriptor",
     "UnsupportedDescriptorError",
     "UtxoForBuild",
+    "_MULTISIG_TYPES",
 ]

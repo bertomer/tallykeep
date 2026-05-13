@@ -1,7 +1,10 @@
 <!--
   Title: Mobile — Home (empty)
-  Status: validated  (Rémy greenlight 2026-05-10 after three design passes)
-  Date last touched: 2026-05-10
+  Status: validated  (Rémy greenlight 2026-05-10 initial; re-validated
+                       2026-05-13 after the cosmetic pass — + button
+                       filled primary, 2 px verdigris top-indicator on
+                       active nav, hero amount swapped to sans + tabular-nums)
+  Date last touched: 2026-05-13
   Replaces: archive/UI/tallykeep_mobile_v2.html §B3 "Home empty" (richer empty state with welcome heading + four inline Add tiles, now stripped) AND the first iteration of this file (centered-Phoenix-aesthetic, rejected by Rémy 2026-05-10)
 
   Design note: banking-grade structure, not minimal-aesthetic.
@@ -77,8 +80,12 @@
     align-items: baseline;
     gap: var(--space-3);
   }
+  /* Amount typography — sans + tabular-nums per
+     brand/README.md §"Typography conventions". Locked 2026-05-13;
+     Manrope numerals at 36 px hold their column without needing
+     mono, which clashed against the surrounding sans body type. */
   .amount {
-    font-family: var(--font-mono);
+    font-family: var(--font-sans);
     font-size: 36px;
     font-weight: var(--font-weight-semibold);
     color: var(--color-text);
@@ -136,22 +143,25 @@
     text-transform: uppercase;
     letter-spacing: 0.05em;
   }
-  /* Add affordance — rounded-square outlined "+" button. Quieter
-     than filled, more elegant than circular-filled. Translation-
-     free (the "+" is universal). Thin SVG stroke for elegance. */
+  /* Add affordance — filled primary CTA. Verdigris bg + white
+     glyph. Anchors the brand colour on the page and gives the
+     "Add a Holding" action visual priority. Earlier iteration
+     was outlined; bumped to filled 2026-05-13 to inject more
+     visual identity (Rémy: page felt undercolored). */
   .section-head .add-btn {
     width: 28px;
     height: 28px;
     border-radius: var(--radius-md);
-    border: 1.5px solid var(--color-primary);
-    background: transparent;
-    color: var(--color-primary);
+    border: 0;
+    background: var(--color-primary);
+    color: var(--color-on-primary);
     display: inline-flex;
     align-items: center;
     justify-content: center;
     cursor: pointer;
     padding: 0;
   }
+  .section-head .add-btn:hover { background: var(--color-primary-strong); }
   .section-head .add-btn svg {
     width: 14px;
     height: 14px;
@@ -202,7 +212,25 @@
     height: 22px;
     color: currentColor;
   }
-  .nav-item.active { color: var(--color-primary-strong); font-weight: var(--font-weight-semibold); }
+  /* Active nav — coloured icon + label PLUS a 2px verdigris top
+     indicator (60% width, centred) to make the active state
+     legible at a glance and plant the brand colour on the nav
+     bar. Added 2026-05-13 in the visual-identity pass. */
+  .nav-item.active {
+    color: var(--color-primary-strong);
+    font-weight: var(--font-weight-semibold);
+    position: relative;
+  }
+  .nav-item.active::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 20%;
+    right: 20%;
+    height: 2px;
+    background: var(--color-primary);
+    border-radius: 0 0 var(--radius-sm) var(--radius-sm);
+  }
   .nav-item.disabled { color: var(--color-text-dim); opacity: 0.4; cursor: not-allowed; }
   .nav-item.enabled-inactive { color: var(--color-text-muted); }
 </style>

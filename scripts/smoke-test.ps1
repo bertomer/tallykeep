@@ -33,6 +33,8 @@ function Show($label, $value) {
 # mnemonic. Mainnet native-segwit, external chain.
 $wpkhMainnet = "wpkh(xpub6BosfCnifzxcFwrSzQiqu2DBVTshkCXacvNsWGYJVVhhawA7d4R5WSWGFNbi8Aw6ZRc1brxMyWMzG3DSSSSoekkudhUd9yLb6qx39T9nMdj/0/*)"
 $wpkhMainnetChange = "wpkh(xpub6BosfCnifzxcFwrSzQiqu2DBVTshkCXacvNsWGYJVVhhawA7d4R5WSWGFNbi8Aw6ZRc1brxMyWMzG3DSSSSoekkudhUd9yLb6qx39T9nMdj/1/*)"
+# 2-of-3 WSH sortedmulti — used for Vault creation (multisig required by service).
+$wshMultisig = "wsh(sortedmulti(2,xpub6BosfCnifzxcFwrSzQiqu2DBVTshkCXacvNsWGYJVVhhawA7d4R5WSWGFNbi8Aw6ZRc1brxMyWMzG3DSSSSoekkudhUd9yLb6qx39T9nMdj/0/*,xpub6BosfCnifzxcFwrSzQiqu2DBVTshkCXacvNsWGYJVVhhawA7d4R5WSWGFNbi8Aw6ZRc1brxMyWMzG3DSSSSoekkudhUd9yLb6qx39T9nMdj/1/*,xpub6BosfCnifzxcFwrSzQiqu2DBVTshkCXacvNsWGYJVVhhawA7d4R5WSWGFNbi8Aw6ZRc1brxMyWMzG3DSSSSoekkudhUd9yLb6qx39T9nMdj/2/*))"
 
 
 # --- 1. Health -----------------------------------------------------------------
@@ -238,6 +240,62 @@ $body = @{ new_type = "strongbox"; reason = "Smoke test: migrated keys" } | Conv
 $changed = Invoke-RestMethod -Method Post -Uri "$BaseUrl/api/v1/holdings/$purseId/change-type" `
     -ContentType 'application/json' -Body $body -Headers $Headers
 Show "holding_type"  $changed.holding_type
+
+
+# --- 13b. Descriptor validate (pure parser) ------------------------------------
+
+Section "13b. POST /api/v1/descriptors/validate - happy paths + rejection"
+
+# Happy path: P2WPKH
+$validateBody = @{ input = $wpkhMainnet; network = "mainnet" } | ConvertTo-Json -Compress
+$validated = Invoke-RestMethod -Method Post -Uri "$BaseUrl/api/v1/descriptors/validate" `
+    -ContentType 'application/json' -Body $validateBody -Headers $Headers
+Show "script_type"    $validated.script_type
+Show "is_multisig"    $validated.is_multisig
+Show "first_addr[0]"  ($validated.first_addresses | Select-Object -First 1)
+
+# Happy path: WSH multisig
+$validateMultisig = @{ input = $wshMultisig; network = "mainnet" } | ConvertTo-Json -Compress
+$validatedMs = Invoke-RestMethod -Method Post -Uri "$BaseUrl/api/v1/descriptors/validate" `
+    -ContentType 'application/json' -Body $validateMultisig -Headers $Headers
+Show "multisig script" $validatedMs.script_type
+Show "is_multisig"     $validatedMs.is_multisig
+Show "required"        $validatedMs.required_signers
+
+# Error path: bare bitcoin address should return SINGLE_ADDRESS_INPUT
+try {
+    Invoke-RestMethod -Method Post -Uri "$BaseUrl/api/v1/descriptors/validate" `
+        -ContentType 'application/json' `
+        -Body '{"input":"bc1qar0srrr7xfkvy5l643lydnw9re59gtzzwf5mdq","network":"mainnet"}' `
+        -Headers $Headers | Out-Null
+    Show "address rejection" '(unexpected 200!)'
+} catch {
+    $errBody = ($_.ErrorDetails.Message | ConvertFrom-Json)
+    Show "SINGLE_ADDRESS_INPUT" ($errBody.detail.error_code -eq "SINGLE_ADDRESS_INPUT")
+}
+
+# Error path: garbage → PARSE_ERROR
+try {
+    Invoke-RestMethod -Method Post -Uri "$BaseUrl/api/v1/descriptors/validate" `
+        -ContentType 'application/json' `
+        -Body '{"input":"not-a-descriptor","network":"mainnet"}' `
+        -Headers $Headers | Out-Null
+    Show "parse error rejection" '(unexpected 200!)'
+} catch {
+    $errBody = ($_.ErrorDetails.Message | ConvertFrom-Json)
+    Show "PARSE_ERROR" ($errBody.detail.error_code -eq "PARSE_ERROR")
+}
+
+
+# --- 13c. Global holdings summary (meta + scan_status) -------------------------
+
+Section "13c. GET /api/v1/holdings/summary/global - meta + scan_status fields"
+$summary = Invoke-RestMethod -Uri "$BaseUrl/api/v1/holdings/summary/global" -Headers $Headers
+Show "total_sats"       $summary.total_sats
+Show "holdings count"   $summary.holdings.Count
+foreach ($h in $summary.holdings) {
+    Show ("  [" + $h.holding_type + "] " + $h.name) ("scan_status=$($h.scan_status) meta=$($h.meta)")
+}
 
 
 # --- 14. Chain scan against regtest (M5.2) -----------------------------------
@@ -493,7 +551,7 @@ if (-not $bankingSkipped) {
         Invoke-RestMethod -Method Post `
             -Uri "$BaseUrl/api/v1/banking/payment-requests/$prId/cancel" `
             -Headers $Headers | Out-Null
-        Show "double-cancel" "(unexpected 200!)"
+        Show "double-cancel" '(unexpected 200!)'
     } catch {
         $sc = $_.Exception.Response.StatusCode.value__
         Show "double-cancel returns" "409=$($sc -eq 409)"
@@ -512,9 +570,11 @@ $vaultBody = @{
     name = "Smoke test vault"
     description = "Cold storage destination for sweep smoke test"
     purpose = "reserve"
+    required_signers = 2
+    total_signers = 3
     declared_security = @{
         custody_model = "self_multisig"
-        signing_model = "hardware_offline"
+        signing_model = "ceremonial"
         geographic_distribution = $false
         inheritance_configured = $false
     }
@@ -523,7 +583,7 @@ $vaultBody = @{
     descriptors = @(
         @{
             name = "vault-external"
-            expression = "wpkh(xpub6BosfCnifzxcFwrSzQiqu2DBVTshkCXacvNsWGYJVVhhawA7d4R5WSWGFNbi8Aw6ZRc1brxMyWMzG3DSSSSoekkudhUd9yLb6qx39T9nMdj/1/*)"
+            expression = $wshMultisig
             network = "mainnet"
             gap_limit = 5
         }
@@ -573,7 +633,7 @@ Show "patched.max_per_period"    $spPatch.maximum_per_period_sats
 try {
     Invoke-RestMethod -Method Post -Uri "$BaseUrl/api/v1/sweep-policies/$spId/enable" `
         -Headers $Headers | Out-Null
-    Show "enable before ack" "(unexpected 200!)"
+    Show "enable before ack" '(unexpected 200!)'
 } catch {
     $sc = $_.Exception.Response.StatusCode.value__
     Show "enable before ack" "409=$($sc -eq 409)"
@@ -622,7 +682,7 @@ Show "initial jobs count" $jobsList.Count
 try {
     Invoke-RestMethod -Uri "$BaseUrl/api/v1/jobs/00000000-0000-0000-0000-000000000001" `
         -Headers $Headers | Out-Null
-    Show "unknown job" "(unexpected 200!)"
+    Show "unknown job" '(unexpected 200!)'
 } catch {
     $sc = $_.Exception.Response.StatusCode.value__
     Show "unknown job 404" ($sc -eq 404)
@@ -632,7 +692,7 @@ try {
 try {
     Invoke-WebRequest -Method Delete -Uri "$BaseUrl/api/v1/jobs/00000000-0000-0000-0000-000000000001" `
         -Headers $Headers | Out-Null
-    Show "delete unknown" "(unexpected 200!)"
+    Show "delete unknown" '(unexpected 200!)'
 } catch {
     $sc = $_.Exception.Response.StatusCode.value__
     Show "delete unknown 404" ($sc -eq 404)
@@ -669,7 +729,7 @@ foreach ($pair in @(
     $path = $pair[1]
     try {
         Invoke-RestMethod -Method $method -Uri "$BaseUrl$path" -Headers $Headers | Out-Null
-        Show ("$method $path") "(unexpected 200!)"
+        Show ("$method $path") '(unexpected 200!)'
     } catch {
         $resp = $_.Exception.Response
         if ($resp -and $resp.StatusCode -eq 501) {

@@ -123,7 +123,7 @@ class TestParseRejection:
             adapter.parse("not a descriptor at all", Network.MAINNET)
 
     def test_multisig_rejected(self, adapter: DescriptorAdapter) -> None:
-        with pytest.raises(UnsupportedDescriptorError, match="not supported in v1"):
+        with pytest.raises(UnsupportedDescriptorError, match="not accepted here"):
             adapter.parse(WSH_MULTISIG_MAINNET_EXPRESSION, Network.MAINNET)
 
     def test_multipath_rejected(self, adapter: DescriptorAdapter) -> None:

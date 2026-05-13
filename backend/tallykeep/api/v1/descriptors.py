@@ -1,5 +1,8 @@
 """Descriptor endpoints — spec module 04.
 
+Includes:
+  POST /api/v1/descriptors/validate  — pure descriptor parser, no state mutation.
+
 M4 implements:
   - GET    /api/v1/descriptors                            (list, with holding_id filter)
   - POST   /api/v1/descriptors                            (attach a new descriptor to an existing holding)
@@ -17,6 +20,7 @@ Stubs (deferred to M5):
 
 from __future__ import annotations
 
+import re
 from datetime import UTC, datetime
 from uuid import UUID, uuid4
 
@@ -33,6 +37,7 @@ from tallykeep.adapters.descriptor_adapter import (
 from tallykeep.adapters.node_adapter import NodeAdapter, NodeError
 from tallykeep.api.dependencies import get_db_session, get_node_adapter
 from tallykeep.domain.descriptor import Address, Descriptor
+from tallykeep.domain.enums import Network
 from tallykeep.repositories import descriptor as descriptor_repo
 from tallykeep.repositories import holding as holding_repo
 from tallykeep.schemas.holding import (
@@ -44,8 +49,112 @@ from tallykeep.schemas.holding import (
 )
 
 
+# --- bitcoin address detection ------------------------------------------------
+# Used by the validate endpoint to give a typed rejection when the caller passes
+# a bare address instead of a BIP 380 descriptor.
+_ADDRESS_PATTERN = re.compile(
+    r'^(?:'
+    r'bc1[a-zA-HJ-NP-Z0-9]{6,87}'   # mainnet bech32/bech32m
+    r'|tb1[a-zA-HJ-NP-Z0-9]{6,87}'  # testnet bech32/bech32m
+    r'|bcrt1[a-zA-HJ-NP-Z0-9]{6,87}' # regtest bech32/bech32m
+    r'|[13mn2][a-km-zA-HJ-NP-Z1-9]{24,34}'  # base58check (P2PKH / P2SH)
+    r')$'
+)
+
+
 router = APIRouter(tags=["descriptors"])
 _ADAPTER = DescriptorAdapter()
+
+
+# --- descriptor validate (pure parser, no state mutation) --------------------
+
+_SCRIPT_TYPE_LABELS: dict[str, str] = {
+    "legacy": "p2pkh",
+    "nested_segwit": "p2sh-p2wpkh",
+    "native_segwit": "p2wpkh",
+    "taproot": "p2tr",
+    "p2sh_multisig": "p2sh-multisig",
+    "p2wsh": "p2wsh",
+    "p2sh_p2wsh": "p2sh-p2wsh",
+}
+
+
+class ValidateDescriptorRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    input: str = Field(..., min_length=1, max_length=4096)
+    network: Network
+
+
+class ValidateDescriptorResponse(BaseModel):
+    script_type: str
+    is_multisig: bool
+    required_signers: int | None = None
+    total_signers: int | None = None
+    timelocks: None = None
+    first_addresses: list[str]
+
+
+@router.post(
+    "/descriptors/validate",
+    response_model=ValidateDescriptorResponse,
+    summary="Validate a BIP 380 descriptor — pure parser, no state mutation.",
+)
+async def validate_descriptor(body: ValidateDescriptorRequest) -> ValidateDescriptorResponse:
+    """Validate a descriptor expression and return its parsed properties.
+
+    Accepts single-key and multisig BIP 380 descriptors.
+    Returns a typed 422 error when given a bare bitcoin address instead of
+    a descriptor (error_code: SINGLE_ADDRESS_INPUT).
+    """
+    expr = body.input.strip()
+
+    if _ADDRESS_PATTERN.match(expr):
+        raise HTTPException(
+            status_code=422,
+            detail={
+                "error_code": "SINGLE_ADDRESS_INPUT",
+                "message": (
+                    "A bare bitcoin address is not a valid descriptor. "
+                    "Wrap it in a descriptor function such as wpkh(...) or tr(...)."
+                ),
+            },
+        )
+
+    try:
+        parsed = _ADAPTER.parse(expr, body.network, allow_multisig=True)
+    except DescriptorParseError as exc:
+        raise HTTPException(
+            status_code=422,
+            detail={"error_code": "PARSE_ERROR", "message": str(exc)},
+        ) from exc
+    except UnsupportedDescriptorError as exc:
+        raise HTTPException(
+            status_code=422,
+            detail={"error_code": "UNSUPPORTED_DESCRIPTOR", "message": str(exc)},
+        ) from exc
+
+    first_addresses: list[str] = []
+    try:
+        derived = _ADAPTER.derive_addresses(
+            expr, body.network, count=3, allow_multisig=True
+        )
+        first_addresses = [d.address for d in derived]
+    except Exception:
+        pass  # address derivation is best-effort for the validate endpoint
+
+    script_type = _SCRIPT_TYPE_LABELS.get(
+        parsed.address_type.value, parsed.address_type.value
+    )
+
+    return ValidateDescriptorResponse(
+        script_type=script_type,
+        is_multisig=parsed.is_multisig,
+        required_signers=parsed.required_signers,
+        total_signers=parsed.total_signers,
+        timelocks=None,
+        first_addresses=first_addresses,
+    )
 
 
 # --- attach-to-existing-holding input ---------------------------------------

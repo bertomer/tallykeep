@@ -263,13 +263,21 @@ only:
 - *Colors:* `var(--color-*)` from `tokens.css`. Never raw hex
   values in component files (`#A88554`, `#2e8a3f`) — every color
   reference goes through a token.
-- *Icons:* import from `brand/identity/*.svg`, ideally via a thin
-  wrapper component (e.g. `<Icon name="home" />`) so the
-  consumer-side API stays stable as the icon set grows. Never
-  inline SVG paths in feature component files. The mockup-tier
-  inlining of `wordmark-icony` and the nav icons is a workaround
-  for static-HTML / file:// loading; SvelteKit must import
-  cleanly.
+- *Icons:* import from `brand/identity/*.svg`, always via a thin
+  wrapper component (e.g. `<Icon name="home" />` for nav icons,
+  `<HoldingIcon type="vault" size={32} />` for holding-type icons)
+  so the consumer-side API stays stable as the icon set grows.
+  **Never inline SVG paths in feature component files — not even
+  once, not even as a "quick copy".** Inlining creates diverging
+  copies: the next component that needs the same icon will copy it
+  again, detail will drift between copies, and bugs like missing
+  spoke lines will appear. The rule: one domain object = one
+  component = one source of truth. `HoldingIcon.svelte` is the
+  mandatory wrapper for all four holding-type icons; any feature
+  component that needs a holding-type icon imports it and passes
+  `type` and `size`. The mockup-tier inlining of `wordmark-icony`
+  and the nav icons is a workaround for static-HTML / file://
+  loading; SvelteKit must import cleanly.
 - *Spacing, radii, shadows, type:* `var(--space-*)`,
   `var(--radius-*)`, `var(--shadow-*)`, `var(--font-*)`. Never
   raw values.

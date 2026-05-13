@@ -245,6 +245,14 @@ async def list_holdings(
     return [_to_response(h) for h in holdings]
 
 
+_CUSTODY_TIER: dict[HoldingType, int] = {
+    HoldingType.ACCOUNT: 0,
+    HoldingType.PURSE: 1,
+    HoldingType.STRONGBOX: 2,
+    HoldingType.VAULT: 3,
+}
+
+
 @router.get("/holdings/summary/global")
 async def global_holdings_summary(
     include_archived: bool = False,
@@ -256,7 +264,15 @@ async def global_holdings_summary(
     breakdown alongside the total. No silent consolidation." We honour
     that — the response includes the full summary list, not just the
     totals.
+
+    Holdings are sorted by custody tier (Account → Purse → Strongbox → Vault),
+    then by display_order within each tier. Each entry carries:
+      - meta: type-specific label (provider name / device label / m-of-n)
+      - scan_status: "n/a" | "scanning" | "scanned"
     """
+    from sqlalchemy import select as _select
+
+    from tallykeep.models.custodial_provider import CustodialProviderRow
     from tallykeep.repositories import (
         descriptor as descriptor_repo,
         utxo as utxo_repo,
@@ -265,6 +281,9 @@ async def global_holdings_summary(
     holdings = holding_service.list_holdings(
         session, include_archived=include_archived
     )
+    holdings.sort(
+        key=lambda h: (_CUSTODY_TIER.get(h.holding_type, 99), h.display_order)
+    )
 
     summaries: list[dict] = []
     by_type: dict[str, int] = {}
@@ -272,14 +291,43 @@ async def global_holdings_summary(
     total_sats = 0
 
     for h in holdings:
-        descriptor_ids = descriptor_repo.descriptor_ids_for_holding(session, h.id)
+        descriptors = descriptor_repo.list_descriptors_for_holding(session, h.id)
         confirmed = 0
         utxo_count = 0
-        for d_id in descriptor_ids:
-            confirmed += utxo_repo.descriptor_balance_sats(session, d_id)
+        for d in descriptors:
+            confirmed += utxo_repo.descriptor_balance_sats(session, d.id)
             utxo_count += len(
-                utxo_repo.list_for_descriptor(session, d_id, only_unspent=True)
+                utxo_repo.list_for_descriptor(session, d.id, only_unspent=True)
             )
+
+        # meta: type-specific human label
+        if h.holding_type == HoldingType.ACCOUNT:
+            provider_name: str | None = session.execute(
+                _select(CustodialProviderRow.display_name).where(
+                    CustodialProviderRow.holding_id == h.id
+                )
+            ).scalar_one_or_none()
+            meta: str | None = provider_name
+        elif h.holding_type == HoldingType.STRONGBOX:
+            meta = h.signing_device_label
+        elif h.holding_type == HoldingType.VAULT:
+            if h.required_signers is not None and h.total_signers is not None:
+                meta = f"{h.required_signers}-of-{h.total_signers} multisig"
+            else:
+                meta = None
+        else:  # PURSE
+            meta = None
+
+        # scan_status
+        if h.holding_type == HoldingType.ACCOUNT:
+            scan_status = "n/a"
+        elif not descriptors:
+            scan_status = "n/a"
+        elif all(d.last_scanned_height > 0 for d in descriptors):
+            scan_status = "scanned"
+        else:
+            scan_status = "scanning"
+
         summaries.append(
             {
                 "holding_id": str(h.id),
@@ -287,11 +335,13 @@ async def global_holdings_summary(
                 "name": h.name,
                 "purpose": h.purpose.value,
                 "confirmed_sats": confirmed,
-                "descriptor_count": len(descriptor_ids),
+                "descriptor_count": len(descriptors),
                 "utxo_count": utxo_count,
                 "is_archived": h.is_archived,
                 "display_color": h.display_color,
                 "display_order": h.display_order,
+                "meta": meta,
+                "scan_status": scan_status,
             }
         )
         total_sats += confirmed

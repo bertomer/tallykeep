@@ -1,0 +1,286 @@
+<!--
+  Title: Mobile — Add Holding · "Coming in an upcoming iteration" stub
+  Status: validated  (Rémy greenlight 2026-05-13 — drafted as part of
+                      the Add Holding scaffolding iteration; one mockup
+                      shown for Purse, production parameterizes by
+                      Holding type)
+  Date last touched: 2026-05-13
+  Replaces: nothing on disk. Supersedes the iteration block's earlier
+    plan for a four-different-stubs surface — single parameterized
+    screen serves Account, Purse, Strongbox, Vault tile taps in the
+    scaffolding iteration. As each wizard ships, its tile starts
+    routing to the real wizard instead of this stub.
+
+  Design notes:
+  - Page-per-file (PROCESS.md §2.3). This file shows ONE state of
+    ONE type (Purse) — production renders the same layout
+    parameterized by the picked type's icon + name. The four
+    parameterizations are visually identical except for the icon
+    SVG from brand/identity/holding-{type}.svg and the type name
+    in the app-bar title and the body heading.
+  - App-bar carries a back chevron (left) + screen title (centred),
+    no wordmark. First sub-route mockup in the spec tree, so this
+    pattern is being introduced here. The back chevron routes to
+    Home (the sheet doesn't persist between visits).
+  - Body is centred vertically and horizontally — large icon
+    (96 px), heading, one-paragraph body, secondary "Return to
+    Home" CTA. The big-icon-at-rest treatment echoes the picker's
+    icon-with-bordered-square framing but at a bigger size (icon
+    fills more of the visual budget since this screen has nothing
+    else to show).
+  - Body copy is honest about the state: "The Purse onboarding
+    wizard ships in an upcoming iteration. Holdings can be added
+    via the API in the meantime." This signals to the user that
+    the feature is in flight rather than missing, and to a
+    technical user it points at the dev-phase workaround.
+  - Bottom nav stays (Home active, others enabled-inactive) per
+    the populated-home pattern. The dev-phase user shouldn't
+    feel trapped on a sub-route.
+  - Icon: inline SVG from brand/identity/holding-purse-watch-only.svg
+    (canonical default per palette v2 lock §4). Production swaps
+    based on type.
+-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>TallyKeep — Mobile — Add Holding · Coming soon (Purse)</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="_shared/tokens.css">
+<link rel="stylesheet" href="_shared/shell.css">
+<style>
+  .phone-screen { background: var(--color-bg); }
+
+  /* ---------- App bar — back chevron + centred title ---------- */
+  .app-bar {
+    height: var(--mobile-app-bar);
+    flex-shrink: 0;
+    display: grid;
+    grid-template-columns: 44px 1fr 44px;
+    align-items: center;
+    padding: 0 var(--space-2);
+    background: var(--color-surface);
+    border-bottom: 1px solid var(--color-border);
+  }
+  .app-bar .back-btn {
+    width: 36px;
+    height: 36px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: transparent;
+    border: 0;
+    border-radius: var(--radius-md);
+    color: var(--color-text);
+    cursor: pointer;
+    justify-self: start;
+    margin-left: var(--space-2);
+  }
+  .app-bar .back-btn:hover { background: var(--color-bg); }
+  .app-bar .back-btn svg { width: 22px; height: 22px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+  .app-bar .screen-title {
+    text-align: center;
+    font-size: var(--font-size-base);
+    font-weight: var(--font-weight-semibold);
+    color: var(--color-text);
+    line-height: 1;
+  }
+
+  /* ---------- Body — centred icon + message + CTA ---------- */
+  .scroll-area {
+    flex: 1;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+  }
+  .stub-body {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: var(--space-7) var(--space-5);
+    gap: var(--space-4);
+    text-align: center;
+  }
+  .stub-icon-wrap {
+    width: 96px;
+    height: 96px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--color-surface);
+    border: 2px solid var(--stub-border, var(--color-border));
+    border-radius: var(--radius-lg);
+  }
+  .stub-icon-wrap svg { width: 72px; height: 72px; display: block; }
+  .stub-heading {
+    font-size: var(--font-size-lg);
+    font-weight: var(--font-weight-semibold);
+    color: var(--color-text);
+    line-height: var(--line-height-tight);
+    margin: 0;
+  }
+  .stub-body-text {
+    font-size: var(--font-size-sm);
+    color: var(--color-text-muted);
+    line-height: var(--line-height-default);
+    max-width: 280px;
+    margin: 0;
+  }
+  .stub-cta {
+    margin-top: var(--space-3);
+    padding: var(--space-3) var(--space-5);
+    background: transparent;
+    border: 1px solid var(--color-border-strong);
+    border-radius: var(--radius-md);
+    font-family: inherit;
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-weight-medium);
+    color: var(--color-text);
+    cursor: pointer;
+  }
+  .stub-cta:hover { background: var(--color-surface); }
+
+  /* Per-type binding for the icon-wrap border (consumes the same
+     token the picker and the populated list use). Production renders
+     ONE of these classes on .stub-icon-wrap depending on the picked
+     Holding type. This mockup shows Purse. */
+  .stub-icon-wrap.account   { --stub-border: var(--color-holding-account); }
+  .stub-icon-wrap.purse     { --stub-border: var(--color-holding-purse); }
+  .stub-icon-wrap.strongbox { --stub-border: var(--color-holding-strongbox); }
+  .stub-icon-wrap.vault     { --stub-border: var(--color-holding-vault); }
+
+  /* ---------- Bottom nav (same as Home populated) ---------- */
+  .bottom-nav {
+    height: var(--mobile-bottom-nav);
+    flex-shrink: 0;
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    background: var(--color-surface);
+    border-top: 1px solid var(--color-border);
+  }
+  .nav-item {
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    gap: 2px;
+    padding: var(--space-2) 0;
+    font-size: 10px;
+    color: var(--color-text-dim);
+    background: transparent; border: 0; cursor: pointer;
+    position: relative;
+  }
+  .nav-item .nav-ico { width: 22px; height: 22px; color: currentColor; }
+  .nav-item.active {
+    color: var(--color-primary-strong);
+    font-weight: var(--font-weight-semibold);
+  }
+  .nav-item.active::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 20%; right: 20%;
+    height: 2px;
+    background: var(--color-primary);
+    border-radius: 0 0 var(--radius-sm) var(--radius-sm);
+  }
+  .nav-item.enabled-inactive { color: var(--color-text-muted); }
+</style>
+</head>
+<body>
+
+<div class="mockup-meta">
+  <strong>Mobile — Add Holding · Coming soon (Purse shown)</strong> ·
+  <span class="status-validated">validated</span> ·
+  2026-05-13 · 360×800
+</div>
+
+<div class="phone-frame">
+  <div class="phone-screen">
+
+    <!-- App bar: back chevron + screen title (parameterized in
+         production: "Add a Purse" / "Add a Strongbox" / etc.) -->
+    <div class="app-bar">
+      <button class="back-btn" aria-label="Back to Home">
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <polyline points="15 6 9 12 15 18"/>
+        </svg>
+      </button>
+      <div class="screen-title">Add a Purse</div>
+      <div></div>
+    </div>
+
+    <div class="scroll-area">
+      <div class="stub-body">
+
+        <!-- Icon (Purse watch-only canonical from brand/identity/).
+             Production swaps to the picked type's SVG. -->
+        <div class="stub-icon-wrap purse">
+          <svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+            <path d="M 22 28 Q 12 30 8 42 L 8 54 Q 8 60 14 60 L 50 60 Q 56 60 56 54 L 56 42 Q 52 30 42 28 Z" fill="#80452f"/>
+            <ellipse cx="32" cy="24" rx="11" ry="2" fill="#3a1a10"/>
+            <path d="M 22 28 Q 24 14 28 24 Q 30 16 32 24 Q 34 16 36 24 Q 40 14 42 28 Z" fill="#80452f"/>
+            <ellipse cx="32" cy="28" rx="13" ry="3" fill="#b89968"/>
+            <path d="M 21 27 L 24 29 M 25 27 L 28 29 M 29 27 L 32 29 M 33 27 L 36 29 M 37 27 L 40 29 M 41 27 L 44 29" stroke="#8a6e3e" stroke-width="0.7" opacity="0.85" fill="none" stroke-linecap="round"/>
+            <path d="M 44 27 Q 50 32 52 38" stroke="#b89968" stroke-width="2" fill="none" stroke-linecap="round"/>
+            <circle cx="52" cy="38" r="2.2" fill="#b89968"/>
+            <ellipse cx="22" cy="44" rx="3.5" ry="8" fill="#9a5a40" opacity="0.5"/>
+            <path d="M 22 38 L 22 56" stroke="#5e2f1f" stroke-width="0.7" opacity="0.35" fill="none"/>
+            <path d="M 42 38 L 42 56" stroke="#5e2f1f" stroke-width="0.7" opacity="0.35" fill="none"/>
+            <line x1="32" y1="32" x2="32" y2="58" stroke="#5e2f1f" stroke-width="0.5" opacity="0.25"/>
+          </svg>
+        </div>
+
+        <h1 class="stub-heading">Coming in an upcoming iteration</h1>
+
+        <p class="stub-body-text">
+          The Purse onboarding wizard ships shortly. Backend support
+          is in place — Holdings can be added via the API for now.
+        </p>
+
+        <button class="stub-cta" type="button">Return to Home</button>
+
+      </div>
+    </div>
+
+    <!-- Bottom nav (same as populated home) -->
+    <nav class="bottom-nav" aria-label="Primary navigation">
+      <button class="nav-item active" aria-current="page">
+        <svg class="nav-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M 3 12 L 12 3 L 21 12 M 6 10 L 6 21 L 18 21 L 18 10"/>
+        </svg>
+        Home
+      </button>
+      <button class="nav-item enabled-inactive">
+        <svg class="nav-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+          <line x1="5" y1="7"  x2="19" y2="7"/>
+          <line x1="5" y1="12" x2="19" y2="12"/>
+          <line x1="5" y1="17" x2="19" y2="17"/>
+        </svg>
+        Activity
+      </button>
+      <button class="nav-item enabled-inactive">
+        <svg class="nav-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="4" y="6"  width="16" height="4" rx="1"/>
+          <rect x="4" y="12" width="16" height="4" rx="1"/>
+          <rect x="4" y="18" width="16" height="2" rx="1"/>
+        </svg>
+        Holdings
+      </button>
+      <button class="nav-item enabled-inactive">
+        <svg class="nav-ico" viewBox="0 0 24 24" fill="currentColor">
+          <circle cx="6"  cy="12" r="2"/>
+          <circle cx="12" cy="12" r="2"/>
+          <circle cx="18" cy="12" r="2"/>
+        </svg>
+        More
+      </button>
+    </nav>
+
+  </div>
+</div>
+
+</body>
+</html>

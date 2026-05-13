@@ -89,7 +89,19 @@
     transition: color 0.1s;
   }
   .nav-tab.active {
-    color: var(--color-primary);
+    color: var(--color-primary-strong);
+    font-weight: var(--font-weight-semibold);
+    position: relative;
+  }
+  .nav-tab.active::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 20%;
+    right: 20%;
+    height: 2px;
+    background: var(--color-primary);
+    border-radius: 0 0 var(--radius-sm) var(--radius-sm);
   }
   .nav-tab.disabled {
     pointer-events: none;

@@ -51,6 +51,10 @@ class AddressType(str, Enum):
     NESTED_SEGWIT = "nested_segwit"
     NATIVE_SEGWIT = "native_segwit"
     TAPROOT = "taproot"
+    # Multisig script types (Vault descriptors)
+    P2SH_MULTISIG = "p2sh_multisig"      # sh(sortedmulti())
+    P2WSH = "p2wsh"                        # wsh(sortedmulti())
+    P2SH_P2WSH = "p2sh_p2wsh"             # sh(wsh(sortedmulti()))
 
 
 class HygieneFlag(str, Enum):

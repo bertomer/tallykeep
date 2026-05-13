@@ -289,24 +289,45 @@ this surface. Matches banking norms.
   (120 px, static, no dynamic-mark behavior on this surface).
   Hero on its own white-surface block (`--color-surface` with
   bottom border, visually distinct from the page bg below):
-  "TOTAL BALANCE" small uppercase label, left-aligned mono `0`
-  amount at 36 px semibold, baseline-aligned with a small unit
-  column to the right (a 14-px cycle icon stacked above a
-  `sats` label — the icon is the affordance for cycling
-  sats / BTC, the label is just the unit). Subdued
+  "TOTAL BALANCE" small uppercase label, left-aligned `0` amount
+  at 36 px semibold in Manrope tabular-nums (per
+  `brand/README.md` §"Typography conventions"), baseline-aligned
+  with a small unit column to the right (a 14-px cycle icon
+  stacked above a `sats` label — the icon is the affordance for
+  cycling sats / BTC, the label is just the unit). Subdued
   `Show in fiat` link beneath the amount (dim, no underline, no
   arrow — we don't push fiat). Below the hero: a "HOLDINGS"
   section header (uppercase 11 px, muted) with a small
-  `+ Add` affordance right-aligned. An empty list-card
+  filled-primary `+` button right-aligned. An empty list-card
   placeholder below the header carries "No Holdings yet"
   (`--color-text-dim`, small, centered). Bottom nav with four
-  tabs: Home (active), Activity (greyed, no transactions yet),
-  Holdings (greyed, no Holdings yet), More (enabled — Settings
-  always works). *Status: validated (Rémy greenlight 2026-05-10).*
+  tabs: Home (active, with a 2 px verdigris top-indicator),
+  Activity (greyed, no transactions yet), Holdings (greyed,
+  no Holdings yet), More (enabled — Settings always works).
+  *Status: validated (Rémy greenlight 2026-05-10; re-validated
+  2026-05-13 after the cosmetic pass — filled-primary `+`
+  button, 2 px verdigris top-indicator on active nav, hero
+  amount swapped to Manrope tabular-nums).*
 
-Populated states (single Holding, multiple Holdings,
-discrepancy banner, fiat-on) are not yet drafted — they sharpen
-in subsequent sessions once the empty state is locked.
+- `mobile_home_populated.html` — populated state, one row per
+  Holding type as the canonical sample. Same chrome as empty.
+  Hero amount shows the consolidated total (`4 358 921 sats` in
+  the sample) in Manrope tabular-nums. Below the section
+  header, a list-card with rows in custody-tier order
+  (Account → Purse → Strongbox → Vault). Each row: 4 px stripe
+  in `--color-holding-{type}` (brass for Vault per palette v2
+  lock §4 update 2026-05-13), name (Manrope 600), meta line
+  (source name — Phoenix / Coldcard Mk4 / Kraken; or
+  "2-of-3 multisig" for Vault since multisig structure is the
+  identity), amount in Manrope tabular-nums right-aligned with a
+  small `sats` unit label. Filled-primary `+` button and active-
+  nav indicator match the re-validated empty state. *Status:
+  validated (Rémy greenlight 2026-05-13).*
+
+Remaining populated variants — discrepancy banner (driven by
+the security-health system), fiat-on display, scanning-in-
+progress row state (driven by scan-status SSE event) — are
+deferred to subsequent iterations once their drivers ship.
 
 ### Reconcilability gauntlet answers
 
@@ -359,12 +380,24 @@ hero on its own white-surface block, sectioned layout with a
 beneath. The user feels the app's information architecture
 from the start.
 
-**Mono amount, left-aligned.** Mono numerals are the
-institutional-banking default — they read as data, not
-display copy. Left-aligned means the leftmost digit stays at
-a fixed position as the number grows (0, 100, 1,000,
-1,000,000 all start at the same x-coordinate). Centered
-numerals shift around; banking-grade does not.
+**Amount typography — Manrope tabular-nums, left-aligned.**
+Tabular numerals are the institutional-banking default —
+they read as data, not display copy, AND digits in a column
+align (1 occupies the same width as 8). Left-aligned means the
+leftmost digit stays at a fixed position as the number grows
+(0, 100, 1,000, 1,000,000 all start at the same x-coordinate).
+Centered numerals shift around; banking-grade does not.
+
+Earlier draft used `--font-mono` (system monospace) for the
+"institutional data" effect; swapped 2026-05-13 to
+`--font-sans` + `font-variant-numeric: tabular-nums` after
+side-by-side review revealed the Manrope-vs-Consolas mismatch
+on Windows read worse than mono did better. Manrope supports
+tabular numerals — same alignment property, native to the
+brand typeface. Convention locked in `brand/README.md`
+§"Typography conventions"; `--font-mono` stays defined and is
+reserved for code-shaped content (BIP 380 descriptors,
+addresses, transaction IDs, passphrase entry).
 
 **Unit-label sized for cycle balance.** The `sats` label sits at
 `--font-size-md` (16 px) rather than `--font-size-base` (14 px).
@@ -420,21 +453,34 @@ model of the app's information architecture from the first
 launch; subsequent populated states slot into the same
 structure without re-organizing the screen.
 
-**Add affordance is a small rounded-square outlined `+`
-button.** Sharpened across three passes 2026-05-10. First:
-big centered primary CTA (rejected — too "shiny",
-Phoenix-coded). Second: small `+ Add` text-link in the
-section-head (rejected — translation friction: "Add" varies in
-width across languages and `+` alone is universal). Third:
-circular filled button with a bold `+` glyph (rejected — felt
-"fat" and too prominent for a section-header affordance).
-Final: 28-px rounded-square (`--radius-md`), 1.5-px solid
-primary-color outline, transparent background, SVG `+` inside
-with stroke-width 2 at 14×14 px (visually ~1.2 px effective
-stroke — elegant, not heavy). Quieter than filled, still
-unambiguous as an affordance. On tap, opens the Add-Holding
-picker popup (per `next_iteration.md` transient — four type
-choices in a popup, not inline on the empty state).
+**Add affordance is a 28 px rounded-square filled-primary
+button.** Sharpened across four passes 2026-05-10 → 2026-05-13.
+First (2026-05-10): big centred primary CTA (rejected — too
+"shiny", Phoenix-coded). Second: small `+ Add` text-link in
+the section-head (rejected — translation friction: "Add"
+varies in width across languages and `+` alone is universal).
+Third: circular filled button with a bold `+` glyph (rejected
+— felt "fat" and too prominent for a section-header
+affordance). Fourth (2026-05-10 landing): 28-px rounded-square
+(`--radius-md`), 1.5-px solid primary-colour outline,
+transparent background, SVG `+` inside — quieter than filled,
+still unambiguous. Fifth (2026-05-13 cosmetic pass): swapped
+to filled-primary verdigris with white glyph after the
+populated home felt under-coloured (the earth-tone Holding
+stripes were the only colour on the page, primary verdigris
+only appeared in the active-nav label). Rounded-square filled
+at 28 px reads as a banking-grade CTA (the earlier "too fat"
+rejection was about CIRCULAR filled, which feels chubby —
+rounded-square reads taut). On tap, opens the Add-Holding
+picker bottom sheet (see `## Add Holding` below).
+
+**Active nav indicator — 2 px verdigris top stripe.** Added
+2026-05-13 alongside the filled `+` button to plant the brand
+colour more visibly on the page. The 60 %-width centred
+indicator above the active tab works in peripheral vision; the
+user can spot the active tab without reading the label. Bottom
+rounding on the indicator (`border-radius: 0 0 sm sm`) gives
+it a softer landing.
 
 **Translation-free affordances where possible — locks a
 discipline for the rest of the app.** This is the first surface
@@ -466,6 +512,38 @@ detail pages, not here.
 detects declared-vs-observable mismatch; with no Holdings,
 nothing to analyze. Banner sharpens when populated states are
 drafted.
+
+**Populated home sort order — custody tier ascending.** Sorted
+by Holding type in the same order as the Add-Holding picker
+(Account → Purse → Strongbox → Vault — hot-to-cold,
+least-sovereign-to-most-sovereign). Within a tier with
+multiple Holdings of the same type, secondary sort is
+creation-date ascending (oldest first). Sort options (toggle
+to by-amount or by-recency) are a polish concern for a
+follow-up iteration if the default doesn't hold for real use.
+
+**Source-name meta lines over script-type jargon.** The line
+under each Holding name shows the source identity (provider
+for Account, hot-wallet app for Purse, hardware device for
+Strongbox) rather than the technical script-type
+(`P2WPKH`, `P2TR`). Target-market users know "Phoenix" and
+"Coldcard Mk4"; they don't know what P2WPKH means. Vault is
+the exception — multi-sig structure ("2-of-3 multisig") IS the
+identity, no single device name captures it. The source-name
+field is captured optionally in each per-type wizard's label
+step (per-type dropdown + Other → free-text); when skipped,
+meta falls back to friendlier script-type spellings ("Native
+segwit", "Taproot", "Multi-sig").
+
+**Brass Vault stripe — brand-cohesion thread.** The Vault
+row's 4 px stripe renders in brass (`#b89968`) rather than
+brushed steel (`#6c7682`) per the palette v2 lock §4 update
+2026-05-13. Brass echoes the brass hub in the Vault icon and
+the brass cord in watch-only Purse — same brand-cohesion
+thread carried out from icon-detail to surface-wide identity.
+The Vault icon body itself stays brushed-steel internally; the
+brass move is on the framing (token-driven stripe + picker
+icon-border), not on the icon's body fill.
 
 ### Reconcilability gauntlet answers
 
@@ -727,3 +805,179 @@ Captured for sharpening in `future_iterations.md` as
 "Dynamic brand mark on first-touch surfaces"; not landed in this
 mockup because mockups are static-only per
 `UI/mockups/README.md`.
+
+---
+
+## Add Holding
+
+The scaffolding iteration (`next_iteration.md`) ships the
+picker entry surface plus a type-parameterized "coming soon"
+stub for every tile tap. Per-wizard surfaces (Purse / Strongbox
+/ Vault descriptor wizards, Account provider-key wizard) ship
+in subsequent iterations as each design pass validates the
+relevant mockups — entries will appear in this section as those
+iterations close, each with its own gauntlet pass.
+
+### Screens
+
+- `mobile_add_holding_picker.html` — bottom-sheet picker open
+  over Home empty (scrimmed). Four rows in custody-progression
+  order: Account → Purse → Strongbox → Vault. Each row carries
+  a 44 px icon (inlined from `brand/identity/holding-*.svg`)
+  inside a 2 px-bordered rounded square, with the border
+  tinted `--color-holding-{type}`; bold name; one-line
+  description; chevron. Sheet title *"Add a Holding"*, sub
+  *"Each holds your keys differently."* Cancel button at
+  the bottom. Sheet rises from the bottom with slide-up
+  animation; scrim at `--color-overlay`. *Status: validated
+  (Rémy greenlight 2026-05-13).*
+
+- `mobile_add_holding_coming_soon.html` — one-screen stub
+  parameterized by Holding type, used in this iteration by all
+  four tile taps. (Account because the Add Account wizard ships
+  in its own follow-up iteration with ccxt provider integration;
+  Purse / Strongbox / Vault because their descriptor wizards
+  ship in subsequent iterations each.) App bar with back
+  chevron + screen title ("Add a Purse" / "Add a Strongbox" /
+  etc.), centred body with a 96 px Holding icon (same per-type
+  bordered framing as the picker row, sized up), heading
+  *"Coming in an upcoming iteration"*, paragraph copy
+  acknowledging API workaround for dev-phase users, "Return to
+  Home" secondary CTA. Bottom nav unchanged. *Status: validated
+  (Rémy greenlight 2026-05-13).*
+
+As each wizard iteration ships, its tile starts routing to the
+real wizard instead of the coming-soon stub. Promotion order
+locked in `future_iterations.md`: **Purse first** (canonical
+descriptor wizard, also carries the shared wizard shell into
+the codebase since it's the first consumer), then Strongbox
+(copy + framing variant on Purse), then Vault (multisig-only
++ framing pre-card), then Account (different surface — ccxt
+provider integration, no descriptor parser).
+
+### Reconcilability gauntlet answers
+
+1. **Trust boundary.** Phone (UI only). The picker is local
+   sheet state — no backend call when opening or dismissing.
+   The coming-soon stub is a UI dead-end — no backend
+   interaction. The backend interaction (descriptor validation,
+   per-type Holding creation) lives in the per-wizard
+   iterations that ship later; for this scaffolding iteration
+   the stub is the honest "nothing happens yet" gate. The
+   backend endpoints DO ship in this iteration (so the
+   populated home can render against Swagger-seeded fixture
+   data), they're just not yet reachable from inside the app.
+
+2. **Keys and secrets.** None on these surfaces. No descriptor
+   input, no API keys, no passphrases. Per-wizard gauntlet
+   answers — touching descriptors (Purse / Strongbox / Vault)
+   and API credentials (Account) — land with each wizard's
+   iteration.
+
+3. **Self-hosted vs hosted.** Identical surface. The picker
+   and stub render identically regardless of the connection
+   target. The Holding-create backend endpoints behave
+   identically on both deployment models per
+   `01_architecture.md`.
+
+4. **Confirmation honesty.** Picker doesn't promise anything
+   — it presents the four type choices. Stub is explicit
+   ("Coming in an upcoming iteration") plus an API-workaround
+   disclosure for technical users ("Backend support is in
+   place — Holdings can be added via the API for now"). No
+   "added!" state shown before anything is added.
+
+5. **Browser-only fallback.** Per ADR-0007. Both surfaces are
+   fully browser-compatible. No Capacitor-only capability is
+   exercised on the picker or stub — no QR scan, no biometric,
+   no secure-storage write. The deferred wizard capability
+   checks (managed-Purse on Capacitor-with-secure-storage,
+   QR-scan via camera) land with their respective wizard
+   iterations alongside honest browser gates.
+
+6. **Open-source and reproducibility.** No closed-source
+   dependency. Inline SVG icons from `brand/identity/`,
+   token-driven styling (no raw hex in component CSS), no
+   third-party JS libraries on these surfaces.
+
+### Notes
+
+**Picker order is custody-progression / lifecycle, not
+brand-pitch.** Sharpened during the design pass 2026-05-13.
+Hot-to-cold, least-sovereign-to-most-sovereign: Account
+(third-party custody) → Purse (your phone, daily) → Strongbox
+(hardware, short-term cold) → Vault (multisig, long-term
+ceremonial). Pedagogically stronger than "lead with the
+sovereignty pitch" (Purse first) because the ordering tells a
+story across the four rows — where money typically starts,
+where it lives daily, where it accumulates short-term, where
+it sits long-term. Earlier draft proposed Purse-first; Rémy
+reframed as lifecycle arc.
+
+**Rows-only layout, cards variant rejected.** Earlier
+design-tool prototype toggled between row and 2×2 card
+variants. Rows won: four options on a mobile sheet earn rows
+(single-column read, no eye-darting, description text never
+crops). Cards earn their keep at 6+ options or when each
+option's thumbnail is the primary signal — neither holds for
+four Holding types.
+
+**No "Recommended" pill in this iteration.** The pill is
+meaningful only when managed-Purse capability is available
+(Capacitor with secure-storage backend). Shipping a
+conditionally-rendered pill that's always-false in dev phase
+would mean shipping capability-check infrastructure with no
+visible consumer. The pill, the capability check
+(`device.capabilities.canStoreSeed`), and the Purse-wizard
+managed-flavor branch all land together in the Capacitor-wrap
+iteration, where they have a working surface to attach to.
+General discipline: honest gate via *absence of affordance*,
+not stubbed APIs returning false.
+
+**Picker tile copy — locked.** Each row's one-line description
+follows a parallel axis (where the key is + how often you
+touch it):
+
+- *Account:* "Held at an exchange or broker. They hold the
+  keys; you see balances."
+- *Purse:* "On your phone. For daily spending."
+- *Strongbox:* "On a hardware wallet. For amounts you spend
+  rarely."
+- *Vault:* "Multiple keys required. For amounts you rarely
+  touch — years, not days."
+
+Earlier design-tool prototype said "you hold the key" on
+Strongbox specifically, which was wrong — true of Purse and
+Vault too; only differentiator-from-Account. The parallel axis
+(where + when) is what distinguishes the four types from each
+other, not what each shares with three of them.
+
+**2 px coloured icon-border at picker scale; same convention
+extends to the stub.** Each picker tile's 44 px icon sits
+inside a 2 px-bordered rounded square; border colour is the
+matching `--color-holding-{type}` (limestone / auburn / iron /
+brass). The icon itself carries its own internal colours from
+`brand/identity/`. The border makes the type readable at a
+glance even before the user reads the name. The coming-soon
+stub uses the same border convention at 96 px scale.
+
+**Coming-soon stub treatment — visible-with-stub for all four
+tiles in this iteration.** All four tile taps route to the
+same parameterized stub (icon + name change per type). Earlier
+plan had a unique Account-only stub with the other three tiles
+leading to their wizards directly. Once the iteration was
+split (wizards to their own follow-on iterations), the stub
+treatment generalised to all four — keeps the picker visibly
+honest about what's coming across the board, avoids the "why
+is Account special?" question, and the parameterized stub is
+one mockup instead of three placeholders.
+
+**Backend ships before per-type frontend wizards.** The
+descriptor-validate endpoint and the three Holding-create
+endpoints (purse / strongbox / vault) ship in this scaffolding
+iteration alongside the picker + stub frontend. Without the
+wizards, Holdings can be created via Swagger UI for testing
+the populated home rendering. This decouples backend
+correctness testing from wizard UX work, and means each
+wizard's coding session focuses purely on the per-type UI
+rather than re-discovering backend shapes.
