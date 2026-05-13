@@ -274,7 +274,7 @@ try {
     Show "SINGLE_ADDRESS_INPUT" ($errBody.detail.error_code -eq "SINGLE_ADDRESS_INPUT")
 }
 
-# Error path: garbage → PARSE_ERROR
+# Error path: garbage -> PARSE_ERROR
 try {
     Invoke-RestMethod -Method Post -Uri "$BaseUrl/api/v1/descriptors/validate" `
         -ContentType 'application/json' `
@@ -302,7 +302,7 @@ foreach ($h in $summary.holdings) {
 
 Section "13d. Purse wizard — regtest tpub validation + tallykeep_managed creation"
 
-# Validate a regtest tpub — exercises frontend's "tpub prefix → regtest" detection.
+# Validate a regtest tpub — exercises frontend's "tpub prefix -> regtest" detection.
 $tpubRegtest = "wpkh(tpubD6NzVbkrYhZ4XHndKkuB8FifXm8r5FQHwrN6oZuWCz13qb93rtgKvD4PQsqC4HP4yhV3tA2fqr2RbY5mNXfM7RxXUoeABoDtsFUq2zJq6YK/900/*)"
 $validateRegtest = @{ input = $tpubRegtest; network = "regtest" } | ConvertTo-Json -Compress
 $validatedRegtest = Invoke-RestMethod -Method Post -Uri "$BaseUrl/api/v1/descriptors/validate" `
@@ -668,7 +668,7 @@ $vaultHolding = Invoke-RestMethod -Method Post -Uri "$BaseUrl/api/v1/holdings/va
 $vaultId = $vaultHolding.id
 Show "vault holding id" $vaultId
 
-# 15.1 Create sweep policy (purse → vault)
+# 15.1 Create sweep policy (purse -> vault)
 $spBody = @{
     name = "Smoke sweep"
     source_holding_id = $purseId
