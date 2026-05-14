@@ -8,11 +8,14 @@ The user-facing words are chosen deliberately. They are used consistently throug
 
 - **Holding** — the abstract container concept. A purpose-bound bucket of value the user wants to see, manage, and reason about as a unit. Has four concrete subtypes: Account, Purse, Strongbox, Vault.
 - **Account** — a Holding backed by a custodial provider. The provider holds the keys; we read balances and trigger withdrawals via API.
-- **Purse** — a Holding backed by a wallet whose private keys are on a connected day-to-day device. User holds the keys; signing is light. Has two seed origins (see "Purse seed origin" below): **external-watch-only** (TallyKeep observes a descriptor whose seed lives in another hot wallet — Phoenix, BlueWallet, Mutiny, Sparrow's hot mode, etc.) and **TallyKeep-managed** (TallyKeep generated the seed; the seed itself lives in some client device's secure local storage, not on the backend).
+- **Purse** — a Holding for everyday spending. The implementation axis that matters is **whether the Purse has on-device keys**:
+   - *Descriptor-only* — TallyKeep watches an xpub / descriptor; the seed lives in another hot wallet (Phoenix, BlueWallet, Mutiny, Sparrow hot mode). TallyKeep never holds the key. Spending redirects to the source wallet.
+   - *On-device-keys* — the seed lives in the Capacitor client's OS Keychain/Keystore (biometric-gated), on the specific device that ran creation or import. Never on the backend. Signing happens in-app via the `NativeBridge` interface.
+   The seed *source* — TallyKeep generated it (`ON_DEVICE_TK_GENERATED`) or the user imported it from another wallet (`ON_DEVICE_USER_IMPORTED`, pending arbitration `purse-upgrade-path`) — is a secondary classification carried for disclosure copy and security-health framing. It does not change the implementation axis (both have on-device keys).
 - **Strongbox** — a Holding backed by a wallet whose private keys are on an offline or hardware signing device. User holds the keys; signing requires the external device.
-- **Vault** — a Holding backed by a wallet under additional structural protection (multisig, timelocks, geographic separation, inheritance setup). User holds the keys; access requires ceremony.
+- **Vault** — a Holding backed by a wallet under additional structural protection (multisig, timelocks, geographic separation, inheritance setup). User holds the keys; access requires ceremony. Multisig descriptors are deferred; pre-shipping accepts single-key descriptors with the analyzer surfacing the gap.
 - **Descriptor** — the technical primitive (BIP 380) that defines how a wallet derives its addresses. A Holding of type Purse, Strongbox, or Vault references one or more Descriptors. Account does not have a Descriptor.
-- **CustodialProvider** — the technical primitive that defines a connection to a third party that holds custody (Kraken, Bitstamp, Swissquote, future P2P venues). An Account references exactly one CustodialProvider.
+- **CustodialProvider** — the technical primitive that defines a connection to a third-party custodian that holds keys on the user's behalf (Kraken, Bitstamp, Swissquote). An Account references exactly one CustodialProvider. **P2P acquisition venues** (RoboSats, Bisq, future similar) are *not* CustodialProviders — keys stay with the user — and are tracked separately when their iteration lands; see `future_iterations.md`.
 - **LedgerEntry** — a recorded movement of value affecting one or more Holdings. May be backed by an OnChainTransaction, a Lightning payment (when that iteration ships), or a CustodialProvider event (deposit, withdrawal).
 - **OnChainTransaction** — a Bitcoin blockchain transaction record, identified by txid.
 - **PaymentRequest** — a user-initiated outgoing payment, in lifecycle from draft to confirmed.
@@ -87,11 +90,12 @@ class Account(Holding):
 @dataclass
 class Purse(Holding):
     descriptor_ids: list[UUID]          # one or more Descriptors
-    seed_origin: PurseSeedOrigin        # see "Purse seed origin" below
+    purse_mode: PurseMode               # see "Purse mode" below
 
-class PurseSeedOrigin(Enum):
-    EXTERNAL_WATCH_ONLY = "external_watch_only"  # imported xpub/descriptor; seed lives in another hot wallet
-    TALLYKEEP_MANAGED   = "tallykeep_managed"    # TallyKeep generated the seed; seed lives in a client device's secure local storage
+class PurseMode(Enum):
+    WATCH_ONLY             = "watch_only"              # imported xpub/descriptor; seed lives in another hot wallet
+    ON_DEVICE_TK_GENERATED = "on_device_tk_generated"  # TallyKeep generated the seed; seed lives in a client device's secure local storage
+    ON_DEVICE_USER_IMPORTED = "on_device_user_imported" # user imported a seed from another wallet; same storage mechanic (pending purse-upgrade-path)
 
 @dataclass
 class Strongbox(Holding):
@@ -107,19 +111,19 @@ class Vault(Holding):
     recovery_setup_notes: str | None
 ```
 
-### Purse seed origin
+### Purse mode
 
-`seed_origin` records **what kind of wallet this Purse is** in a way
+`purse_mode` records **what kind of wallet this Purse is** in a way
 that is stable across devices and meaningful to all of them. It is
 the resolution recorded in ADR-0006 (slug `purse-flavors`). The
 split is structural because the spending UX differs materially.
 
-`seed_origin` does **not** record where the seed physically lives.
+`purse_mode` does **not** record where the seed physically lives.
 That is a per-client, runtime concern (see "Signing capability is
 per-client" below) — and the locked principle "no signing keys to
 backend" forbids the backend from holding a seed reference at all.
 
-- **External-watch-only Purse** (`PurseSeedOrigin.EXTERNAL_WATCH_ONLY`).
+- **Watch-only Purse** (`PurseMode.WATCH_ONLY`).
   Onboarded by importing an xpub or descriptor. The seed lives in
   another hot wallet (Phoenix, BlueWallet, Mutiny, Sparrow's hot
   mode, etc.). TallyKeep observes activity and aggregates balances;
@@ -128,7 +132,7 @@ backend" forbids the backend from holding a seed reference at all.
   across many addresses; observing one address shows a misleading
   slice).
 
-- **TallyKeep-managed Purse** (`PurseSeedOrigin.TALLYKEEP_MANAGED`).
+- **TallyKeep-generated Purse** (`PurseMode.ON_DEVICE_TK_GENERATED`).
   TallyKeep generated a fresh seed into a client device's secure
   local storage (iOS Keychain / Android Keystore, biometric-gated)
   during the Add-Holding flow. The descriptor (public part) is
@@ -139,9 +143,16 @@ backend" forbids the backend from holding a seed reference at all.
   the same Purse appears as view-only with a "go sign on the device
   that holds the seed" gate.
 
-A user may have both kinds of Purse simultaneously (for example, an
-external-watch-only Purse mirroring their Phoenix balance, plus a
-TallyKeep-managed Purse for fresh receipts directly into TallyKeep).
+- **User-imported Purse** (`PurseMode.ON_DEVICE_USER_IMPORTED`).
+  The user imported a seed from another wallet (pending
+  `purse-upgrade-path` iteration). Same on-device storage mechanic as
+  `ON_DEVICE_TK_GENERATED`; differs only in disclosure copy and
+  security-health framing (user already has a backup from the source
+  wallet).
+
+A user may have multiple Purses simultaneously (for example, a
+watch-only Purse mirroring their Phoenix balance, plus an
+on-device Purse for fresh receipts directly into TallyKeep).
 
 ### Signing capability is per-client, not per-Holding
 
@@ -158,22 +169,22 @@ Holding's `id`?
   the "go sign on the device that holds the seed" gate.
 - **Browser PWA on desktop or mobile:** no Keychain access at all.
   Same gate.
-- **Any external-watch-only Purse, any client:** Send always points
+- **Any watch-only Purse, any client:** Send always points
   to the source wallet (Phoenix, BlueWallet, etc.), regardless of
-  client. There is no scenario in which TallyKeep signs an
-  external-watch-only Purse.
+  client. There is no scenario in which TallyKeep signs a
+  watch-only Purse.
 
 The "Create a TallyKeep wallet" affordance during Add-Holding is
 gated **client-side** based on the client's capability to generate
 and securely store a seed. Capacitor on phone: shown. PWA in any
 browser: hidden (with a "this requires the TallyKeep app" message).
 The backend does not enforce or detect build type; it accepts any
-Purse-creation request and stores the asserted `seed_origin`.
+Purse-creation request and stores the asserted `purse_mode`.
 
 This keeps the locked principle clean: the backend never holds
 signing material in any form, encrypted or otherwise. The trade-off
-is that an attacker calling the API directly could create a
-`seed_origin=TALLYKEEP_MANAGED` Purse for which no client actually
+is that an attacker calling the API directly could create an
+`ON_DEVICE_TK_GENERATED` Purse for which no client actually
 holds a seed; the result is a Holding nobody can spend from, which
 is a UX nuisance, not a security risk.
 
@@ -194,8 +205,8 @@ This model is reflected in the threat model
 - Purse, Strongbox, and Vault have at least one Descriptor and no CustodialProvider.
 - Vault may have multisig parameters (`required_signers`, `total_signers`); Purse and Strongbox should not.
 - Holdings are soft-deleted (archived). No hard delete, to preserve LedgerEntry integrity.
-- Every Purse has a `seed_origin` value. The field is required at creation and immutable thereafter.
-- The backend never stores any reference to the seed itself. For `seed_origin=TALLYKEEP_MANAGED`, the seed lives only in a client device's secure local storage; the backend has no field, encrypted or otherwise, that points at it.
+- Every Purse has a `purse_mode` value. The field is required at creation and immutable thereafter.
+- The backend never stores any reference to the seed itself. For `purse_mode=ON_DEVICE_TK_GENERATED` (or `ON_DEVICE_USER_IMPORTED`), the seed lives only in a client device's secure local storage; the backend has no field, encrypted or otherwise, that points at it.
 
 ### Descriptor
 
@@ -666,7 +677,7 @@ When the user views a Holding, the UI compares `declared_security` and `observab
 
 - Declared as Vault with multisig, but Descriptor is single-key → loud warning.
 - Declared as Strongbox (HARDWARE_OFFLINE), but recent transactions show signing patterns suggesting hot software signing → medium warning.
-- Declared as Purse, but Descriptor is a 2-of-3 multisig → informational note (the user understated their security).
+- Declared as Vault with timelock, but Descriptor has no Miniscript `older()` / `after()` fragment → medium warning.
 
 The analyzer never modifies declared values automatically. It only surfaces observations.
 
@@ -710,5 +721,5 @@ Job (standalone, linked to whatever triggered it via parameters)
 7. The whitelist address of a CustodialProvider must be owned by a non-Account Holding.
 8. No domain entity exposes a private key, seed, or signing material in any field. The type system forbids it.
 9. PaymentRequest from a Holding whose `signing_model == NOT_APPLICABLE` is rejected at construction.
-10. A Purse's `seed_origin` is immutable after creation. Migrating between origins requires creating a new Purse and moving funds; the original is archived.
+10. A Purse's `purse_mode` is immutable after creation. Migrating between modes requires creating a new Purse and moving funds; the original is archived.
 11. The backend never validates client build type. The "create a TallyKeep wallet" affordance is gated client-side on the client's capability to generate and securely store a seed. The backend accepts any Purse-creation request that satisfies the schema.

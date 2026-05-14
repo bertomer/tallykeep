@@ -406,7 +406,7 @@
           geographic_distribution: false,
           inheritance_configured: false,
         },
-        seed_origin: mode === 'generate' ? 'tallykeep_managed' : 'external_watch_only',
+        purse_mode: mode === 'generate' ? 'on_device_tk_generated' : 'watch_only',
         descriptors: [{
           name: 'main',
           expression: derivedExpression,

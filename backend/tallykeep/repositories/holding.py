@@ -18,7 +18,7 @@ from tallykeep.domain.enums import (
     CustodyModel,
     HoldingType,
     Purpose,
-    PurseSeedOrigin,
+    PurseMode,
     SigningModel,
 )
 from tallykeep.domain.holding import Holding, SecurityClaim
@@ -49,9 +49,9 @@ def _row_to_domain(
         updated_at=row.updated_at,
         custodial_provider_id=custodial_provider_id,
         descriptor_ids=list(descriptor_ids),
-        seed_origin=(
-            PurseSeedOrigin(subtype["seed_origin"])
-            if subtype.get("seed_origin") else None
+        purse_mode=(
+            PurseMode(subtype["purse_mode"])
+            if subtype.get("purse_mode") else None
         ),
         signing_device_label=subtype.get("signing_device_label"),
         required_signers=subtype.get("required_signers"),

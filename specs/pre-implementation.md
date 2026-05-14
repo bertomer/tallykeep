@@ -34,6 +34,108 @@ decision slot.
 
 ## Open
 
+### `vault-pre-multisig-shape`
+
+**Status:** open (resolved in the brainstorm session that
+sharpens the Vault wizard iteration).
+
+**Item:** A Vault is multisig by definition (per
+`holdings/04_vault.md`: "A single-key Holding is not a Vault —
+that's a Strongbox"). Target-state implementation supports
+multisig descriptors. **What does the product do *before*
+multisig descriptor support ships?**
+
+Two shapes, both consistent with the target definition:
+
+- **Block.** Add-Vault is disabled with: *"Vault Holdings
+  require multisig descriptor support, which ships in a later
+  iteration. To track Bitcoin held with a hardware wallet
+  today, use Strongbox. Your Strongbox can be promoted to a
+  Vault when multisig support arrives."* Cleanest match to the
+  definition. No half-state. Cost: a user who wants the Vault
+  semantic identity (long-term storage, ceremonial spending
+  guardrail) can't have it yet.
+- **Accept single-key as a temporary placeholder.** Add-Vault
+  accepts a single-key descriptor; the
+  `claimed_multisig_but_single_key` discrepancy fires at high
+  severity, the user dismisses with "yes, multisig setup in
+  progress". Lets users carve out the Vault slot now, get the
+  long-term-purpose framing + outgoing-payment guardrail, and
+  migrate the descriptor when multisig ships. Cost: a Vault
+  Holding that's structurally indistinguishable from a Strongbox
+  for some time, papered over by a discrepancy warning.
+
+**Tensions worth surfacing in the session:**
+
+- The declared-vs-observable principle accommodates option B
+  cleanly (the discrepancy is *exactly* what that system is
+  for). Option A says "the type system shouldn't tolerate
+  obviously-wrong configurations even with a discrepancy".
+- The Vault outgoing-payment guardrail (warn before sending
+  from `purpose=long_term` Vault) only triggers on Vault-typed
+  Holdings. Option A delays that guardrail availability.
+  Option B lets the user have it now, even on a single-key
+  setup.
+- Multisig setup is genuinely a process — collecting xpubs from
+  multiple hardware wallets, coordinating across signers,
+  testing the spend ceremony. Option B accepts that a user
+  partway through that process has a temporarily-single-key
+  Vault. Option A says: don't create the Holding until the
+  process is complete.
+
+**Leading direction:** None — Rémy explicitly left this open
+2026-05-14 ("I don't know what to do"). Resolve before the
+Vault-wizard iteration sharpens.
+
+**Decision:** ___ (pending session)
+**Decided on:** ___
+
+---
+
+### `sweep-validator-extended-rules`
+
+**Status:** open (deferred to brainstorm after the four Holding
+types are working end-to-end in code)
+
+**Item:** What additional warnings — beyond `no_maximum_cap_set`
+and `unverified_whitelist_on_provider` — should the SweepPolicy
+safety validator surface? Earlier drafts had
+`destination_is_custodial`, `destination_keys_on_host`, and
+`same_security_tier` rated `high` / `medium`; those have been
+pulled because they opinionate about user intent in ways that
+don't survive contact with real use cases (decumulation toward
+custodian is legitimate; on-device-keys Purses aren't inherently
+riskier destinations; same-tier sweeps can be legitimate rotation
+flows).
+
+**Why deferred:** real validator design needs the four-Holding
+infrastructure working first. Without seeing the actual sweep
+flows for each (Account → Strongbox, Purse-on-device → Strongbox,
+Strongbox → anywhere, Vault → anywhere), the warning categories
+will be either over-specified or wrong.
+
+**Direction to keep in mind for the brainstorm:**
+
+- The locked discipline is **warn don't block** — the validator
+  makes sure the user knows what they're doing; it does not
+  second-guess.
+- Two patterns Rémy named worth designing against: *saving while
+  working* (income → Account → auto-sweep → Strongbox; Strongbox
+  → Purse top-up) and *spending while retiring* (Strongbox →
+  Account → manual sell). The validator shouldn't treat one as
+  more legitimate than the other.
+- A potential third pattern: *static address reuse for recurring
+  payments* (rent recipient, family, etc.) — a banking-IBAN
+  analogue. Touches `future_iterations.md` "Receive in static /
+  merchant mode" and "Contact book / saved counterparties".
+  Worth thinking about whether sweep-policy destinations should
+  be addresses-not-Holdings for those flows.
+
+**Decision:** ___ (pending session after four-Holding scaffold)
+**Decided on:** ___
+
+---
+
 ### `purse-upgrade-path`
 
 **Status:** open (sharpened 2026-05-13 during the Purse-wizard
@@ -41,17 +143,17 @@ design pass; resolution feeds the next Purse-detail iteration
 and informs the Capacitor-wrap iteration)
 
 **Item:** When a Purse is added watch-only
-(`seed_origin=EXTERNAL_WATCH_ONLY`, the user pasted a descriptor
+(`purse_mode=WATCH_ONLY`, the user pasted a descriptor
 from another wallet), can the user later add the seed phrase /
 master xprv from that same source wallet to TallyKeep to make
 this existing Purse spendable from TallyKeep? Or is "spending
 from TallyKeep" only available by creating a fresh, separate
-`TALLYKEEP_MANAGED` Purse and migrating funds?
+`ON_DEVICE_TK_GENERATED` Purse and migrating funds?
 
-This is the seed-origin mode the domain doesn't currently name:
-**`EXTERNAL_IMPORTED`** — TallyKeep holds the spending key
+The domain already reserves the third mode for this:
+**`ON_DEVICE_USER_IMPORTED`** — TallyKeep holds the spending key
 (stored in Capacitor secure storage on a specific device, same
-mechanic as `TALLYKEEP_MANAGED`) but **TallyKeep is not the
+mechanic as `ON_DEVICE_TK_GENERATED`) but **TallyKeep is not the
 original creator of the seed**. The user already has a backup
 elsewhere (from the source wallet); the disclosure copy and
 the security-health surface differ accordingly.
@@ -92,9 +194,9 @@ own micro-iteration with:
 
 **Open part — full session needed:**
 
-- Domain model: is `seed_origin` a mutable field (a watch-only
-  Purse becomes `EXTERNAL_IMPORTED` on upgrade)? Or do we
-  preserve the original origin and add a separate
+- Domain model: is `purse_mode` a mutable field (a watch-only
+  Purse becomes `ON_DEVICE_USER_IMPORTED` on upgrade)? Or do we
+  preserve the original mode and add a separate
   `spending_capability` flag on the Holding? ADR-0006
   preceded this discussion; revisit.
 - Disclosure copy lockstep with `seed-backup-disclosure`
@@ -108,9 +210,6 @@ own micro-iteration with:
   former — the localStorage stub is acceptable for
   Rémy-only personal-shipping but not the right shape for a
   user-facing affordance.
-- Naming for the third `seed_origin` enum value — `EXTERNAL_
-  IMPORTED` is the working name; alternatives: `USER_IMPORTED`,
-  `EXTERNAL_SPENDABLE`.
 
 **Why this is preferable to baking the upgrade into the Add
 wizard:** the wizard's job is registering a new Purse. The

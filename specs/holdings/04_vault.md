@@ -1,10 +1,11 @@
 # Vault — long-term, ceremonial Holdings
 
-A **Vault** is a wallet under additional structural protection
-beyond a single hardware-wallet key: multisig (`m-of-n`),
-timelocks (`older()` / `after()`), geographic key separation,
-inheritance setup. Accessing the funds requires a ceremony —
-multiple signers, possibly across locations.
+A **Vault** is a wallet **with multisig** (`m-of-n`), optionally
+combined with timelocks (`older()` / `after()`), geographic key
+separation, or inheritance setup. By definition: a Vault has
+multiple keys, held by multiple parties or devices, requiring
+ceremony to spend. *A single-key Holding is not a Vault — that's
+a Strongbox.*
 
 **Key custody zone (ADR-0009):** hardware wallets + multisig
 co-signers. The keys never live on any TallyKeep surface;
@@ -12,26 +13,35 @@ TallyKeep choreographs PSBTs across multiple signers.
 
 ## Pre-shipping status
 
-**Multisig is mostly deferred.** The current build:
+**Multisig descriptor support is the load-bearing missing
+piece.** When it ships (per `future_iterations.md` "Multisig
+descriptor support"), the Add-Vault flow accepts
+`sh(multi(...))`, `wsh(multi(...))`, `tr(multi_a(...))`
+descriptors; the analyzer infers the `(required, total)`
+parameters from the descriptor and cross-checks against the
+user's declared values.
 
-- Accepts Vault Holdings with multisig metadata fields populated
-  (declared `custody_model=self_multisig`, declared
-  `required_signers` and `total_signers`).
-- Accepts only **single-key descriptors** at the descriptor
-  layer. Even when the user declares a multisig Vault, the
-  underlying BDK descriptor today is single-key.
-- Surfaces the discrepancy honestly via the declared-vs-
-  observable analyzer (`concerns/observation.md`). The
-  `claimed_multisig_but_single_key` discrepancy fires at high
-  severity. The user can dismiss with "yes, I know — the
-  multisig setup is in progress" if intentional.
+**Open arbitration — what does Add-Vault do *before* multisig
+ships?** Two reasonable shapes, both consistent with the
+target-state definition above:
 
-Full multisig descriptor support is captured in
-`future_iterations.md` "Multisig descriptor support". When that
-iteration ships, Vault Holdings will accept `sh(multi(...))`,
-`wsh(multi(...))`, `tr(multi_a(...))` descriptors, the analyzer
-will infer the multisig parameters from the descriptor, and the
-discrepancy goes away.
+- *Block.* Add-Vault is disabled with a clear explanation:
+  "Vault Holdings require multisig descriptor support, which
+  ships in a later iteration." Cleanest match to "a Vault is
+  multisig by definition", no half-state on the books.
+- *Accept single-key as a temporary placeholder, surface the
+  gap.* Add-Vault accepts a single-key descriptor, but the
+  analyzer fires `claimed_multisig_but_single_key` at high
+  severity ("yes I know — multisig setup is in progress").
+  Lets users carve out a Vault slot now and migrate to multisig
+  when it ships. Acknowledges the gap honestly per the
+  declared-vs-observable principle.
+
+Captured as `vault-pre-multisig-shape` in
+`pre-implementation.md`. Resolved in the brainstorm session that
+sharpens the Vault wizard iteration. **Whichever shape is
+chosen, "Vault has a single key forever" is not a thing** —
+the type's definition is multisig.
 
 ## What a Vault does (target state)
 
@@ -61,20 +71,32 @@ The Vault type's domain model carries:
 - `recovery_setup_notes` — user-facing free-text notes about the
   recovery / inheritance configuration.
 
-## Add-Holding flow
+## Add-Holding flow (target — when multisig descriptor support ships)
 
-1. **Descriptor + multisig metadata.** User provides:
-   - A descriptor (single-key today; multisig descriptors when
-     that iteration ships).
-   - `required_signers` and `total_signers` (declared values).
-   - `timelock_blocks` if applicable.
-   - `recovery_setup_notes` free text.
-2. **Validation.** BDK parses the descriptor. The declared
-   multisig parameters are stored but not enforced against the
-   descriptor today.
-3. **Initial scan.** Backend runs the initial scan and surfaces
+1. **Multisig descriptor input.** User provides a multisig
+   descriptor (`sh(multi(...))` / `wsh(multi(...))` /
+   `tr(multi_a(...))`). Single-key descriptors are rejected with
+   redirect to the Strongbox wizard.
+2. **Validation.** BDK parses the descriptor. The
+   `(required, total)` parameters are extracted directly from
+   the descriptor — not declared separately. Optional metadata:
+   `timelock_blocks` (declared if known; cross-checked against
+   any Miniscript fragment in the descriptor),
+   `recovery_setup_notes` (free text).
+3. **Cosigner annotation** — for each xpub in the descriptor,
+   the user can optionally label which device / co-signer it
+   belongs to ("Coldcard in safe", "Cousin Marie's Trezor",
+   "Geographic backup — bank deposit box").
+4. **Initial scan.** Backend runs the initial scan and surfaces
    balance + history. Declared-vs-observable analysis runs
-   immediately; the user sees any discrepancy.
+   immediately.
+
+## Add-Holding flow (current — before multisig support ships)
+
+**Behavior pending arbitration** — see `pre-implementation.md`
+`vault-pre-multisig-shape`. Two shapes under consideration
+(block vs accept-with-discrepancy); whichever lands, "Vault
+with permanent single key" is not the target state.
 
 ## Outgoing-payment guardrail (locked)
 
@@ -118,9 +140,11 @@ When multisig descriptor support ships, the send flow becomes:
 6. **Repeat** until `m` signatures are collected.
 7. **Finalize and broadcast** — once `m`-of-`n` is reached.
 
-The pre-shipping build treats Vault sends the same as Strongbox
-sends (single-key PSBT roundtrip), with the
-declared-vs-observable analyzer making the discrepancy visible.
+Pre-multisig Send-flow behavior depends on
+`vault-pre-multisig-shape` arbitration. If block: no Vault
+Send runs. If accept-with-discrepancy: Vault Send mirrors
+Strongbox Send (single-key PSBT roundtrip) with the analyzer's
+high-severity discrepancy surfaced.
 
 ## Receive flow
 
@@ -151,14 +175,12 @@ descriptor support.
 
 - **Vault outgoing-payment guardrail** (above) — fires for any
   `purpose=long_term` Vault outflow.
-- **`claimed_vault_no_timelock_no_multisig` discrepancy** — when
-  the user declares a Vault but the descriptor shows neither
-  timelock nor multisig, the analyzer surfaces this honestly
-  (medium severity).
-- **`claimed_multisig_but_single_key` discrepancy** — high
-  severity. Fires during the pre-shipping period for every
-  declared-multisig Vault, because descriptors are single-key
-  today. Dismissible with "yes, multisig setup is in progress."
+- **`claimed_vault_no_timelock` discrepancy** — when the user
+  declares timelock-protection but the descriptor has no
+  Miniscript `older()` / `after()` fragment, the analyzer
+  surfaces this honestly (medium severity). Multisig
+  parameters cannot diverge in the same way — they're parsed
+  directly from the descriptor, not declared separately.
 
 ## Deferred
 

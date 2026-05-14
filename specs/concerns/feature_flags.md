@@ -30,16 +30,6 @@ This shape was chosen over named presets because:
 Flag names use dotted namespaces: `domain.feature.setting`. All
 flags are positive (`enable_X` or `X.enabled`); no negations.
 
-### Holding type visibility
-
-| Flag key | Description |
-|---|---|
-| `holding.account.enabled` | Allow creating Account Holdings |
-| `holding.purse.enabled` | Allow creating Purse Holdings |
-| `holding.strongbox.enabled` | Allow creating Strongbox Holdings |
-| `holding.vault.enabled` | Allow creating Vault Holdings |
-| `holding.multiple_per_type` | Allow multiple Holdings of the same type |
-
 ### UTXO and detail view
 
 | Flag key | Description |
@@ -132,12 +122,6 @@ shows everything a new user reasonably needs.
 
 ```python
 DEFAULT_FLAG_VALUES: dict[str, bool] = {
-    # Holdings
-    "holding.account.enabled":                  True,
-    "holding.purse.enabled":                    True,
-    "holding.strongbox.enabled":                True,
-    "holding.vault.enabled":                    True,
-    "holding.multiple_per_type":                True,
     # UTXO
     "utxo.detail_view.enabled":                 False,
     "utxo.coin_control.enabled":                False,

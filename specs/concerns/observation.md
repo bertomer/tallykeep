@@ -157,10 +157,33 @@ single transaction). Severity: medium.
 
 ### `ROUND_NUMBER`
 
-Output value matches a round-number heuristic: multiples of
-100,000 sats or 1,000,000 sats, or values matching common fiat
-denominations at the transaction's block-time price. Severity:
-low (informational).
+Why this matters: a round-number output reveals the user's
+intent in a way most amounts don't. A transaction with output
+`100,000 sats` (or `1,000,000 sats`, or any clean multiple) is
+visibly different from `94,318 sats` to a chain-analysis tool.
+Similarly, `0.001 BTC` worth exactly `€50.00` at the block's
+timestamp price is observable as a fiat-denominated payment. The
+flag tells the user: "this output advertises that it's
+denominated in something else — round sats or a fiat amount —
+which leaks info about the source of funds (likely an exchange
+buy or a fiat-priced purchase) and helps cluster-analysis tools
+group your outputs."
+
+Trigger conditions (any of):
+
+- Output value is a multiple of 100,000 sats or 1,000,000 sats
+  (BTC-denominated "round number").
+- Output value matches a common fiat denomination at the
+  transaction's block-time exchange rate, within a small
+  tolerance (e.g. resolves to within ±0.5% of $10, $20, $50,
+  $100, €10, €20, €50, €100, etc.). The fiat-denomination
+  check is gated by the same rate-source plumbing as
+  `display.fiat_conversion.enabled`.
+
+Severity: low (informational). Not actionable per-payment; the
+user can opt to use non-round amounts for privacy-sensitive
+sends, but the flag is a flag, not a recommendation to redo the
+transaction.
 
 ### `SUSPECTED_CONSOLIDATION`
 
@@ -228,11 +251,16 @@ A `Discrepancy` compares `declared_security` and
 
 | Discrepancy kind | Severity | Trigger |
 |---|---|---|
-| `claimed_multisig_but_single_key` | High | Holding declared as multisig, descriptor is single-key |
-| `claimed_single_but_observable_multisig` | Informational | Declared single-sig, descriptor is multisig (user understated) |
 | `claimed_offline_but_pattern_suggests_hot` | Medium | Declared `hardware_offline`, heuristic suggests software-hot |
-| `claimed_vault_no_timelock_no_multisig` | Medium | Declared as Vault but neither timelock nor multisig present |
+| `claimed_vault_no_timelock` | Medium | Declared timelock-protection on a Vault, but the descriptor has no Miniscript `older()` / `after()` fragment |
 | `claimed_inheritance_no_recovery_path` | Low | Declared `inheritance_configured`, no observable recovery setup |
+
+The discrepancies that **don't fire post-onboarding** because the wizards prevent the mismatch at descriptor-paste time:
+
+- `claimed_single_but_observable_multisig` — user declared Purse but pasted a multisig descriptor. Purse wizard redirects to Vault creation.
+- `claimed_multisig_but_single_key` — user declared Vault but pasted a single-key descriptor. Vault wizard rejects and redirects to Strongbox (per `holdings/04_vault.md`, target — once the Vault wizard ships with multisig support).
+
+Both are kept as defensive enums in code for safety against database corruption or migration bugs, but should never fire on a normally-created Holding.
 
 Surfaced via the analysis endpoint and fired as domain events
 when newly detected. UI surfaces in real time.

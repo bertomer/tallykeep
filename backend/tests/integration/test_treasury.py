@@ -34,7 +34,7 @@ def _create_purse(client, expression: str, name: str = "Purse") -> str:
         json={
             "name": name,
             "purpose": "reserve",
-            "seed_origin": "external_watch_only",
+            "purse_mode": "watch_only",
             "declared_security": _SEC,
             "display_color": "#000000",
             "display_order": 0,

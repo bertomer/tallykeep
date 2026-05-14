@@ -21,8 +21,8 @@ SVG for human readers; these files are for machine consumers.
 | File | Source lock doc | When to use |
 |---|---|---|
 | `holding-account.svg`           | `tallykeep_palette_v2_lock.html` §4 | Account type — classical pediment institution. Filled limestone. |
-| `holding-purse-watch-only.svg`  | `tallykeep_palette_v2_lock.html` §4 | Purse with `seed_origin=external_watch_only`. Brass cord variant. Also the default/canonical "Purse" icon for the type chooser. |
-| `holding-purse-managed.svg`     | `tallykeep_palette_v2_lock.html` §4 | Purse with `seed_origin=tallykeep_managed`. Dark cord variant. |
+| `holding-purse-watch-only.svg`  | `tallykeep_palette_v2_lock.html` §4 | Purse with `purse_mode=watch_only`. Brass cord variant. Also the default/canonical "Purse" icon for the type chooser. |
+| `holding-purse-on-device.svg`   | `tallykeep_palette_v2_lock.html` §4 | Purse with `purse_mode=on_device_tk_generated` or `on_device_user_imported`. Dark cord variant. |
 | `holding-strongbox.svg`         | `tallykeep_palette_v2_lock.html` §4 | Strongbox — iron chest. Filled dark steel. |
 | `holding-vault.svg`             | `tallykeep_palette_v2_lock.html` §4 | Vault — brushed-steel door with brass hub, three T-handles, six inner tubes. Hinge on left. |
 

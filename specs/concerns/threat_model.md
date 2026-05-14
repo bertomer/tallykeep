@@ -166,7 +166,7 @@ An adversary publishes a malicious fork that looks identical and tricks the user
 
 A worker subscriber is down when an event fires. The bus does not retain the event.
 
-**Impact:** state divergence. Example: a sweep completes, `trading.sweep.executed` fires, but the LiveUpdateBridge is restarting and the user's UI never gets the notification. The audit-table row exists, so the data is correct, but the UI lags.
+**Impact:** state divergence. Example: a sweep completes, `treasury.sweep.executed` fires, but the LiveUpdateBridge is restarting and the user's UI never gets the notification. The audit-table row exists, so the data is correct, but the UI lags.
 
 **Mitigation:** persist-first-emit-second pattern (module 01). The audit reconciler subscriber periodically scans `event_emission_log` for unacknowledged critical events and re-emits them. State is reconstructable from audit tables even if all subscribers crashed.
 
@@ -250,23 +250,25 @@ authoritative until then.
   wallets / multisig co-signers, exactly as in the host-centered
   model above.
 - **The backend never holds a reference to a Purse seed**, encrypted
-  or otherwise. `seed_origin` records intent (TallyKeep generated
-  the seed vs. the user imported a watch-only descriptor); it does
-  not record where the seed lives. The seed location is per-client
-  runtime state, indexed locally by `holding_id`.
-- **Purse has two seed origins** (resolved per ADR-0006, slug
-  `purse-flavors`):
-  - *External-watch-only* — onboarded via xpub / descriptor. No
-    seed lives in any TallyKeep client; the seed is in another hot
-    wallet (Phoenix, BlueWallet, Mutiny, Sparrow's hot mode).
+  or otherwise. `purse_mode` records intent (on-device keys or
+  watch-only); it does not record where the seed lives. The seed
+  location is per-client runtime state, indexed locally by
+  `holding_id`.
+- **Purse has three modes** (resolved per ADR-0006, slug
+  `purse-flavors`; field renamed to `purse_mode` in the
+  Purse-mode-rename janitorial iteration):
+  - *Watch-only* (`WATCH_ONLY`) — onboarded via xpub / descriptor.
+    No seed lives in any TallyKeep client; the seed is in another
+    hot wallet (Phoenix, BlueWallet, Mutiny, Sparrow's hot mode).
     Available on browser and Capacitor. Spending always points back
     to the source wallet.
-  - *TallyKeep-managed* — TallyKeep generated the seed during
-    Add-Holding. The seed lives in *the client device that ran the
-    creation flow*, in its Keychain/Keystore. Other clients
-    accessing the same backend see the same Holding but as
-    view-only, with a "go sign on the device that holds the seed"
-    gate. The "create TallyKeep wallet" affordance is gated
+  - *TallyKeep-generated* (`ON_DEVICE_TK_GENERATED`) — TallyKeep
+    generated the seed during Add-Holding. The seed lives in *the
+    client device that ran the creation flow*, in its
+    Keychain/Keystore. Other clients accessing the same backend
+    see the same Holding but as view-only, with a "go sign on the
+    device that holds the seed" gate. The "create TallyKeep wallet"
+    affordance is gated
     client-side by the client's capability to generate and securely
     store a seed (Capacitor: yes; browser PWA: no).
 

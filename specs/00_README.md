@@ -5,8 +5,10 @@
 A self-hosted, Bitcoin-first application that integrates three personal-finance domains under one user interface and one internal API:
 
 - **Savings** — watch-only multi-Holding view over user-controlled Bitcoin, with UTXO hygiene flags, transaction categorization, and security-claim verification (declared vs observable).
-- **Banking** — on-chain Bitcoin payments and receipts via PSBT (signed on an external device, or on the Capacitor client for TallyKeep-managed Purses per ADR-0009). Lightning support is deferred to a future iteration behind a defined interface (see `concerns/lightning_placeholder.md`).
-- **Trading** — read-only balance aggregation across custodial providers (centralized exchanges and brokers), plus policy-driven auto-sweep between any two Holdings ("minimum-exposure trading").
+- **Payment** — on-chain Bitcoin send and receive via PSBT (signed on an external device, or on the Capacitor client for Purses with on-device keys per ADR-0009). Lightning support is deferred to a future iteration behind a defined interface (see `concerns/lightning_placeholder.md`).
+- **Treasury** — read + withdrawal balance aggregation across custodial providers (centralized exchanges and brokers), plus policy-driven auto-sweep between any two Holdings ("minimum-exposure"). Direct trading from custodian (order placement) is **not** in scope and is captured for much later — TallyKeep is a treasury surface, not a trading terminal.
+
+Banking is the *whole* product — these three are its functional surfaces.
 
 The app is designed for a single self-hosted user. It does not custody keys, does not hold funds, does not create user accounts, and exposes no public network surface in the dev or personal-use phase.
 
@@ -31,7 +33,7 @@ Marketing voice should foreground the first two layers — concrete utility for 
 5. **Generalized SweepPolicy.** Not just "exchange to cold." Any Holding to any Holding, with a safety validator that warns about risky configurations but never blocks. The user is the final authority; the validator just makes sure they know what they are doing before they do it.
 6. **No custody of funds. Key custody is bounded and explicit.** TallyKeep never custodies user funds and never creates user accounts on TallyKeep infrastructure. Where signing keys live is a four-zone model (per ADR-0009):
    - *Backend:* never holds spending keys, ever. Holds descriptors (public-key info), custodial-provider API credentials (encrypted at rest with the user's passphrase), configuration.
-   - *Capacitor client:* holds spending keys only for `TALLYKEEP_MANAGED` and `EXTERNAL_IMPORTED` Purses, in OS secure storage (iOS Keychain / Android Keystore), biometric-gated, never transmitted to the backend.
+   - *Capacitor client:* holds spending keys only for Purses with `purse_mode = ON_DEVICE_TK_GENERATED` or `ON_DEVICE_USER_IMPORTED`, in OS secure storage (iOS Keychain / Android Keystore), biometric-gated, never transmitted to the backend.
    - *Hardware wallet:* Strongbox and Vault keys live on the user's external signing device. TallyKeep choreographs PSBTs; never sees keys.
    - *Custodial provider:* Account keys are held by the third party (Kraken, Bitstamp, etc.). TallyKeep reads balances and triggers withdrawals via API.
    The browser PWA explicitly never holds spending keys (no OS-grade secure storage); operations requiring local keys gate honestly.
@@ -52,12 +54,13 @@ tags lives in `future_iterations.md`.
 - Watch-only Holdings (Account, Purse, Strongbox, Vault) with descriptor-based wallets
 - Node integration via local `bitcoind` JSON-RPC plus ZeroMQ subscription for live chain events
 - PSBT construction, export (file and QR), re-import, and broadcast
-- Read-only custodial provider integration (Kraken, Bitstamp) via the ccxt library
+- Custodial provider integration (Kraken, Bitstamp) via the ccxt library — read + withdrawal-to-whitelist permissions; **no order placement**, ever. Withdrawal is in dev-phase scope because SweepPolicies need it.
 - Generalized sweep policies between any two Holdings, with a safety validator that warns but does not block
 - Live blockchain scanning and user-driven transaction categorization
 - UTXO hygiene flags computed in the backend (address reuse, dust, change larger than payment, suspected consolidation) — UI surface deferred per `future_iterations.md`
 - Declared-vs-observable security analysis
-- Onboarding-question-driven feature-flag defaults (no named user identities — see `09_feature_flags.md`)
+- Onboarding-question-driven feature-flag defaults (no named user identities — see `concerns/feature_flags.md`)
+- Security-health system surfacing persistent warnings (seed-backup not yet acknowledged, declared-vs-observable discrepancies, hosted-tier privacy boundary, principles acknowledgement). Full specification pending arbitration `seed-backup-disclosure` in `pre-implementation.md`; minimum-viable surface in dev-phase scope so warnings accumulate before the private-ship event needs them.
 - Internal REST API (localhost-bound) plus Server-Sent Events stream for live updates
 - SvelteKit Progressive Web App frontend, mobile-first, fine-tuned in browser at mobile viewport against the real backend (per ADR-0003 dev phase)
 - Deployment via Docker Compose
@@ -158,4 +161,10 @@ active iteration's scope lives in `next_iteration.md`.
 Because vocabulary matters in this spec, the four user-facing Holding types and their meanings are introduced here and used consistently throughout:
 
 - **Account** — a balance held by a custodial provider on the user's behalf. The provider holds the keys. Examples: a Kraken balance, a Bitstamp balance, a Swissquote crypto position. An Account is *what someone owes you*, not what you own.
-- **Purse** — a wallet whose private keys are on a connected
+- **Purse** — a wallet for everyday spending. The implementation axis that matters is **whether the Purse has on-device keys**: either it's **descriptor-only** (the seed lives in another hot wallet — Phoenix, BlueWallet, Mutiny, Sparrow hot mode; TallyKeep observes only), or it's **on-device-keys** (the seed lives in the Capacitor client's OS Keychain/Keystore, biometric-gated, never on the backend). The seed *source* (TallyKeep generated it, or the user imported it from another wallet) is a secondary classification carried for disclosure copy and security-health framing — not a structural axis. See ADR-0006 and the pending `purse-upgrade-path` arbitration for the seed-origin enumeration.
+- **Strongbox** — a wallet whose private keys are on an offline or hardware signing device (Coldcard, Trezor, Ledger, Jade, an airgapped laptop). The user holds the keys; signing requires deliberate action with the external device. TallyKeep choreographs the PSBT round-trip but never sees the key.
+- **Vault** — a wallet under additional structural protection: multisig, timelocks, geographic key separation, inheritance setup. The user holds the keys but accessing the funds requires a ceremony involving multiple steps or co-signers. Multisig descriptor support is deferred; current build accepts single-key descriptors with the analyzer surfacing the gap honestly.
+
+The technical primitive that backs Purse, Strongbox, and Vault is called a **Descriptor** (from BIP 380). A Holding may reference one or more Descriptors (typically one descriptor encodes both the receive and change branches of a wallet; multisig Vaults may reference multiple). Account has no Descriptor — it has a CustodialProvider connection instead.
+
+A movement of value, whether on-chain, on Lightning (when that iteration ships), or a custodial-provider event, is recorded as a **LedgerEntry**. The on-chain transaction itself, when applicable, is the **OnChainTransaction** that the LedgerEntry references.

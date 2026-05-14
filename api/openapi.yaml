@@ -3636,9 +3636,9 @@ components:
             format: uuid
           - type: 'null'
           title: Custodial Provider Id
-        seed_origin:
+        purse_mode:
           anyOf:
-          - $ref: '#/components/schemas/PurseSeedOrigin'
+          - $ref: '#/components/schemas/PurseMode'
           - type: 'null'
         signing_device_label:
           anyOf:
@@ -4351,8 +4351,8 @@ components:
           minimum: 0.0
           title: Display Order
           default: 0
-        seed_origin:
-          $ref: '#/components/schemas/PurseSeedOrigin'
+        purse_mode:
+          $ref: '#/components/schemas/PurseMode'
         descriptors:
           items:
             $ref: '#/components/schemas/DescriptorInput'
@@ -4365,15 +4365,16 @@ components:
       - name
       - purpose
       - declared_security
-      - seed_origin
+      - purse_mode
       - descriptors
       title: PurseCreate
-    PurseSeedOrigin:
+    PurseMode:
       type: string
       enum:
-      - external_watch_only
-      - tallykeep_managed
-      title: PurseSeedOrigin
+      - watch_only
+      - on_device_tk_generated
+      - on_device_user_imported
+      title: PurseMode
     RecomputeBody:
       properties:
         holding_id:
@@ -5180,3 +5181,4 @@ components:
       - address
       - is_whitelisted
       title: WhitelistVerificationOut
+

@@ -188,6 +188,171 @@ record.
   Rémy first (spec-agent work), then iteration to fix the bugs and
   ship the missing surfaces. Probably 2 iterations end-to-end.
 
+### External bitcoind connection (self-hosters)
+
+- **Captured:** 2026-05 (Rémy, module 03 review).
+- **Motivation:** Self-hosters who already run a Bitcoin Core
+  node shouldn't be forced to run a second `bitcoind` in the
+  TallyKeep Docker stack. Today's stack ships its own `bitcoind`
+  service; users with an existing node end up with two running.
+  This costs disk (pruned or not), bandwidth (two IBDs if
+  someone's not careful), and operational complexity.
+- **Sketch:** A configuration option in `configuration.toml`
+  that points TallyKeep at an external `bitcoind` — RPC host /
+  port / cookie / user-password, plus ZMQ endpoints — instead of
+  spinning up the Docker-internal one. The Docker Compose file
+  needs a profile or override that excludes the internal
+  bitcoind service. Onboarding-time check verifies the external
+  node has the required RPC methods + ZMQ topics enabled
+  (`zmqpubrawblock`, `zmqpubrawtx`, `zmqpubhashblock` — already
+  documented in `concerns/observation.md`); if missing, surfaces
+  the exact `bitcoin.conf` lines to add and refuses to start
+  until they're present.
+- **Touches:** `01_architecture.md` service topology (becomes
+  optional), `configuration.toml` schema, install guide,
+  `concerns/observation.md` "Configuration requirement" section.
+- **Status:** sketched
+- **Milestone:** pre-shipping (private-ship enabler for
+  self-hosters who already run bitcoind; can land anytime once
+  Rémy hits the case in his own setup or another self-hoster
+  asks for it).
+- **Notes:** Hosted-tier users don't touch this — the hosted
+  backend manages bitcoind centrally.
+
+### Self-host upgrade mechanism
+
+- **Captured:** 2026-05 (Rémy, module 03 review).
+- **Motivation:** When TallyKeep ships a new version, self-hosted
+  users need a way to upgrade their stack cleanly — pull new
+  Docker images, run Alembic migrations, restart, verify, roll
+  back if needed. Today there's no documented upgrade path; an
+  agent landing on this question has to invent one.
+- **Sketch:**
+  - Versioned Docker images (semver, tagged per release).
+  - Release notes (changelog) per version, including any manual
+    pre-upgrade or post-upgrade steps (e.g. "this version drops
+    `feature_flags.holding.*` keys — run the bundled
+    migration").
+  - A simple upgrade script (`./tk upgrade` or similar) that
+    pulls images, runs migrations inside the backend container
+    (`alembic upgrade head`), bumps the stack, and runs a
+    health-check.
+  - Rollback path: pinning to the previous image tag if the
+    health-check fails. Database backups before migration are
+    user responsibility (documented in install guide).
+  - Notification surface: TallyKeep periodically checks GitHub
+    releases (or a configurable update channel) and shows the
+    user "v0.X.Y available — release notes / changelog link" on
+    the home page. Opt-out for users who don't want
+    network-checks (config flag).
+- **Touches:** release pipeline, install guide, configuration
+  model, UI (update notification surface), backend (`/health`
+  + version reporting endpoint).
+- **Status:** sketched
+- **Milestone:** **pre-shipping** for the public-ship event
+  alongside signed releases and reproducible builds (per the
+  ship-gate meta-iteration).
+- **Notes:** App-store builds (Capacitor) have store-managed
+  updates; this entry is the self-hosted backend equivalent.
+  Hosted-tier users update transparently as the operator pushes
+  releases — separate mechanism.
+
+### Onboarding-driven feature-flag picker
+
+- **Captured:** 2026-05 (Rémy, module 03/04 review — flagged
+  that the onboarding iteration shipped without the
+  feature-flag selection step that the spec assumes seeds
+  initial flag values).
+- **Motivation:** `concerns/feature_flags.md` describes a small
+  set of onboarding questions that seed initial flag values (2–3
+  questions, mapping answers to a flag bundle). The onboarding
+  iteration (`mobile_onboarding_*`) shipped without those
+  questions — the user lands on Home with `DEFAULT_FLAG_VALUES`
+  applied, and tunes individual flags from Settings later. The
+  spec's "Onboarding UI contract" section is therefore not yet
+  implemented.
+- **Sketch:** A 2–3 screen onboarding sub-flow inserted between
+  the existing paired / biometric / passphrase screens and the
+  Home page. Question shape (per `concerns/feature_flags.md`
+  "Onboarding-driven defaults"):
+  - *Bitcoin holding posture* — exchange, phone wallet, hardware
+    wallet, multiple, none yet.
+  - *Detail-density preference* — technical details visible by
+    default, or surfaced on demand.
+  - *Custodial connection* — will the user connect an exchange
+    / broker account, or use TallyKeep purely for self-custody.
+  - The mapping from answers to flag bundles is implementation
+    detail (not domain — refining later doesn't require an ADR).
+- **Touches:** `UI/mobile.md` onboarding section, new mockups in
+  `UI/mockups/` (`mobile_onboarding_03_questions_*.html`),
+  `concerns/feature_flags.md` onboarding-UI-contract section
+  becomes implemented rather than aspirational, frontend
+  onboarding state machine.
+- **Status:** sketched
+- **Milestone:** pre-shipping (private-ship). The fact that
+  it shipped without these questions is a spec-vs-code gap
+  worth closing before the private-ship event.
+- **Notes:** Skip-onboarding fallback (per existing spec) means
+  this can ship without breaking the current code path —
+  questions are additive; if the user skips them, `DEFAULT_FLAG_VALUES`
+  apply as today.
+
+### Strongbox geolocation correlation (idea, low priority)
+
+- **Captured:** 2026-05 (Rémy, holdings review — "just an idea
+  to brainstorm completely, probably to discard").
+- **Motivation:** Strongbox spending requires the user to be
+  physically near the hardware wallet to sign. The app could, in
+  principle, verify the user's device is near the location
+  associated with the Strongbox at signing time and warn if not
+  ("you're spending from your Coldcard, but your phone is 500km
+  from the address you tagged as its location — is this
+  intentional?"). Could catch a remote-control attack scenario.
+- **Sketch:**
+  - Optional per-Strongbox `expected_location` (lat/lon +
+    radius) set by the user during Add-Holding.
+  - At PSBT-export time, the Capacitor app reads device location
+    (with permission) and compares against the expected
+    location.
+  - Mismatch → soft warning, "warn don't block" discipline.
+- **Touches:** domain (new optional field on Strongbox),
+  Capacitor location plugin, send-flow UI.
+- **Status:** idea (likely discard)
+- **Milestone:** TBD — low priority. Rémy's own framing: "probably
+  to discard". Kept here as a breadcrumb so it doesn't resurface
+  cold later.
+- **Notes:** Privacy implications worth a dedicated session if
+  pursued — location data on a Holding row is sensitive. Could
+  also be implemented client-only (location never leaves the
+  device, comparison happens locally). The "remote-control
+  attack" mitigation is the only real value; if that attack
+  vector isn't on the threat model's top list, this feature is
+  noise. Probably stays as a captured idea unless the threat
+  model evolves.
+
+### Lightning — bitcoind sharing with self-hoster
+
+- **Captured:** 2026-05 (Rémy, observation review — flagged
+  that Lightning iteration should consider the same
+  bring-your-own-bitcoind shape).
+- **Motivation:** The Lightning provider options (CoreLightning,
+  LND, Phoenix per `concerns/lightning_placeholder.md`) all
+  depend on a Bitcoin node. Self-hosters running TallyKeep with
+  an external bitcoind should be able to point their Lightning
+  daemon at the same node — otherwise we end up recommending
+  two parallel Bitcoin nodes for a single user.
+- **Sketch:** When the Lightning iteration designs the
+  CLN/LND provider configuration, the option to share the
+  external bitcoind (per "External bitcoind connection" above)
+  is a first-class choice. Phoenix is custodial-mode for the
+  LSP-managed channel layer, so it doesn't need a node — that
+  case is unchanged.
+- **Touches:** Lightning iteration design (when it lands), install
+  guide.
+- **Status:** captured for the Lightning-iteration design
+  session (this entry is just a flag, not a separate iteration).
+- **Milestone:** TBD — moves with the Lightning iteration.
+
 ### Hosted tier infrastructure
 
 - **Captured:** 2026-05 (from `design_decisions.md` §11, pre-merge);
@@ -1046,269 +1211,4 @@ record.
   `banking.coin_selection_per_payment_override` feature flag. That
   default was set early in the spec and hasn't been revisited with
   current understanding of fee dynamics, privacy practice, and
-  target-market behaviour. Worth a dedicated session before
-  public-ship to confirm or change.
-- **Sketch:** Walk through the trade-offs across the standard
-  algorithms (BranchAndBound, Single Random Draw, Knapsack, Largest
-  First) with current data — fee landscape, privacy implications,
-  expected wallet sizes for target users. Decide the default plus
-  per-profile overrides. If the default changes, document with an
-  ADR and update `concerns/outflow.md`.
-- **Touches:** banking layer (coin selection), profiles + flags,
-  threat model (privacy implications), tx composition tests
-- **Status:** sketched
-- **Milestone:** **pre-shipping** — between the private-ship event
-  and the public-ship event, during the personal-use phase. Rémy's
-  explicit ask: dedicated session in that window.
-- **Notes:** Per-payment override is gated behind the
-  `banking.coin_selection_per_payment_override` flag — power-user
-  territory. The question is whether the *default algorithm* is
-  right. Privacy-preferring defaults age well; fee-minimizing
-  defaults age noisily.
-
-### Possible Purse / Strongbox collapse
-
-- **Captured:** 2026-05 (from module 13 Q8, pre-retirement)
-- **Motivation:** The four-Holding-type model bets that the Purse vs
-  Strongbox distinction matters to a real user. The fiat-banking
-  parallel — where "checking" and "card balance" collapsed into one
-  account view long ago — suggests the bet might be wrong. If during
-  the personal-use phase Rémy finds himself choosing one over the
-  other arbitrarily, collapsing to a single "user-keys Holding" type
-  with a `signing_method` attribute (light vs ceremonial) reduces
-  the model to three types and may match how users actually think.
-- **Sketch:** Track during personal-use phase. If the distinction
-  feels artificial, draft a domain-model migration: collapse Purse
-  and Strongbox into a single Holding type with a `signing_method`
-  enum. Vocabulary lock means the rename is non-trivial — this would
-  need an ADR.
-- **Touches:** `02_domain_model.md`, `UI/README.md` Holding
-  vocabulary table, every iteration that referenced Purse / Strongbox
-  separately
-- **Status:** observation-mode (not active work)
-- **Milestone:** TBD — only acted on if the personal-use phase
-  signals duplication. Likely never; flagged anyway because the
-  vocabulary lock is foundational and worth re-examining once.
-- **Notes:** Touches the locked "Holdings are first-class and typed"
-  principle. Reducing four to three types is itself a re-litigation
-  of vocabulary; deserves an ADR if pursued.
-
-### Tor integration
-
-- **Captured:** 2026-05 (from module 13 Q15, pre-retirement)
-- **Motivation:** Privacy posture. Self-hosted users running their
-  own bitcoind already have the option of Tor-routed RPC; TallyKeep
-  itself doesn't currently route its outbound traffic (provider APIs,
-  rate feeds) through Tor.
-- **Sketch:** Optional, off by default. When enabled, all outbound
-  HTTPS requests (CustodialProvider APIs, optional rate feeds) route
-  through a configured Tor SOCKS proxy. Recommended in the hardening
-  guide; surfaced as a settings toggle.
-- **Touches:** networking layer, settings, hardening guide
-- **Status:** idea
-- **Milestone:** post-shipping
-- **Notes:** Some provider APIs block Tor exit nodes; UX needs to
-  fail gracefully and tell the user which provider blocked them.
-
-### Investment layer with structured yield (the "v5" sketch)
-
-- **Captured:** 2026-05 (from module 12 v5, pre-retirement)
-- **Motivation:** A constrained, contract-defined alternative to
-  the lending / yield zone the spec rejects by default. Multisig
-  vaults with discreet log contracts (DLCs) or LSP-mediated
-  structures, where the user always retains at least one key and a
-  clear unilateral exit path. Distinct from the simpler "Retirement
-  plan with timelock" entry — this is yield-bearing under a contract,
-  not just a CSV/CLTV lock.
-- **Sketch:** A sibling product to TallyKeep's banking app, sharing
-  deployment shell and possibly auth (post-public-ship). Own
-  database, own threat model, own regulatory analysis. Not a
-  generalization of the current banking-app domain.
-- **Touches:** new product surface, regulatory analysis,
-  legal counsel
-- **Status:** idea
-- **Milestone:** post-shipping (likely far post)
-- **Notes:** Requires legal review before scoping. The question is
-  whether enabling these structures from within the app makes us a
-  broker / arranger / custodian by some jurisdiction's reading. The
-  default reflexive answer is "no"; this entry forces that question
-  to be re-asked carefully if pursued. Rejected adjacent: lending,
-  borrowing, yield without contract-bound user-key retention.
-
-### Multi-server per single client
-
-- **Captured:** 2026-05 (during onboarding-screen-2 session, when
-  Rémy considered whether the server identifier needed to be
-  prominent on the paired-confirmation screen)
-- **Motivation:** Power-user case for the sovereignty audience.
-  Examples: home stack + parents' Umbrel for inheritance management,
-  home stack + work-pseudonym stack, home stack + traveling test
-  instance. Currently the architecture and onboarding assume
-  single-server-per-client (one paired stack, one device credential
-  in the Keychain). Extending to multi-server adds non-trivial UX
-  surface.
-- **Sketch:**
-    - **Connect screen extension.** Currently terminal — once paired,
-      the user lands on Home. Multi-server adds a Settings → "Paired
-      stacks" view + an "Add another stack" affordance that
-      re-runs the Connect flow without unpairing the existing one.
-    - **Switch-server affordance.** Top-level UI element (likely the
-      app bar or a Settings-rooted toggle) for moving between paired
-      stacks. Active stack's identifier prominent; inactive stacks
-      one tap away.
-    - **Per-stack data isolation.** Each paired stack has its own
-      device credential, its own observable Holdings, its own
-      cached state. The phone holds N credentials; the user picks
-      which is active.
-    - **Notification routing.** When push notifications land
-      (post-Lightning iteration), the notification has to indicate
-      which stack it's about — otherwise tapping a notification
-      lands on the wrong active context.
-    - **Paired stacks server-side.** The inverse problem: the
-      server's "paired devices" list shows N devices for the user.
-      That part already needs to exist for single-stack
-      revocation; multi-server doesn't change the server side.
-- **Touches:** mobile UI (Connect, Settings, app bar, Home),
-  device-credential storage shape (Keychain entry per stack vs
-  array), backend (no change — multi-server is a client-side
-  concern, the server doesn't know about other stacks the device
-  is paired with), `UI/mobile.md` Onboarding section, future
-  notification handler.
-- **Status:** idea
-- **Milestone:** **post-public-ship** (Rémy's call: "defers to after
-  public shipping for sure"). Not blocking for personal-use phase
-  or public-ship event. The single-server-per-client model is the
-  default and will likely cover the majority of public-ship users;
-  multi-server is power-user expansion.
-- **Notes:** Onboarding-screen-2 design assumes single-server when
-  rendering the paired-server identifier. If multi-server lands,
-  the paired-confirmation screen gains an "and your existing
-  stack(s)" line, or the Add-stack flow is folded into Settings
-  rather than re-running through Onboarding. Defer the design.
-
----
-
-### Dynamic brand mark on first-touch surfaces
-
-- **Captured:** 2026-05 (during onboarding-screen-1 session, after
-  Rémy noted excitement about showcasing the dynamic mark)
-- **Motivation:** The brand v1 mark lock doc
-  (`brand/tallykeep_brand_mark_v1_lock.html` §5) already implements
-  a working tap-to-regenerate-grain interaction (~80 LOC, seeded
-  xorshift32 PRNG, both halves regenerate matching stripes — the
-  verification metaphor of split tally sticks made tactile, the
-  pedagogical heart of the brand). v1 sanctions it for the
-  **landing-page hero only**; everywhere else uses the locked
-  static seed. Extending the sanction to one or more first-touch
-  surfaces in the app would let new users experience the verification
-  metaphor at the moment of first arrival, which is structurally
-  the same shape of moment as a landing-page hero.
-- **Sketch:**
-    - **Connect screen (primary candidate, `mobile_onboarding_01_connect.html`).**
-      The screen's brand surface is `wordmark-icony` (the wordmark
-      with the canonical Y embedded between "tall" and "keep"),
-      not the bare icon. Make the whole wordmark area the tap
-      target; on tap, only the embedded Y's grain regenerates
-      (the "tall" and "keep" text stays static). This is a small
-      extension of brand v1 §5, which demoed the dynamic
-      interaction on the bare canonical icon — the same seeded
-      PRNG and rendering function applies, only the surrounding
-      typography changes. v1 → v2 lock-doc bump should explicitly
-      sanction the wordmark-icony embedded Y as a dynamic surface
-      alongside the bare icon. This is the user's first-touch
-      moment in the app; the metaphor lands hardest here, and zero
-      additional screen real estate is consumed (the brand mark
-      was already going to be there).
-    - **Settings → About / How it works (secondary candidate).**
-      A dedicated explainer page where the mark is the visual
-      anchor for "what tallykeep means as a verification primitive."
-      Less time-pressured than the Connect screen, more room for
-      the full caption ("The grain matches. A tally stick is split
-      from a single piece of wood. The pattern on both halves is
-      the proof — that's how you knew it was real.").
-    - **Other surfaces** (home page, Holding detail, etc.) stay
-      static-mark-with-locked-seed per the current brand rule.
-- **Touches:**
-    - **Brand:** v1 → v2 lock-doc bump for the mark, updating §5
-      "Landing-page interaction" to extend the sanction list. Per
-      `PROCESS.md §2.4`, pre-public-ship lock-doc edits are
-      allowed without an ADR; v1 → v2 is the convention. Update
-      the canonical SVG export in `brand/identity/` if any visual
-      detail changes (probably not — the dynamic component reuses
-      the canonical geometry).
-    - **Frontend:** SvelteKit component implementing the demo from
-      §5 of the lock doc. Mockups are static (per
-      `UI/mockups/README.md`); the dynamic version lands in code.
-    - **`UI/mobile.md` Onboarding section:** note that the Connect
-      screen's brand mark is the dynamic variant (when this
-      iteration ships).
-- **Status:** sketched
-- **Milestone:** **TBD** — best guess: pre-shipping (between
-  private-ship and public-ship), since the personal-use phase is
-  exactly when defining UX patterns get tested against daily use.
-  Could also pull forward into the Capacitor / private-ship
-  iteration if the wrapping work is touching this screen anyway.
-- **Notes:**
-    - Discoverability: the demo-hint text ("Tap to verify a new
-      pair") in the lock doc is for a documentation context; the
-      Connect screen probably wants a subtler hint (a one-time
-      pulse on first launch? no hint and trust the affordance is
-      noticed?). Sharpen during the iteration.
-    - Accessibility: keyboard-activate (`Enter` / `Space`) already
-      implemented in the lock doc demo. Carry forward.
-    - Animation budget: the lock doc uses an 180ms opacity
-      crossfade. Cheap enough on any phone. No perf concern.
-    - Content of the seed display ("seed · 7777" in the lock doc
-      demo) does not belong on the Connect screen — that's a
-      doc-context affordance for the lock doc only.
-
----
-
-### "Tap to see under the hood" — UI spine pattern
-
-- **Captured:** 2026-05 (mid-conversation, exploring TallyKeep's
-  distinctive UI behavior)
-- **Motivation:** Bitcoin makes nearly every number a value with
-  nuance behind it (balance = pending + confirmed UTXOs;
-  confirmation count = probabilistic finality; fee = mempool
-  dynamics; rate = source + staleness). Most apps hide this nuance
-  to feel clean. TallyKeep's honest-abstraction principle says
-  don't hide; this pattern says surface on demand. Strong candidate
-  for the product's spine behavior — a behavior flowing through
-  every screen rather than a separate feature module. Aligns
-  directly with the settlement-rails / confirmation-probability
-  idea.
-- **Sketch:** every numeric or stateful element is tappable; tap
-  surfaces what's behind it.
-    - Tap a balance → UTXO breakdown, pending vs confirmed split
-    - Tap a confirmation count → probability framing with assumed
-      adversary hashpower and natural-orphan baseline visible
-    - Tap a fee tier → mempool dynamics, fee distribution,
-      expected time-to-confirm
-    - Tap a "via [source]" rate attribution → fetch timestamp,
-      last N quotes, divergence from another source
-    - Tap a security indicator (declared-vs-observable) → the chain
-      observation that produced the verdict
-    - Tap a Holding type badge → the banking analogy expanded
-- **Touches:** every UI surface (this is a spine pattern, not a
-  feature module)
-- **Status:** sketched — candidate for a defining UX pattern
-- **Milestone:** TBD — decision path is mockup iteration. If the
-  pattern feels natural after a few screens, becomes pre-shipping
-  (defining UX); if forced, drops or scopes down.
-- **Open questions (block commit-as-direction):**
-    - **Mobile friendliness.** Tap targets are premium on small
-      screens; "everything is tappable" risks accidental taps and
-      conflicts with scroll/swipe gestures. Maybe restricted to
-      specific element types only.
-    - **Visual signaling.** How do users know what's tappable
-      without cluttering every screen? Options to evaluate in
-      mockups: subtle dotted underline on tappable values; a
-      consistent color tint on tappable numbers; a single info
-      icon adjacent to tappable groups; long-press instead of tap;
-      a dedicated "explain mode" toggle that highlights everything
-      at once. None is obviously right; each has trade-offs.
-    - **Consistency of disclosure.** Every tappable should reveal
-      the same SHAPE of info (popover? bottom sheet? inline
-      expand?). Inconsistency would feel chaotic.
-    - **Discoverabilit
+  target-market behavi

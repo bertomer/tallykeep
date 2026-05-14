@@ -34,7 +34,7 @@ def _purse_body(
     return {
         "name": f"Analysis test {secrets.token_hex(2)}",
         "purpose": "spending",
-        "seed_origin": "external_watch_only",
+        "purse_mode": "watch_only",
         "declared_security": {
             "custody_model": custody_model,
             "signing_model": signing_model,

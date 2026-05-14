@@ -161,9 +161,10 @@ class JobStatus(str, Enum):
     CANCELLED = "cancelled"
 
 
-class PurseSeedOrigin(str, Enum):
-    EXTERNAL_WATCH_ONLY = "external_watch_only"
-    TALLYKEEP_MANAGED = "tallykeep_managed"
+class PurseMode(str, Enum):
+    WATCH_ONLY = "watch_only"
+    ON_DEVICE_TK_GENERATED = "on_device_tk_generated"
+    ON_DEVICE_USER_IMPORTED = "on_device_user_imported"  # reserved; creation flow ships in purse-upgrade-path iteration
 
 
 class DiscrepancyKind(str, Enum):

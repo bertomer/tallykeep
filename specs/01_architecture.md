@@ -18,7 +18,7 @@ should first locate which surface is responsible.
 | Surface | What it runs | What it can do | What it cannot do |
 |---|---|---|---|
 | **Backend** | FastAPI app, Postgres, Redis, worker process. Docker Compose stack on the user's host (or hosted-tier infrastructure when that ships). | Observe the chain via bitcoind. Construct PSBTs. Persist Holdings, Descriptors, LedgerEntries. Call custodial-provider APIs. Emit and consume domain events. Encrypt and decrypt third-party credentials with the user's passphrase. | **Hold spending keys.** Sign anything. Create user accounts on TallyKeep infrastructure. |
-| **Capacitor client** | The mobile app (Capacitor wrap of the SvelteKit PWA), distributed via app store / sideload. | Hold spending keys for `TALLYKEEP_MANAGED` and `EXTERNAL_IMPORTED` Purses, in OS Keychain/Keystore, biometric-gated. Sign with the on-device key via NativeBridge. Read camera (QR). Subscribe to push notifications. | Transmit spending keys to the backend. Sign for Holdings whose keys live elsewhere (a Strongbox's hardware wallet, an external-watch-only Purse's source wallet). |
+| **Capacitor client** | The mobile app (Capacitor wrap of the SvelteKit PWA), distributed via app store / sideload. | Hold spending keys for Purses with `purse_mode = ON_DEVICE_TK_GENERATED` or `ON_DEVICE_USER_IMPORTED`, in OS Keychain/Keystore, biometric-gated. Sign with the on-device key via NativeBridge. Read camera (QR). Subscribe to push notifications. | Transmit spending keys to the backend. Sign for Holdings whose keys live elsewhere (a Strongbox's hardware wallet, a `WATCH_ONLY` Purse's source wallet). |
 | **Browser PWA client** | The SvelteKit PWA in any browser (desktop Chrome / Safari / Firefox, mobile browsers, or installed-as-PWA). Same SvelteKit code as the Capacitor client; the `NativeBridge` interface stubs out. | Observe Holdings. Render flows. Compose PSBTs server-side and download the file. | Hold spending keys (no OS-grade secure storage primitive). Sign with on-device keys. Operations requiring keys gate honestly with "install the app / sign externally". |
 | **bitcoind** | Bitcoin Core node, pruned or full, running on the user's host (or shared in the hosted tier — see `future_iterations.md`). | Serve chain data via JSON-RPC. Push live events via ZeroMQ. Hold the source-of-truth view of the chain. | Sign anything. The backend never sends keys to bitcoind for signing. |
 | **Custodial provider** | Third-party exchange / broker API (Kraken, Bitstamp; future Lemon, Buenbit, Belo, Coinbase Advanced, Swissquote). | Hold custody of the user's BTC (and stablecoin) balances at the provider. Accept withdrawals to whitelisted addresses. | Anything TallyKeep is responsible for. TallyKeep owns the API credentials encrypted at rest; the provider owns the funds. |
@@ -51,12 +51,13 @@ than restating.
 1. **Backend** — never holds spending keys, ever. Holds
    descriptors, custodial credentials (encrypted at rest with
    the user's passphrase), configuration.
-2. **Capacitor client** — holds spending keys for
-   `TALLYKEEP_MANAGED` and `EXTERNAL_IMPORTED` Purses, in OS
-   secure storage, biometric-gated, never transmitted to the
-   backend. Per-client signing-capability check (per ADR-0006)
-   is local: a different Capacitor instance reaching the same
-   backend will see the Holding as view-only.
+2. **Capacitor client** — holds spending keys for Purses with
+   `purse_mode = ON_DEVICE_TK_GENERATED` or
+   `ON_DEVICE_USER_IMPORTED`, in OS secure storage,
+   biometric-gated, never transmitted to the backend.
+   Per-client signing-capability check (per ADR-0006) is local:
+   a different Capacitor instance reaching the same backend
+   will see the Holding as view-only.
 3. **Hardware wallet** — holds Strongbox / Vault keys. TallyKeep
    choreographs (PSBT export → external sign → re-import →
    broadcast); never sees the key.

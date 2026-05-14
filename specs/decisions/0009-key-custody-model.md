@@ -1,5 +1,11 @@
 # ADR-0009 — Key custody model
 
+> **Vocabulary update (2026-05):** The `seed_origin` field (ADR-0006) was
+> renamed to `purse_mode`; values `TALLYKEEP_MANAGED` → `ON_DEVICE_TK_GENERATED`
+> and `EXTERNAL_IMPORTED` → `ON_DEVICE_USER_IMPORTED`. The custody-zone logic
+> described below is unchanged; only the names differ. See `02_domain_model.md`
+> §"Purse mode" for the current enum.
+
 - **Date:** 2026-05
 - **Status:** Accepted
 - **Decided by:** Rémy
@@ -21,12 +27,12 @@ access credentials are stored, encrypted at rest."*
 That was true when TallyKeep was conceived as a self-hosted
 backend that watched user-controlled wallets and bridged to
 custodial providers. It is **no longer accurate** since
-ADR-0006 (Purse seed origin) introduced `TALLYKEEP_MANAGED`
+ADR-0006 (Purse seed origin) introduced `ON_DEVICE_TK_GENERATED`
 Purses — wallets where TallyKeep generates the seed and stores it
 in the **Capacitor client's** OS keychain/keystore. The
 `purse-upgrade-path` arbitration item further introduces
-`EXTERNAL_IMPORTED` Purses, where TallyKeep stores a key the user
-brought from another wallet.
+`ON_DEVICE_USER_IMPORTED` Purses, where TallyKeep stores a key the
+user brought from another wallet.
 
 "We never hold keys" is therefore a half-truth. The backend never
 holds keys; the Capacitor client may. Saying it the original way
@@ -47,10 +53,10 @@ custody facts:
    any form.
 
 2. **The Capacitor client may hold spending keys** for the two
-   Purse seed-origin modes that require local signing:
-   - `TALLYKEEP_MANAGED` — the client generated the seed during
+   Purse modes that require local signing:
+   - `ON_DEVICE_TK_GENERATED` — the client generated the seed during
      Add-Holding.
-   - `EXTERNAL_IMPORTED` — the user imported a seed from another
+   - `ON_DEVICE_USER_IMPORTED` — the user imported a seed from another
      wallet via the Purse-detail upgrade flow.
    Storage is **OS-provided secure storage** (iOS Keychain backed
    by Secure Enclave; Android Keystore backed by TEE / StrongBox

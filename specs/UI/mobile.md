@@ -77,7 +77,7 @@ The pre-shipping mobile UI iterations target the private-ship event
 (per ADR-0003). The roadmap is sketched in `next_iteration.md` and
 typically begins with Onboarding + Home (empty + populated states),
 followed by Add Holding, Holding detail per type, Send + Receive,
-Activity + Categorization, Sweep policy + Trading view, Settings.
+Activity + Categorization, Sweep policy + Treasury view, Settings.
 
 When an iteration ships, its corresponding section appears below.
 
@@ -992,12 +992,12 @@ wizard shell into the codebase; Strongbox and Vault wizards
 derive). Design pass closed 2026-05-13; lands after the Add
 Holding scaffolding iteration closes.
 
-The Purse wizard covers both seed-origin modes Purse supports
-per ADR-0006: `EXTERNAL_WATCH_ONLY` (the user pastes a descriptor
-exported from an existing wallet) and `TALLYKEEP_MANAGED` (the
-user asks TallyKeep to generate a fresh seed on-device). Mode 2
-(`EXTERNAL_IMPORTED` — user pastes a seed/xprv from another
-wallet to make their existing Purse spendable from TallyKeep)
+The Purse wizard covers the two `purse_mode` values Purse supports
+at creation per ADR-0006: `WATCH_ONLY` (the user pastes a descriptor
+exported from an existing wallet) and `ON_DEVICE_TK_GENERATED` (the
+user asks TallyKeep to generate a fresh seed on-device). The third
+mode (`ON_DEVICE_USER_IMPORTED` — user pastes a seed/xprv from
+another wallet to make their existing Purse spendable from TallyKeep)
 is **not** part of this wizard — it lands as a separate Purse-
 detail "upgrade to spending" feature once `purse-upgrade-path`
 in `pre-implementation.md` resolves.
@@ -1299,96 +1299,4 @@ copy adapted to "Here's what we generated for you" and a small
 
 6. **Open-source and reproducibility.** No closed-source
    dependency. Descriptor parsing (BIP 380 + miniscript) lives
-   in-tree on the backend. BIP39 mnemonic generation runs in
-   JavaScript with an audited library (selection deferred to
-   the coding agent; constraint is "audited, MIT-compatible,
-   no remote calls during generation"). Brand icons inline
-   from `brand/identity/`. Tokens-only styling per PROCESS §2.4.
-
-### Notes
-
-**Mode 2 (`EXTERNAL_IMPORTED`) is deliberately out of scope.**
-The Purse-detail "upgrade to spending" surface (paste a seed
-phrase or master xprv from another wallet to make an existing
-watch-only Purse spendable from TallyKeep) is a separate
-feature that lands in a follow-up iteration once
-`purse-upgrade-path` resolves. Rationale: a user who has imported
-watch-only and later wants to spend doesn't go back through the
-Add wizard — they reach for the affordance from the Purse's
-detail page. Keeping mode 2 out of the wizard preserves the
-"one shape, all three wizards" principle (Strongbox and Vault
-inherit cleanly) and pushes the load-bearing seed-disclosure
-work to where the user actually triggers it.
-
-**Wallet-specific tips — surfaced inline when a source is
-picked.** The source dropdown drives a wallet-tips banner that
-appears between the dropdown and the descriptor textarea
-(superseded the earlier help-link + bottom-sheet pattern during
-the 2026-05-13 design pass). Locked copy for the source-dropdown
-wallets:
-
-- *BlueWallet:* Settings → Wallet → Export / Backup → Copy the
-  Master Public Key (xpub).
-- *Electrum:* Wallet → Information → Master Public Key.
-- *Mutiny:* From the (self-hosted or Emergency Kit) export,
-  copy the master public key or recover the 12-word seed in
-  Sparrow to derive a descriptor.
-- *Nunchuk:* Wallet → Settings → Wallet Configuration → Copy
-  Wallet Descriptor.
-- *Phoenix:* Settings → Wallet info → Wallet final → Copy the
-  master public key (`zpub...`, path `m/84'/0'/0`). The swap-in
-  wallet descriptors are for LN-onchain bridging and aren't
-  supported here yet — paste the "Wallet final" zpub instead.
-- *Sparrow:* File → Wallet Settings → Export → Output Descriptor.
-- *Specter:* Wallet Settings → Advanced → Export → Public Key
-  (output descriptor).
-- *Other:* paste any standard xpub / ypub / zpub or BIP 380
-  output descriptor. Single Bitcoin addresses (`bc1q...`,
-  `1...`, `3...`) are rejected.
-
-The Phoenix entry deserves the explicit "swap-in descriptors
-aren't supported yet" callout because the Phoenix wallet info
-screen surfaces three exports (legacy swap-in descriptor,
-Taproot swap-in descriptor, Wallet final master public key) and
-the user could reasonably try any of them. Coding-agent task:
-verify the descriptor-validate endpoint either accepts Phoenix-
-shape miniscript fragments (`wsh(and_v(v:pk([...]xpu...)))`)
-gracefully or returns a typed error mapping to a "Use the
-Wallet final key instead" message — pure miniscript handling
-is a backend parser-scope decision.
-
-**Source dropdown — provenance label, not capability filter.**
-The same dropdown serves users who exported a descriptor
-directly (BlueWallet, Sparrow, Electrum) and users who derived
-externally from a seed phrase (Mutiny refugee, Phoenix user
-who recovered from words). Both are valid Purse origins; both
-deserve a label. The dropdown does not advise "from this
-wallet you can / cannot import" — that's the help bottom-sheet's
-job.
-
-**Step 3 deliberately does not surface gap-limit / "scan more
-addresses" affordances.** The first-time Purse adder doesn't
-have the context to make that call. Gap-limit tooling lands in
-Holding Detail / Settings → Scan, scoped out of the wizard
-per `next_iteration.md` 2026-05-13 sharpening.
-
-**No "Cancel / X" in the wizard header in this iteration.** Back
-chevron alone handles navigation; user taps back to retrace.
-Banking apps differ (Wise has X, Revolut doesn't); we ship
-without and add the X if dev-phase usage surfaces a friction.
-
-**No "Copy" affordance on the recovery phrase display, and no
-hard backup-acknowledgement gate.** Clipboard is a known seed-
-leak vector (system clipboard managers, cross-device sync
-clipboards). Per the leading direction in
-`seed-backup-disclosure`, persistent acknowledgement lives in
-the security-health system on Home, not a one-shot checkbox at
-generation time. The wizard ships honest forward-references
-("you can return to this view from Holdings → Purse →
-Information") to the Purse-detail iteration's Information
-section.
-
-**Mockup-tier inline SVG.** All icons and per-step graphics
-inline directly into the mockup HTML for static-file review.
-SvelteKit components consume from `brand/identity/` via the
-`<Icon name="..." />` wrapper per PROCESS.md §2.4.
+   in

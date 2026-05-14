@@ -238,7 +238,7 @@ def create_purse(
     display_order: int,
     descriptors: list[DescriptorInput],
     adapter: DescriptorAdapter,
-    seed_origin,  # PurseSeedOrigin
+    purse_mode,  # PurseMode
 ) -> Holding:
     return _create_holding_with_descriptors(
         session,
@@ -251,8 +251,8 @@ def create_purse(
         display_order=display_order,
         descriptors=descriptors,
         adapter=adapter,
-        subtype_data={"seed_origin": seed_origin.value},
-        extra_holding_kwargs={"seed_origin": seed_origin},
+        subtype_data={"purse_mode": purse_mode.value},
+        extra_holding_kwargs={"purse_mode": purse_mode},
     )
 
 

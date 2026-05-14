@@ -36,18 +36,37 @@ regulatory evaluation before commit.
 ## What an Account does
 
 - **Connects** to a supported CustodialProvider via ccxt using
-  user-provided API credentials (read + withdrawal permissions
-  only).
-- **Polls** the provider on a schedule (default 10 min,
-  configurable 1–60 min) plus on demand. Surfaces balance,
-  recent withdrawal history, recent deposit history.
-- **Detects** new BTC balances appearing on the provider
-  (typically the result of a manual buy or a deposit).
-- **Withdraws** to the pre-whitelisted destination address when a
-  SweepPolicy fires (see `concerns/sweep_policies.md`) or on
-  manual user request.
-- **Reconciles** provider-reported withdrawals with the resulting
-  on-chain LedgerEntries detected by the chain scanner.
+  user-provided API credentials. Read permission is required;
+  withdrawal permission is **optional** (see "API permissions"
+  below).
+- **Polls** the provider's API on a schedule (default 10 min,
+  configurable 1–60 min) plus on demand. One polling call
+  fetches: current BTC balance, recent withdrawal history,
+  recent deposit history, other-asset balances (read-only).
+  This is the only source of truth about the Account — there is
+  no chain scan for an Account, because the Account doesn't have
+  a descriptor and TallyKeep doesn't know which on-chain
+  addresses belong to the user at the provider.
+- **Surfaces balance changes** by comparing the latest poll's
+  balance to the previous one. A delta fires
+  `treasury.custodial.balance_changed` (typically the result of
+  a manual buy on the provider's website, a deposit, or an
+  external withdrawal). The "detect" verb here = "noticed a
+  balance change between two polls"; not chain scanning.
+- **Withdraws** to the pre-whitelisted destination address when
+  a SweepPolicy fires (see `concerns/sweep_policies.md`) or on
+  manual user request — **only when the API credential has
+  withdrawal permission**. Read-only Accounts cannot withdraw;
+  they watch-and-advise like external-key Holdings.
+- **Reconciles** withdrawals across two surfaces. When the
+  provider reports a withdrawal in its history, TallyKeep
+  expects a corresponding on-chain incoming transaction at the
+  whitelisted destination address (which belongs to a non-Account
+  Holding — Strongbox, Vault, etc.). The chain scanner detects
+  that incoming tx and links the `sweep_execution` row to the
+  resulting LedgerEntry. The reconciliation closes the loop:
+  "the provider said the withdrawal completed; the chain
+  confirmed it landed at the right address."
 
 ## Supported providers (target state)
 
@@ -64,26 +83,66 @@ Adding a provider is a localized change against the
 `CustodialProviderAdapter` ABC (the treasury-layer ACL described
 in `01_architecture.md`). The service code never sees ccxt directly.
 
+## API permissions
+
+The user picks a permission level when creating an Account. Two
+options.
+
+- **Read-only.** API key has `query funds` enabled only.
+  TallyKeep polls balances and surfaces deposits / withdrawals
+  detected by the provider. **No outgoing operations are
+  possible from this Account** — the user transfers funds out
+  via the provider's own website / app. SweepPolicies against
+  this Account run in **watch-and-advise mode**: the trigger
+  fires, the UI shows "your balance crossed the threshold; go
+  withdraw on the provider", but no API call is made.
+
+- **Read + withdrawal-to-whitelist.** API key has
+  `query funds` plus `withdraw funds` enabled. The whitelist
+  on the provider side restricts withdrawals to a single
+  pre-configured address (typically a Strongbox or Vault
+  address). SweepPolicies can execute automatically against
+  this Account.
+
+In both cases, the registration **rejects** API credentials
+with any of `{trade, margin, staking, futures}` enabled — those
+permissions go beyond what TallyKeep needs and broaden the
+blast radius if the credential leaks. The rejection message:
+*"This API credential has more permissions than required.
+Create a new credential with only `query funds` (and optionally
+`withdraw funds` to enable auto-sweep) enabled."*
+
+The user's withdrawal-permission choice persists on the Account
+Holding (`withdrawal_enabled: bool` or similar; field naming in
+the domain module). It can be upgraded later by replacing the
+API credential with one that has `withdraw funds`; downgraded by
+revoking on the provider side and re-pairing.
+
 ## Add-Holding flow
 
 1. **Provider selection** — chooser of supported providers.
-2. **Credentials** — user provides API key + secret. Backend
-   calls the provider's "get key permissions" endpoint. **If any
-   of `{trade, margin, staking, futures}` is enabled, the
-   registration is rejected** with: *"This API credential has
-   more permissions than required. Create a new credential with
-   only 'query funds' and 'withdraw funds' enabled."*
-3. **Whitelist verification:**
+2. **Permission level** — choose Read-only or
+   Read + withdrawal-to-whitelist (per the section above). The
+   UI explains the implication: Read-only → manual transfers
+   from the provider's site; Read + withdraw → SweepPolicies
+   can execute automatically.
+3. **Credentials** — user provides API key + secret. Backend
+   calls the provider's "get key permissions" endpoint and
+   verifies the credential matches the user's chosen level. If
+   any of `{trade, margin, staking, futures}` is enabled, the
+   registration is rejected (per "API permissions" above).
+4. **Whitelist verification** (only if withdrawal-enabled):
    - If the provider exposes a withdrawal-whitelist API, the
      backend verifies the configured `whitelist_address` is
      present.
-   - If the provider does not expose a whitelist-check API, the
-     UI displays a blocking warning: *"We cannot programmatically
-     verify withdrawal whitelisting on this provider. You must
-     manually configure a withdrawal whitelist on the provider's
-     website for the address `{address}`. Confirm you have done
-     this?"* User must check a confirmation box.
-4. **Credential storage** — credentials persist in the `secret`
+   - If the provider does not expose a whitelist-check API,
+     the UI displays a blocking warning: *"We cannot
+     programmatically verify withdrawal whitelisting on this
+     provider. You must manually configure a withdrawal
+     whitelist on the provider's website for the address
+     `{address}`. Confirm you have done this?"* User must check
+     a confirmation box.
+5. **Credential storage** — credentials persist in the `secret`
    table (cryptography per `03_data_model.md`). The Account
    Holding's `custodial_provider` row references credentials by
    reference string; values never appear in the row.

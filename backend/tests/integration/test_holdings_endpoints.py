@@ -47,7 +47,7 @@ def _purse_body(
         "name": name,
         "description": "My day-to-day spending",
         "purpose": "spending",
-        "seed_origin": "external_watch_only",
+        "purse_mode": "watch_only",
         "declared_security": {
             "custody_model": "self_single",
             "signing_model": "software_hot",
@@ -75,7 +75,7 @@ def _strongbox_body() -> dict:
         name="Cold reserve", expression=WPKH_MAINNET_CHANGE
     )
     body["purpose"] = "reserve"
-    body.pop("seed_origin", None)
+    body.pop("purse_mode", None)
     body["declared_security"] = {
         "custody_model": "self_single",
         "signing_model": "hardware_offline",
@@ -93,7 +93,7 @@ def _vault_body() -> dict:
         network="mainnet",
     )
     body["purpose"] = "long_term"
-    body.pop("seed_origin", None)
+    body.pop("purse_mode", None)
     body["declared_security"] = {
         "custody_model": "self_multisig",
         "signing_model": "ceremonial",

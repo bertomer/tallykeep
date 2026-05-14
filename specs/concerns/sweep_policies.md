@@ -18,13 +18,17 @@ Two product patterns are powered by the same primitive:
 - **Holding-to-Holding rebalancing** — e.g. Strongbox → Purse
   ("top up the spending stack"), Purse → Strongbox ("daily
   spending bounded"), Strongbox → Vault ("promote to long-term").
-  Architecturally supported pre-shipping; UX deferred (see
-  `future_iterations.md` "Holding-to-Holding sweeps beyond
-  Account-originated").
+  **Purse-on-device → anywhere is in dev-phase scope** (sweep
+  fires on the Capacitor device that holds the seed; biometric
+  prompt + native sign + broadcast). **Strongbox- and
+  Vault-source sweeps stay scheduled-reminder shape** (no
+  auto-execution; the user signs externally) — architecturally
+  present, UI surface deferred per `future_iterations.md`
+  "Holding-to-Holding sweeps beyond Account-originated".
 
-The Trading layer is the primary user of this primitive (for
+The Treasury layer is the primary user of this primitive (for
 Account → non-Account sweeps), but the primitive itself is
-cross-cutting, not Trading-specific.
+cross-cutting.
 
 ## Trigger types
 
@@ -55,7 +59,7 @@ with cooldown to avoid flapping.
 ```
 
 The SweepEngine subscriber listens for
-`trading.custodial.balance_changed` events and re-evaluates
+`treasury.custodial.balance_changed` events and re-evaluates
 threshold policies for the affected Holding.
 
 **Manual** — fires on user request only.
@@ -67,13 +71,10 @@ and computes `safety_warnings`. The policy **cannot be enabled
 until all warnings are acknowledged**. The user explicitly
 acknowledges each.
 
-Validator rules:
+Validator rules (current minimum — see open question below):
 
 | Warning | Severity | Condition |
 |---|---|---|
-| `destination_keys_on_host` | high | Destination Holding is a Purse — keys may live on the same host as the backend |
-| `destination_is_custodial` | high | Destination Holding is an Account — defeats minimum-exposure |
-| `same_security_tier` | medium | Source and destination have the same `signing_model` |
 | `no_maximum_cap_set` | medium | `maximum_per_period_sats` is None for non-trivial amounts |
 | `unverified_whitelist_on_provider` | high | Source Holding is an Account whose CustodialProvider whitelist could not be verified via API |
 
@@ -86,14 +87,39 @@ different parameters, acknowledgement is cleared and the user
 must re-confirm.
 
 The "warn don't block" discipline is locked: the validator's job
-is to make sure the user knows what they're doing, not to second-
-guess them. Risky configurations are allowed if the user
+is to make sure the user knows what they're doing, not to
+second-guess them. Risky configurations are allowed if the user
 acknowledges.
+
+**Open question — extended validator rules.** Earlier drafts of
+the validator carried three additional warnings —
+`destination_is_custodial`, `destination_keys_on_host`,
+`same_security_tier` — that opinionated which destination shapes
+"defeat minimum-exposure." Those warnings have been removed
+from the current rule-set because:
+
+- *Decumulation is a legitimate flow* (saved → custodial to
+  sell, or to pay a bill that needs fiat off-ramp). Flagging
+  Account-as-destination at `high` reads the wrong way for that
+  use case.
+- *On-device-keys Purse* is not inherently more dangerous as a
+  sweep destination than another Purse; if anything, a
+  TallyKeep-managed Purse with biometric-gated keys is a tighter
+  surface than an external hot wallet.
+- *Same-tier sweeps* (Strongbox → Strongbox) can be legitimate
+  for rotation / device migration; flagging is informational at
+  best.
+
+The full set of "what should the safety validator warn about?"
+is open arbitration pending the brainstorm session once all
+four Holding types are working in code (per
+`pre-implementation.md` item `sweep-validator-extended-rules`).
+Until then the validator runs with the two rules above only.
 
 ## Execution path
 
-When `trading.sweep.triggered` fires (from the scheduler) or
-`trading.custodial.balance_changed` matches a threshold policy:
+When `treasury.sweep.triggered` fires (from the scheduler) or
+`treasury.custodial.balance_changed` matches a threshold policy:
 
 ### 1. Pre-check
 
@@ -193,7 +219,7 @@ sweeps are architecturally supported but UX-deferred (per
   UI surfaces prominently.
 - **Per-policy `requires_user_confirmation`** — when true, every
   execution prompts. The default for newly-created policies is
-  controlled by the `trading.sweep_confirmation.required`
+  controlled by the `treasury.sweep_confirmation.required`
   feature flag (default `true`); users can change it per policy
   thereafter.
 
@@ -247,34 +273,4 @@ The same primitive supports user-driven rebalancing. Examples:
 
 Mechanics differ from Account-source sweeps: the SweepEngine
 constructs a PaymentRequest, the user signs (in-app on
-Capacitor for Purse-on-device, externally for Strongbox / Vault),
-broadcast happens via the normal outflow flow. The sweep is
-driven by the policy but the signing remains user-controlled.
-
-UX for non-Account-source sweeps is deferred (per
-`future_iterations.md` "Holding-to-Holding sweeps beyond
-Account-originated"). The architectural primitive ships pre-
-shipping; only the UI surface is deferred.
-
-## What the user sees (target UX)
-
-The Trading view shows, per Account Holding:
-
-- Active SweepPolicy summaries ("Auto-sweep weekly every Friday
-  at 03:00 to Strongbox").
-- "Sweep now" button.
-- Recent sweep history with status badges.
-
-For non-Account Holdings with outgoing SweepPolicies
-(rebalancing), the same panel appears on the Holding's detail
-page when that UX ships.
-
-Specific layout and component naming lives in `UI/README.md`
-and the iteration that ships the sweep-creation UI.
-
-## Deferred
-
-| Item | Tracked in |
-|---|---|
-| UX for Holding-to-Holding sweeps (non-Account source) | `future_iterations.md` "Holding-to-Holding sweeps beyond Account-originated" |
-| DCA (recurring scheduled purchases) — depends on order placement | `future_iterations.md` "DCA primitive" |
+Capacitor f

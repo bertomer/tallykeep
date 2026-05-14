@@ -57,9 +57,9 @@ CREATE TABLE holding (
     -- For 'vault':     { "required_signers": 2, "total_signers": 3, "timelock_blocks": null, "recovery_setup_notes": "..." }
     -- For 'strongbox': { "signing_device_label": "Coldcard Mk4 in safe" }
     -- For 'account':   empty (CustodialProvider link is in custodial_provider table)
-    -- For 'purse':     { "seed_origin": "external_watch_only" | "tallykeep_managed" }
-    --                  See 02_domain_model.md §"Purse seed origin". The backend never
-    --                  stores a reference to the seed itself; for tallykeep_managed Purses
+    -- For 'purse':     { "purse_mode": "watch_only" | "on_device_tk_generated" | "on_device_user_imported" }
+    --                  See 02_domain_model.md §"Purse mode". The backend never
+    --                  stores a reference to the seed itself; for on-device Purses
     --                  the seed lives in a client device's secure local storage (iOS
     --                  Keychain / Android Keystore), keyed client-side by holding_id.
 

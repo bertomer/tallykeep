@@ -24,7 +24,7 @@ from tallykeep.domain.enums import (
     CustodyModel,
     HoldingType,
     Purpose,
-    PurseSeedOrigin,
+    PurseMode,
     SigningModel,
 )
 
@@ -71,7 +71,7 @@ class Holding:
     descriptor_ids: list[UUID] = field(default_factory=list)  # purse / strongbox / vault
 
     # Purse metadata
-    seed_origin: PurseSeedOrigin | None = None
+    purse_mode: PurseMode | None = None
 
     # Strongbox metadata
     signing_device_label: str | None = None

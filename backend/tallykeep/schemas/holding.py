@@ -24,7 +24,7 @@ from tallykeep.domain.enums import (
     HoldingType,
     Network,
     Purpose,
-    PurseSeedOrigin,
+    PurseMode,
     SigningModel,
 )
 
@@ -81,7 +81,7 @@ class _HoldingCreateBase(BaseModel):
 
 
 class PurseCreate(_HoldingCreateBase):
-    seed_origin: PurseSeedOrigin
+    purse_mode: PurseMode
     descriptors: list[DescriptorInput] = Field(..., min_length=1)
 
 
@@ -157,7 +157,7 @@ class HoldingResponse(BaseModel):
     custodial_provider_id: UUID | None = None
 
     # Purse
-    seed_origin: PurseSeedOrigin | None = None
+    purse_mode: PurseMode | None = None
 
     # Strongbox
     signing_device_label: str | None = None

@@ -200,13 +200,13 @@ Type chooser → type-specific flow.
 - **Add Account:** provider selection → credentials → whitelist
   verification.
 - **Add Purse:** binary at the start of the flow:
-    - **Import an existing wallet** (`seed_origin=external_watch_only`)
+    - **Import an existing wallet** (`purse_mode=watch_only`)
       — paste / QR an xpub or descriptor. **xpub or descriptor only**
       — single-address import is not supported (per ADR-0006;
       observing one address misrepresents wallet activity that
       rotates across many addresses).
     - **Create a new TallyKeep wallet**
-      (`seed_origin=tallykeep_managed`) — TallyKeep generates a
+      (`purse_mode=on_device_tk_generated`) — TallyKeep generates a
       fresh seed into the current client's Keychain/Keystore and
       registers the derived descriptor with the backend. Includes
       the seed-backup warning per pending pre-implementation item
@@ -357,14 +357,14 @@ The custodial / sweep surface covers two related things:
 **Custodial accounts (Account Holdings).** For users who connect a
 CustodialProvider (Kraken, Bitstamp): connection status, balance,
 whitelist target, recent activity. Specific affordances (panel
-layout, controls, kill switches) are designed in the Trading-view
+layout, controls, kill switches) are designed in the Treasury-view
 iteration.
 
 **Sweep policies — generalized.** Per `concerns/sweep_policies.md`, a SweepPolicy
 moves funds from any Holding to any Holding, with a safety validator
 that warns about risky configurations but never blocks (the user is
 the final authority). Specific UI for sweep-policy creation and
-listing is designed in the Trading-view iteration.
+listing is designed in the Treasury-view iteration.
 
 **Auto-sweep is only feasible when TallyKeep can sign without
 external action.** Practically:
@@ -429,4 +429,4 @@ Rémy 2026-05:
   posture; finalized at ship-gate.
 - Future iterations and parked ideas — see `future_iterations.md`.
 - The threat-model implications of mobile and the Capacitor build
-  — see `concerns/threat_model.md` §Mobile addendum.
+  — see `concerns/threat_mo

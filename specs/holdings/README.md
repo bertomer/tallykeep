@@ -14,7 +14,7 @@ Reorganized 2026-05 — see the spec reshape session.
 | Type | Banking analogy | Key custody zone (ADR-0009) | Outflow mechanic |
 |---|---|---|---|
 | [Account](01_account.md) | Like an exchange account | Custodial provider holds keys | Withdraw to pre-whitelisted address (provider API) |
-| [Purse](02_purse.md) | Like a checking account | Per seed-origin: external wallet **or** Capacitor client **or** browser N/A | Native sign (Capacitor) / source-wallet redirect / view-only gate |
+| [Purse](02_purse.md) | Like a checking account | Per `purse_mode`: external wallet (`WATCH_ONLY`) **or** Capacitor client (`ON_DEVICE_TK_GENERATED` / `ON_DEVICE_USER_IMPORTED`) | Native sign (Capacitor) / source-wallet redirect / view-only gate |
 | [Strongbox](03_strongbox.md) | Like a savings account, but you hold the key | Hardware wallet (user's external device) | PSBT export → external sign → re-import → broadcast |
 | [Vault](04_vault.md) | Like a safety-deposit box | Hardware wallets + multisig co-signers | PSBT with multisig coordination (mostly deferred) |
 

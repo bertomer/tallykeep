@@ -1,5 +1,14 @@
 # ADR-0006 — Purse seed origin and per-client signing capability
 
+> **Vocabulary update (2026-05):** The `seed_origin` field was renamed to
+> `purse_mode`; the enum values were reorganized around the on-device-keys
+> axis: `EXTERNAL_WATCH_ONLY` → `WATCH_ONLY`, `TALLYKEEP_MANAGED` →
+> `ON_DEVICE_TK_GENERATED`, and `ON_DEVICE_USER_IMPORTED` reserved for the
+> upcoming `purse-upgrade-path` iteration. The substantive decision — three
+> Purse flavors, per-client signing-capability check, no seed reference on
+> the backend — is unchanged. See `02_domain_model.md` §"Purse mode" for
+> the current shape.
+
 - **Date:** 2026-05
 - **Status:** Accepted
 - **Decided by:** Rémy

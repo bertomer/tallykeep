@@ -1,4 +1,4 @@
-﻿openapi: 3.1.0
+openapi: 3.1.0
 info:
   title: TallyKeep
   version: 0.1.0-dev
@@ -2024,7 +2024,7 @@ paths:
   /api/v1/sweep-policies:
     get:
       tags:
-      - trading
+      - treasury
       summary: List Sweep Policies
       operationId: list_sweep_policies_api_v1_sweep_policies_get
       parameters:
@@ -2063,7 +2063,7 @@ paths:
                 $ref: '#/components/schemas/HTTPValidationError'
     post:
       tags:
-      - trading
+      - treasury
       summary: Create Sweep Policy
       operationId: create_sweep_policy_api_v1_sweep_policies_post
       requestBody:
@@ -2088,7 +2088,7 @@ paths:
   /api/v1/sweep-policies/pause-all:
     post:
       tags:
-      - trading
+      - treasury
       summary: Pause All Sweep Policies
       operationId: pause_all_sweep_policies_api_v1_sweep_policies_pause_all_post
       responses:
@@ -2103,7 +2103,7 @@ paths:
   /api/v1/sweep-policies/resume-all:
     post:
       tags:
-      - trading
+      - treasury
       summary: Resume All Sweep Policies
       operationId: resume_all_sweep_policies_api_v1_sweep_policies_resume_all_post
       responses:
@@ -2118,7 +2118,7 @@ paths:
   /api/v1/sweep-policies/{policy_id}:
     get:
       tags:
-      - trading
+      - treasury
       summary: Get Sweep Policy
       operationId: get_sweep_policy_api_v1_sweep_policies__policy_id__get
       parameters:
@@ -2144,7 +2144,7 @@ paths:
                 $ref: '#/components/schemas/HTTPValidationError'
     patch:
       tags:
-      - trading
+      - treasury
       summary: Patch Sweep Policy
       operationId: patch_sweep_policy_api_v1_sweep_policies__policy_id__patch
       parameters:
@@ -2176,7 +2176,7 @@ paths:
                 $ref: '#/components/schemas/HTTPValidationError'
     delete:
       tags:
-      - trading
+      - treasury
       summary: Delete Sweep Policy
       operationId: delete_sweep_policy_api_v1_sweep_policies__policy_id__delete
       parameters:
@@ -2199,7 +2199,7 @@ paths:
   /api/v1/sweep-policies/{policy_id}/acknowledge-warnings:
     post:
       tags:
-      - trading
+      - treasury
       summary: Acknowledge Sweep Warnings
       operationId: acknowledge_sweep_warnings_api_v1_sweep_policies__policy_id__acknowledge_warnings_post
       parameters:
@@ -2226,7 +2226,7 @@ paths:
   /api/v1/sweep-policies/{policy_id}/enable:
     post:
       tags:
-      - trading
+      - treasury
       summary: Enable Sweep Policy
       operationId: enable_sweep_policy_api_v1_sweep_policies__policy_id__enable_post
       parameters:
@@ -2253,7 +2253,7 @@ paths:
   /api/v1/sweep-policies/{policy_id}/disable:
     post:
       tags:
-      - trading
+      - treasury
       summary: Disable Sweep Policy
       operationId: disable_sweep_policy_api_v1_sweep_policies__policy_id__disable_post
       parameters:
@@ -2280,7 +2280,7 @@ paths:
   /api/v1/sweep-policies/{policy_id}/execute-now:
     post:
       tags:
-      - trading
+      - treasury
       summary: Execute Sweep Policy Now
       operationId: execute_sweep_policy_now_api_v1_sweep_policies__policy_id__execute_now_post
       parameters:
@@ -2313,7 +2313,7 @@ paths:
   /api/v1/sweep-policies/{policy_id}/executions:
     get:
       tags:
-      - trading
+      - treasury
       summary: List Sweep Policy Executions
       operationId: list_sweep_policy_executions_api_v1_sweep_policies__policy_id__executions_get
       parameters:
@@ -2351,7 +2351,7 @@ paths:
   /api/v1/sweep-executions:
     get:
       tags:
-      - trading
+      - treasury
       summary: List Sweep Executions
       operationId: list_sweep_executions_api_v1_sweep_executions_get
       parameters:
@@ -2398,7 +2398,7 @@ paths:
   /api/v1/sweep-executions/{execution_id}:
     get:
       tags:
-      - trading
+      - treasury
       summary: Get Sweep Execution
       operationId: get_sweep_execution_api_v1_sweep_executions__execution_id__get
       parameters:
@@ -2425,7 +2425,7 @@ paths:
   /api/v1/sweep-executions/{execution_id}/confirm:
     post:
       tags:
-      - trading
+      - treasury
       summary: Confirm Sweep Execution
       operationId: confirm_sweep_execution_api_v1_sweep_executions__execution_id__confirm_post
       parameters:
@@ -3636,9 +3636,9 @@ components:
             format: uuid
           - type: 'null'
           title: Custodial Provider Id
-        seed_origin:
+        purse_mode:
           anyOf:
-          - $ref: '#/components/schemas/PurseSeedOrigin'
+          - $ref: '#/components/schemas/PurseMode'
           - type: 'null'
         signing_device_label:
           anyOf:
@@ -4351,8 +4351,8 @@ components:
           minimum: 0.0
           title: Display Order
           default: 0
-        seed_origin:
-          $ref: '#/components/schemas/PurseSeedOrigin'
+        purse_mode:
+          $ref: '#/components/schemas/PurseMode'
         descriptors:
           items:
             $ref: '#/components/schemas/DescriptorInput'
@@ -4365,15 +4365,16 @@ components:
       - name
       - purpose
       - declared_security
-      - seed_origin
+      - purse_mode
       - descriptors
       title: PurseCreate
-    PurseSeedOrigin:
+    PurseMode:
       type: string
       enum:
-      - external_watch_only
-      - tallykeep_managed
-      title: PurseSeedOrigin
+      - watch_only
+      - on_device_tk_generated
+      - on_device_user_imported
+      title: PurseMode
     RecomputeBody:
       properties:
         holding_id:
@@ -5180,3 +5181,4 @@ components:
       - address
       - is_whitelisted
       title: WhitelistVerificationOut
+

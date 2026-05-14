@@ -355,10 +355,7 @@
     line-height: var(--line-height-default);
     max-width: 280px;
   }
-  .allset-block .summary strong {
-    color: var(--color-text);
-    font-weight: var(--font-weight-semibold);
-  }
+
   .facts {
     background: var(--color-surface);
     border: 1px solid var(--color-border);

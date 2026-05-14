@@ -394,11 +394,194 @@ removed; `concerns/feature_flags.md` flag table updated to
 
 ---
 
+## Shipped 2026-05-14 — Purse-mode rename (closeout after Rémy greenlight on 2026-05-14)
+
+### Iteration: Purse-mode rename (janitorial)
+
+**Started:** 2026-05-14
+**Goal:** Rename Purse's `seed_origin` field and its enum values
+to the cleaner shape that organizes around the on-device-keys
+axis. `PurseSeedOrigin` → `PurseMode`. Three enum values:
+`EXTERNAL_WATCH_ONLY` → `WATCH_ONLY`, `TALLYKEEP_MANAGED` →
+`ON_DEVICE_TK_GENERATED`, and **reserve** the third value
+`ON_DEVICE_USER_IMPORTED` for the upcoming `purse-upgrade-path`
+iteration (no code path yet).
+
+Same shape as Treasury rename — breaking compat is fine
+(dev phase, sole user), single coding session end-to-end.
+
+#### Scope (in) — required
+
+- **Domain entity rename.** Class `PurseSeedOrigin` → `PurseMode`.
+  Field `seed_origin` → `purse_mode` everywhere in
+  `domain/holding.py`, repositories, schemas, services, tests.
+- **Enum value rename:**
+  - `EXTERNAL_WATCH_ONLY` → `WATCH_ONLY`
+  - `TALLYKEEP_MANAGED` → `ON_DEVICE_TK_GENERATED`
+  - **Add** `ON_DEVICE_USER_IMPORTED` to the enum (reserved
+    for the upcoming `purse-upgrade-path` iteration — no
+    creation flow in this iteration; the value exists so the
+    next iteration doesn't have to rename the enum again).
+- **Alembic migration** rewrites every Purse row's
+  `holding.subtype_data` JSONB:
+  - rename key `seed_origin` → `purse_mode`
+  - rewrite values `external_watch_only` → `watch_only`,
+    `tallykeep_managed` → `on_device_tk_generated`
+  - idempotent (re-run safe)
+- **API surface rename.** OpenAPI schema field `seed_origin` →
+  `purse_mode` on the Purse-creation request and any
+  Purse-detail response. Regenerate `api/openapi.yaml` at
+  closeout.
+- **Frontend rename.** TS types, store fields, wizard
+  request-body construction, route-handler code, any copy
+  strings that reference the old enum literals.
+- **Backend smoke tests** (`.ps1`) — every Purse-creation
+  assertion updated.
+- **Canonical-spec cleanup** — sync stale references (verified
+  by grep at iteration close). Files to touch:
+  - `02_domain_model.md` — heaviest; class definition, enum,
+    "Purse seed origin" section
+  - `03_data_model.md` — `holding.subtype_data` JSONB shape
+    example
+  - `holdings/02_purse.md` — two lingering "per seed-origin"
+    phrases in Sends and SweepPolicy sections
+  - `UI/README.md` — Add-Holding Purse section
+  - `UI/mobile.md` — Purse-wizard description
+  - `concerns/threat_model.md` — Mobile addendum (one occurrence)
+  - `brand/identity/README.md` — holding-icon row labels;
+    plus the SVG files themselves rename
+    (`holding-purse-managed.svg` → `holding-purse-on-device.svg`
+    or equivalent; agent picks the cleanest name)
+  - `pre-implementation.md` — `purse-upgrade-path` item text
+    (replace old enum names with new vocabulary)
+  - `decisions/0006-purse-seed-origin.md` — append-only ADR;
+    add a top-of-file *Vocabulary update (2026-05): field
+    renamed to `purse_mode`; values reorganized around the
+    on-device-keys axis. The substantive decision (three Purse
+    flavors, per-client signing-capability check) is unchanged.
+    See `02_domain_model.md` for the current shape.* Same
+    editorial-note pattern as ADR-0003.
+
+#### Scope (out) — required
+
+- **No implementation of the seed-import flow** for
+  `ON_DEVICE_USER_IMPORTED`. The enum value is reserved here;
+  the Purse-detail upgrade flow, disclosure copy, double-spend
+  warnings, etc. are the `purse-upgrade-path` iteration that
+  ships separately.
+- **No change to the per-client signing-capability check** —
+  mechanics unchanged from ADR-0006.
+- **No back-compat shims** — old field name and enum values
+  stop working in the same commit they're renamed.
+
+#### Affected canonical docs
+
+See "Canonical-spec cleanup" under Scope (in) — 9 docs plus the
+brand-identity SVG file renames.
+
+#### Affected mockups
+
+None directly. No visible UI change beyond the wizard's
+request-body fields, which the frontend handles internally.
+
+#### Tasks — required
+
+1. Rename class + field + enum values across backend. Add the
+   reserved `ON_DEVICE_USER_IMPORTED` value to the enum. Fix
+   imports until the backend test suite compiles.
+2. Run backend unit + integration tests. Fix failures.
+3. Write the Alembic migration. Apply locally; verify with
+   `SELECT subtype_data FROM holding WHERE holding_type='purse'`.
+4. Regenerate Pydantic schemas / OpenAPI route definitions.
+5. Update frontend types + stores + wizard request-body.
+6. Update smoke-test `.ps1` payload assertions.
+7. Run full test suite — backend + frontend. Fix until green.
+8. Run `tools/check-spec.ps1`.
+9. **Stop and hand off** (per `PROCESS.md §2.7` stage 3). Post a
+   "ready for verification" message: what changed, on-agent test
+   results, what Rémy verifies, what greenlight triggers.
+10. **On Rémy's greenlight only:** regenerate `api/openapi.yaml`,
+    edit all 9 canonical-spec files + rename brand-identity
+    SVGs, run sweep, commit closeout.
+
+#### Acceptance / done-when — required
+
+- `grep -rn "seed_origin\|PurseSeedOrigin\|EXTERNAL_WATCH_ONLY\|TALLYKEEP_MANAGED\|EXTERNAL_IMPORTED" backend/ frontend/`
+  returns zero hits.
+- `grep -rn "seed_origin\|PurseSeedOrigin\|EXTERNAL_WATCH_ONLY\|TALLYKEEP_MANAGED\|EXTERNAL_IMPORTED" specs/`
+  returns zero hits **except**: the historical-record references
+  inside `decisions/0006-purse-seed-origin.md` (ADR
+  append-only), and the migration-note paragraph in
+  `holdings/02_purse.md` (lines 24–37) that documents the
+  rename for posterity.
+- `api/openapi.yaml` shows `purse_mode` in Purse schemas and
+  no `seed_origin`.
+- Every Purse row in the DB has a `subtype_data->>'purse_mode'`
+  value (no `seed_origin` key left), verified by SQL inspect
+  after migration.
+- `tools/check-spec.ps1` passes (all six checks).
+- Rémy's `.ps1` smoke-test suite passes against the running
+  backend.
+- Creating a new Purse through the wizard (`WATCH_ONLY` and
+  `ON_DEVICE_TK_GENERATED` modes) persists the new field name
+  cleanly.
+
+#### Dependencies
+
+None hard. Treasury rename (Shipped 2026-05-14, see below) has
+landed; no branch collision risk.
+
+#### Verification (Rémy)
+
+- Run the `.ps1` smoke-test suite against the running backend.
+  Expect green.
+- Open Swagger UI. Verify the Purse-creation request body
+  carries `purse_mode` and `seed_origin` is gone.
+- Hand-test the Add-Holding wizard: paste a watch-only
+  descriptor → creates a `WATCH_ONLY` Purse. Generate a
+  TallyKeep wallet → creates an `ON_DEVICE_TK_GENERATED`
+  Purse. Both persist cleanly; the existing pre-migration
+  Purses (if any) load with their new `purse_mode` value.
+- Read the canonical-spec doc edits — confirm the migration
+  shape in `02_domain_model.md` reads cleanly and matches the
+  framing in `holdings/02_purse.md`.
+
+#### Closeout
+
+The agent does **not** start closeout until Rémy's explicit
+greenlight. On greenlight:
+
+1. Regenerate `api/openapi.yaml` from the running backend.
+2. Edit the 9 canonical-spec docs listed under Scope (in).
+3. Rename the brand-identity SVG file(s) — `git mv`, then
+   update the row in `brand/identity/README.md`.
+4. Move this Active block to a `## Shipped YYYY-MM-DD —
+   Purse-mode rename` record at the bottom, summarizing what
+   landed.
+5. Reset the `## Active iteration` section to the "no active
+   coding iteration" placeholder.
+6. Add a breadcrumb to `future_iterations.md` "Promoted"
+   section.
+7. Run `tools/check-spec.ps1` one final time. Must pass.
+8. Commit the closeout in a single change. Commit message:
+   `Purse-mode rename closeout after Rémy greenlight YYYY-MM-DD`.
+
+Closeout: `api/openapi.yaml` regenerated (5184 lines, `PurseMode` schema,
+`purse_mode` field, no `seed_origin`). Canonical-spec cleanup: `02_domain_model.md`
+class + enum + section renamed; `03_data_model.md` JSONB comment updated;
+`holdings/02_purse.md` two "per seed-origin" phrases updated; `UI/README.md`
+Add-Purse field references updated; `UI/mobile.md` wizard description updated;
+`concerns/threat_model.md` Mobile addendum updated; `brand/identity/README.md`
+SVG row updated + `holding-purse-managed.svg` → `holding-purse-on-device.svg`;
+`pre-implementation.md` purse-upgrade-path item updated;
+`decisions/0006-purse-seed-origin.md` vocabulary note prepended.
+`tools/check-spec.ps1` passing (6 checks). 499 passed, 1 skipped throughout.
+
+---
+
 ## Active iteration
 
-No active coding iteration. Next promotion from
-`future_iterations.md` when Rémy is ready to start the next
-session.
+No active coding iteration.
 
 ---
 

@@ -140,7 +140,7 @@ $body = @{
     name = "Smoke-test phone wallet"
     description = "Created by smoke-test.ps1"
     purpose = "spending"
-    seed_origin = "external_watch_only"
+    purse_mode = "watch_only"
     declared_security = @{
         custody_model = "self_single"
         signing_model = "software_hot"
@@ -311,13 +311,13 @@ Show "regtest script_type"    $validatedRegtest.script_type
 Show "regtest is_multisig"    $validatedRegtest.is_multisig
 Show "regtest first_addr[0]"  ($validatedRegtest.first_addresses | Select-Object -First 1)
 
-# Create a tallykeep_managed Purse — exercises the generate mode path.
+# Create a on_device_tk_generated Purse — exercises the generate mode path.
 # Uses branch /901/* to avoid conflicting with other smoke sections.
 $tpubGenerated = "wpkh(tpubD6NzVbkrYhZ4XHndKkuB8FifXm8r5FQHwrN6oZuWCz13qb93rtgKvD4PQsqC4HP4yhV3tA2fqr2RbY5mNXfM7RxXUoeABoDtsFUq2zJq6YK/901/*)"
 $managedPurseBody = @{
     name        = "Smoke TallyKeep Purse"
     purpose     = "spending"
-    seed_origin = "tallykeep_managed"
+    purse_mode = "on_device_tk_generated"
     declared_security = @{
         custody_model = "self_single"
         signing_model = "software_hot"
@@ -334,7 +334,7 @@ $managedPurseBody = @{
 try {
     $managedPurse = Invoke-RestMethod -Method Post -Uri "$BaseUrl/api/v1/holdings/purse" `
         -ContentType 'application/json' -Body $managedPurseBody -Headers $Headers
-    Show "managed seed_origin"   $managedPurse.seed_origin
+    Show "managed purse_mode"    $managedPurse.purse_mode
     Show "managed holding_type"  $managedPurse.holding_type
     $managedPurseId   = $managedPurse.id
     $managedDescId    = $managedPurse.descriptor_ids[0]
@@ -379,7 +379,7 @@ $wpkhRegtest = "wpkh(tpubD6NzVbkrYhZ4XHndKkuB8FifXm8r5FQHwrN6oZuWCz13qb93rtgKvD4
 $regtestBody = @{
     name = "Smoke regtest wallet"
     purpose = "spending"
-    seed_origin = "external_watch_only"
+    purse_mode = "watch_only"
     declared_security = @{
         custody_model = "self_single"
         signing_model = "software_hot"
@@ -499,7 +499,7 @@ try {
     $bankPurseBody = @{
         name = "Smoke banking wallet"
         purpose = "spending"
-        seed_origin = "external_watch_only"
+        purse_mode = "watch_only"
         declared_security = @{
             custody_model = "self_single"
             signing_model = "software_hot"

@@ -545,6 +545,17 @@ Checklist:
 6. **No "Decided" parallel ledger.** `pre-implementation.md`
    contains only Open items. Closed items left the file (to ADR or
    canonical doc edits, per §2.6).
+7. **No NUL-byte trails on edited files.** After any large or
+   structural edit on a markdown / yaml / css / html / svg file,
+   verify the file ends cleanly — no trailing NUL bytes (`\x00`),
+   no truncation mid-sentence, no spurious whitespace block at
+   the tail. **This is a recurring failure mode.** Multiple
+   sessions have produced files corrupted by tool / linter
+   interactions, with hundreds of NUL bytes appended after the
+   last real line, or with the tail of the file silently dropped
+   mid-paragraph. The sanity sweep grep-checks for `\x00` in
+   non-binary spec files; the agent should also eyeball the
+   `tail -10` of any file it just substantially rewrote.
 
 If any check fails, the iteration isn't done. Fix in the same
 commit, not as a TODO. Drift is a bug, not a chore (per §2.2).
