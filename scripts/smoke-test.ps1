@@ -488,11 +488,11 @@ if ($regtestSkipped) {
 
 Section "14c. Banking: fee-estimate, payment-request, invoice, cancel"
 
-# Use a dedicated tpub branch so descriptor uniqueness never conflicts with
-# section 14's single-expression xpub.  Branches 800 (external) + 801 (change)
-# are reserved for this smoke section.
-$bankingExt = "wpkh([73c5da0a]tpubD6NzVbkrYhZ4XYa9MoLt4BiMZ4gkt2faZ4BcmKu2a9te4LDpQmvEz2L2yDERivHxFPnxXXhqDRkUNnQCpZggCyEZLBktV7VaSmwayqMJy1s/800/*)"
-$bankingChg = "wpkh([73c5da0a]tpubD6NzVbkrYhZ4XYa9MoLt4BiMZ4gkt2faZ4BcmKu2a9te4LDpQmvEz2L2yDERivHxFPnxXXhqDRkUNnQCpZggCyEZLBktV7VaSmwayqMJy1s/801/*)"
+# Use the same regtest-validated tpub as section 14 but on distinct branches
+# (/800/* external, /801/* change) so descriptor uniqueness never conflicts.
+$bankingTpub = "tpubD6NzVbkrYhZ4XHndKkuB8FifXm8r5FQHwrN6oZuWCz13qb93rtgKvD4PQsqC4HP4yhV3tA2fqr2RbY5mNXfM7RxXUoeABoDtsFUq2zJq6YK"
+$bankingExt = "wpkh($bankingTpub/800/*)"
+$bankingChg = "wpkh($bankingTpub/801/*)"
 
 $bankingSkipped = $false
 try {
@@ -527,14 +527,17 @@ try {
     # skipped.
     $bankFunder     = "smoke_bank_$(Get-Random -Maximum 99999)"
     $bankFunderFlag = "-rpcwallet=$bankFunder"
-    docker compose exec -T bitcoind bitcoin-cli @rpcAuth createwallet $bankFunder | Out-Null
+    $bankCreateOut  = docker compose exec -T bitcoind bitcoin-cli @rpcAuth createwallet $bankFunder 2>&1
+    if ($LASTEXITCODE -ne 0) { throw "createwallet '$bankFunder' failed: $bankCreateOut" }
     $bankFunderAddr = (docker compose exec -T bitcoind bitcoin-cli @rpcAuth $bankFunderFlag getnewaddress).Trim()
     docker compose exec -T bitcoind bitcoin-cli @rpcAuth generatetoaddress 150 $bankFunderAddr | Out-Null
 
     $bankRecvAddr = (Invoke-RestMethod `
-        -Uri "$BaseUrl/api/v1/descriptors/$bankDescId/addresses?limit=1" `
+        -Uri "$BaseUrl/api/v1/descriptors/$bankDescId/addresses?limit=1&is_change=false" `
         -Headers $Headers).addresses[0].address
-    (docker compose exec -T bitcoind bitcoin-cli @rpcAuth $bankFunderFlag sendtoaddress $bankRecvAddr 0.00050000).Trim() | Out-Null
+    $bankSendTxid = (docker compose exec -T bitcoind bitcoin-cli @rpcAuth $bankFunderFlag sendtoaddress $bankRecvAddr 0.00050000).Trim()
+    if ($LASTEXITCODE -ne 0) { throw "sendtoaddress to '$bankRecvAddr' failed" }
+    Show "bank funded txid" $bankSendTxid
     $bankMinerAddr = (docker compose exec -T bitcoind bitcoin-cli @rpcAuth $bankFunderFlag getnewaddress).Trim()
     docker compose exec -T bitcoind bitcoin-cli @rpcAuth generatetoaddress 1 $bankMinerAddr | Out-Null
 
