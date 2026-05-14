@@ -425,8 +425,11 @@ Rémy 2026-05:
   / `desktop.md`.
 - Implementation specifics (SvelteKit components, routing, state
   stores) — those are code, not spec.
-- Brand identity, copy voice — placeholder per ADR-0003 dev-phase
-  posture; finalized at ship-gate.
+- Brand identity, copy voice — see `brand/README.md` (mark,
+  wordmark, palette locked; voice/about draft; finalized at
+  the public-ship event per ADR-0003).
 - Future iterations and parked ideas — see `future_iterations.md`.
 - The threat-model implications of mobile and the Capacitor build
-  — see `concerns/threat_mo
+  — see `concerns/threat_model.md` §Mobile addendum.
+nd the Capacitor build
+  — see `concerns/threat_model.md` §Mobile addendum.

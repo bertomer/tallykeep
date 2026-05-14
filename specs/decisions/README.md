@@ -51,7 +51,7 @@ resolve.
 ## Index
 
 Keep this list in sync with the files in this folder. The
-iteration-done sanity sweep (`PROCESS.md §2.9`) checks it.
+iteration-done sanity sweep (`PROCESS.md §4.6`) checks it.
 
 - [0001 — Spec consolidation pass](0001-spec-consolidation.md) — Accepted; refined by 0002
 - [0002 — Iteration cycle and module retirement](0002-iteration-cycle.md) — Accepted

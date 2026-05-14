@@ -30,7 +30,7 @@
 
   Mark values are eyeballed from the photo, not eyedropped — expect
   to nudge. If 3e is adopted, the brand mark v1 lock doc needs a
-  v1 → v2 bump (per PROCESS §2.4 lockstep): the canonical "Aged Oak"
+  v1 → v2 bump (per brand/README.md brand → tokens lockstep): the canonical "Aged Oak"
   hex updates, the mark anatomy comment about "freshly carved oak"
   updates to "centuries-aged oak", identity/*.svg regenerates.
 
@@ -39,8 +39,8 @@
   Original brand v1 (Aged Oak) values preserved in
   outputs/tokens.css.original. Lock-doc / identity-SVG / palette-v2
   Holding-accent values UNCHANGED — those are part of the brand v1
-  story and only get touched if a swap is adopted (per PROCESS §2.4
-  lockstep rule).
+  story and only get touched if a swap is adopted (per
+  brand/README.md brand → tokens lockstep rule).
 
   Status: TEST OVERRIDE — not a brand revision
   Last touched: 2026-05-13 (Vault accent #6c7682 → #b89968 brass +
@@ -219,7 +219,7 @@
   --shadow-lg: 0 12px 32px rgba(26, 26, 26, 0.12);
 
   /* ---------------- Mobile shell ---------------- */
-  /* Baseline viewport per PROCESS.md §5 and UI/mockups/README.md:
+  /* Baseline viewport per UI/mockups/README.md:
      360 × 800 (mid Galaxy A, Moto G — broad Argentine mid-range).
      Mobile-first principle: if it works at 360, it works on the
      larger smoke-test sizes (384×854 Galaxy A56, 390×844 iPhone,

@@ -1,6 +1,6 @@
 #!/usr/bin/env pwsh
 # check-spec.ps1 — iteration-done sanity sweep for the specs/ tree
-# (per PROCESS.md §2.9). PowerShell mirror of tools/check-spec.sh,
+# (per PROCESS.md §4.6). PowerShell mirror of tools/check-spec.sh,
 # kept in sync. Either is sufficient; the .ps1 is the recommended
 # entry point on Windows since the backend smoke-tests are .ps1.
 #
@@ -273,7 +273,7 @@ if ($script:failCount -eq 0) {
     Pop-Location
     exit 0
 } else {
-    Write-Host "FAIL - $($script:failCount) check(s) failed. Fix in the same commit (PROCESS.md §2.9)."
+    Write-Host "FAIL - $($script:failCount) check(s) failed. Fix in the same commit (PROCESS.md §4.6)."
     Pop-Location
     exit 1
 }

@@ -114,8 +114,9 @@ modules fought the user's mental model.
 UI specs live in `UI/` (cross-platform decisions in `UI/README.md`,
 platform-specific in `UI/mobile.md` and `UI/desktop.md`, page-per-file
 HTML mockups in `UI/mockups/`). Brand identity (icon, wordmark, color
-palette, typography, voice) lives in `brand/` — currently in
-placeholder mode pending the public-ship event per ADR-0003. ADRs
+palette, typography, voice) lives in `brand/` — mark, wordmark, and
+palette are locked (v1 / v1 / v2); voice/about is draft. The
+public-ship event (per ADR-0003) confirms or revises. ADRs
 live in `decisions/`. The OpenAPI extract from the running backend
 lives in `api/openapi.yaml`. The working process and document layout
 are described in `PROCESS.md`.

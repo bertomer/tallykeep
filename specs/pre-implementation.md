@@ -409,8 +409,8 @@ and the same-LAN constraint goes away.
 
 **Status:** open (deferred — depends on palette stabilising)
 
-**Item:** PROCESS.md §2.4 currently bundles narrative and live data
-into a single lock-doc per brand artifact. During the May 2026
+**Item:** `brand/README.md` "Lock-doc pattern" currently bundles
+narrative and live data into a single lock-doc per brand artifact. During the May 2026
 palette iteration sweep, this surfaced as friction: editing tokens
 to find the right palette was easier in `tokens.css` than in the
 lock docs, because the lock docs interleave hex values with prose,
@@ -460,8 +460,8 @@ the brand v1 → v2 bump if/when verdigris-on-cool is adopted.
   Aged Oak; only inline SVGs with class hooks follow tokens.css).
   Decision: rewrite identity SVGs to use class-based fills (more
   flexible, requires consumers to inline rather than `<img>`), or
-  keep hex-baked and regenerate per brand version (matches §2.4
-  lockstep more cleanly).
+  keep hex-baked and regenerate per brand version (matches
+  `brand/README.md` brand → tokens lockstep more cleanly).
 - Whether the canvas should additionally expose non-color tokens
   (type, spacing, radius, shadow) in v2.
 

@@ -8,7 +8,7 @@ and URI versioning.
 It does **not** list endpoints. The source of truth for endpoint
 shapes — paths, methods, request bodies, response schemas — is
 `api/openapi.yaml`, regenerated from the running backend on every
-iteration that touches the API (per PROCESS.md §2.2). When you need
+iteration that touches the API (per PROCESS.md §4.2). When you need
 to know "what does endpoint X take and return," read OpenAPI. When
 you need to know "what's our error format" or "what's the pagination
 convention," read this file.
@@ -152,6 +152,6 @@ a typed TypeScript client (e.g., `openapi-typescript`). This keeps
 the frontend and backend in sync and catches contract drift at build
 time.
 
-Per PROCESS.md §2.2, any iteration whose code changes touch the API
+Per PROCESS.md §4.2, any iteration whose code changes touch the API
 surface must regenerate `api/openapi.yaml` as part of that
 iteration's acceptance. Drift is a bug, not a chore.

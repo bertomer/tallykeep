@@ -310,7 +310,7 @@ in `api/openapi.yaml`.
 - **End-to-end tests** (Playwright / Cypress) are post-shipping.
   Not a current gate.
 - **Smoke tests** — a `.ps1` suite run against the running
-  backend at iteration handoff (per PROCESS.md §2.7 stage 4).
+  backend at iteration handoff (per PROCESS.md §4.4 stage 4).
 - **Target coverage**: 80% on backend `services/`, `domain/`,
   `adapters/`. Coverage on API routes and frontend is not a
   current gate.

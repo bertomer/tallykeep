@@ -4,10 +4,22 @@ Page-per-file HTML mockups for visual fine-tuning. Each file is
 self-contained, imports shared tokens and shell styles, and
 targets the mobile baseline viewport.
 
-Working rules for mockups (page-per-file rule, status semantics,
-ADR thresholds, baseline + smoke-test viewports) live in
-`PROCESS.md §2.3` and `§5`. This file holds operational layout
-only — naming, header structure, file structure, contact sheet.
+This file is canonical for all mockup-process rules:
+page-per-file discipline, naming, header structure, status
+semantics, viewports, browser matrix. PROCESS.md points here.
+
+## Page-per-file rule
+
+One `.html` per screen-state. Shared CSS lives in `_shared/`.
+Big multi-screen wireframes are dev artefacts; archive them,
+don't iterate on them.
+
+The rule exists because mockup files diverge fast when they
+carry multiple states. A single big-page mockup with five
+sub-screens drifts on each edit; one of them gets fresh tokens
+applied, the others don't, and a reviewer can't tell which
+sub-screen represents current truth. One file per state, one
+truth per file.
 
 ## Naming
 
@@ -68,9 +80,26 @@ Header comment lines (always include):
 -->
 ```
 
-Status field is one of `draft` / `review` / `validated`. Semantics
-and the "ADR or no ADR" test for changes to a validated mockup are
-in `PROCESS.md §7`.
+Status field is one of `draft` / `review` / `validated`.
+
+**Status semantics:**
+- *draft* — agent or Rémy is iterating on form / copy / layout;
+  may break or contradict another mockup mid-pass.
+- *review* — ready for Rémy's eyes; held at this status until
+  he validates or sends back.
+- *validated* — Rémy gave the explicit greenlight. The
+  corresponding section of `UI/mobile.md` references the file.
+
+**Cosmetic iteration on a validated mockup** (label tweak,
+tap-target adjustment, micro-interaction polish, layout
+reshuffle that doesn't change what's on the screen) — edit the
+file and bump the date. No ADR.
+
+**Structural change to a validated mockup** (touches a locked
+principle, vocabulary, security/posture, trust boundary, or
+reverses a foundational design decision) — new ADR, fresh
+draft. Adding a Send button to a screen previously decided to
+be view-only is the canonical example.
 
 Each file imports shared CSS:
 
@@ -94,11 +123,24 @@ Body wraps content in a `phone-frame` for visual review:
 ## Self-contained for review
 
 - No JS dependencies. Static HTML + CSS.
-- If a state needs interactivity to communicate, draft both states
-  as separate files (e.g. `..._fiat_off.html` and
+- If a state needs interactivity to communicate, draft both
+  states as separate files (e.g. `..._fiat_off.html` and
   `..._fiat_on.html`) rather than relying on JS toggles.
-- Inline any per-screen CSS overrides in a `<style>` block at the
-  top of `<head>`, after the shared CSS imports.
+- Inline any per-screen CSS overrides in a `<style>` block at
+  the top of `<head>`, after the shared CSS imports.
+
+## Viewports
+
+- **Baseline: 360×800** (mid Samsung Galaxy A, Motorola Moto G
+  — broad Argentine mid-range). Mobile-first principle: if it
+  works here, it works everywhere.
+- **Smoke-test at:** 384×854 (Galaxy A56-class), 390×844
+  (iPhone), 412×900 (larger Android).
+
+## Browsers
+
+Check at Chrome, Samsung Internet (default on the ~48% Samsung
+share), Safari mobile.
 
 ## Visual contact sheet
 
@@ -106,18 +148,17 @@ Body wraps content in a `phone-frame` for visual review:
 at-a-glance review — useful for spotting drift across screens
 (colors, type, spacing, navigation conventions).
 
-When adding or removing a mockup, update the `mockups` array near
-the top of `index.html`. The iteration-done sanity sweep
-(`PROCESS.md §2.9`) verifies the array matches the files present.
+When adding or removing a mockup, update the `mockups` array
+near the top of `index.html`. The iteration-done sanity sweep
+(`PROCESS.md §Iteration-done sanity sweep`) verifies the array
+matches the files present.
 
 Open `index.html` in any browser; click any card to open the
 full-size mockup in a new tab.
 
-## Pointers (don't duplicate the rules below)
+## Pointers
 
-- Page-per-file rule and rationale → `PROCESS.md §2.3`
-- Baseline + smoke-test viewports, browser matrix →
-  `PROCESS.md §5`
-- Status semantics and ADR test → `PROCESS.md §7`
-- Mockup-iteration acceptance (validated mockups referenced from
-  `UI/mobile.md`) → `PROCESS.md §2.7`
+- Mockup-iteration acceptance (validated mockups referenced
+  from `UI/mobile.md`) → `PROCESS.md §Iteration cycle`
+- Routing table for ADR-vs-edit decisions → `PROCESS.md §When
+  things change`

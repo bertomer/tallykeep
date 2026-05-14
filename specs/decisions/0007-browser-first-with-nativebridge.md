@@ -65,7 +65,7 @@ land before touching UI work.
 
 - `01_architecture.md` — Capacitor build target, mobile/desktop
   shell separation
-- `PROCESS.md §4` — "Browser fine-tuning (no Capacitor yet)"
+- `PROCESS.md §5` — "Browser fine-tuning (no Capacitor yet)"
 - `PROCESS.md §3 question 5` — browser-only fallback
 - `concerns/threat_model.md` Mobile addendum
 - `UI/README.md` — Send / Receive flows reflecting NativeBridge

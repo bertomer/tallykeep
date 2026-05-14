@@ -38,7 +38,7 @@ either side moved.
 
 - UI specs reference endpoint shapes by pointing at
   `api/openapi.yaml`; they never restate them.
-- The "iteration is done when…" checklist in PROCESS.md §2.9
+- The "iteration is done when…" checklist in PROCESS.md §4.6
   enforces this mechanically; the per-iteration sanity sweep
   catches any drift that slipped past commit time.
 - Reviewers reject iterations that landed backend changes without
@@ -50,4 +50,4 @@ either side moved.
 - `api/README.md` — describes the regen procedure
 - `04_api_conventions.md` — cross-cutting rules only
 - `archive/04_api_surface.md` — historical
-- `PROCESS.md §2.2` and `§2.9` — enforcement
+- `PROCESS.md §4.2` and `§4.6` — enforcement

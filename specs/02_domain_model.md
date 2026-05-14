@@ -205,7 +205,7 @@ This model is reflected in the threat model
 - Purse, Strongbox, and Vault have at least one Descriptor and no CustodialProvider.
 - Vault may have multisig parameters (`required_signers`, `total_signers`); Purse and Strongbox should not.
 - Holdings are soft-deleted (archived). No hard delete, to preserve LedgerEntry integrity.
-- Every Purse has a `purse_mode` value. The field is required at creation and immutable thereafter.
+- Every Purse has a `purse_mode` value. Required at creation; mutable only along the `WATCH_ONLY → ON_DEVICE_USER_IMPORTED` axis via the in-place upgrade flow (per `pre-implementation.md` `purse-upgrade-path`). All other transitions are forbidden — see rule 10 in the summary at the end.
 - The backend never stores any reference to the seed itself. For `purse_mode=ON_DEVICE_TK_GENERATED` (or `ON_DEVICE_USER_IMPORTED`), the seed lives only in a client device's secure local storage; the backend has no field, encrypted or otherwise, that points at it.
 
 ### Descriptor
@@ -721,5 +721,5 @@ Job (standalone, linked to whatever triggered it via parameters)
 7. The whitelist address of a CustodialProvider must be owned by a non-Account Holding.
 8. No domain entity exposes a private key, seed, or signing material in any field. The type system forbids it.
 9. PaymentRequest from a Holding whose `signing_model == NOT_APPLICABLE` is rejected at construction.
-10. A Purse's `purse_mode` is immutable after creation. Migrating between modes requires creating a new Purse and moving funds; the original is archived.
+10. A Purse's `purse_mode` is mutable only along the `WATCH_ONLY → ON_DEVICE_USER_IMPORTED` axis, gated by the in-place upgrade flow defined in `pre-implementation.md` `purse-upgrade-path` (the user pastes the seed of the wallet whose descriptor was already imported; the same Purse becomes spendable from the device that holds the seed). The seed *source* itself is invariant — `ON_DEVICE_TK_GENERATED` and `ON_DEVICE_USER_IMPORTED` never convert into each other. Any other transition requires creating a new Purse and moving funds; the original is archived. The upgrade flow is target state; implementation lands when `purse-upgrade-path` arbitration closes.
 11. The backend never validates client build type. The "create a TallyKeep wallet" affordance is gated client-side on the client's capability to generate and securely store a seed. The backend accepts any Purse-creation request that satisfies the schema.

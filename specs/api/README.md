@@ -32,9 +32,16 @@ this is reproducible by any agent.
 
 ## Status
 
-The file should be present at `openapi.yaml` (or `.json`).
-If absent, regenerate as in the previous section before any UI work
-starts.
+The file should be present at `openapi.yaml` (or `.json`) and
+should reflect the running backend as of the last iteration's
+closeout. **Arriving agents trust the file and do not
+regenerate it** — regeneration is a closeout-stage action
+(per `PROCESS.md §4.4` stage 5 and `PROCESS.md §6` boot
+sequence step 8). If the file is missing, stale, or doesn't
+match the live backend, that is a §4.4 closeout failure by a
+prior session — flag it to Rémy with context and stop.
+Regenerating from whatever backend happens to be running can
+silently overwrite the contract with the wrong state.
 
 ## Working rules
 
@@ -46,7 +53,7 @@ starts.
   closeout commit of that iteration. Drift between OpenAPI and
   code is a bug. The coding agent is responsible.
 - **Regeneration timing.** Regen happens during iteration closeout
-  (`PROCESS.md §2.7` stage 5), **after** Rémy's smoke-test +
+  (`PROCESS.md §4.4` stage 5), **after** Rémy's smoke-test +
   Swagger validation gives the explicit greenlight — not while the
   code is still being iterated. Regenerating mid-iteration captures
   half-built state; regenerating after greenlight captures the

@@ -115,7 +115,7 @@ Created (this session):
 
 Updated (this session):
 
-- `specs/PROCESS.md` — §1 layout, §2.2 backend contract, §6 working
+- `specs/PROCESS.md` — §1 layout, §4.2 backend contract, §6 working
   agreement, §7 when things change, plus filename hygiene throughout.
 - `specs/pre-implementation.md` — intro updated to reflect iteration
   model.
@@ -152,7 +152,7 @@ principle / rejection ADRs from 14 were *not* created. The content
 was already encoded across canonical modules 00–10 and UI/README;
 new ADRs would have been paperwork. The two genuine gaps surfaced
 by triage (no marketing in domain, no abbreviations in identifiers)
-were lifted into `PROCESS.md` §2.8. Multi-asset aggregation, which
+were lifted into `PROCESS.md` §4.5. Multi-asset aggregation, which
 ADR-0002 had implicitly assumed was a settled rejection, surfaced
 as an actually-open arbitration question and lives in
 `pre-implementation.md` item `multi-asset-aggregation`.

@@ -28,7 +28,7 @@ CREATE TABLE user_profile (
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 -- Note: there is no `preset` column. Initial flag values come from
--- onboarding answers (see 09_feature_flags.md); after onboarding,
+-- onboarding answers (see concerns/feature_flags.md); after onboarding,
 -- the user toggles individual flags in Settings. No tier / named
 -- identity is stored.
 ```

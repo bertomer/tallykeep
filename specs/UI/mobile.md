@@ -54,7 +54,9 @@ screen-state) per the convention in `UI/mockups/README.md`.
   and `UI/mockups/_shared/shell.css`.
 - Implementation specifics (SvelteKit components, routing, state
   stores) — those are code, not spec.
-- Brand identity, copy voice — placeholder per ADR-0003.
+- Brand identity, copy voice — see `brand/README.md` (mark,
+  wordmark, palette locked; voice/about draft; finalized at the
+  public-ship event per ADR-0003).
 
 ## Migration note for the first Send / Receive iteration
 
@@ -799,8 +801,9 @@ fit candidate is this Connect screen — the user's first-touch
 moment in the app is the same shape of moment as a landing-page
 hero, and the verification metaphor is what TallyKeep's whole
 brand argues. Bringing it into Connect requires a brand v1 → v2
-lock-doc bump (per `PROCESS.md §2.4` — pre-public-ship lock-doc
-edits allowed without an ADR) updating §5 to extend the sanction.
+lock-doc bump (per `brand/README.md` §Status-driven discipline —
+pre-public-ship lock-doc edits allowed without an ADR) updating §5
+to extend the sanction.
 Captured for sharpening in `future_iterations.md` as
 "Dynamic brand mark on first-touch surfaces"; not landed in this
 mockup because mockups are static-only per
@@ -1025,7 +1028,8 @@ Locked during the 2026-05-13 design pass:
 The shared wizard-shell pattern lands with this iteration since
 the Purse wizard is its first consumer. Splitting the shell into
 its own iteration would have produced a no-consumer artifact —
-the anti-pattern §2 of `PROCESS.md` warns against.
+the role-mixing / scope-creep anti-pattern `PROCESS.md` §2 warns
+against.
 
 **Header.** 3-cell grid `[back chevron 44 px] [step counter
 centered] [empty 44 px]`. The step counter renders as
@@ -1299,4 +1303,13 @@ copy adapted to "Here's what we generated for you" and a small
 
 6. **Open-source and reproducibility.** No closed-source
    dependency. Descriptor parsing (BIP 380 + miniscript) lives
-   in
+   in BDK's miniscript module (Rust, MIT-licensed). The
+   `@scure/bip39` and `@scure/bip32` JS libraries are MIT,
+   in-tree-buildable, no closed deps.
+
+<!-- 2026-05-14 spec-cleanup note: section 6 above ("Open-source and
+reproducibility") was truncated mid-sentence on disk by a tool-side
+write bug during this session. The closure is a minimal-fidelity
+reconstruction from project context (BDK, scure libs already referenced
+elsewhere). Restore from git history if a more accurate version is
+needed. -->
