@@ -34,11 +34,11 @@ ALL_FEATURE_FLAGS: tuple[str, ...] = (
     "banking.rbf.enabled",
     "banking.vault_outgoing_warns",
     "banking.coin_selection_per_payment_override",
-    # Trading
-    "trading.enabled",
-    "trading.sweep_policy.enabled",
-    "trading.sweep_confirmation.required",
-    "trading.bidirectional_sweeps.shown",
+    # Treasury
+    "treasury.enabled",
+    "treasury.sweep_policy.enabled",
+    "treasury.sweep_confirmation.required",
+    "treasury.bidirectional_sweeps.shown",
     # Notifications
     "notifications.in_app",
     # Display
@@ -74,11 +74,11 @@ DEFAULT_FLAG_VALUES: dict[str, bool] = {
     "banking.rbf.enabled":                          False,
     "banking.vault_outgoing_warns":                 True,
     "banking.coin_selection_per_payment_override":  False,
-    # Trading
-    "trading.enabled":                              True,
-    "trading.sweep_policy.enabled":                 True,
-    "trading.sweep_confirmation.required":          True,
-    "trading.bidirectional_sweeps.shown":           True,
+    # Treasury
+    "treasury.enabled":                              True,
+    "treasury.sweep_policy.enabled":                 True,
+    "treasury.sweep_confirmation.required":          True,
+    "treasury.bidirectional_sweeps.shown":           True,
     # Notifications
     "notifications.in_app":                         True,
     # Display

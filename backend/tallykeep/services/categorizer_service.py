@@ -86,7 +86,7 @@ def _custodial_match(session: Session, entry_row: LedgerEntryRow) -> LedgerCateg
 
     The CustodialProvider table isn't populated in v1's savings-only
     milestone — the lookup returns no rows and this heuristic stays
-    quiet. M8's trading layer wires it.
+    quiet. M8's treasury layer wires it.
     """
     try:
         from tallykeep.models import CustodialProviderRow

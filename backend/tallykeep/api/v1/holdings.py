@@ -32,11 +32,11 @@ from tallykeep.schemas.holding import (
     StrongboxCreate,
     VaultCreate,
 )
-from tallykeep.services import holding_service, trading_service
+from tallykeep.services import holding_service, treasury_service
 from tallykeep.services.holding_service import HoldingServiceError
-from tallykeep.services.trading_service import (
+from tallykeep.services.treasury_service import (
     ProviderConnectionError,
-    TradingServiceError,
+    TreasuryServiceError,
     TradePermissionsDetected,
 )
 
@@ -195,7 +195,7 @@ async def create_account_holding(
 ) -> HoldingResponse:
     cp = body.custodial_provider
     try:
-        holding, _ = trading_service.create_account_holding(
+        holding, _ = treasury_service.create_account_holding(
             session,
             name=body.name,
             description=body.description,
@@ -220,7 +220,7 @@ async def create_account_holding(
     except ProviderConnectionError as exc:
         session.rollback()
         raise HTTPException(status_code=502, detail=str(exc)) from exc
-    except TradingServiceError as exc:
+    except TreasuryServiceError as exc:
         session.rollback()
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     return _to_response(holding)

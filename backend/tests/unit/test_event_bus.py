@@ -34,7 +34,7 @@ class TestTopicMatchesPattern:
             # Wildcard matches.
             ("chain.tx.confirmed", "chain.*", True),
             ("chain.block.new", "chain.*", True),
-            ("trading.sweep.executed", "chain.*", False),
+            ("treasury.sweep.executed", "chain.*", False),
             # Multi-segment wildcards.
             ("chain.tx.confirmed", "chain.tx.*", True),
             ("chain.block.new", "chain.tx.*", False),
@@ -46,8 +46,8 @@ class TestTopicMatchesPattern:
             # Empty payload still matches its own topic.
             ("", "*", True),
             # Distinct topic-roots do not bleed.
-            ("trading.sweep.executed", "trading.*", True),
-            ("trading_sweep.executed", "trading.*", False),
+            ("treasury.sweep.executed", "treasury.*", True),
+            ("treasury_sweep.executed", "treasury.*", False),
         ],
     )
     def test_match(self, topic: str, pattern: str, expected: bool) -> None:
@@ -92,7 +92,7 @@ class TestInMemoryBusBasics:
         self, bus: InMemoryEventBus
     ) -> None:
         received: list[Event] = []
-        bus.subscribe(["trading.*"], received.append)
+        bus.subscribe(["treasury.*"], received.append)
 
         bus.publish("chain.tx.confirmed", {})
 

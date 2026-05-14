@@ -1,4 +1,4 @@
-"""Trading service — spec module 07 (M8).
+"""Treasury service — spec module 07 (M8).
 
 Handles:
   - Account Holding creation + CustodialProvider registration
@@ -43,39 +43,39 @@ from tallykeep.services import holding_service
 # --- Exceptions -----------------------------------------------------------------
 
 
-class TradingServiceError(ValueError):
-    """Base for trading-layer errors (API layer catches this)."""
+class TreasuryServiceError(ValueError):
+    """Base for treasury-layer errors (API layer catches this)."""
 
 
-class ProviderNotFound(TradingServiceError):
+class ProviderNotFound(TreasuryServiceError):
     pass
 
 
-class PolicyNotFound(TradingServiceError):
+class PolicyNotFound(TreasuryServiceError):
     pass
 
 
-class ExecutionNotFound(TradingServiceError):
+class ExecutionNotFound(TreasuryServiceError):
     pass
 
 
-class TradePermissionsDetected(TradingServiceError):
+class TradePermissionsDetected(TreasuryServiceError):
     """Registration rejected because the API key has trade permissions."""
 
 
-class ProviderConnectionError(TradingServiceError):
+class ProviderConnectionError(TreasuryServiceError):
     """Wrapped adapter error surfaced at the API layer."""
 
 
-class PolicyHasUnacknowledgedWarnings(TradingServiceError):
+class PolicyHasUnacknowledgedWarnings(TreasuryServiceError):
     pass
 
 
-class PolicyAlreadyEnabled(TradingServiceError):
+class PolicyAlreadyEnabled(TreasuryServiceError):
     pass
 
 
-class WrongExecutionStatus(TradingServiceError):
+class WrongExecutionStatus(TreasuryServiceError):
     pass
 
 
@@ -192,12 +192,12 @@ def create_account_holding(
             adapter_id, api_key=api_key, api_secret=api_secret, api_passphrase=api_passphrase
         )
     except UnsupportedAdapterError as exc:
-        raise TradingServiceError(str(exc)) from exc
+        raise TreasuryServiceError(str(exc)) from exc
 
     try:
         perms = adapter.get_permissions()
     except ProviderAuthError as exc:
-        raise TradingServiceError(f"Provider authentication failed: {exc}") from exc
+        raise TreasuryServiceError(f"Provider authentication failed: {exc}") from exc
     except ProviderError as exc:
         raise ProviderConnectionError(f"Could not reach provider: {exc}") from exc
 
@@ -225,7 +225,7 @@ def create_account_holding(
             passphrase_ref = f"provider:{provider_id}:api_passphrase"
             secret_store.set_secret(passphrase_ref, api_passphrase.encode())
     except LockedError as exc:
-        raise TradingServiceError("Secret store is locked; unlock before registering a provider") from exc
+        raise TreasuryServiceError("Secret store is locked; unlock before registering a provider") from exc
 
     # Persist Holding
     now = datetime.now(UTC)
@@ -312,7 +312,7 @@ def patch_provider(
 
     if api_key is not None or api_secret is not None:
         if secret_store is None:
-            raise TradingServiceError("secret_store is required for credential rotation")
+            raise TreasuryServiceError("secret_store is required for credential rotation")
         new_key = api_key or secret_store.get_secret(provider.api_credential_reference).decode()
         new_secret = api_secret or secret_store.get_secret(provider.api_secret_reference).decode()
         new_pass = api_passphrase
@@ -323,7 +323,7 @@ def patch_provider(
                                     api_passphrase=new_pass)
             perms = adapter.get_permissions()
         except ProviderAuthError as exc:
-            raise TradingServiceError(f"New credentials are invalid: {exc}") from exc
+            raise TreasuryServiceError(f"New credentials are invalid: {exc}") from exc
         except ProviderError as exc:
             raise ProviderConnectionError(str(exc)) from exc
 
@@ -378,7 +378,7 @@ def refresh_provider_balance(
             if provider.api_passphrase_reference else None
         )
     except (KeyError, LockedError) as exc:
-        raise TradingServiceError(f"Cannot read provider credentials: {exc}") from exc
+        raise TreasuryServiceError(f"Cannot read provider credentials: {exc}") from exc
 
     try:
         adapter = build_adapter(provider.adapter_id, api_key=api_key, api_secret=api_secret,
@@ -387,7 +387,7 @@ def refresh_provider_balance(
     except ProviderAuthError as exc:
         cp_repo.update_error(session, provider_id,
                              error=str(exc), polled_at=datetime.now(UTC))
-        raise TradingServiceError(f"Provider authentication failed: {exc}") from exc
+        raise TreasuryServiceError(f"Provider authentication failed: {exc}") from exc
     except ProviderError as exc:
         cp_repo.update_error(session, provider_id,
                              error=str(exc), polled_at=datetime.now(UTC))
@@ -414,7 +414,7 @@ def verify_whitelist(
             if provider.api_passphrase_reference else None
         )
     except (KeyError, LockedError) as exc:
-        raise TradingServiceError(f"Cannot read provider credentials: {exc}") from exc
+        raise TreasuryServiceError(f"Cannot read provider credentials: {exc}") from exc
 
     adapter = build_adapter(provider.adapter_id, api_key=api_key, api_secret=api_secret,
                             api_passphrase=api_passphrase)
@@ -445,12 +445,12 @@ def create_sweep_policy(
 ) -> SweepPolicy:
     source = holding_service.get_holding(session, source_holding_id)
     if source is None:
-        raise TradingServiceError(f"Source holding {source_holding_id} not found")
+        raise TreasuryServiceError(f"Source holding {source_holding_id} not found")
     destination = holding_service.get_holding(session, destination_holding_id)
     if destination is None:
-        raise TradingServiceError(f"Destination holding {destination_holding_id} not found")
+        raise TreasuryServiceError(f"Destination holding {destination_holding_id} not found")
     if source_holding_id == destination_holding_id:
-        raise TradingServiceError("Source and destination holdings must differ")
+        raise TreasuryServiceError("Source and destination holdings must differ")
 
     source_provider: CustodialProvider | None = None
     if source.holding_type == HoldingType.ACCOUNT and source.custodial_provider_id:
@@ -559,7 +559,7 @@ def update_sweep_policy(
 def delete_sweep_policy(session: Session, policy_id: UUID) -> None:
     policy = get_sweep_policy(session, policy_id)
     if policy.is_enabled:
-        raise TradingServiceError("Disable the policy before deleting it")
+        raise TreasuryServiceError("Disable the policy before deleting it")
     sp_repo.delete(session, policy_id)
 
 
@@ -649,34 +649,34 @@ def execute_sweep_now(
 
     policy = get_sweep_policy(session, policy_id)
     if not policy.is_enabled:
-        raise TradingServiceError("Policy must be enabled before manual execution")
+        raise TreasuryServiceError("Policy must be enabled before manual execution")
 
     source = holding_service.get_holding(session, policy.source_holding_id)
     if source is None:
-        raise TradingServiceError(f"Source holding {policy.source_holding_id} not found")
+        raise TreasuryServiceError(f"Source holding {policy.source_holding_id} not found")
 
     if source.holding_type != HoldingType.ACCOUNT or not source.custodial_provider_id:
-        raise TradingServiceError(
+        raise TreasuryServiceError(
             "Manual execute-now is only supported for Account → self-custody policies"
         )
 
     provider = cp_repo.get(session, source.custodial_provider_id)
     if provider is None:
-        raise TradingServiceError("CustodialProvider not found for source holding")
+        raise TreasuryServiceError("CustodialProvider not found for source holding")
 
     # Resolve destination address from the first descriptor of the destination holding.
     dest_descriptors = descriptor_repo.list_descriptors_for_holding(
         session, policy.destination_holding_id
     )
     if not dest_descriptors:
-        raise TradingServiceError(
+        raise TreasuryServiceError(
             "Destination holding has no descriptors — cannot derive a receive address"
         )
     address_row = descriptor_repo.next_unused_address(
         session, dest_descriptors[0].id, is_change=False
     )
     if address_row is None:
-        raise TradingServiceError(
+        raise TreasuryServiceError(
             "No unused receive address available on destination holding's descriptor"
         )
 
@@ -689,7 +689,7 @@ def execute_sweep_now(
             if provider.api_passphrase_reference else None
         )
     except (KeyError, LockedError) as exc:
-        raise TradingServiceError(f"Cannot read provider credentials: {exc}") from exc
+        raise TreasuryServiceError(f"Cannot read provider credentials: {exc}") from exc
 
     # Calculate sweep amount.
     current_balance = provider.last_known_balance_sats or 0
@@ -701,7 +701,7 @@ def execute_sweep_now(
         sweep_amount = amount_sats
 
     if sweep_amount <= 0:
-        raise TradingServiceError(
+        raise TreasuryServiceError(
             "Calculated sweep amount is zero or negative — "
             "check the balance and minimum_balance_sats"
         )
@@ -752,7 +752,7 @@ def execute_sweep_now(
 
 
 __all__ = [
-    "TradingServiceError",
+    "TreasuryServiceError",
     "TradePermissionsDetected",
     "ProviderNotFound",
     "PolicyNotFound",

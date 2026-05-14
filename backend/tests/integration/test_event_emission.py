@@ -127,11 +127,11 @@ def test_publish_failure_still_leaves_row_for_replay(
     failing_bus = _FailingBus()
     emitter = PersistentEmitter(failing_bus, session_factory)
 
-    event = emitter.emit_critical("trading.sweep.executed", {"id": "s1"})
+    event = emitter.emit_critical("treasury.sweep.executed", {"id": "s1"})
 
     # The publish raised internally — the emitter caught it and synthesized an
     # Event handle so the caller still has a usable reference.
-    assert event.topic == "trading.sweep.executed"
+    assert event.topic == "treasury.sweep.executed"
 
     # The row exists and is unacknowledged — the reconciler can replay later.
     with session_factory() as session:
@@ -156,7 +156,7 @@ def test_reconciler_skips_recent_events(
     received: list[Event] = []
     bus.subscribe(["*"], received.append)
 
-    emitter.emit_critical("trading.sweep.executed", {"id": "s1"})
+    emitter.emit_critical("treasury.sweep.executed", {"id": "s1"})
     received.clear()  # don't count the original publish
 
     reconciler = AuditReconciler(
@@ -179,7 +179,7 @@ def test_reconciler_replays_unacknowledged_old_events(
     received: list[Event] = []
     bus.subscribe(["*"], received.append)
 
-    event = emitter.emit_critical("trading.sweep.executed", {"id": "s1"})
+    event = emitter.emit_critical("treasury.sweep.executed", {"id": "s1"})
     received.clear()
 
     # Fast-forward the reconciler's clock past the grace period.
@@ -237,11 +237,11 @@ def test_reconciler_recovers_event_lost_to_subscriber_outage(
         emitter = PersistentEmitter(bus, session_factory)
 
         # No subscribers yet — emit the critical event. The publish goes nowhere.
-        event = emitter.emit_critical("trading.sweep.executed", {"id": "s1"})
+        event = emitter.emit_critical("treasury.sweep.executed", {"id": "s1"})
 
         # Subscriber comes online (analogue: worker process restarts).
         received: list[Event] = []
-        bus.subscribe(["trading.*"], received.append)
+        bus.subscribe(["treasury.*"], received.append)
 
         # Run the reconciler with the clock fast-forwarded past the grace period.
         future = datetime.now(UTC) + timedelta(minutes=10)
@@ -271,7 +271,7 @@ def test_reconciler_run_is_concurrent_safe(
     bus.subscribe(["*"], received.append)
 
     for i in range(5):
-        emitter.emit_critical("trading.sweep.executed", {"i": i})
+        emitter.emit_critical("treasury.sweep.executed", {"i": i})
     received.clear()
 
     future = datetime.now(UTC) + timedelta(minutes=10)

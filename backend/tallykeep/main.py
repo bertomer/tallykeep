@@ -34,7 +34,7 @@ from tallykeep.api.v1 import (
     pairing as pairing_routes,
     profile as profile_routes,
     server_info as server_info_routes,
-    trading as trading_routes,
+    treasury as treasury_routes,
     unlock,
     utxos as utxos_routes,
 )
@@ -181,7 +181,7 @@ def create_app() -> FastAPI:
     app.include_router(utxos_routes.router, prefix="/api/v1")
     app.include_router(ledger_entries_routes.router, prefix="/api/v1")
     app.include_router(banking_routes.router, prefix="/api/v1")
-    app.include_router(trading_routes.router, prefix="/api/v1")
+    app.include_router(treasury_routes.router, prefix="/api/v1")
     app.include_router(analysis_routes.router, prefix="/api/v1")
     app.include_router(jobs_routes.router, prefix="/api/v1")
     app.include_router(export_routes.router, prefix="/api/v1")

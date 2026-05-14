@@ -1,7 +1,7 @@
 """Server-Sent Events stream — spec module 04.
 
 GET /api/v1/events/stream
-  Query: ?topics=chain.*,holding.*,banking.*,trading.*,...
+  Query: ?topics=chain.*,holding.*,banking.*,treasury.*,...
          (default: all topics)
   Response: text/event-stream
 

@@ -186,7 +186,7 @@ class ChainListener:
         if invoice_paid is not None:
             self._bus.publish("banking.invoice.paid", invoice_paid)
         if sweep_confirmed is not None:
-            self._bus.publish("trading.sweep_execution.completed", sweep_confirmed)
+            self._bus.publish("treasury.sweep_execution.completed", sweep_confirmed)
 
     def _handle_block(self, block_hash: str) -> None:
         """A new block tip arrived. Emit chain.block.new and drive any

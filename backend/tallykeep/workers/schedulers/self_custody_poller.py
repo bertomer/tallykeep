@@ -244,7 +244,7 @@ class SelfCustodyPoller:
             )
 
         self._bus.publish(
-            "trading.sweep_execution.payment_request_created",
+            "treasury.sweep_execution.payment_request_created",
             {
                 "execution_id": str(execution.id),
                 "payment_request_id": str(build_result.payment_request.id),

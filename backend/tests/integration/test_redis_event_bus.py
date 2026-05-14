@@ -101,7 +101,7 @@ def test_pattern_matches_select_subscribers(
 ) -> None:
     """A second subscriber on a non-matching pattern must NOT receive the event."""
     chain_received: list[Event] = []
-    trading_received: list[Event] = []
+    treasury_received: list[Event] = []
     chain_arrived = threading.Event()
 
     def chain_handler(e: Event) -> None:
@@ -109,16 +109,16 @@ def test_pattern_matches_select_subscribers(
         chain_arrived.set()
 
     bus.subscribe([f"{topic_prefix}.chain.*"], chain_handler)
-    bus.subscribe([f"{topic_prefix}.trading.*"], trading_received.append)
+    bus.subscribe([f"{topic_prefix}.treasury.*"], treasury_received.append)
     time.sleep(0.05)
 
     bus.publish(f"{topic_prefix}.chain.tx.confirmed", {"txid": "abc"})
 
     assert _wait_for(chain_arrived)
-    # Give any erroneous trading delivery a chance to land.
+    # Give any erroneous treasury delivery a chance to land.
     time.sleep(0.1)
     assert len(chain_received) == 1
-    assert trading_received == []
+    assert treasury_received == []
 
 
 def test_multiple_subscribers_each_receive(

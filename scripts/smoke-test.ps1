@@ -120,7 +120,7 @@ Show "rbf override stored" ($profile.feature_flags."banking.rbf.enabled" -eq $tr
 
 Section "5. Feature flags (defaults + override applied)"
 $flags = Invoke-RestMethod -Uri "$BaseUrl/api/v1/feature-flags" -Headers $Headers
-Show "trading.enabled"                          $flags.flags."trading.enabled"
+Show "treasury.enabled"                         $flags.flags."treasury.enabled"
 Show "banking.custom_fee_rate"                  $flags.flags."banking.custom_fee_rate.enabled"
 Show "banking.coin_selection_per_payment"       $flags.flags."banking.coin_selection_per_payment_override"
 Show "banking.rbf (overridden to true)"         $flags.flags."banking.rbf.enabled"

@@ -1,4 +1,4 @@
-"""Trading endpoints — sweep policies + executions. Spec module 04 / 07 / M8."""
+"""Treasury endpoints — sweep policies + executions. Spec module 04 / 07 / M8."""
 
 from __future__ import annotations
 
@@ -13,24 +13,24 @@ from tallykeep.api.v1._stubs import not_implemented_response
 from tallykeep.domain.enums import SweepExecutionStatus
 from tallykeep.infrastructure.job_queue import JobQueue
 from tallykeep.infrastructure.secrets import SecretStore
-from tallykeep.schemas.trading import (
+from tallykeep.schemas.treasury import (
     SafetyWarningOut,
     SweepExecutionOut,
     SweepPolicyCreate,
     SweepPolicyOut,
     SweepPolicyPatch,
 )
-from tallykeep.services import trading_service
-from tallykeep.services.trading_service import (
+from tallykeep.services import treasury_service
+from tallykeep.services.treasury_service import (
     ExecutionNotFound,
     PolicyHasUnacknowledgedWarnings,
     PolicyNotFound,
-    TradingServiceError,
+    TreasuryServiceError,
     WrongExecutionStatus,
 )
 
 
-router = APIRouter(tags=["trading"])
+router = APIRouter(tags=["treasury"])
 
 
 def _policy_to_out(p) -> SweepPolicyOut:  # type: ignore[no-untyped-def]
@@ -88,7 +88,7 @@ async def list_sweep_policies(
     enabled: bool | None = None,
     session: Session = Depends(get_db_session),
 ) -> list[SweepPolicyOut]:
-    policies = trading_service.list_sweep_policies(
+    policies = treasury_service.list_sweep_policies(
         session, source_holding_id=source_holding_id, enabled=enabled
     )
     return [_policy_to_out(p) for p in policies]
@@ -99,7 +99,7 @@ async def create_sweep_policy(
     body: SweepPolicyCreate, session: Session = Depends(get_db_session)
 ) -> SweepPolicyOut:
     try:
-        policy = trading_service.create_sweep_policy(
+        policy = treasury_service.create_sweep_policy(
             session,
             name=body.name,
             source_holding_id=body.source_holding_id,
@@ -112,7 +112,7 @@ async def create_sweep_policy(
             is_dry_run=body.is_dry_run,
         )
         session.commit()
-    except TradingServiceError as exc:
+    except TreasuryServiceError as exc:
         session.rollback()
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     return _policy_to_out(policy)
@@ -122,7 +122,7 @@ async def create_sweep_policy(
 async def pause_all_sweep_policies(
     session: Session = Depends(get_db_session),
 ) -> dict:  # type: ignore[type-arg]
-    count = trading_service.pause_all_policies(session)
+    count = treasury_service.pause_all_policies(session)
     session.commit()
     return {"paused": count}
 
@@ -131,7 +131,7 @@ async def pause_all_sweep_policies(
 async def resume_all_sweep_policies(
     session: Session = Depends(get_db_session),
 ) -> dict:  # type: ignore[type-arg]
-    count = trading_service.resume_all_policies(session)
+    count = treasury_service.resume_all_policies(session)
     session.commit()
     return {"resumed": count}
 
@@ -141,7 +141,7 @@ async def get_sweep_policy(
     policy_id: UUID, session: Session = Depends(get_db_session)
 ) -> SweepPolicyOut:
     try:
-        policy = trading_service.get_sweep_policy(session, policy_id)
+        policy = treasury_service.get_sweep_policy(session, policy_id)
     except PolicyNotFound as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     return _policy_to_out(policy)
@@ -154,7 +154,7 @@ async def patch_sweep_policy(
     session: Session = Depends(get_db_session),
 ) -> SweepPolicyOut:
     try:
-        policy = trading_service.update_sweep_policy(
+        policy = treasury_service.update_sweep_policy(
             session,
             policy_id,
             name=body.name,
@@ -169,7 +169,7 @@ async def patch_sweep_policy(
     except PolicyNotFound as exc:
         session.rollback()
         raise HTTPException(status_code=404, detail=str(exc)) from exc
-    except TradingServiceError as exc:
+    except TreasuryServiceError as exc:
         session.rollback()
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     return _policy_to_out(policy)
@@ -180,12 +180,12 @@ async def delete_sweep_policy(
     policy_id: UUID, session: Session = Depends(get_db_session)
 ) -> Response:
     try:
-        trading_service.delete_sweep_policy(session, policy_id)
+        treasury_service.delete_sweep_policy(session, policy_id)
         session.commit()
     except PolicyNotFound as exc:
         session.rollback()
         raise HTTPException(status_code=404, detail=str(exc)) from exc
-    except TradingServiceError as exc:
+    except TreasuryServiceError as exc:
         session.rollback()
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     return Response(status_code=204)
@@ -199,7 +199,7 @@ async def acknowledge_sweep_warnings(
     policy_id: UUID, session: Session = Depends(get_db_session)
 ) -> SweepPolicyOut:
     try:
-        policy = trading_service.acknowledge_warnings(session, policy_id)
+        policy = treasury_service.acknowledge_warnings(session, policy_id)
         session.commit()
     except PolicyNotFound as exc:
         session.rollback()
@@ -212,7 +212,7 @@ async def enable_sweep_policy(
     policy_id: UUID, session: Session = Depends(get_db_session)
 ) -> SweepPolicyOut:
     try:
-        policy = trading_service.enable_sweep_policy(session, policy_id)
+        policy = treasury_service.enable_sweep_policy(session, policy_id)
         session.commit()
     except PolicyNotFound as exc:
         session.rollback()
@@ -228,7 +228,7 @@ async def disable_sweep_policy(
     policy_id: UUID, session: Session = Depends(get_db_session)
 ) -> SweepPolicyOut:
     try:
-        policy = trading_service.disable_sweep_policy(session, policy_id)
+        policy = treasury_service.disable_sweep_policy(session, policy_id)
         session.commit()
     except PolicyNotFound as exc:
         session.rollback()
@@ -252,7 +252,7 @@ def _do_execute(policy_id: UUID, amount_sats: int | None, session_factory, secre
 
     factory = session_factory or _gsf()
     with factory() as session:
-        trading_service.execute_sweep_now(
+        treasury_service.execute_sweep_now(
             session,
             policy_id,
             secret_store=secret_store,
@@ -270,7 +270,7 @@ async def execute_sweep_policy_now(
     job_queue: JobQueue = Depends(get_job_queue),
 ) -> ExecuteNowOut:
     try:
-        execution = trading_service.execute_sweep_now(
+        execution = treasury_service.execute_sweep_now(
             session,
             policy_id,
             secret_store=secret_store,
@@ -279,7 +279,7 @@ async def execute_sweep_policy_now(
         session.commit()
     except PolicyNotFound as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
-    except TradingServiceError as exc:
+    except TreasuryServiceError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
 
     job_id = job_queue.enqueue(
@@ -304,10 +304,10 @@ async def list_sweep_policy_executions(
     session: Session = Depends(get_db_session),
 ) -> list[SweepExecutionOut]:
     try:
-        trading_service.get_sweep_policy(session, policy_id)
+        treasury_service.get_sweep_policy(session, policy_id)
     except PolicyNotFound as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
-    executions = trading_service.list_sweep_executions(
+    executions = treasury_service.list_sweep_executions(
         session, sweep_policy_id=policy_id, limit=limit
     )
     return [_execution_to_out(e) for e in executions]
@@ -323,7 +323,7 @@ async def list_sweep_executions(
     limit: int = 50,
     session: Session = Depends(get_db_session),
 ) -> list[SweepExecutionOut]:
-    executions = trading_service.list_sweep_executions(
+    executions = treasury_service.list_sweep_executions(
         session, sweep_policy_id=sweep_policy_id, status=status, limit=limit
     )
     return [_execution_to_out(e) for e in executions]
@@ -334,7 +334,7 @@ async def get_sweep_execution(
     execution_id: UUID, session: Session = Depends(get_db_session)
 ) -> SweepExecutionOut:
     try:
-        execution = trading_service.get_sweep_execution(session, execution_id)
+        execution = treasury_service.get_sweep_execution(session, execution_id)
     except ExecutionNotFound as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     return _execution_to_out(execution)
@@ -347,7 +347,7 @@ async def confirm_sweep_execution(
     execution_id: UUID, session: Session = Depends(get_db_session)
 ) -> SweepExecutionOut:
     try:
-        execution = trading_service.confirm_sweep_execution(session, execution_id)
+        execution = treasury_service.confirm_sweep_execution(session, execution_id)
         session.commit()
     except ExecutionNotFound as exc:
         session.rollback()

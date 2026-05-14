@@ -17,7 +17,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from tallykeep.schemas.trading import CustodialProviderInput
+from tallykeep.schemas.treasury import CustodialProviderInput
 from tallykeep.domain.enums import (
     AddressType,
     CustodyModel,

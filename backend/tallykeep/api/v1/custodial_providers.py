@@ -10,17 +10,17 @@ from sqlalchemy.orm import Session
 from tallykeep.adapters.adapter_registry import SUPPORTED_ADAPTER_IDS
 from tallykeep.api.dependencies import get_db_session, get_secret_store
 from tallykeep.infrastructure.secrets import SecretStore
-from tallykeep.schemas.trading import (
+from tallykeep.schemas.treasury import (
     BalanceOut,
     CustodialProviderOut,
     PatchCustodialProviderRequest,
     WhitelistVerificationOut,
 )
-from tallykeep.services import trading_service
-from tallykeep.services.trading_service import (
+from tallykeep.services import treasury_service
+from tallykeep.services.treasury_service import (
     ProviderConnectionError,
     ProviderNotFound,
-    TradingServiceError,
+    TreasuryServiceError,
 )
 
 
@@ -58,7 +58,7 @@ async def get_provider(
     provider_id: UUID, session: Session = Depends(get_db_session)
 ) -> CustodialProviderOut:
     try:
-        provider = trading_service.get_provider(session, provider_id)
+        provider = treasury_service.get_provider(session, provider_id)
     except ProviderNotFound as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     return _provider_to_out(provider)
@@ -72,7 +72,7 @@ async def patch_provider(
     secret_store: SecretStore = Depends(get_secret_store),
 ) -> CustodialProviderOut:
     try:
-        provider = trading_service.patch_provider(
+        provider = treasury_service.patch_provider(
             session,
             provider_id,
             display_name=body.display_name,
@@ -88,7 +88,7 @@ async def patch_provider(
     except ProviderConnectionError as exc:
         session.rollback()
         raise HTTPException(status_code=502, detail=str(exc)) from exc
-    except TradingServiceError as exc:
+    except TreasuryServiceError as exc:
         session.rollback()
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     return _provider_to_out(provider)
@@ -101,7 +101,7 @@ async def refresh_provider(
     secret_store: SecretStore = Depends(get_secret_store),
 ) -> CustodialProviderOut:
     try:
-        provider = trading_service.refresh_provider_balance(
+        provider = treasury_service.refresh_provider_balance(
             session, provider_id, secret_store=secret_store
         )
         session.commit()
@@ -109,7 +109,7 @@ async def refresh_provider(
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     except ProviderConnectionError as exc:
         raise HTTPException(status_code=502, detail=str(exc)) from exc
-    except TradingServiceError as exc:
+    except TreasuryServiceError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     return _provider_to_out(provider)
 
@@ -119,7 +119,7 @@ async def provider_balance(
     provider_id: UUID, session: Session = Depends(get_db_session)
 ) -> BalanceOut:
     try:
-        provider = trading_service.get_provider(session, provider_id)
+        provider = treasury_service.get_provider(session, provider_id)
     except ProviderNotFound as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     return BalanceOut(
@@ -139,13 +139,13 @@ async def verify_whitelist(
     secret_store: SecretStore = Depends(get_secret_store),
 ) -> WhitelistVerificationOut:
     try:
-        provider, is_whitelisted, error = trading_service.verify_whitelist(
+        provider, is_whitelisted, error = treasury_service.verify_whitelist(
             session, provider_id, secret_store=secret_store
         )
         session.commit()
     except ProviderNotFound as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
-    except TradingServiceError as exc:
+    except TreasuryServiceError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     return WhitelistVerificationOut(
         provider_id=provider.id,

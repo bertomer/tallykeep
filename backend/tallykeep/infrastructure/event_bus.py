@@ -3,7 +3,7 @@
 Spec module 01: domain events flow on a bus. Producers publish to a topic; many
 subscribers can listen, with no coupling between them.
 
-Topic shape: dotted segments like ``chain.tx.confirmed`` or ``trading.sweep.executed``.
+Topic shape: dotted segments like ``chain.tx.confirmed`` or ``treasury.sweep.executed``.
 Pattern matching uses a single ``*`` wildcard per segment-or-tail:
 - ``*`` matches every topic
 - ``chain.*`` matches ``chain.tx.confirmed``, ``chain.block.new``, etc.

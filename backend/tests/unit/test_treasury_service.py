@@ -1,4 +1,4 @@
-"""Unit tests for the trading service safety validator and account-creation logic.
+"""Unit tests for the treasury service safety validator and account-creation logic.
 
 All tests are fully in-process — no database, no exchange API calls.
 """
@@ -22,8 +22,8 @@ from tallykeep.domain.enums import (
 )
 from tallykeep.domain.holding import Holding, SecurityClaim
 from tallykeep.domain.sweep_policy import SafetyWarning
-from tallykeep.services.trading_service import (
-    TradingServiceError,
+from tallykeep.services.treasury_service import (
+    TreasuryServiceError,
     TradePermissionsDetected,
     _compute_safety_warnings,
 )
@@ -271,7 +271,7 @@ def test_create_account_holding_rejects_trade_permissions(monkeypatch) -> None: 
     """create_account_holding raises TradePermissionsDetected when the adapter
     reports can_trade=True."""
     from tallykeep.infrastructure.secrets import InMemorySecretStore
-    from tallykeep.services.trading_service import create_account_holding
+    from tallykeep.services.treasury_service import create_account_holding
 
     store = InMemorySecretStore()
     store.initialize("test")
@@ -281,7 +281,7 @@ def test_create_account_holding_rejects_trade_permissions(monkeypatch) -> None: 
         can_read=True, can_trade=True, can_withdraw=False
     )
 
-    with patch("tallykeep.services.trading_service.build_adapter", return_value=mock_adapter):
+    with patch("tallykeep.services.treasury_service.build_adapter", return_value=mock_adapter):
         with pytest.raises(TradePermissionsDetected):
             create_account_holding(
                 MagicMock(),
@@ -307,14 +307,14 @@ def test_create_account_holding_rejects_trade_permissions(monkeypatch) -> None: 
 
 
 def test_create_account_holding_rejects_unknown_adapter() -> None:
-    """Unsupported adapter_id raises TradingServiceError, not a bare ValueError."""
+    """Unsupported adapter_id raises TreasuryServiceError, not a bare ValueError."""
     from tallykeep.infrastructure.secrets import InMemorySecretStore
-    from tallykeep.services.trading_service import create_account_holding
+    from tallykeep.services.treasury_service import create_account_holding
 
     store = InMemorySecretStore()
     store.initialize("test")
 
-    with pytest.raises(TradingServiceError, match="Unsupported adapter"):
+    with pytest.raises(TreasuryServiceError, match="Unsupported adapter"):
         create_account_holding(
             MagicMock(),
             name="Test",

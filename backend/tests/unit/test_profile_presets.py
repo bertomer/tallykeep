@@ -39,7 +39,7 @@ class TestDefaultFlagValues:
         assert DEFAULT_FLAG_VALUES["banking.coin_selection_per_payment_override"] is False
 
     def test_sweep_confirmation_required_by_default(self) -> None:
-        assert DEFAULT_FLAG_VALUES["trading.sweep_confirmation.required"] is True
+        assert DEFAULT_FLAG_VALUES["treasury.sweep_confirmation.required"] is True
 
 
 # --- resolver -------------------------------------------------------------------
@@ -71,12 +71,12 @@ class TestResolveFeatureFlags:
         flags = resolve_feature_flags(overrides)
         assert flags["utxo.coin_control.enabled"] is True
         assert flags["banking.rbf.enabled"] is True
-        assert flags["trading.enabled"] is DEFAULT_FLAG_VALUES["trading.enabled"]
+        assert flags["treasury.enabled"] is DEFAULT_FLAG_VALUES["treasury.enabled"]
 
 
 class TestIsKnownFlag:
     def test_known_flag_returns_true(self) -> None:
-        assert is_known_flag("trading.enabled") is True
+        assert is_known_flag("treasury.enabled") is True
 
     def test_unknown_flag_returns_false(self) -> None:
         assert is_known_flag("not.a.real.flag") is False
