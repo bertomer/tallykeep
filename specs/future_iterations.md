@@ -147,6 +147,47 @@ record.
   ceremony, blueprint analysis, declared-vs-observable mismatch
   warnings) stay deferred to the Vault-detail iteration.
 
+### Unlock flow cleanup
+
+- **Captured:** 2026-05 (Rémy, during module 03 review). Surfaced
+  by an hour of manual UI testing.
+- **Motivation:** The unlock flow has several real bugs and
+  unclear semantics that need a dedicated design + implementation
+  pass. Rémy's observed symptoms in ~1 hour of testing:
+  - Pairing succeeds but passphrase remains locked.
+  - Passphrase unlocked but pairing reported as lost.
+  - Refreshing the home page with unlocked passphrase redirects to
+    the passphrase prompt anyway.
+  - Server reboot loses the passphrase but the home page is still
+    refreshable (no relock).
+  - Passphrase-rotation flow undocumented and unclear how a
+    compromised passphrase is rotated.
+  - No clear path to set up the server **without a UI** — install
+    wizard happens through the web app; CLI-only setup is unclear /
+    unsupported.
+  - Pairing direction question: should the device-ID flow run the
+    other way (server-knows-device, not device-knows-server) to
+    avoid needing a desktop / web client during initial setup?
+- **Sketch:** Design pass first — state machine for unlock + pair
+  with all edge cases (cold boot, mid-session reboot, network
+  partition, refresh, passphrase rotation, server-side rotation
+  while device is paired). Then implementation pass to fix the
+  state-management bugs and add the missing flows (CLI setup,
+  passphrase rotation).
+- **Touches:** `01_architecture.md` §"Configuration model" + the
+  surfaces/trust-zones section; ADR-0008 (passphrase + recovery
+  model) likely needs an addendum or supersede entry for any
+  decisions taken; `concerns/threat_model.md` Mobile addendum;
+  `UI/mobile.md` onboarding screens; possibly the pairing-handshake
+  arbitration in `pre-implementation.md`.
+- **Status:** sketched
+- **Milestone:** pre-shipping — gating concern for the
+  personal-use phase. Worth scheduling soon since each daily-use
+  test multiplies the friction.
+- **Notes:** Sequencing — the design pass is a brainstorm with
+  Rémy first (spec-agent work), then iteration to fix the bugs and
+  ship the missing surfaces. Probably 2 iterations end-to-end.
+
 ### Hosted tier infrastructure
 
 - **Captured:** 2026-05 (from `design_decisions.md` §11, pre-merge);
@@ -321,7 +362,7 @@ record.
   target markets where users haven't accumulated yet and want a
   set-and-forget acquisition path.
 - **Sketch:** Schedule + connected Account + sweep policy.
-- **Touches:** trading layer, scheduler, UI
+- **Touches:** treasury layer, scheduler, UI
 - **Status:** idea
 - **Milestone:** post-shipping
 - **Notes:** Pull forward only if real user feedback shows
@@ -415,7 +456,7 @@ record.
 - **Motivation:** Pre-shipping is read + withdraw only. Order
   placement enables buying / selling Bitcoin through the connected
   provider directly from TallyKeep.
-- **Touches:** trading layer, threat model, regulatory posture
+- **Touches:** treasury layer, threat model, regulatory posture
 - **Status:** idea
 - **Milestone:** post-shipping
 - **Notes:** Requires fresh regulatory evaluation before commit.
@@ -783,7 +824,7 @@ record.
 - **Sketch:** Each adapter is a ccxt wrapper with adapter-specific
   fixtures and integration tests. LatAm-native venues likely need
   custom adapters where ccxt doesn't cover them.
-- **Touches:** trading layer adapters, integration test harness
+- **Touches:** treasury layer adapters, integration test harness
 - **Status:** idea
 - **Milestone:** post-shipping (some may be pre-shipping if a
   specific target-market launch needs them)
@@ -799,7 +840,7 @@ record.
   with traditional broker accounts that hold Bitcoin positions.
 - **Sketch:** Implement the same `CustodialProvider` interface
   ccxt adapters use, but against Swissquote's REST API directly.
-- **Touches:** trading layer adapter abstraction
+- **Touches:** treasury layer adapter abstraction
 - **Status:** idea
 - **Milestone:** post-shipping
 
@@ -953,7 +994,7 @@ record.
   ceremonial than an exchange — order matching, escrow lifecycle,
   reputation scores. Likely a separate sub-flow rather than a
   dropdown option.
-- **Touches:** trading layer, adapter abstraction, threat model
+- **Touches:** treasury layer, adapter abstraction, threat model
 - **Status:** idea
 - **Milestone:** post-shipping
 - **Notes:** Liquidity at any P2P venue is variable; integration
@@ -1270,201 +1311,4 @@ record.
     - **Consistency of disclosure.** Every tappable should reveal
       the same SHAPE of info (popover? bottom sheet? inline
       expand?). Inconsistency would feel chaotic.
-    - **Discoverability.** If it's the spine, users need to know
-      about it. Onboarding mention? First-run hint? Or let them
-      discover by accident?
-
----
-
-### Non-custodial sourcing router (best-execution for Bitcoin acquisition)
-
-- **Captured:** 2026-05 (sparring session captured verbatim in
-  `archive/2026-05_parking_notes_sourcing_and_decumulation.md`)
-- **Motivation:** Atomic-swap venues (SideSwap, Mostro, Boltz) and
-  custodial Accounts are paths to the same outcome — sats into a
-  Holding. Building a venue forks scope into protocol territory
-  currently being closed by Lightning Labs / Blockstream / Tether-
-  Bitfinex multi-year teams. Building a **router** that picks the
-  best path per transfer is the wedge: Smart Order Routing applied
-  to self-custody Bitcoin acquisition. Reinforces banking-grade
-  ergonomics; never asks the user the word "swap."
-- **Sketch:**
-    - Sourcing path becomes a first-class concept alongside
-      `CustodialProvider` Accounts. User sees a single banking-style
-      "transfer" UI; routing happens behind it.
-    - Evaluator inputs: amount, time tolerance, counterparty
-      preferences, depth, current quotes, user's connected providers.
-    - Suggested integration order: SideSwap (Liquid PSBT atomic
-      swaps — most production-ready) → Mostro (Nostr-based LN P2P)
-      → Boltz (quote service for BTC ↔ LN ↔ Liquid) → custodial
-      route + immediate sweep (the dev-phase path, becomes one
-      input among many).
-    - Compliance framing: **"never recustody," not "no KYC."** Most
-      realistic users KYC at the on-ramp anyway. The wedge is
-      "identity proven once at the on-ramp, funds stay sovereign
-      forever."
-- **Touches:** trading layer (`07_trading_layer.md`), domain model
-  (sourcing path concept — possibly a new entity), UI sourcing
-  flow, threat model, regulatory posture
-- **Status:** sketched
-- **Milestone:** post-shipping (source notes explicitly v1.5+)
-- **Notes:**
-    - **Direct competitor on the sourcing side: Peach Bitcoin** —
-      mobile-first, Swiss, EU/LatAm/Africa coverage. Different
-      wedge (Peach is a venue; TallyKeep would be a router across
-      venues + custodial), but the closest market overlap. Study
-      feature set and traction before sharpening.
-    - **SideSwap caveat:** venue (matching server) is trusted; chain
-      (Liquid Federation, ~70 entities) is federated. If single-
-      vendor risk matters, build on the open Liquid PSBT swap
-      protocol itself (`docs.liquid.net/docs/swaps-and-smart-contracts`),
-      with LiquiDEX / TDEX as alternative consumers.
-    - **Vocabulary discipline.** "Swap" overloads three different
-      things in crypto: (1) atomic-swap primitive (HTLC/PTLC,
-      proper finance: DvP with simultaneous bilateral settlement);
-      (2) CLOB trading with atomic settlement (SideSwap, Bisq —
-      these are *trades*, not swaps); (3) AMM "swaps" (Uniswap-
-      style, different design school, doesn't fit the wedge —
-      impermanent loss, slippage on size, MEV). Integrate (2);
-      skip (3). Worth a vocabulary ADR when this entry sharpens.
-    - **Don't build a venue.** Source notes are emphatic — building
-      an orderbook fragments solo-builder scope across two
-      unrelated hard problems with no compounding leverage. The
-      router is the moat; protocols underneath are commodity
-      infrastructure to ride on.
-
-### Target-price accumulation (limit-bid sourcing)
-
-- **Captured:** 2026-05 (same sparring session as the sourcing-
-  router entry; archive file as above)
-- **Motivation:** Once instant-execution sourcing exists, the
-  natural follow-on is letting the user post a passive limit bid
-  at the price they're happy to buy at, routed to the best venue.
-  The fill IS the goal — no adverse-selection problem, no market-
-  making risk. Banking-grade framing: **"Set the price you want
-  to buy at. We route your bid to the best venue. Fill auto-sweeps
-  to Strongbox."** Same liquidity-contribution effect as market-
-  makers without the structural risk story.
-- **Sketch:** New SourcingPolicy variant (sibling to instant-
-  sourcing): limit-price bid posted to the routed venue, listening
-  for fill, on-fill triggers auto-sweep to the destination Holding.
-  Cancel / amend affordances. Execution-uncertainty disclosure
-  honest — bid at X, BTC rallies past X without touching it →
-  user watched from sidelines, capital locked. That's the cost of
-  being a patient buyer, which is what the target user signed up
-  for.
-- **Touches:** trading layer, sourcing-router (blocks on the entry
-  above), UI sourcing flow, threat model
-- **Status:** sketched
-- **Milestone:** post-shipping (sequencable: instant-execution
-  router first, limit-price router after — source notes frame as
-  v1 → v1.5)
-- **Notes:**
-    - **Vocabulary lock candidates (sharpen alongside brand voice
-      work):**
-        - ❌ "Earn the spread" — misleading. Real spread capture
-          (50–200 bps on thin books) requires posting both sides
-          and getting filled on both = market making. Likely trips
-          AMF/CSSF marketing rules in EU.
-        - ✅ "Skip the taker fee" — honest. User saves the venue's
-          taker fee (typically 0.2%) by being a maker. Fee saving,
-          not spread capture.
-    - **Do not build market-making.** Onboarding clients into a
-      structurally losing game dressed as "earn the maker fee" =
-      reputational damage. Strict distinction in source notes:
-      target-price accumulation is single-sided and aligned with
-      directional view; market-making is two-sided and faces
-      adverse selection on thin books.
-    - Reference precedents: Strike's "buy the dip," Swan's limit
-      orders. Neither does this well in a self-custody, route-
-      across-venues shape.
-
-### Decumulation + planning layer (the fourth product layer)
-
-- **Captured:** 2026-05 (same sparring session; archive file as above)
-- **Motivation:** TallyKeep's three current layers (savings /
-  banking / trading) cover accumulation and current spending.
-  They don't cover decumulation — "how do I spend this when I no
-  longer earn." Pensions are roughly 70% decumulation, 30% growth;
-  current spec is the opposite. Vault-as-pension is **segment-
-  dependent**: in high-inflation economies (Argentina, Turkey,
-  Nigeria, Lebanon) the Vault IS the pension because the local
-  "risk-free fiat asset" doesn't exist; in EU the Vault
-  *complements* traditional pension infrastructure (PEA / PER /
-  assurance-vie give tax wrappers self-custody can't replicate
-  without becoming a PSAN/CASP custodian — which would destroy
-  the self-custody thesis).
-- **Sketch:** SweepPolicy in reverse, same primitive. Vault /
-  Strongbox as source, Account / Purse as sink, scheduled or
-  trigger-driven. Three additions beyond raw periodic sweep:
-    1. **Buffer layer (bucket strategy from CFP literature).**
-       12–24 months of declared monthly spend in stable form
-       (Purse, plus possibly a small stablecoin sleeve depending
-       on resolution of the "stablecoins as transit" candidate
-       principle below). Replenish when BTC is up. Textbook fix
-       for **sequence-of-returns risk** — the classic retirement-
-       finance failure mode (force-selling stack at the bottom
-       during drawdowns).
-    2. **Dynamic withdrawal rate.** Even the simple "draw 4% of
-       vault annually, recalculate yearly" beats fixed-EUR/month
-       substantially. Guyton-Klinger guardrails or variable-
-       percentage-withdrawal as a policy layer on top of
-       SweepPolicy.
-    3. **Tax-aware projection.** France: 30% PFU on crypto capital
-       gains. **Show** projected tax events alongside projected
-       purchasing power; do not **advise** (configurable
-       simulator, not "we recommend X% per year" — that crosses
-       AMF rules on personalized financial advice).
-- **Touches:** new product layer (likely a new spec module —
-  module-11-shaped, e.g. a decumulation-layer module), domain
-  model (SweepPolicy direction + new Buffer / WithdrawalRate
-  entities), trading layer (cap-gains tagging in LedgerEntry),
-  UI (calculator + planning view), threat model, regulatory
-  framing
-- **Status:** sketched
-- **Milestone:** post-shipping (far post — needs a population of
-  users who have accumulated enough to plan decumulation)
-- **Notes:**
-    - **Regulatory framing locked in source notes:** frame as
-      **configurable calculator + automation the user drives**,
-      never as personalized advice. AMF actively polices
-      personalized financial advice in France.
-    - **"Without any risk" doesn't appear in user-facing copy.**
-      BTC has volatility (60–80% drawdowns are historically
-      normal), regulatory, and operational risk (lost keys,
-      multisig coordination). Source notes flag the language as
-      trip-wire for MiCA marketing rules in EU. Candidate brand-
-      voice guardrail.
-    - Segment-driven UX: Argentine schoolteacher vs French
-      employee with a PER have different decumulation needs. The
-      planning view exploration for each is itself a sharpening-
-      session when this entry promotes.
-    - Direct-BTC-payment as a withdrawal path is bonus; off-ramp
-      is the realistic default for the foreseeable future (BTC
-      direct-pay still <5% of normal household spend even in
-      target markets, per source notes).
-    - Adjacent to but distinct from the existing "Retirement plan
-      with timelock" entry. Timelock is the script-enforced
-      lock-period mechanic on a Holding; this entry is the
-      consumption-planning layer on top of accumulated Holdings.
-      They compose.
-
-### PSD2 / Open Banking integration for fiat-leg verification
-
-- **Captured:** 2026-05 (same sparring session — EU-specific angle
-  on the non-custodial sourcing question; archive file as above)
-- **Motivation:** Every "P2P BTC-fiat" platform (Bisq, HodlHodl,
-  Peach, Mostro) faces the same asymmetry: BTC leg is verifiable
-  on-chain, fiat leg isn't — atomicity is cryptographically
-  impossible, so they all bolt on a multisig + arbitrator pattern
-  resolving fiat disputes socially. **PSD2 Access-to-Account (AIS)
-  APIs** let a regulated entity programmatically verify "€X landed
-  in this IBAN from that IBAN at this timestamp." Not trustless —
-  bank and AISP are trust anchors — but **collapses ~95% of fiat-
-  receipt disputes into automated resolution.** No existing P2P
-  platform has built this properly. If TallyKeep is EU-domiciled
-  and partners with an AISP (Tink, TrueLayer, Bridge by Bud) or
-  holds an AISP license itself, there's a real wedge for the
-  sourcing-router's EU-fiat-input path.
-- **Sketch:**
-    - For the EU
+    - **Discoverabilit

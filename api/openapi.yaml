@@ -447,16 +447,14 @@ paths:
       tags:
       - holdings
       summary: Global Holdings Summary
-      description: 'Fortune view: per-Holding summary plus cross-Holding rollups.
-
-
-        Spec module 05: "the global view always shows the per-Holding
-
-        breakdown alongside the total. No silent consolidation." We honour
-
-        that — the response includes the full summary list, not just the
-
-        totals.'
+      description: "Fortune view: per-Holding summary plus cross-Holding rollups.\n\
+        \nSpec module 05: \"the global view always shows the per-Holding\nbreakdown\
+        \ alongside the total. No silent consolidation.\" We honour\nthat — the response\
+        \ includes the full summary list, not just the\ntotals.\n\nHoldings are sorted\
+        \ by custody tier (Account → Purse → Strongbox → Vault),\nthen by display_order\
+        \ within each tier. Each entry carries:\n  - meta: type-specific label (provider\
+        \ name / device label / m-of-n)\n  - scan_status: \"n/a\" | \"scanning\" |\
+        \ \"scanned\""
       operationId: global_holdings_summary_api_v1_holdings_summary_global_get
       parameters:
       - name: include_archived
@@ -619,6 +617,39 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HoldingResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/descriptors/validate:
+    post:
+      tags:
+      - descriptors
+      summary: Validate a BIP 380 descriptor — pure parser, no state mutation.
+      description: 'Validate a descriptor expression and return its parsed properties.
+
+
+        Accepts single-key and multisig BIP 380 descriptors.
+
+        Returns a typed 422 error when given a bare bitcoin address instead of
+
+        a descriptor (error_code: SINGLE_ADDRESS_INPUT).'
+      operationId: validate_descriptor_api_v1_descriptors_validate_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ValidateDescriptorRequest'
+        required: true
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidateDescriptorResponse'
         '422':
           description: Validation Error
           content:
@@ -1993,7 +2024,7 @@ paths:
   /api/v1/sweep-policies:
     get:
       tags:
-      - trading
+      - treasury
       summary: List Sweep Policies
       operationId: list_sweep_policies_api_v1_sweep_policies_get
       parameters:
@@ -2032,7 +2063,7 @@ paths:
                 $ref: '#/components/schemas/HTTPValidationError'
     post:
       tags:
-      - trading
+      - treasury
       summary: Create Sweep Policy
       operationId: create_sweep_policy_api_v1_sweep_policies_post
       requestBody:
@@ -2057,7 +2088,7 @@ paths:
   /api/v1/sweep-policies/pause-all:
     post:
       tags:
-      - trading
+      - treasury
       summary: Pause All Sweep Policies
       operationId: pause_all_sweep_policies_api_v1_sweep_policies_pause_all_post
       responses:
@@ -2072,7 +2103,7 @@ paths:
   /api/v1/sweep-policies/resume-all:
     post:
       tags:
-      - trading
+      - treasury
       summary: Resume All Sweep Policies
       operationId: resume_all_sweep_policies_api_v1_sweep_policies_resume_all_post
       responses:
@@ -2087,7 +2118,7 @@ paths:
   /api/v1/sweep-policies/{policy_id}:
     get:
       tags:
-      - trading
+      - treasury
       summary: Get Sweep Policy
       operationId: get_sweep_policy_api_v1_sweep_policies__policy_id__get
       parameters:
@@ -2113,7 +2144,7 @@ paths:
                 $ref: '#/components/schemas/HTTPValidationError'
     patch:
       tags:
-      - trading
+      - treasury
       summary: Patch Sweep Policy
       operationId: patch_sweep_policy_api_v1_sweep_policies__policy_id__patch
       parameters:
@@ -2145,7 +2176,7 @@ paths:
                 $ref: '#/components/schemas/HTTPValidationError'
     delete:
       tags:
-      - trading
+      - treasury
       summary: Delete Sweep Policy
       operationId: delete_sweep_policy_api_v1_sweep_policies__policy_id__delete
       parameters:
@@ -2168,7 +2199,7 @@ paths:
   /api/v1/sweep-policies/{policy_id}/acknowledge-warnings:
     post:
       tags:
-      - trading
+      - treasury
       summary: Acknowledge Sweep Warnings
       operationId: acknowledge_sweep_warnings_api_v1_sweep_policies__policy_id__acknowledge_warnings_post
       parameters:
@@ -2195,7 +2226,7 @@ paths:
   /api/v1/sweep-policies/{policy_id}/enable:
     post:
       tags:
-      - trading
+      - treasury
       summary: Enable Sweep Policy
       operationId: enable_sweep_policy_api_v1_sweep_policies__policy_id__enable_post
       parameters:
@@ -2222,7 +2253,7 @@ paths:
   /api/v1/sweep-policies/{policy_id}/disable:
     post:
       tags:
-      - trading
+      - treasury
       summary: Disable Sweep Policy
       operationId: disable_sweep_policy_api_v1_sweep_policies__policy_id__disable_post
       parameters:
@@ -2249,7 +2280,7 @@ paths:
   /api/v1/sweep-policies/{policy_id}/execute-now:
     post:
       tags:
-      - trading
+      - treasury
       summary: Execute Sweep Policy Now
       operationId: execute_sweep_policy_now_api_v1_sweep_policies__policy_id__execute_now_post
       parameters:
@@ -2282,7 +2313,7 @@ paths:
   /api/v1/sweep-policies/{policy_id}/executions:
     get:
       tags:
-      - trading
+      - treasury
       summary: List Sweep Policy Executions
       operationId: list_sweep_policy_executions_api_v1_sweep_policies__policy_id__executions_get
       parameters:
@@ -2320,7 +2351,7 @@ paths:
   /api/v1/sweep-executions:
     get:
       tags:
-      - trading
+      - treasury
       summary: List Sweep Executions
       operationId: list_sweep_executions_api_v1_sweep_executions_get
       parameters:
@@ -2367,7 +2398,7 @@ paths:
   /api/v1/sweep-executions/{execution_id}:
     get:
       tags:
-      - trading
+      - treasury
       summary: Get Sweep Execution
       operationId: get_sweep_execution_api_v1_sweep_executions__execution_id__get
       parameters:
@@ -2394,7 +2425,7 @@ paths:
   /api/v1/sweep-executions/{execution_id}/confirm:
     post:
       tags:
-      - trading
+      - treasury
       summary: Confirm Sweep Execution
       operationId: confirm_sweep_execution_api_v1_sweep_executions__execution_id__confirm_post
       parameters:
@@ -2899,6 +2930,9 @@ components:
       - nested_segwit
       - native_segwit
       - taproot
+      - p2sh_multisig
+      - p2wsh
+      - p2sh_p2wsh
       title: AddressType
     AnalysisConfiguration:
       properties:
@@ -4985,6 +5019,53 @@ components:
       - is_spent
       - hygiene_flags
       title: UtxoSummary
+    ValidateDescriptorRequest:
+      properties:
+        input:
+          type: string
+          maxLength: 4096
+          minLength: 1
+          title: Input
+        network:
+          $ref: '#/components/schemas/Network'
+      additionalProperties: false
+      type: object
+      required:
+      - input
+      - network
+      title: ValidateDescriptorRequest
+    ValidateDescriptorResponse:
+      properties:
+        script_type:
+          type: string
+          title: Script Type
+        is_multisig:
+          type: boolean
+          title: Is Multisig
+        required_signers:
+          anyOf:
+          - type: integer
+          - type: 'null'
+          title: Required Signers
+        total_signers:
+          anyOf:
+          - type: integer
+          - type: 'null'
+          title: Total Signers
+        timelocks:
+          type: 'null'
+          title: Timelocks
+        first_addresses:
+          items:
+            type: string
+          type: array
+          title: First Addresses
+      type: object
+      required:
+      - script_type
+      - is_multisig
+      - first_addresses
+      title: ValidateDescriptorResponse
     ValidationError:
       properties:
         loc:
@@ -5099,4 +5180,3 @@ components:
       - address
       - is_whitelisted
       title: WhitelistVerificationOut
-

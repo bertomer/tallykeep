@@ -68,14 +68,14 @@ flags are positive (`enable_X` or `X.enabled`); no negations.
 | `banking.vault_outgoing_warns` | Vault guardrail: warn before outgoing from Vault Holding |
 | `banking.coin_selection_per_payment_override` | Allow choosing coin-selection algorithm per payment |
 
-### Trading
+### Treasury
 
 | Flag key | Description |
 |---|---|
-| `trading.enabled` | Show Trading section at all |
-| `trading.sweep_policy.enabled` | Allow creating sweep policies |
-| `trading.sweep_confirmation.required` | Require explicit user confirmation before each sweep execution |
-| `trading.bidirectional_sweeps.shown` | Show inter-Holding (non-Account-source) sweeps in UI |
+| `treasury.enabled` | Show Treasury section at all |
+| `treasury.sweep_policy.enabled` | Allow creating sweep policies |
+| `treasury.sweep_confirmation.required` | Require explicit user confirmation before each sweep execution |
+| `treasury.bidirectional_sweeps.shown` | Show inter-Holding (non-Account-source) sweeps in UI |
 
 ### Notifications and display
 
@@ -154,11 +154,11 @@ DEFAULT_FLAG_VALUES: dict[str, bool] = {
     "banking.rbf.enabled":                      False,    # deferred per future_iterations.md
     "banking.vault_outgoing_warns":             True,
     "banking.coin_selection_per_payment_override": False,
-    # Trading
-    "trading.enabled":                          True,
-    "trading.sweep_policy.enabled":             True,
-    "trading.sweep_confirmation.required":      True,
-    "trading.bidirectional_sweeps.shown":       True,
+    # Treasury
+    "treasury.enabled":                          True,
+    "treasury.sweep_policy.enabled":             True,
+    "treasury.sweep_confirmation.required":      True,
+    "treasury.bidirectional_sweeps.shown":       True,
     # Notifications
     "notifications.in_app":                     True,
     # Display

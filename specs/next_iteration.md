@@ -187,16 +187,218 @@ API surface unchanged — no `api/openapi.yaml` regeneration.
 
 ---
 
-## Active iteration
+## Shipped 2026-05-14 — Treasury rename (closeout after Rémy greenlight on 2026-05-14)
 
-_Next iteration to promote from `future_iterations.md`:
-**Add Holding — Strongbox wizard** (copy + framing variant
-on the Purse pattern, reuses `WizardShell` shipped here).
-Picker order: Strongbox second, Vault third, Account fourth._
+### Iteration: Treasury rename (janitorial)
+
+**Started:** 2026-05-14
+**Goal:** Replace every "trading-named" identifier in backend
+code, frontend code, API surface, database, and tests with
+"treasury-named" equivalents, so that the codebase matches the
+canonical-spec vocabulary. Breaking compatibility is acceptable
+— TallyKeep is in the dev phase with one user (Rémy); no
+back-compat shims.
+
+The product is **not a trading terminal**; auto-sweep and
+internal-transfer are treasury management. Real trading
+(UniSwap, custodian order placement, P2P acquisition) is
+captured for much later and is clearly distinct (per
+`00_README.md` line 9). Code-vocabulary alignment with the
+spec closes the last surface of the rename done earlier this
+session.
+
+#### Scope (in) — required
+
+- **Backend service rename.** `app/services/trading_service.py`
+  → `app/services/treasury_service.py`. Class `TradingService`
+  → `TreasuryService`. All imports and call sites
+  (`routes/`, `workers/`, `tests/`) updated. If there are
+  trading-prefixed worker components (e.g.
+  `TradingSweepEngine` — verify in code), rename them too. The
+  `CustodialPoller`, `CategorizerSuggester`, `SweepEngine`,
+  `LiveUpdateBridge`, `AuditReconciler` names stay as-is.
+- **Event-topic prefix rename:** `trading.*` → `treasury.*`
+  in the event constants module. Specific topics to rename:
+  - `trading.custodial.balance_changed` → `treasury.custodial.balance_changed`
+  - `trading.custodial.poll_requested` → `treasury.custodial.poll_requested`
+  - `trading.sweep.triggered` → `treasury.sweep.triggered`
+  - `trading.sweep.executed` → `treasury.sweep.executed`
+  - `trading.sweep.failed` → `treasury.sweep.failed`
+  Update every publisher, every subscriber, every SSE
+  subscription on the frontend, every test that asserts
+  against a topic name.
+- **Feature-flag key rename** in `DEFAULT_FLAG_VALUES`, the
+  flag catalog table, the flag-resolution code, and the
+  frontend store:
+  - `trading.enabled` → `treasury.enabled`
+  - `trading.sweep_policy.enabled` → `treasury.sweep_policy.enabled`
+  - `trading.sweep_confirmation.required` → `treasury.sweep_confirmation.required`
+  - `trading.bidirectional_sweeps.shown` → `treasury.bidirectional_sweeps.shown`
+- **Alembic migration** rewriting `user_profile.feature_flags`
+  JSONB keys from `trading.*` to `treasury.*` for every row.
+  Idempotent (re-run safe) — read each key, if it starts with
+  `trading.` replace the prefix; if a `treasury.*` key already
+  exists for the same suffix, prefer it. Tested locally on a
+  populated DB.
+- **API path rename:** any `/api/v1/trading/...` paths to
+  `/api/v1/treasury/...`. Router prefix + every test fixture
+  hitting those paths.
+- **Frontend updates:** SSE topic subscriptions, Svelte store
+  filenames (if any are trading-named), API-client modules,
+  route groups, component names that carry "trading".
+- **Backend smoke-test suite** (`.ps1`) — every reference to
+  `/api/v1/trading/...` and every event-name assertion updated.
+- **OpenAPI regen** from the running backend (closeout step).
+- **Canonical-spec cleanup** — these notes I left in place
+  while keeping back-compat language go stale once the rename
+  ships:
+  - `holdings/01_account.md` — remove the "(currently
+    `TradingService` in the codebase; will rename to
+    `TreasuryService`…)" parenthetical. Reads cleanly as
+    "the service code never sees ccxt directly."
+  - `concerns/feature_flags.md` — remove the paragraph after
+    the Treasury flag table that explains the `trading.*`
+    namespace asymmetry. Flag keys are clean `treasury.*` now.
+  - `01_architecture.md` — verify the event taxonomy section
+    references `treasury.*` (it currently lists `trading.*`).
+    Update the namespace prefix bullet.
+
+#### Scope (out) — required
+
+- **No product / domain changes.** Rename-only. No new flags,
+  no new endpoints, no behavior changes, no schema additions.
+- **No back-compat shims.** Old topic names, flag keys, and
+  paths stop working in the same commit they're renamed.
+- The **unlock-flow cleanup** (separate iteration, captured in
+  `future_iterations.md` "Unlock flow cleanup").
+- Any work on **trading proper** (custodian order placement,
+  P2P swap routes, etc.) — those are out of current scope by
+  ADR-0008 / `holdings/01_account.md` regulatory posture and
+  `future_iterations.md`.
+
+#### Affected canonical docs
+
+- `holdings/01_account.md` (cleanup of placeholder note)
+- `concerns/feature_flags.md` (cleanup of asymmetry-explainer
+  paragraph; flag table reads `treasury.*`)
+- `01_architecture.md` (event taxonomy prefix list, worker
+  component names if any rename)
+- `api/openapi.yaml` (regenerated after backend changes)
+
+No new ADR required — the rename is a vocabulary alignment, not
+a foundational decision. The conceptual call was already taken
+(canonical specs renamed Trading → Treasury earlier this
+session); this iteration closes the code-side drift.
+
+#### Affected mockups
+
+None. No UI change visible to the user; flag-gating logic and
+SSE-topic filters update internally.
+
+#### Tasks — required
+
+Ordered. Each task is one atomic move with tests passing before
+the next starts.
+
+1. Rename `app/services/trading_service.py` →
+   `treasury_service.py`. Rename class `TradingService` →
+   `TreasuryService`. Fix all imports across the codebase
+   until the backend unit-test suite compiles.
+2. Run backend unit + integration tests. Fix failures.
+3. Rename event-topic constants (`TRADING_CUSTODIAL_BALANCE_CHANGED`
+   → `TREASURY_CUSTODIAL_BALANCE_CHANGED`, etc.) and their
+   string values. Update every publisher and subscriber.
+4. Run the full backend test suite. Fix failures (subscribers
+   not finding their topics, etc.) until green.
+5. Write the Alembic migration for `user_profile.feature_flags`
+   JSONB key rewrite. Apply locally; verify with `SELECT
+   feature_flags FROM user_profile`.
+6. Rename flag keys in `DEFAULT_FLAG_VALUES` and the flag
+   catalog. Update the frontend store that consumes the
+   `treasury.*` keys.
+7. Rename API route prefix in the router. Update every test
+   fixture's URL.
+8. Update the `.ps1` smoke-test suite — replace `/trading/`
+   path fragments and event-name assertions.
+9. Run the full test suite again. Run
+   `tools/check-spec.ps1` — fix any orphaned references.
+10. **Stop and hand off to Rémy** (per `PROCESS.md §2.7`
+    stage 3). Post a "ready for verification" message listing:
+    everything changed, on-agent test results, what Rémy needs
+    to verify (.ps1 smoke + Swagger walk through `treasury.*`
+    + one manual sweep policy creation against the renamed
+    flag), and what greenlight triggers.
+11. **On Rémy's greenlight only:** regenerate
+    `api/openapi.yaml` from the running backend.
+12. Apply the canonical-spec cleanup (the three doc edits
+    listed under "Affected canonical docs"). Run
+    `tools/check-spec.ps1` once more.
+13. Edit `next_iteration.md` — move this Active block to a
+    `## Shipped <date>` record; clear the active-iteration
+    section back to the template placeholder; add the
+    `future_iterations.md` "Promoted" breadcrumb.
+14. Commit the closeout in a single change. Commit message:
+    `Treasury rename closeout after Rémy greenlight YYYY-MM-DD`.
+
+#### Acceptance / done-when — required
+
+- `grep -rn "trading\." backend/ frontend/` returns **zero
+  hits** outside (a) test names that explicitly cover the
+  migration, (b) historical-record comments referencing the
+  old name with explicit explanation.
+- `grep -rn "TradingService\|trading_service" backend/`
+  returns zero hits.
+- `api/openapi.yaml` shows `/api/v1/treasury/...` paths and
+  no `/api/v1/trading/...`.
+- `concerns/feature_flags.md` flag table uses `treasury.*`
+  keys; the asymmetry-explainer paragraph is gone.
+- `holdings/01_account.md` reads "the service code never sees
+  ccxt directly" without the rename parenthetical.
+- `01_architecture.md` event-taxonomy section lists
+  `treasury.*` (and other prefixes unchanged).
+- `tools/check-spec.ps1` passes (all six checks green).
+- Rémy's `.ps1` smoke-test suite passes against the running
+  backend.
+- A manual sweep policy created via the UI uses the new flag
+  namespace (frontend reads `treasury.*` keys correctly,
+  backend persists, fires `treasury.sweep.triggered`).
+
+#### Dependencies
+
+None. No pre-implementation arbitration blocking. No prior
+iteration to wait on. Self-contained.
+
+#### Verification (Rémy)
+
+- Run the `.ps1` smoke-test suite against the running backend
+  with the renamed routes. Expect green.
+- Open Swagger UI. Verify `/api/v1/treasury/...` routes exist
+  and `/api/v1/trading/...` routes are gone.
+- Hand-test: create one sweep policy through the UI. Confirm
+  the policy persists, the trigger fires correctly, and the
+  SSE stream emits a `treasury.sweep.triggered` event (visible
+  in the network panel or via a manual SSE subscription).
+- Hand-test: open Settings → Treasury section. Confirm the
+  feature-flag toggles operate cleanly and persist (they're
+  reading `treasury.*` keys from the migrated JSONB).
+- Read the three affected canonical-spec docs — confirm the
+  placeholder notes are gone and the prose reads cleanly.
+
+Closeout: `api/openapi.yaml` regenerated from running backend
+(5182 lines, `treasury` tag, no `trading` paths). Canonical-spec
+cleanup: `holdings/01_account.md` TradingService parenthetical
+removed; `concerns/feature_flags.md` flag table updated to
+`treasury.*` keys and asymmetry-explainer paragraph removed;
+`01_architecture.md` event-taxonomy bullet updated to `treasury.*`.
+`tools/check-spec.ps1` passing (6 checks).
 
 ---
 
-_The old iteration body has been removed — see git history for the full spec._
+## Active iteration
+
+No active coding iteration. Next promotion from
+`future_iterations.md` when Rémy is ready to start the next
+session.
 
 ---
 
@@ -220,7 +422,7 @@ security-health work lands.
    device that holds the seed
 5. **Activity + Categorization** — cross-Holding feed plus
    per-Holding categorization
-6. **Sweep Policy + Trading view** — Account-originated sweeps in
+6. **Sweep Policy + Treasury view** — Account-originated sweeps in
    the dev-phase scope
 7. **Settings** — including the security-health system at least
    for seed-backup warnings (private-ship gate)
@@ -249,3 +451,4 @@ third-party audit, and (optionally) hosted-tier launch.
 Feature updates per `future_iterations.md` post-shipping entries
 (Blueprint, Lightning, DCA, equity-reference, etc., depending on
 user feedback and roadmap priorities).
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          

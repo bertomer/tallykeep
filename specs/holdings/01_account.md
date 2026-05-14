@@ -61,9 +61,8 @@ captured in `future_iterations.md`.
 | Lemon / Buenbit / Belo / Coinbase / Swissquote | (per `future_iterations.md`) | Per-adapter | Post-shipping |
 
 Adding a provider is a localized change against the
-`CustodialProviderAdapter` ABC (the trading-layer ACL described
-in `01_architecture.md`). The Trading service code never sees
-ccxt directly.
+`CustodialProviderAdapter` ABC (the treasury-layer ACL described
+in `01_architecture.md`). The service code never sees ccxt directly.
 
 ## Add-Holding flow
 
@@ -102,7 +101,7 @@ The poller fetches BTC balance, other-asset balances (read-only
 display; never actionable), recent withdrawal history, and
 recent deposit history. Updates the provider row's
 `last_known_balance_sats`, `last_polled_at`, `last_error`. Emits
-`trading.custodial.balance_changed` on delta.
+`treasury.custodial.balance_changed` on delta.
 
 Polling failures (rate-limit hits, network errors, auth errors)
 are logged and surfaced via `system.custodial.auth_failed`. After
