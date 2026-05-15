@@ -40,10 +40,21 @@ The Strongbox type's domain model carries:
    descriptor exported from their hardware wallet. Methods:
    paste, QR scan (via Capacitor camera), or file upload
    (browser).
-2. **Validation.** BDK parses and canonicalizes. Single-key
-   descriptors only — `pkh()`, `sh(wpkh())`, `wpkh()`,
-   `tr()`. Multisig descriptors are deferred — see
-   `holdings/04_vault.md`.
+2. **Validation.** BDK parses and canonicalizes. Strongbox
+   accepts **pure single-key descriptors only**, with no
+   script complexity:
+   - Accepted: `pkh()`, `sh(wpkh())`, `wpkh()`, single-key
+     `tr()`.
+   - Rejected: multisig (`multi`, `sortedmulti`, `multi_a`,
+     etc.) → inline redirect to the Vault wizard. Already
+     locked.
+   - Rejected: single-key wrapped in miniscript with a timelock
+     fragment (`wsh(and_v(v:after(...),pk(K)))`,
+     `wsh(and_v(v:older(...),pk(K)))`, Taproot equivalents)
+     → inline redirect to the Vault wizard. A timelock makes
+     the wallet a Vault per ADR-0010 (Vault = friction-bearing
+     = multisig OR timelock OR both); Strongbox is the
+     always-spendable single-key tier.
 3. **Naming + metadata.** User-facing name and the
    `signing_device_label` note.
 4. **Initial scan.** Backend runs the descriptor through the

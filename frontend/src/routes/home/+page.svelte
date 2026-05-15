@@ -134,7 +134,7 @@
     {:else}
       <ul class="holding-list">
         {#each holdings as h (h.holding_id)}
-          <li><button class="holding-row {h.holding_type}" type="button">
+          <li><button class="holding-row {h.holding_type}" type="button" onclick={() => goto(`/holding/${h.holding_id}`)}>
             <span class="holding-stripe" aria-hidden="true"></span>
             <span class="holding-body">
               <span class="holding-name">{h.name}</span>

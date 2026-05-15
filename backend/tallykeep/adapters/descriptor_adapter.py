@@ -4,9 +4,15 @@ Spec module 01: adapters translate foreign data shapes into domain types. Domain
 code never imports `bdkpython`; it goes through `DescriptorAdapter` here.
 
 Single-key descriptors (PKH, WPKH, SH_WPKH, TR-single) are accepted by default.
-Multisig descriptors (WSH_SORTED_MULTI, SH_SORTED_MULTI, SH_WSH_SORTED_MULTI) are
-accepted when `allow_multisig=True` is passed to `parse()`. Vault creation uses
-this; Purse and Strongbox creation do not.
+Vault descriptors (multisig and single-key+timelock) are accepted when
+`allow_multisig=True` is passed to `parse()`. Vault creation uses this; Purse
+and Strongbox creation do not.
+
+Vault v1 accept set (all require `allow_multisig=True`):
+  - WSH_SORTED_MULTI / SH_SORTED_MULTI / SH_WSH_SORTED_MULTI (existing)
+  - BDK type WSH: wsh(multi), wsh(and_v(timelock, pk)), wsh(and_v(timelock, multi))
+  - BDK type SH: sh(multi)
+  - BDK type TR with miniscript: tr(key, multi_a(...)), tr(key, and_v(timelock, pk))
 
 A note on the `Network` mapping: bdkpython exposes `Network.BITCOIN` for
 mainnet; our domain enum uses the more conventional `MAINNET`. The translation
@@ -28,6 +34,21 @@ from tallykeep.domain.enums import AddressType, Network
 _MULTISIG_THRESHOLD_RE = re.compile(r'(?:sorted)?multi(?:_a)?\(\s*(\d+)\s*,')
 # Extended public key pattern — covers xpub/tpub/ypub/zpub and capital variants.
 _XPUB_RE = re.compile(r'[a-zA-Z]{1,4}pub[a-zA-Z0-9]+')
+# Timelock detection.
+_TIMELOCK_AFTER_RE = re.compile(r'after\(\s*(\d+)\s*\)')   # CLTV (absolute block height)
+_TIMELOCK_OLDER_RE = re.compile(r'older\(\s*(\d+)\s*\)')   # CSV (relative block count)
+# BIP32 key-origin fingerprint — 8 hex chars before the first `/` or `]` in brackets.
+_FINGERPRINT_RE = re.compile(r'\[([0-9a-fA-F]{8})[/\]]')
+# Taproot-specific multisig fragments.
+_TAPROOT_MULTISIG_RE = re.compile(r'(?:sorted)?multi_a\(')
+# Multi-path / branching miniscript fragments NOT in the v1 accept set.
+# Matches or_i / or_d / or_c / or_b combinators, thresh(), and hash-lock
+# primitives (sha256, hash256, ripemd160, hash160).  Any expression containing
+# these must route to "unsupported descriptor form" — not to Vault parseback —
+# even if it also carries a timelock or multisig fragment.
+_UNSUPPORTED_FRAGMENT_RE = re.compile(
+    r'\bor_[idcb]\(|\bthresh\(|\bsha256\(|\bhash256\(|\bripemd160\(|\bhash160\('
+)
 
 
 # --- network mapping ---------------------------------------------------------
@@ -61,6 +82,15 @@ _MULTISIG_TYPES: frozenset[bdk.DescriptorType] = frozenset(
     }
 )
 
+# WSH / SH / TR also cover miniscript descriptors (Vault v1 accept set).
+# These are only valid when allow_multisig=True.
+_MINISCRIPT_TYPES: frozenset[bdk.DescriptorType] = frozenset(
+    {
+        bdk.DescriptorType.WSH,  # wsh(multi), wsh(sortedmulti), wsh(miniscript)
+        bdk.DescriptorType.SH,   # sh(multi)
+    }
+)
+
 _BDK_TYPE_TO_ADDRESS_TYPE: dict[bdk.DescriptorType, AddressType] = {
     bdk.DescriptorType.PKH: AddressType.LEGACY,
     bdk.DescriptorType.SH_WPKH: AddressType.NESTED_SEGWIT,
@@ -69,6 +99,9 @@ _BDK_TYPE_TO_ADDRESS_TYPE: dict[bdk.DescriptorType, AddressType] = {
     bdk.DescriptorType.SH_SORTED_MULTI: AddressType.P2SH_MULTISIG,
     bdk.DescriptorType.WSH_SORTED_MULTI: AddressType.P2WSH,
     bdk.DescriptorType.SH_WSH_SORTED_MULTI: AddressType.P2SH_P2WSH,
+    # Miniscript types (Vault v1 accept set)
+    bdk.DescriptorType.WSH: AddressType.P2WSH,
+    bdk.DescriptorType.SH: AddressType.P2SH_MULTISIG,
 }
 
 
@@ -96,6 +129,11 @@ class ParsedDescriptor:
 
     For multisig descriptors `is_multisig` is True and `required_signers` /
     `total_signers` carry the m-of-n extracted from the expression.
+
+    For Vault descriptors `timelock_kind` is "cltv" or "csv" when a miniscript
+    timelock is present; `timelock_value` is the block height (CLTV) or block
+    count (CSV). `cosigner_fingerprints` lists BIP32 fingerprints found in the
+    key-origin brackets of the expression.
     """
 
     expression: str
@@ -106,6 +144,9 @@ class ParsedDescriptor:
     is_multisig: bool = False
     required_signers: int | None = None
     total_signers: int | None = None
+    timelock_kind: str | None = None          # "cltv" | "csv" | None
+    timelock_value: int | None = None         # block height (CLTV) or count (CSV)
+    cosigner_fingerprints: tuple[str, ...] = field(default_factory=tuple)
 
 
 @dataclass(frozen=True)
@@ -117,19 +158,56 @@ class DerivedAddress:
 # --- adapter -----------------------------------------------------------------
 
 
-def _extract_multisig_params(expression: str) -> tuple[int | None, int | None]:
+def _extract_multisig_params(
+    expression: str,
+    *,
+    is_taproot_multisig: bool = False,
+) -> tuple[int | None, int | None]:
     """Extract (required_signers, total_signers) from a multisig expression.
 
     Uses regex heuristics on the raw expression string — BDK does not expose
     m-of-n counts as structured fields. Accurate for standard BIP 380
     sortedmulti/multi expressions; exotic or non-standard forms may return None.
+
+    For Taproot multisig (multi_a / sortedmulti_a), pass `is_taproot_multisig=True`
+    so that the internal key is subtracted from the total xpub count.
     """
     m = _MULTISIG_THRESHOLD_RE.search(expression)
     if m is None:
         return None, None
     required = int(m.group(1))
     total = len(_XPUB_RE.findall(expression))
+    if is_taproot_multisig:
+        total -= 1  # subtract the internal (key-path) taproot key
     return required, total if total > 0 else None
+
+
+def _extract_timelock(expression: str) -> tuple[str | None, int | None]:
+    """Extract (timelock_kind, timelock_value) from a miniscript expression.
+
+    Returns ("cltv", height) for after(), ("csv", count) for older(), (None, None)
+    for no timelock.
+    """
+    m = _TIMELOCK_AFTER_RE.search(expression)
+    if m:
+        return "cltv", int(m.group(1))
+    m = _TIMELOCK_OLDER_RE.search(expression)
+    if m:
+        return "csv", int(m.group(1))
+    return None, None
+
+
+def _extract_fingerprints(expression: str) -> tuple[str, ...]:
+    """Extract all BIP32 key-origin fingerprints from a descriptor expression.
+
+    Returns the unique fingerprints in order of first appearance (lowercase hex).
+    """
+    seen: list[str] = []
+    for fp in _FINGERPRINT_RE.findall(expression):
+        fp_lower = fp.lower()
+        if fp_lower not in seen:
+            seen.append(fp_lower)
+    return tuple(seen)
 
 
 class DescriptorAdapter:
@@ -188,6 +266,8 @@ class DescriptorAdapter:
                 )
             address_type = _BDK_TYPE_TO_ADDRESS_TYPE[desc_type]
             required_signers, total_signers = _extract_multisig_params(expression)
+            timelock_kind, timelock_value = _extract_timelock(expression)
+            fingerprints = _extract_fingerprints(expression)
             return ParsedDescriptor(
                 expression=expression,
                 canonical_expression=str(descriptor),
@@ -197,6 +277,60 @@ class DescriptorAdapter:
                 is_multisig=True,
                 required_signers=required_signers,
                 total_signers=total_signers,
+                timelock_kind=timelock_kind,
+                timelock_value=timelock_value,
+                cosigner_fingerprints=fingerprints,
+            )
+
+        # Miniscript WSH / SH — covers wsh(multi), wsh(and_v(...,pk(...))),
+        # wsh(and_v(...,multi(...))), sh(multi), etc.
+        if desc_type in _MINISCRIPT_TYPES:
+            if not allow_multisig:
+                raise UnsupportedDescriptorError(
+                    f"Descriptor type {desc_type.name} is a Vault descriptor "
+                    "(multisig or timelock) and is not accepted here. Vault "
+                    "descriptors are only valid for Vault holdings."
+                )
+            # Reject multi-path / branching fragments not in the v1 accept set.
+            # or_i/or_d/or_c/or_b, thresh(), hash-lock primitives — these are
+            # protocol-level constructs (swap-in, recovery paths, decaying
+            # multisig) that must not be misclassified as simple timelocked Vaults.
+            if _UNSUPPORTED_FRAGMENT_RE.search(expression):
+                raise UnsupportedDescriptorError(
+                    "Descriptor contains branching or hash-lock fragments "
+                    "(or_i / or_d / or_c / or_b / thresh / sha256 / hash256 / "
+                    "ripemd160 / hash160) that are not in the v1 Vault accept "
+                    "set. This is an unsupported descriptor form."
+                )
+            # Reject SH without a multi/sortedmulti clause (unusual SH form).
+            if desc_type == bdk.DescriptorType.SH and not _MULTISIG_THRESHOLD_RE.search(
+                expression
+            ):
+                raise UnsupportedDescriptorError(
+                    "sh() descriptors without a multi/sortedmulti clause are not "
+                    "supported. Use wsh() or one of the standard multisig wrappers."
+                )
+            address_type = _BDK_TYPE_TO_ADDRESS_TYPE[desc_type]
+            is_multisig_expr = bool(_MULTISIG_THRESHOLD_RE.search(expression))
+            # For WSH, single-key+timelock has no multi clause → required=total=1.
+            if is_multisig_expr:
+                required_signers, total_signers = _extract_multisig_params(expression)
+            else:
+                required_signers, total_signers = 1, 1
+            timelock_kind, timelock_value = _extract_timelock(expression)
+            fingerprints = _extract_fingerprints(expression)
+            return ParsedDescriptor(
+                expression=expression,
+                canonical_expression=str(descriptor),
+                address_type=address_type,
+                descriptor_id=str(descriptor.descriptor_id()),
+                is_multipath=False,
+                is_multisig=is_multisig_expr,
+                required_signers=required_signers,
+                total_signers=total_signers,
+                timelock_kind=timelock_kind,
+                timelock_value=timelock_value,
+                cosigner_fingerprints=fingerprints,
             )
 
         if desc_type not in _SINGLE_KEY_TYPES:
@@ -204,6 +338,47 @@ class DescriptorAdapter:
                 f"Descriptor type {desc_type.name} is not supported. "
                 "Bare scripts and other exotic forms are not accepted."
             )
+
+        # TR type: detect miniscript content (Vault markers).
+        if desc_type == bdk.DescriptorType.TR:
+            timelock_kind, timelock_value = _extract_timelock(expression)
+            has_taproot_multisig = bool(_TAPROOT_MULTISIG_RE.search(expression))
+            is_vault_tr = timelock_kind is not None or has_taproot_multisig
+            if is_vault_tr:
+                if not allow_multisig:
+                    raise UnsupportedDescriptorError(
+                        "Taproot descriptors with a timelock or multi_a clause are "
+                        "Vault descriptors and are not accepted here. Set this up "
+                        "as a Vault instead."
+                    )
+                if _UNSUPPORTED_FRAGMENT_RE.search(expression):
+                    raise UnsupportedDescriptorError(
+                        "Descriptor contains branching or hash-lock fragments "
+                        "(or_i / or_d / or_c / or_b / thresh / sha256 / hash256 / "
+                        "ripemd160 / hash160) that are not in the v1 Vault accept "
+                        "set. This is an unsupported descriptor form."
+                    )
+                is_multisig_tr = has_taproot_multisig
+                if is_multisig_tr:
+                    required_signers, total_signers = _extract_multisig_params(
+                        expression, is_taproot_multisig=True
+                    )
+                else:
+                    required_signers, total_signers = 1, 1
+                fingerprints = _extract_fingerprints(expression)
+                return ParsedDescriptor(
+                    expression=expression,
+                    canonical_expression=str(descriptor),
+                    address_type=AddressType.TAPROOT,
+                    descriptor_id=str(descriptor.descriptor_id()),
+                    is_multipath=False,
+                    is_multisig=is_multisig_tr,
+                    required_signers=required_signers,
+                    total_signers=total_signers,
+                    timelock_kind=timelock_kind,
+                    timelock_value=timelock_value,
+                    cosigner_fingerprints=fingerprints,
+                )
 
         return ParsedDescriptor(
             expression=expression,
@@ -405,5 +580,6 @@ __all__ = [
     "ParsedDescriptor",
     "UnsupportedDescriptorError",
     "UtxoForBuild",
+    "_MINISCRIPT_TYPES",
     "_MULTISIG_TYPES",
 ]

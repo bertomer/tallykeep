@@ -136,6 +136,17 @@ the routing explicit.
 - *Input:* `next_iteration.md`'s active iteration block.
   Does not invent scope; if scope is empty, stops and reports
   per `next_iteration.md` intro.
+- *Visual contract:* For any iteration whose scope touches UI,
+  every file listed under `Mockup contract` in
+  `next_iteration.md` is the **visual ground truth** for the
+  screens it covers — copy, spacing, states, affordances,
+  error variants. Read each before writing the corresponding
+  screen. Implementation may not deviate silently. Deviation
+  is either a code bug (fix the code) or a spec drift event
+  (stop, surface the discrepancy to Rémy, resolve via mockup
+  edit + ADR if structural, mockup edit alone if cosmetic).
+  No third path. The mobile.md / desktop.md prose describes
+  intent; the mockup HTML is the contract.
 - *Output:* code commits implementing the iteration. At
   closeout: regenerated `api/openapi.yaml`, condensed entry
   appended to `shipped.md`, cleared active block in
@@ -146,10 +157,17 @@ the routing explicit.
 **Design / brand agent** — draws and locks the visual surface.
 - *Input:* a UI iteration block, or a brand-artifact revision
   (mark, wordmark, future lockup, voice draft).
-- *Output:* mockup HTML files in `UI/mockups/`, brand lock
-  docs in `brand/`, regenerated `brand/identity/*.svg`,
-  lockstep `tokens.css` updates, edits to `UI/mobile.md` flow
-  sections when a mockup is validated.
+- *Output:* mockup HTML files in `UI/mockups/` (status
+  `draft` → `review` → `validated`; **the flip from `review`
+  to `validated` happens at this agent's design-pass
+  greenlight, not at the coding agent's closeout** — update
+  the mockup HTML header's `Status:` field, the matching
+  card status in `UI/mockups/index.html`, and any
+  per-screen status annotation in `UI/mobile.md` in the
+  same change); brand lock docs in `brand/`, regenerated
+  `brand/identity/*.svg`, lockstep `tokens.css` updates;
+  edits to `UI/mobile.md` flow sections when a mockup is
+  validated.
 - *Gate:* Rémy's visual validation (look, vocabulary, gauntlet
   question 4 "confirmation honesty"). **Not** smoke tests, not
   OpenAPI regeneration. Lockstep propagation rule (brand →
@@ -445,12 +463,17 @@ condensed into `shipped.md` at closeout.
      full template body inside a retitled "Shipped" block —
      that's the failure mode that bloated this file before
      `shipped.md` existed.
-   - Marks any newly validated mockups in `UI/mobile.md`.
    - Runs the sanity sweep (§4.6) one final time. **Must
      pass.**
    - Commits the closeout in a single change. Commit message
      references the iteration name and the validation context
      ("closeout after Rémy greenlight on YYYY-MM-DD").
+
+   **Mockup status flips are not a closeout step.** They land
+   when the spec/design agent's pass closes with Rémy's
+   greenlight (per §2 Design / brand agent — *Output*).
+   By the time the coding agent reaches closeout, every mockup
+   it touched is already `validated`.
 
 6. **Promote.** One item from `future_iterations.md` is
    sharpened into the new active-iteration block. Picking the
@@ -494,6 +517,20 @@ Industry-standard exceptions are accepted as-is: UTXO, PSBT,
 BIP, RPC, BTC, sats, LN, gRPC, SSE, API, KDF, GCM, plus the
 SQL prefix `idx_*` for index names. Add to this list with
 care; brevity is not a sufficient reason on its own.
+
+**"v1 / v2" as feature-iteration shorthand is retired.** The
+"v1 / v1.5 / v2 / v3" roadmap framing was dropped in ADR-0003
+in favour of phase events (dev → private-ship → personal-use
+→ public-ship). The shorthand keeps drifting back as
+per-feature scope-versioning ("v1 Vault wizard", "v1 accept
+set") and that overloads the same letters with two different
+meanings, confusing fresh agents. When you mean "the accept
+set / surface this iteration ships", say so — e.g. "the
+initial Vault wizard accept set", "the dev-phase Strongbox
+input shape". When you mean a literal version (e.g. brand
+artifact `..._v1_lock.html`), the version suffix is fine —
+that is what brand-lock filenames are *for*. Janitorial
+sweep across stale uses is opportunistic, not blocking.
 
 ### 4.6 Iteration-done sanity sweep
 
@@ -644,6 +681,15 @@ When starting a new session:
    state and stop. Use `shipped.md` for a quick read on what
    already closed out.
 5. Read the canonical spec module(s) relevant to your scope.
+   **If your scope touches UI** (coding agent on a UI iteration,
+   spec agent extending a flow, triage on a UI section): open
+   every file listed under `Mockup contract` in the active
+   iteration block of `next_iteration.md` and read it as the
+   visual ground truth for the screens you'll touch — copy,
+   spacing, states, affordances, error variants. The mobile.md
+   / desktop.md prose describes intent; the mockup HTML is the
+   contract. Deviation rule lives in §2 Coding agent (Visual
+   contract bullet) and the routing table in §7.
 6. Read `pre-implementation.md` — Open items only; that's
    what's blocked on Rémy's arbitration.
 7. `future_iterations.md` is reference only; do not work it.

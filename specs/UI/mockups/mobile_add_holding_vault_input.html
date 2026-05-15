@@ -1,0 +1,336 @@
+<!--
+  Title: Mobile — Add Vault · step 1 (default — descriptor input)
+  Status: validated  (Rémy greenlight 2026-05-15 closing the
+                       Vault-wizard design pass; ADR-0010 β with v1
+                       onboarding for both Vault shapes.)
+  Date last touched: 2026-05-15
+  Replaces: an earlier draft (multisig-only framing pre-β). Derives
+            structurally from mobile_add_holding_strongbox_input.html
+            with Vault-specific divergences below.
+
+  Design notes:
+  - 3-step wizard. Step counter "STEP 1 OF 3".
+  - Vault-vs-Strongbox divergences:
+      1. No vendor dropdown. A Vault descriptor may combine multiple
+         cosigners from different vendors (multisig case), or be a
+         single-sig + timelock from one hardware wallet — either way
+         the vendor dropdown adds noise rather than guidance. Vendor
+         labelling becomes a post-creation Detail-page concern.
+      2. Different hint banner. Replaces the vendor-specific export
+         hint with a friction-source explainer: where these
+         descriptors come from depending on whether the user is
+         building a timelock-only setup (Liana, Bitcoin Core
+         miniscript) or a multisig setup (Sparrow, Specter,
+         Coldcard's multisig export).
+      3. Textarea placeholder shows a single-sig + CLTV miniscript
+         shape — the v1-accepted form — to anchor the wizard's
+         primary case while still working for multisig at parse
+         time.
+  - Three input affordances: paste textarea (default), Upload file
+    (always — coordinators export `.json` or `.txt` descriptors),
+    Scan QR (Capacitor-only — gated by absence-of-affordance in
+    browser per ADR-0007). Multi-frame QR (BBQr/UR2) lands when the
+    PSBT-by-QR roundtrip iteration ships; single-frame QR is
+    impractical for typical multisig descriptors (>1 KB) but works
+    fine for single-sig + timelock descriptors which are usually
+    well under that. The button stays visible for the Capacitor
+    target; backend gates by descriptor size honestly.
+  - Bottom-nav hidden during the wizard.
+  - Step 1 back-chevron returns to Home (picker dismissed).
+  - Continue button stays disabled until a non-empty parse-able
+    descriptor is in the textarea. Parse validation runs on type
+    pause; the four parse outcomes route to: parseback
+    (single-sig+timelock), inline error multisig-deferred
+    (multisig), redirect to Strongbox (pure single-sig), inline
+    error unsupported-form (everything else). Each outcome has its
+    own mockup.
+-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>TallyKeep — Mobile — Add Vault · 1 of 3 · Input</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="_shared/tokens.css">
+<link rel="stylesheet" href="_shared/shell.css">
+<style>
+  .phone-screen { background: var(--color-bg); }
+
+  .app-bar {
+    height: var(--mobile-app-bar);
+    flex-shrink: 0;
+    display: grid;
+    grid-template-columns: 44px 1fr 44px;
+    align-items: center;
+    padding: 0 var(--space-2);
+    background: var(--color-surface);
+    border-bottom: 1px solid var(--color-border);
+  }
+  .app-bar .back-btn {
+    width: 36px; height: 36px;
+    display: inline-flex; align-items: center; justify-content: center;
+    background: transparent; border: 0;
+    border-radius: var(--radius-md);
+    color: var(--color-text);
+    cursor: pointer;
+    justify-self: start;
+    margin-left: var(--space-2);
+  }
+  .app-bar .back-btn:hover { background: var(--color-bg); }
+  .app-bar .back-btn svg {
+    width: 22px; height: 22px;
+    stroke: currentColor; fill: none;
+    stroke-width: 2; stroke-linecap: round; stroke-linejoin: round;
+  }
+  .step-counter {
+    text-align: center;
+    font-size: var(--font-size-xs);
+    font-weight: var(--font-weight-semibold);
+    color: var(--color-text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    line-height: 1;
+  }
+
+  .scroll-area {
+    flex: 1;
+    overflow-y: auto;
+    padding: var(--space-4) var(--space-4) var(--space-5);
+  }
+
+  .step-head { margin-bottom: var(--space-4); }
+  .step-heading {
+    font-size: var(--font-size-lg);
+    font-weight: var(--font-weight-semibold);
+    color: var(--color-text);
+    line-height: var(--line-height-tight);
+    margin: 0;
+    letter-spacing: -0.01em;
+  }
+  .step-sub {
+    font-size: var(--font-size-sm);
+    color: var(--color-text-muted);
+    line-height: var(--line-height-default);
+    margin: var(--space-2) 0 0;
+  }
+
+  .wallet-hint {
+    margin-top: var(--space-3);
+    padding: var(--space-3);
+    background: var(--color-info-soft);
+    border: 1px solid var(--color-info-border);
+    border-radius: var(--radius-md);
+    color: var(--color-info-text-on-soft);
+    font-size: var(--font-size-sm);
+    line-height: var(--line-height-default);
+    display: flex;
+    gap: var(--space-2);
+    align-items: flex-start;
+  }
+  .wallet-hint .hint-icon {
+    width: 18px; height: 18px; flex-shrink: 0;
+    stroke: currentColor; fill: none;
+    stroke-width: 2; stroke-linecap: round; stroke-linejoin: round;
+    margin-top: 1px;
+  }
+  .wallet-hint .hint-title {
+    font-weight: var(--font-weight-semibold);
+    margin: 0 0 2px;
+  }
+  .wallet-hint .hint-body { margin: 0; }
+  .wallet-hint code {
+    font-family: var(--font-mono);
+    font-size: 0.95em;
+    background: rgba(0,0,0,0.04);
+    padding: 1px 4px;
+    border-radius: var(--radius-sm);
+  }
+
+  .field-label {
+    font-size: var(--font-size-xs);
+    color: var(--color-text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    font-weight: var(--font-weight-semibold);
+    display: block;
+    margin: var(--space-4) 0 var(--space-2);
+  }
+  .descriptor-input-wrap { position: relative; }
+  .descriptor-textarea {
+    width: 100%;
+    min-height: 140px;
+    padding: var(--space-3);
+    padding-right: 72px;
+    background: var(--color-surface);
+    border: 1px solid var(--color-border-strong);
+    border-radius: var(--radius-md);
+    font-family: var(--font-mono);
+    font-size: var(--font-size-sm);
+    color: var(--color-text);
+    line-height: 1.5;
+    resize: vertical;
+  }
+  .descriptor-textarea::placeholder { color: var(--color-text-dim); }
+  .descriptor-textarea:focus {
+    outline: none;
+    border-color: var(--color-border-focus);
+    box-shadow: 0 0 0 2px var(--color-primary-soft);
+  }
+  .paste-btn {
+    position: absolute;
+    top: var(--space-2);
+    right: var(--space-2);
+    padding: var(--space-1) var(--space-3);
+    background: var(--color-surface);
+    border: 1px solid var(--color-border-strong);
+    border-radius: var(--radius-pill);
+    font-family: inherit;
+    font-size: var(--font-size-xs);
+    font-weight: var(--font-weight-semibold);
+    color: var(--color-text);
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+  }
+  .paste-btn:hover { background: var(--color-bg); }
+  .paste-btn svg { width: 12px; height: 12px; stroke: currentColor; fill: none; stroke-width: 2; }
+
+  .alt-inputs {
+    margin-top: var(--space-3);
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--space-2);
+  }
+  .alt-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-2);
+    padding: var(--space-2) var(--space-3);
+    background: var(--color-surface);
+    border: 1px solid var(--color-border-strong);
+    border-radius: var(--radius-md);
+    font-family: inherit;
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-weight-medium);
+    color: var(--color-text);
+    cursor: pointer;
+  }
+  .alt-btn:hover { background: var(--color-bg); }
+  .alt-btn svg {
+    width: 16px; height: 16px;
+    stroke: currentColor; fill: none;
+    stroke-width: 2; stroke-linecap: round; stroke-linejoin: round;
+  }
+
+  .wizard-footer {
+    flex-shrink: 0;
+    padding: var(--space-3) var(--space-4) var(--space-4);
+    background: var(--color-surface);
+    border-top: 1px solid var(--color-border);
+  }
+  .wizard-cta {
+    width: 100%;
+    padding: var(--space-3) var(--space-4);
+    background: var(--color-primary);
+    color: var(--color-on-primary);
+    border: 0;
+    border-radius: var(--radius-md);
+    font-family: inherit;
+    font-size: var(--font-size-base);
+    font-weight: var(--font-weight-semibold);
+    cursor: pointer;
+  }
+  .wizard-cta:hover { background: var(--color-primary-strong); }
+  .wizard-cta:disabled {
+    background: var(--color-border);
+    color: var(--color-text-dim);
+    cursor: not-allowed;
+  }
+</style>
+</head>
+<body>
+
+<div class="mockup-meta">
+  <strong>Mobile — Add Vault · 1 of 3 · Input</strong> ·
+  <span class="status-validated">validated</span> ·
+  2026-05-15 · 360×800
+</div>
+
+<div class="phone-frame">
+  <div class="phone-screen">
+
+    <div class="app-bar">
+      <button class="back-btn" aria-label="Back to Home">
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <polyline points="15 6 9 12 15 18"/>
+        </svg>
+      </button>
+      <div class="step-counter">Step 1 of 3</div>
+      <div></div>
+    </div>
+
+    <div class="scroll-area">
+
+      <div class="step-head">
+        <h1 class="step-heading">Add a Vault</h1>
+        <p class="step-sub">
+          A Vault is a wallet whose spending is locked behind a
+          script-enforced timelock, multiple keys, or both. Paste
+          the descriptor of your locked wallet below.
+        </p>
+      </div>
+
+      <label class="field-label" for="descriptor-input">Vault descriptor</label>
+      <div class="descriptor-input-wrap">
+        <textarea id="descriptor-input" class="descriptor-textarea"
+                  placeholder="wsh(and_v(v:after(900000),pk([abc12345/86h/0h/0h]xpub6D.../<0;1>/*)))"
+                  aria-label="Vault descriptor"></textarea>
+        <button class="paste-btn" type="button" aria-label="Paste from clipboard">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <rect x="9" y="3"  width="6"  height="4"  rx="1"/>
+            <rect x="5" y="5"  width="14" height="16" rx="2"/>
+          </svg>
+          Paste
+        </button>
+      </div>
+
+      <div class="alt-inputs">
+        <button class="alt-btn" type="button" aria-label="Scan a QR code with the camera">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <rect x="3"  y="3"  width="7" height="7" rx="1"/>
+            <rect x="14" y="3"  width="7" height="7" rx="1"/>
+            <rect x="3"  y="14" width="7" height="7" rx="1"/>
+            <line x1="14" y1="14" x2="14" y2="17"/>
+            <line x1="14" y1="20" x2="17" y2="20"/>
+            <line x1="17" y1="14" x2="17" y2="17"/>
+            <line x1="20" y1="17" x2="20" y2="20"/>
+          </svg>
+          Scan QR
+        </button>
+        <button class="alt-btn" type="button" aria-label="Upload a descriptor file">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M 14 3 H 7 a 2 2 0 0 0 -2 2 v 14 a 2 2 0 0 0 2 2 h 10 a 2 2 0 0 0 2 -2 V 8 Z"/>
+            <polyline points="14 3 14 8 19 8"/>
+            <line x1="12" y1="12" x2="12" y2="17"/>
+            <polyline points="10 14 12 12 14 14"/>
+          </svg>
+          Upload file
+        </button>
+      </div>
+
+    </div>
+
+    <div class="wizard-footer">
+      <button class="wizard-cta" type="button" disabled>Continue</button>
+    </div>
+
+  </div>
+</div>
+
+</body>
+</html>

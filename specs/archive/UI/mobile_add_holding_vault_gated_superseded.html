@@ -1,0 +1,339 @@
+<!--
+  Title: Mobile — Add Holding · Vault (gated until multisig ships)
+  Status: review  (drawn 2026-05-15 alongside ADR-0010; pending Rémy
+                    greenlight to flip to validated. This is the one
+                    mockup in scope for the current Vault-wizard
+                    iteration — the wizard itself is deferred to the
+                    multisig descriptor support iteration, with target-
+                    state drafts living alongside this file.)
+  Date last touched: 2026-05-15
+  Replaces: nothing on disk. Sibling to
+            mobile_add_holding_coming_soon.html — uses the same
+            centred-icon + heading + body layout, but the copy and CTAs
+            are Vault-specific (definition explanation + Strongbox
+            migration story), so this isn't a parameterisation of the
+            generic coming-soon stub.
+
+  Design notes:
+  - Page-per-file (UI/mockups/README.md). One screen-state.
+  - App-bar: back chevron (left, routes to Home), centred title
+    "Add a Vault", no wordmark. Same pattern as the generic
+    coming-soon stub.
+  - Body is centred — large Vault icon (the holding-vault.svg from
+    brand/identity, bordered to match the picker / coming-soon
+    aesthetic), heading "Vault — coming with multisig support",
+    two-paragraph body explaining (1) what a Vault is and (2) the
+    Strongbox-then-promote migration story.
+  - Primary CTA: "Set up a Strongbox instead" → routes into the
+    Strongbox wizard. This is the load-bearing affordance — most
+    users tapping the Vault tile today want long-term cold storage,
+    and Strongbox is the right Holding for that until multisig
+    ships.
+  - Secondary CTA: "Return to Home" text-link. Same shape as the
+    generic coming-soon stub's CTA, but de-emphasised to favour the
+    Strongbox path.
+  - Bottom nav stays (Home active, others enabled-inactive) per
+    populated-home pattern — the user shouldn't feel trapped on a
+    sub-route.
+  - Copy discipline (per memory feedback_user_facing_copy_discipline):
+      * Vocabulary locked: "Vault" / "multisig" / "Strongbox" used
+        consistently with their domain definitions.
+      * Forward-reference framing: "ships with multisig support"
+        not "isn't built yet" — signals direction, not deficiency.
+      * No state-coupled warnings — the gating reason (no multisig
+        descriptor support in the backend) is explained as a feature
+        scheduling fact, not a temporary error condition.
+  - No bottom error banner / scrim / disabled-CTA pattern from the
+    wizard mockups — this isn't a wizard step, it's a dead-end
+    informational screen with two next-step paths. The visual
+    register matches the generic coming-soon stub (calm,
+    explanatory) rather than the wizard's instrumented register
+    (steps, validation, errors).
+  - Vault icon: inline SVG from brand/identity/holding-vault.svg
+    (canonical per palette v2 lock). Border colour binds to
+    --color-holding-vault token via the .stub-icon-wrap.vault
+    selector, same shape as the generic coming-soon stub.
+-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>TallyKeep — Mobile — Add Holding · Vault (gated)</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="_shared/tokens.css">
+<link rel="stylesheet" href="_shared/shell.css">
+<style>
+  .phone-screen { background: var(--color-bg); }
+
+  /* ---------- App bar — back chevron + centred title ---------- */
+  .app-bar {
+    height: var(--mobile-app-bar);
+    flex-shrink: 0;
+    display: grid;
+    grid-template-columns: 44px 1fr 44px;
+    align-items: center;
+    padding: 0 var(--space-2);
+    background: var(--color-surface);
+    border-bottom: 1px solid var(--color-border);
+  }
+  .app-bar .back-btn {
+    width: 36px; height: 36px;
+    display: inline-flex; align-items: center; justify-content: center;
+    background: transparent; border: 0;
+    border-radius: var(--radius-md);
+    color: var(--color-text);
+    cursor: pointer;
+    justify-self: start;
+    margin-left: var(--space-2);
+  }
+  .app-bar .back-btn:hover { background: var(--color-bg); }
+  .app-bar .back-btn svg {
+    width: 22px; height: 22px;
+    stroke: currentColor; fill: none;
+    stroke-width: 2; stroke-linecap: round; stroke-linejoin: round;
+  }
+  .app-bar .screen-title {
+    text-align: center;
+    font-size: var(--font-size-base);
+    font-weight: var(--font-weight-semibold);
+    color: var(--color-text);
+    line-height: 1;
+  }
+
+  /* ---------- Body — centred icon + message + CTAs ---------- */
+  .scroll-area {
+    flex: 1;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+  }
+  .gated-body {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: var(--space-6) var(--space-5) var(--space-5);
+    gap: var(--space-4);
+    text-align: center;
+  }
+  .gated-icon-wrap {
+    width: 96px;
+    height: 96px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--color-surface);
+    border: 2px solid var(--gated-border, var(--color-border));
+    border-radius: var(--radius-lg);
+  }
+  .gated-icon-wrap svg { width: 72px; height: 72px; display: block; }
+  .gated-icon-wrap.vault { --gated-border: var(--color-holding-vault); }
+
+  .gated-heading {
+    font-size: var(--font-size-lg);
+    font-weight: var(--font-weight-semibold);
+    color: var(--color-text);
+    line-height: var(--line-height-tight);
+    margin: 0;
+    max-width: 300px;
+  }
+  .gated-body-text {
+    font-size: var(--font-size-sm);
+    color: var(--color-text-muted);
+    line-height: var(--line-height-default);
+    max-width: 300px;
+    margin: 0;
+  }
+  .gated-body-text + .gated-body-text { margin-top: calc(-1 * var(--space-2)); }
+  .gated-body-text strong {
+    color: var(--color-text);
+    font-weight: var(--font-weight-semibold);
+  }
+
+  /* ---------- Footer with two CTAs ---------- */
+  .gated-footer {
+    flex-shrink: 0;
+    padding: var(--space-3) var(--space-4) var(--space-4);
+    background: var(--color-surface);
+    border-top: 1px solid var(--color-border);
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+  }
+  .gated-cta-primary {
+    width: 100%;
+    padding: var(--space-3) var(--space-4);
+    background: var(--color-primary);
+    color: var(--color-on-primary);
+    border: 0;
+    border-radius: var(--radius-md);
+    font-family: inherit;
+    font-size: var(--font-size-base);
+    font-weight: var(--font-weight-semibold);
+    cursor: pointer;
+  }
+  .gated-cta-primary:hover { background: var(--color-primary-strong); }
+  .gated-cta-secondary {
+    width: 100%;
+    padding: var(--space-2) var(--space-4);
+    background: transparent;
+    color: var(--color-text-muted);
+    border: 0;
+    font-family: inherit;
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-weight-medium);
+    cursor: pointer;
+  }
+  .gated-cta-secondary:hover { color: var(--color-text); }
+
+  /* ---------- Bottom nav (same as Home populated / coming-soon stub) ---------- */
+  .bottom-nav {
+    height: var(--mobile-bottom-nav);
+    flex-shrink: 0;
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    background: var(--color-surface);
+    border-top: 1px solid var(--color-border);
+  }
+  .nav-item {
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    gap: 2px;
+    padding: var(--space-2) 0;
+    font-size: 10px;
+    color: var(--color-text-dim);
+    background: transparent; border: 0; cursor: pointer;
+    position: relative;
+  }
+  .nav-item .nav-ico { width: 22px; height: 22px; color: currentColor; }
+  .nav-item.active {
+    color: var(--color-primary-strong);
+    font-weight: var(--font-weight-semibold);
+  }
+  .nav-item.active::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 20%; right: 20%;
+    height: 2px;
+    background: var(--color-primary);
+    border-radius: 0 0 var(--radius-sm) var(--radius-sm);
+  }
+  .nav-item.enabled-inactive { color: var(--color-text-muted); }
+</style>
+</head>
+<body>
+
+<div class="mockup-meta">
+  <strong>Mobile — Add Holding · Vault (gated)</strong> ·
+  <span class="status-review">review</span> ·
+  2026-05-15 · 360×800
+</div>
+
+<div class="phone-frame">
+  <div class="phone-screen">
+
+    <div class="app-bar">
+      <button class="back-btn" aria-label="Back to Home">
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <polyline points="15 6 9 12 15 18"/>
+        </svg>
+      </button>
+      <div class="screen-title">Add a Vault</div>
+      <div></div>
+    </div>
+
+    <div class="scroll-area">
+      <div class="gated-body">
+
+        <!-- Vault icon (canonical brand/identity/holding-vault.svg). -->
+        <div class="gated-icon-wrap vault">
+          <svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+            <rect x="4" y="4" width="56" height="56" rx="4" fill="#5c6470"/>
+            <circle cx="32" cy="32" r="22" fill="#7a8189"/>
+            <circle cx="32" cy="32" r="22" fill="none" stroke="#b89968" stroke-width="2.5"/>
+            <line x1="32" y1="32" x2="12" y2="32" stroke="#5c6470" stroke-width="3.5" stroke-linecap="round"/>
+            <line x1="32" y1="32" x2="42" y2="14.68" stroke="#5c6470" stroke-width="3.5" stroke-linecap="round"/>
+            <line x1="32" y1="32" x2="42" y2="49.32" stroke="#5c6470" stroke-width="3.5" stroke-linecap="round"/>
+            <line x1="12" y1="29" x2="12" y2="35" stroke="#5c6470" stroke-width="3" stroke-linecap="round"/>
+            <line x1="39.4" y1="13.18" x2="44.6" y2="16.18" stroke="#5c6470" stroke-width="3" stroke-linecap="round"/>
+            <line x1="39.4" y1="50.82" x2="44.6" y2="47.82" stroke="#5c6470" stroke-width="3" stroke-linecap="round"/>
+            <line x1="32" y1="28" x2="32" y2="20" stroke="#5c6470" stroke-width="1.5" stroke-linecap="round"/>
+            <line x1="28.54" y1="30" x2="21.6" y2="26" stroke="#5c6470" stroke-width="1.5" stroke-linecap="round"/>
+            <line x1="28.54" y1="34" x2="21.6" y2="38" stroke="#5c6470" stroke-width="1.5" stroke-linecap="round"/>
+            <line x1="32" y1="36" x2="32" y2="44" stroke="#5c6470" stroke-width="1.5" stroke-linecap="round"/>
+            <line x1="35.46" y1="34" x2="42.4" y2="38" stroke="#5c6470" stroke-width="1.5" stroke-linecap="round"/>
+            <line x1="35.46" y1="30" x2="42.4" y2="26" stroke="#5c6470" stroke-width="1.5" stroke-linecap="round"/>
+            <circle cx="32" cy="32" r="4" fill="#b89968"/>
+            <circle cx="10" cy="10" r="1.5" fill="#3e4650"/>
+            <circle cx="54" cy="10" r="1.5" fill="#3e4650"/>
+            <circle cx="10" cy="54" r="1.5" fill="#3e4650"/>
+            <circle cx="54" cy="54" r="1.5" fill="#3e4650"/>
+          </svg>
+        </div>
+
+        <h1 class="gated-heading">Vault — coming with multisig support</h1>
+
+        <p class="gated-body-text">
+          A Vault holds Bitcoin under <strong>multiple keys</strong> —
+          two or more devices, often held by different people or in
+          different places, all required to spend. It's the long-term,
+          ceremonial-spend tier.
+        </p>
+        <p class="gated-body-text">
+          Multisig support ships in an upcoming iteration. To track
+          Bitcoin held on a single hardware wallet today, set up a
+          <strong>Strongbox</strong> — when multisig arrives, your
+          Strongbox can be promoted to a Vault.
+        </p>
+
+      </div>
+    </div>
+
+    <div class="gated-footer">
+      <button class="gated-cta-primary" type="button">Set up a Strongbox instead</button>
+      <button class="gated-cta-secondary" type="button">Return to Home</button>
+    </div>
+
+    <!-- Bottom nav (same as populated home) -->
+    <nav class="bottom-nav" aria-label="Primary navigation">
+      <button class="nav-item active" aria-current="page">
+        <svg class="nav-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M 3 12 L 12 3 L 21 12 M 6 10 L 6 21 L 18 21 L 18 10"/>
+        </svg>
+        Home
+      </button>
+      <button class="nav-item enabled-inactive">
+        <svg class="nav-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+          <line x1="5" y1="7"  x2="19" y2="7"/>
+          <line x1="5" y1="12" x2="19" y2="12"/>
+          <line x1="5" y1="17" x2="19" y2="17"/>
+        </svg>
+        Activity
+      </button>
+      <button class="nav-item enabled-inactive">
+        <svg class="nav-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="4" y="6"  width="16" height="4" rx="1"/>
+          <rect x="4" y="12" width="16" height="4" rx="1"/>
+          <rect x="4" y="18" width="16" height="2" rx="1"/>
+        </svg>
+        Holdings
+      </button>
+      <button class="nav-item enabled-inactive">
+        <svg class="nav-ico" viewBox="0 0 24 24" fill="currentColor">
+          <circle cx="6"  cy="12" r="2"/>
+          <circle cx="12" cy="12" r="2"/>
+          <circle cx="18" cy="12" r="2"/>
+        </svg>
+        More
+      </button>
+    </nav>
+
+  </div>
+</div>
+
+</body>
+</html>

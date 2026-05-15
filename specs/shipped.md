@@ -14,6 +14,49 @@ commit.
 
 ---
 
+## 2026-05-16 — Add Holding · Vault wizard (all initial shapes)
+
+`POST /api/v1/descriptors/validate` response extended with
+`timelock_kind` (string | null), `timelock_value` (int | null),
+`cosigner_fingerprints` (list of strings), `auto_name` (string | null),
+and `parse_category` (`parseback_ready` | `single_key_no_timelock`).
+Descriptor adapter extended to recognise the full initial Vault accept
+set: single-sig + timelock (`wsh`/`tr` with `and_v(v:after/older, pk)`),
+pure multisig (`sh(multi)`, `wsh(multi/sortedmulti)`, `tr(multi_a)`),
+and multisig + single timelock. Structural classification guard added:
+any descriptor containing `or_i/or_d/or_c/or_b/thresh/sha256/hash256/ripemd160/hash160`
+fragments routes to `UnsupportedDescriptorError` before timelock or
+multisig detection, preventing multi-path miniscript constructs from
+misrouting to Vault parseback. Pre-existing `_now()` datetime bug in
+`descriptors.py` fixed (module vs class reference).
+
+`POST /api/v1/holdings/vault` wired with new domain fields:
+`timelock_kind`, `timelock_value`, `required_signers`, `total_signers`
+(all derived server-side from the descriptor; client-supplied values
+overridden). Stored in `subtype_data` JSONB. Auto-name composed
+backend-side per five shape templates; collision suffix appended.
+
+Frontend: `/holding/new/vault/+page.svelte` — 3-step wizard covering
+all five Vault shape variants. Step 1: descriptor textarea + Paste /
+Upload / Scan QR; parse-on-submit routes to parseback (parseback_ready),
+warning redirect (single_key_no_timelock → Strongbox), or danger inline
+error (unsupported). Step 2: vault-stripe auto-name preview + 4-row
+parse-card (Signers required, Signing keys, Script type, Timelock) with
+CLTV/CSV formatting helpers + first-three-addresses tap-to-copy. Step 3:
+vault-coloured scan-row spinner. Strongbox wizard tightened: descriptors
+with `timelock_kind` or `parse_category === parseback_ready` now redirect
+to Vault wizard. Holding detail placeholder `/holding/[id]/+page.svelte`
+added (tapping a Vault row no longer dead-ends). Home holdings list
+wired: tapping any holding row navigates to `/holding/{id}`.
+
+Tests: 4 new descriptor-validate integration tests (single-key
+no-timelock, multisig, CLTV, CSV, or_d-rejection); 2 new vault-create
+tests (CLTV and CSV timelock metadata persistence); 1 existing test
+updated (zero-required-signers rejection). Unit test updated for renamed
+`timelock_value` field. OpenAPI regenerated (107 kB).
+
+---
+
 ## 2026-05-15 — Add Holding · Strongbox wizard
 
 `POST /api/v1/descriptors/validate` response extended with

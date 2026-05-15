@@ -81,7 +81,8 @@ class Holding:
     # Vault metadata
     required_signers: int | None = None
     total_signers: int | None = None
-    timelock_blocks: int | None = None
+    timelock_kind: str | None = None    # "cltv" | "csv" | None
+    timelock_value: int | None = None   # block height (CLTV) or count (CSV)
     recovery_setup_notes: str | None = None
 
     def __post_init__(self) -> None:
@@ -147,12 +148,13 @@ class Holding:
         if (
             self.required_signers is not None
             or self.total_signers is not None
-            or self.timelock_blocks is not None
+            or self.timelock_kind is not None
+            or self.timelock_value is not None
             or self.recovery_setup_notes is not None
         ):
             raise ValueError(
-                "Vault metadata (required_signers, total_signers, timelock_blocks, "
-                "recovery_setup_notes) only valid on Vault holdings"
+                "Vault metadata (required_signers, total_signers, timelock_kind, "
+                "timelock_value, recovery_setup_notes) only valid on Vault holdings"
             )
 
     def _reject_strongbox_metadata(self) -> None:
@@ -177,5 +179,15 @@ class Holding:
                 raise ValueError(
                     "Vault total_signers must be >= required_signers"
                 )
-        if self.timelock_blocks is not None and self.timelock_blocks < 0:
-            raise ValueError("Vault timelock_blocks must be >= 0")
+        valid_timelock_kinds = {None, "cltv", "csv"}
+        if self.timelock_kind not in valid_timelock_kinds:
+            raise ValueError(
+                f"Vault timelock_kind must be one of {valid_timelock_kinds}, "
+                f"got {self.timelock_kind!r}"
+            )
+        if self.timelock_kind is not None and self.timelock_value is None:
+            raise ValueError(
+                "Vault timelock_value must be set when timelock_kind is not None"
+            )
+        if self.timelock_value is not None and self.timelock_value < 0:
+            raise ValueError("Vault timelock_value must be >= 0")

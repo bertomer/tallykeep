@@ -34,64 +34,6 @@ decision slot.
 
 ## Open
 
-### `vault-pre-multisig-shape`
-
-**Status:** open (resolved in the brainstorm session that
-sharpens the Vault wizard iteration).
-
-**Item:** A Vault is multisig by definition (per
-`holdings/04_vault.md`: "A single-key Holding is not a Vault —
-that's a Strongbox"). Target-state implementation supports
-multisig descriptors. **What does the product do *before*
-multisig descriptor support ships?**
-
-Two shapes, both consistent with the target definition:
-
-- **Block.** Add-Vault is disabled with: *"Vault Holdings
-  require multisig descriptor support, which ships in a later
-  iteration. To track Bitcoin held with a hardware wallet
-  today, use Strongbox. Your Strongbox can be promoted to a
-  Vault when multisig support arrives."* Cleanest match to the
-  definition. No half-state. Cost: a user who wants the Vault
-  semantic identity (long-term storage, ceremonial spending
-  guardrail) can't have it yet.
-- **Accept single-key as a temporary placeholder.** Add-Vault
-  accepts a single-key descriptor; the
-  `claimed_multisig_but_single_key` discrepancy fires at high
-  severity, the user dismisses with "yes, multisig setup in
-  progress". Lets users carve out the Vault slot now, get the
-  long-term-purpose framing + outgoing-payment guardrail, and
-  migrate the descriptor when multisig ships. Cost: a Vault
-  Holding that's structurally indistinguishable from a Strongbox
-  for some time, papered over by a discrepancy warning.
-
-**Tensions worth surfacing in the session:**
-
-- The declared-vs-observable principle accommodates option B
-  cleanly (the discrepancy is *exactly* what that system is
-  for). Option A says "the type system shouldn't tolerate
-  obviously-wrong configurations even with a discrepancy".
-- The Vault outgoing-payment guardrail (warn before sending
-  from `purpose=long_term` Vault) only triggers on Vault-typed
-  Holdings. Option A delays that guardrail availability.
-  Option B lets the user have it now, even on a single-key
-  setup.
-- Multisig setup is genuinely a process — collecting xpubs from
-  multiple hardware wallets, coordinating across signers,
-  testing the spend ceremony. Option B accepts that a user
-  partway through that process has a temporarily-single-key
-  Vault. Option A says: don't create the Holding until the
-  process is complete.
-
-**Leading direction:** None — Rémy explicitly left this open
-2026-05-14 ("I don't know what to do"). Resolve before the
-Vault-wizard iteration sharpens.
-
-**Decision:** ___ (pending session)
-**Decided on:** ___
-
----
-
 ### `sweep-validator-extended-rules`
 
 **Status:** open (deferred to brainstorm after the four Holding

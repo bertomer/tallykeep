@@ -418,3 +418,89 @@ def test_validate_single_address_returns_typed_error(app_with_db) -> None:
     )
     assert response.status_code == 422
     assert response.json()["detail"]["error_code"] == "SINGLE_ADDRESS_INPUT"
+
+
+# --- parse_category routing metadata -----------------------------------------
+
+_XPUB = "xpub6BosfCnifzxcFwrSzQiqu2DBVTshkCXacvNsWGYJVVhhawA7d4R5WSWGFNbi8Aw6ZRc1brxMyWMzG3DSSSSoekkudhUd9yLb6qx39T9nMdj"
+
+_WSH_CLTV = f"wsh(and_v(v:pk({_XPUB}/3/*),after(840000)))"
+_WSH_CSV = f"wsh(and_v(v:pk({_XPUB}/4/*),older(52560)))"
+
+
+def test_validate_single_key_returns_single_key_no_timelock(app_with_db) -> None:
+    client, _ = app_with_db
+    response = client.post(
+        "/api/v1/descriptors/validate",
+        json={"input": WPKH_MAINNET, "network": "mainnet"},
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert data["parse_category"] == "single_key_no_timelock"
+    assert data["auto_name"] is None
+
+
+def test_validate_multisig_returns_parseback_ready(app_with_db) -> None:
+    client, _ = app_with_db
+    response = client.post(
+        "/api/v1/descriptors/validate",
+        json={"input": _WSH_MULTISIG, "network": "mainnet"},
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert data["parse_category"] == "parseback_ready"
+    assert data["auto_name"] == "2-of-2 Vault"
+
+
+def test_validate_cltv_descriptor_returns_parseback_ready(app_with_db) -> None:
+    client, _ = app_with_db
+    response = client.post(
+        "/api/v1/descriptors/validate",
+        json={"input": _WSH_CLTV, "network": "mainnet"},
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert data["parse_category"] == "parseback_ready"
+    assert data["timelock_kind"] == "cltv"
+    assert data["timelock_value"] == 840000
+    assert data["is_multisig"] is False
+    # Auto-name references the approximate unlock year.
+    assert data["auto_name"] is not None
+    assert "Vault unlocking" in data["auto_name"]
+
+
+def test_validate_csv_descriptor_returns_parseback_ready(app_with_db) -> None:
+    client, _ = app_with_db
+    response = client.post(
+        "/api/v1/descriptors/validate",
+        json={"input": _WSH_CSV, "network": "mainnet"},
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert data["parse_category"] == "parseback_ready"
+    assert data["timelock_kind"] == "csv"
+    assert data["timelock_value"] == 52560
+    assert "1-year Vault" == data["auto_name"]
+
+
+def test_validate_or_d_branching_descriptor_rejected(app_with_db) -> None:
+    """Descriptors with or_d/or_i/thresh (multi-path miniscript) must return
+    UNSUPPORTED_DESCRIPTOR — not be misrouted to Vault parseback on the
+    strength of the older() fragment they may contain."""
+    client, _ = app_with_db
+    # Liana-style swap-in: primary key can always spend, or after CSV delay
+    # a secondary key can spend. Contains or_d(..., older(...)).
+    or_d_expr = (
+        "wsh(and_v(v:pk([36550033/52h/0h/0h]"
+        "xpub6CsuiRDEsEhCnLD3D3P57pR2BBg4AAMpZ1u7KAjjzAWYpi2ACS9pL6Q"
+        "AGyofowd9CKzSLTGVhfEtug13oW2DFXK8ny2ue2uSoY3aUBwat3u),"
+        "or_d(pk(037e05292c5929224b5817d330419eabbf05452a0fab925e21682d96b88b2f1231),"
+        "older(25920))))"
+    )
+    response = client.post(
+        "/api/v1/descriptors/validate",
+        json={"input": or_d_expr, "network": "mainnet"},
+    )
+    assert response.status_code == 422
+    detail = response.json()["detail"]
+    assert detail["error_code"] == "UNSUPPORTED_DESCRIPTOR"

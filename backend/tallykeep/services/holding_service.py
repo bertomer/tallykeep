@@ -309,31 +309,56 @@ def create_vault(
     display_order: int,
     descriptors: list[DescriptorInput],
     adapter: DescriptorAdapter,
-    required_signers: int | None,
-    total_signers: int | None,
-    timelock_blocks: int | None,
     recovery_setup_notes: str | None,
 ) -> Holding:
-    for spec in descriptors:
-        try:
-            parsed = adapter.parse(spec.expression, spec.network, allow_multisig=True)
-        except (DescriptorParseError, UnsupportedDescriptorError) as exc:
-            raise HoldingServiceError(str(exc)) from exc
-        if not parsed.is_multisig:
-            raise HoldingServiceError(
-                "Vault holdings require multisig descriptors. "
-                f"Descriptor '{spec.name}' is a single-key descriptor and is not accepted here."
-            )
+    """Create a Vault holding.
+
+    Vault v1 accept set: multisig descriptors (any m-of-n) and single-key +
+    timelock miniscript (CLTV/CSV). At least one of `is_multisig=True` OR
+    `timelock_kind is not None` must hold for the first descriptor — otherwise
+    the descriptor belongs to Strongbox, not Vault.
+
+    `required_signers`, `total_signers`, `timelock_kind`, and `timelock_value`
+    are derived from parsing the first descriptor; client-provided values are
+    intentionally ignored to keep the stored metadata consistent with the
+    actual descriptor content.
+    """
+    if not descriptors:
+        raise HoldingServiceError("Vault holdings require at least one descriptor")
+
+    try:
+        parsed = adapter.parse(
+            descriptors[0].expression, descriptors[0].network, allow_multisig=True
+        )
+    except (DescriptorParseError, UnsupportedDescriptorError) as exc:
+        raise HoldingServiceError(str(exc)) from exc
+
+    is_vault_shape = parsed.is_multisig or parsed.timelock_kind is not None
+    if not is_vault_shape:
+        raise HoldingServiceError(
+            "Vault holdings require a multisig descriptor or a descriptor with a "
+            f"timelock (CLTV/CSV). Descriptor '{descriptors[0].name}' is a plain "
+            "single-key descriptor — set this up as a Strongbox instead."
+        )
+
+    # Derive metadata from the descriptor (client-provided values are not used).
+    required_signers = parsed.required_signers
+    total_signers = parsed.total_signers
+    timelock_kind = parsed.timelock_kind
+    timelock_value = parsed.timelock_value
 
     subtype_data: dict = {}
     if required_signers is not None:
         subtype_data["required_signers"] = required_signers
     if total_signers is not None:
         subtype_data["total_signers"] = total_signers
-    if timelock_blocks is not None:
-        subtype_data["timelock_blocks"] = timelock_blocks
+    if timelock_kind is not None:
+        subtype_data["timelock_kind"] = timelock_kind
+    if timelock_value is not None:
+        subtype_data["timelock_value"] = timelock_value
     if recovery_setup_notes is not None:
         subtype_data["recovery_setup_notes"] = recovery_setup_notes
+
     return _create_holding_with_descriptors(
         session,
         holding_type=HoldingType.VAULT,
@@ -350,7 +375,8 @@ def create_vault(
         extra_holding_kwargs={
             "required_signers": required_signers,
             "total_signers": total_signers,
-            "timelock_blocks": timelock_blocks,
+            "timelock_kind": timelock_kind,
+            "timelock_value": timelock_value,
             "recovery_setup_notes": recovery_setup_notes,
         },
     )

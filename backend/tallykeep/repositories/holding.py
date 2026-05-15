@@ -58,7 +58,8 @@ def _row_to_domain(
         signing_metadata_present=subtype.get("signing_metadata_present"),
         required_signers=subtype.get("required_signers"),
         total_signers=subtype.get("total_signers"),
-        timelock_blocks=subtype.get("timelock_blocks"),
+        timelock_kind=subtype.get("timelock_kind"),
+        timelock_value=subtype.get("timelock_value"),
         recovery_setup_notes=subtype.get("recovery_setup_notes"),
     )
 
@@ -78,8 +79,10 @@ def _build_subtype_data(holding: Holding) -> dict[str, Any]:
             payload["required_signers"] = holding.required_signers
         if holding.total_signers is not None:
             payload["total_signers"] = holding.total_signers
-        if holding.timelock_blocks is not None:
-            payload["timelock_blocks"] = holding.timelock_blocks
+        if holding.timelock_kind is not None:
+            payload["timelock_kind"] = holding.timelock_kind
+        if holding.timelock_value is not None:
+            payload["timelock_value"] = holding.timelock_value
         if holding.recovery_setup_notes is not None:
             payload["recovery_setup_notes"] = holding.recovery_setup_notes
     return payload

@@ -67,11 +67,17 @@ custody facts:
    OS-grade secure storage primitive) and surfaces the operation
    as a gate.
 
-3. **Hardware-wallet keys** (Strongbox; Vault when single-key;
-   future multisig cosigners) live on the user's hardware device.
-   TallyKeep choreographs (PSBT export → external signing →
-   signed PSBT re-import → broadcast). TallyKeep never sees these
-   keys.
+3. **Hardware-wallet keys** (Strongbox; Vault) live on the
+   user's hardware device(s). TallyKeep choreographs (PSBT
+   export → external signing → signed PSBT re-import →
+   broadcast). TallyKeep never sees these keys. The Vault zone
+   covers both shapes per ADR-0010:
+   - *Single-sig + script-enforced timelock* — one hardware
+     wallet, script enforces the wait. PSBT-roundtrip with one
+     signer, gated by the chain-side timelock at broadcast.
+   - *Multisig (+ optional timelock)* — multiple hardware
+     wallets / cosigners, script requires m of n signatures plus
+     any timelock. PSBT-roundtrip across multiple signers.
 
 4. **Custodial-provider keys** (Account) are held by the third
    party (Kraken, Bitstamp, Swissquote, future P2P venues).

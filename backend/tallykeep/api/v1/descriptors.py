@@ -1,7 +1,7 @@
 """Descriptor endpoints — spec module 04.
 
 Includes:
-  POST /api/v1/descriptors/validate  — pure descriptor parser, no state mutation.
+  POST /api/v1/descriptors/validate  — descriptor parser with Vault routing metadata.
 
 M4 implements:
   - GET    /api/v1/descriptors                            (list, with holding_id filter)
@@ -20,12 +20,13 @@ Stubs (deferred to M5):
 
 from __future__ import annotations
 
+import datetime
 import re
-from datetime import UTC, datetime
+from datetime import UTC
+from datetime import datetime as _datetime
 from uuid import UUID, uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, Response
-from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy.orm import Session
 
@@ -78,6 +79,75 @@ _SCRIPT_TYPE_LABELS: dict[str, str] = {
     "p2sh_p2wsh": "p2sh-p2wsh",
 }
 
+# Approximate Bitcoin genesis UNIX timestamp (2009-01-03T18:15:05Z).
+# Used for CLTV block-height → calendar-year approximation.
+_GENESIS_TIMESTAMP: int = 1230940905
+
+
+def _cltv_year(block_height: int) -> int:
+    """Approximate Gregorian year when a CLTV lock expires."""
+    approx_ts = _GENESIS_TIMESTAMP + block_height * 600
+    return datetime.datetime.fromtimestamp(approx_ts, tz=datetime.timezone.utc).year
+
+
+def _csv_duration_label(block_count: int) -> str:
+    """Human-readable duration string for a CSV block count (floor division)."""
+    if block_count >= 52560:
+        return f"{block_count // 52560}-year"
+    if block_count >= 4320:
+        return f"{block_count // 4320}-month"
+    days = block_count // 144 or 1
+    return f"{days}-day"
+
+
+def _compute_vault_auto_name(
+    required_signers: int | None,
+    total_signers: int | None,
+    timelock_kind: str | None,
+    timelock_value: int | None,
+) -> str:
+    """Compose the auto-name template for a Vault per the naming table in specs/next_iteration.md."""
+    req = required_signers or 1
+    tot = total_signers or 1
+    if tot == 1:
+        if timelock_kind == "cltv" and timelock_value is not None:
+            return f"Vault unlocking {_cltv_year(timelock_value)}"
+        if timelock_kind == "csv" and timelock_value is not None:
+            return f"{_csv_duration_label(timelock_value)} Vault"
+    else:
+        if timelock_kind is None:
+            return f"{req}-of-{tot} Vault"
+        if timelock_kind == "cltv" and timelock_value is not None:
+            return f"{req}-of-{tot} Vault unlocking {_cltv_year(timelock_value)}"
+        if timelock_kind == "csv" and timelock_value is not None:
+            return f"{req}-of-{tot} Vault · {_csv_duration_label(timelock_value)} lock"
+    return "Vault"
+
+
+def _vault_auto_name_with_collision(
+    session: Session,
+    base_name: str,
+) -> str:
+    """Append " (N)" suffix if a non-archived Vault with `base_name` already exists."""
+    from tallykeep.domain.enums import HoldingType
+    from tallykeep.models import HoldingRow
+    from sqlalchemy import select
+
+    existing = set(
+        session.execute(
+            select(HoldingRow.name).where(
+                HoldingRow.holding_type == HoldingType.VAULT.value,
+                HoldingRow.is_archived.is_(False),
+            )
+        ).scalars().all()
+    )
+    if base_name not in existing:
+        return base_name
+    n = 2
+    while f"{base_name} ({n})" in existing:
+        n += 1
+    return f"{base_name} ({n})"
+
 
 class ValidateDescriptorRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -90,11 +160,27 @@ _KEY_ORIGIN_PATTERN = re.compile(r'\[')
 
 
 class ValidateDescriptorResponse(BaseModel):
+    """Validate response.
+
+    `parse_category`:
+      - "parseback_ready" — descriptor is a valid Vault shape (multisig and/or timelock).
+        The Vault wizard advances to parseback.
+      - "single_key_no_timelock" — descriptor is a valid single-key wallet without
+        timelock. The Vault wizard redirects to Strongbox; the Strongbox wizard proceeds.
+
+    Unsupported / unparseable descriptors still return 422 (PARSE_ERROR /
+    UNSUPPORTED_DESCRIPTOR / SINGLE_ADDRESS_INPUT).
+    """
+
     script_type: str
     is_multisig: bool
     required_signers: int | None = None
     total_signers: int | None = None
-    timelocks: None = None
+    timelock_kind: str | None = None       # "cltv" | "csv" | None
+    timelock_value: int | None = None      # block height (CLTV) or count (CSV)
+    cosigner_fingerprints: list[str] = []
+    auto_name: str | None = None           # suggested Vault name (only when parseback_ready)
+    parse_category: str = "single_key_no_timelock"
     first_addresses: list[str]
     signing_metadata_present: bool
 
@@ -102,14 +188,22 @@ class ValidateDescriptorResponse(BaseModel):
 @router.post(
     "/descriptors/validate",
     response_model=ValidateDescriptorResponse,
-    summary="Validate a BIP 380 descriptor — pure parser, no state mutation.",
+    summary="Validate a BIP 380 descriptor and return Vault routing metadata.",
 )
-async def validate_descriptor(body: ValidateDescriptorRequest) -> ValidateDescriptorResponse:
+async def validate_descriptor(
+    body: ValidateDescriptorRequest,
+    session: Session = Depends(get_db_session),
+) -> ValidateDescriptorResponse:
     """Validate a descriptor expression and return its parsed properties.
 
-    Accepts single-key and multisig BIP 380 descriptors.
+    Accepts single-key, multisig, and miniscript (timelock) BIP 380 descriptors.
     Returns a typed 422 error when given a bare bitcoin address instead of
     a descriptor (error_code: SINGLE_ADDRESS_INPUT).
+
+    `parse_category` signals the routing intent for wizard UIs:
+    - "parseback_ready": valid Vault shape — wizard advances to parseback.
+    - "single_key_no_timelock": valid Strongbox shape — Vault wizard redirects;
+      Strongbox wizard proceeds normally.
     """
     expr = body.input.strip()
 
@@ -147,21 +241,42 @@ async def validate_descriptor(body: ValidateDescriptorRequest) -> ValidateDescri
     except Exception:
         pass  # address derivation is best-effort for the validate endpoint
 
-    script_type = _SCRIPT_TYPE_LABELS.get(
+    script_type_key = _SCRIPT_TYPE_LABELS.get(
         parsed.address_type.value, parsed.address_type.value
     )
+    # Append " miniscript" suffix when the descriptor contains a timelock fragment.
+    if parsed.timelock_kind is not None:
+        script_type = f"{script_type_key} miniscript"
+    else:
+        script_type = script_type_key
 
     # Key-origin brackets ([fingerprint/path]) present → signing metadata available.
-    # Their absence means the descriptor was built from a bare xpub/zpub/ypub with no
-    # derivation info, so hardware wallets may refuse to sign PSBTs for it.
     signing_metadata_present = bool(_KEY_ORIGIN_PATTERN.search(expr))
+
+    # Vault shape: has multisig OR a timelock.
+    is_vault = parsed.is_multisig or parsed.timelock_kind is not None
+    parse_category = "parseback_ready" if is_vault else "single_key_no_timelock"
+
+    auto_name: str | None = None
+    if is_vault:
+        base = _compute_vault_auto_name(
+            parsed.required_signers,
+            parsed.total_signers,
+            parsed.timelock_kind,
+            parsed.timelock_value,
+        )
+        auto_name = _vault_auto_name_with_collision(session, base)
 
     return ValidateDescriptorResponse(
         script_type=script_type,
         is_multisig=parsed.is_multisig,
         required_signers=parsed.required_signers,
         total_signers=parsed.total_signers,
-        timelocks=None,
+        timelock_kind=parsed.timelock_kind,
+        timelock_value=parsed.timelock_value,
+        cosigner_fingerprints=list(parsed.cosigner_fingerprints),
+        auto_name=auto_name,
+        parse_category=parse_category,
         first_addresses=first_addresses,
         signing_metadata_present=signing_metadata_present,
     )
@@ -188,8 +303,8 @@ class DescriptorPatch(BaseModel):
 # --- helpers -----------------------------------------------------------------
 
 
-def _now() -> datetime:
-    return datetime.now(UTC)
+def _now() -> _datetime:
+    return _datetime.now(UTC)
 
 
 def _descriptor_to_response(descriptor: Descriptor) -> DescriptorResponse:

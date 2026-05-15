@@ -259,12 +259,13 @@ class TestVaultMultisigParameters:
             )
 
     def test_negative_timelock_rejected(self) -> None:
-        with pytest.raises(ValueError, match="timelock_blocks must be >= 0"):
+        with pytest.raises(ValueError, match="timelock_value must be >= 0"):
             _make_holding(
                 HoldingType.VAULT,
                 descriptor_ids=[uuid4()],
                 declared_security=_self_single_claim(SigningModel.CEREMONIAL),
-                timelock_blocks=-1,
+                timelock_kind="cltv",
+                timelock_value=-1,
             )
 
 

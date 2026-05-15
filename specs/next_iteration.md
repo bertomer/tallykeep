@@ -47,9 +47,22 @@ Prevents scope creep.>
 <list of canonical spec files this iteration touches. Already
 updated to reflect target before iteration starts.>
 
-#### Affected mockups
+#### Mockup contract — required if iteration touches UI
 
-<list of validated mockup files referenced by the iteration.>
+<List of mockup files defining the visual ground truth for
+this iteration. By the time an iteration is given to the
+coding agent, every listed mockup is `Status: validated` —
+flipped at the spec/design agent's design-pass greenlight
+(see PROCESS.md §2 Design / brand agent — *Output*), not at
+coding closeout.
+
+**Coding-agent rule (PROCESS.md §2 Coding agent — Visual
+contract):** read every file in this list before writing the
+corresponding screen. Copy, spacing, states, affordances,
+error variants — the mockup HTML is the contract. Deviation
+is either a code bug (fix it) or a spec drift event (stop,
+surface to Rémy, edit mockup + ADR if structural). No third
+path.>
 
 #### Tasks — required
 
@@ -89,58 +102,12 @@ sequence in `PROCESS.md §4.4` stages 3–5.
 
 ## Active iteration
 
-No active iteration. See `future_iterations.md` for the next
-candidate to promote and sharpen.
+No active coding iteration.
 
 ---
 
-## Iteration roadmap (rough sketch — not commitment)
-
-For Rémy's mental model, not for the coding agent. Sequence and
-scope will adjust as we learn. The roadmap targets the
-public-ship event (per ADR-0003); private-ship is reached when
-the relevant mobile UI iterations are stable enough and the
-Capacitor + auth + security-health work lands.
-
-### Pre-shipping iterations
-
-**Mobile UI design and dev-phase build:**
-1. **Onboarding + Home (empty + populated states)** — first-touch
-   flow plus landing
-2. **Add Holding** — chooser + four type-specific flows
-3. **Holding Detail** — per-type detail pages
-4. **Send + Receive** — per Holding type, including PSBT
-   roundtrip for Strongbox and native sign for TallyKeep-managed
-   Purse on the device that holds the seed
-5. **Activity + Categorization** — cross-Holding feed plus
-   per-Holding categorization
-6. **Sweep Policy + Treasury view** — Account-originated sweeps
-   in the dev-phase scope
-7. **Settings** — including the security-health system at least
-   for seed-backup warnings (private-ship gate)
-
-**Private-ship gate:**
-- Capacitor wrap + native plugins
-- Authentication layer
-- Security-health (seed-backup recovery flow per
-  pre-implementation item `seed-backup-disclosure`)
-- Self-review
-
-**Pre-public-ship enhancements** (in personal-use phase, before
-public-ship):
-- Iterations driven by Rémy's own daily-use feedback
-- Possible candidates: settlement-rails confirmation probability,
-  "tap to see under the hood" UI spine, others (see
-  `future_iterations.md`)
-
-### Public-ship event (ship-gate work bundle)
-
-See `future_iterations.md` "Ship-gate meta-iteration" entry.
-Bundles native signing, reproducible builds, app stores, F-Droid,
-brand, third-party audit, and (optionally) hosted-tier launch.
-
-### Post-shipping
-
-Feature updates per `future_iterations.md` post-shipping entries
-(Blueprint, Lightning, DCA, equity-reference, etc., depending on
-user feedback and roadmap priorities).
+The rough sequence ("Onboarding → Add Holding → Holding detail
+→ Send + Receive → …") for Rémy's mental model lives in
+`future_iterations.md §Iteration roadmap`, not here.
+`next_iteration.md` carries the active block only; everything
+else is reference.

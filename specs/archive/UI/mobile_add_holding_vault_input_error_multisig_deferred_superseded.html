@@ -1,0 +1,314 @@
+<!--
+  Title: Mobile — Add Vault · step 1 · inline error (multisig deferred)
+  Status: review  (drawn 2026-05-15 under ADR-0010 β. Pending Rémy
+                    greenlight.)
+  Date last touched: 2026-05-15
+  Replaces: nothing on disk. New under β: multisig is structurally
+            valid but not implemented in v1 onboarding (Vault
+            spending plus multi-signer coordination ship in the
+            future multisig iteration). This is the inline-error
+            variant the wizard renders when a multisig descriptor
+            is pasted.
+
+  Design notes:
+  - Warning palette (not danger) — the descriptor is structurally
+    valid; it's the implementation that's deferred. Same palette
+    as the single-key-no-timelock-redirect error.
+  - Different from the redirect error: there's nowhere to route
+    the user. Multisig isn't supported anywhere in v1. So this
+    error has NO secondary CTA — just the explanation and the
+    disabled primary "Continue".
+  - Copy honest about scheduling: "Multisig Vault support is in
+    a later iteration." Doesn't promise a date.
+  - The descriptor-source hint banner is HIDDEN — the error
+    region carries the informational role.
+  - Specifically rendered case: user pasted a 2-of-3 sorted
+    multisig descriptor (typical Sparrow / Specter export). The
+    parser identified it as multisig at step 1; the wizard cannot
+    accept it in v1.
+  - Step counter "STEP 1 OF 3". Primary CTA "Continue" stays
+    visible but disabled.
+-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>TallyKeep — Mobile — Add Vault · 1 of 3 · Multisig deferred</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="_shared/tokens.css">
+<link rel="stylesheet" href="_shared/shell.css">
+<style>
+  .phone-screen { background: var(--color-bg); }
+
+  .app-bar {
+    height: var(--mobile-app-bar);
+    flex-shrink: 0;
+    display: grid;
+    grid-template-columns: 44px 1fr 44px;
+    align-items: center;
+    padding: 0 var(--space-2);
+    background: var(--color-surface);
+    border-bottom: 1px solid var(--color-border);
+  }
+  .app-bar .back-btn {
+    width: 36px; height: 36px;
+    display: inline-flex; align-items: center; justify-content: center;
+    background: transparent; border: 0;
+    border-radius: var(--radius-md);
+    color: var(--color-text);
+    cursor: pointer;
+    justify-self: start;
+    margin-left: var(--space-2);
+  }
+  .app-bar .back-btn svg {
+    width: 22px; height: 22px;
+    stroke: currentColor; fill: none;
+    stroke-width: 2; stroke-linecap: round; stroke-linejoin: round;
+  }
+  .step-counter {
+    text-align: center;
+    font-size: var(--font-size-xs);
+    font-weight: var(--font-weight-semibold);
+    color: var(--color-text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    line-height: 1;
+  }
+
+  .scroll-area {
+    flex: 1;
+    overflow-y: auto;
+    padding: var(--space-4) var(--space-4) var(--space-5);
+  }
+
+  .step-head { margin-bottom: var(--space-4); }
+  .step-heading {
+    font-size: var(--font-size-lg);
+    font-weight: var(--font-weight-semibold);
+    color: var(--color-text);
+    line-height: var(--line-height-tight);
+    margin: 0;
+    letter-spacing: -0.01em;
+  }
+  .step-sub {
+    font-size: var(--font-size-sm);
+    color: var(--color-text-muted);
+    line-height: var(--line-height-default);
+    margin: var(--space-2) 0 0;
+  }
+
+  .field-label {
+    font-size: var(--font-size-xs);
+    color: var(--color-text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    font-weight: var(--font-weight-semibold);
+    display: block;
+    margin: var(--space-4) 0 var(--space-2);
+  }
+  .descriptor-input-wrap { position: relative; }
+  .descriptor-textarea {
+    width: 100%;
+    min-height: 120px;
+    padding: var(--space-3);
+    padding-right: 72px;
+    background: var(--color-surface);
+    border: 1px solid var(--color-warning-border);
+    border-radius: var(--radius-md);
+    font-family: var(--font-mono);
+    font-size: var(--font-size-sm);
+    color: var(--color-text);
+    line-height: 1.5;
+    resize: vertical;
+  }
+  .descriptor-textarea:focus {
+    outline: none;
+    border-color: var(--color-warning);
+    box-shadow: 0 0 0 2px var(--color-warning-soft);
+  }
+  .paste-btn {
+    position: absolute;
+    top: var(--space-2);
+    right: var(--space-2);
+    padding: var(--space-1) var(--space-3);
+    background: var(--color-surface);
+    border: 1px solid var(--color-border-strong);
+    border-radius: var(--radius-pill);
+    font-family: inherit;
+    font-size: var(--font-size-xs);
+    font-weight: var(--font-weight-semibold);
+    color: var(--color-text);
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+  }
+  .paste-btn svg { width: 12px; height: 12px; stroke: currentColor; fill: none; stroke-width: 2; }
+
+  .alt-inputs {
+    margin-top: var(--space-3);
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--space-2);
+  }
+  .alt-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-2);
+    padding: var(--space-2) var(--space-3);
+    background: var(--color-surface);
+    border: 1px solid var(--color-border-strong);
+    border-radius: var(--radius-md);
+    font-family: inherit;
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-weight-medium);
+    color: var(--color-text);
+    cursor: pointer;
+  }
+  .alt-btn svg {
+    width: 16px; height: 16px;
+    stroke: currentColor; fill: none;
+    stroke-width: 2; stroke-linecap: round; stroke-linejoin: round;
+  }
+
+  .wizard-footer {
+    flex-shrink: 0;
+    padding: var(--space-3) var(--space-4) var(--space-4);
+    background: var(--color-surface);
+    border-top: 1px solid var(--color-border);
+  }
+  .wizard-error.deferred {
+    margin-bottom: var(--space-3);
+    padding: var(--space-3);
+    background: var(--color-warning-soft);
+    border: 1px solid var(--color-warning-border);
+    border-radius: var(--radius-md);
+    color: var(--color-warning-text-on-soft);
+    font-size: var(--font-size-sm);
+    line-height: var(--line-height-default);
+    display: flex;
+    gap: var(--space-2);
+    align-items: flex-start;
+  }
+  .wizard-error.deferred .error-icon {
+    width: 18px; height: 18px; flex-shrink: 0;
+    stroke: currentColor; fill: none;
+    stroke-width: 2; stroke-linecap: round; stroke-linejoin: round;
+    margin-top: 1px;
+  }
+  .wizard-error .error-title { font-weight: var(--font-weight-semibold); margin: 0 0 2px; }
+  .wizard-error .error-body  { margin: 0; }
+  .wizard-cta {
+    width: 100%;
+    padding: var(--space-3) var(--space-4);
+    background: var(--color-border);
+    color: var(--color-text-dim);
+    border: 0;
+    border-radius: var(--radius-md);
+    font-family: inherit;
+    font-size: var(--font-size-base);
+    font-weight: var(--font-weight-semibold);
+    cursor: not-allowed;
+  }
+</style>
+</head>
+<body>
+
+<div class="mockup-meta">
+  <strong>Mobile — Add Vault · 1 of 3 · Multisig deferred</strong> ·
+  <span class="status-review">review</span> ·
+  2026-05-15 · 360×800
+</div>
+
+<div class="phone-frame">
+  <div class="phone-screen">
+
+    <div class="app-bar">
+      <button class="back-btn" aria-label="Back to Home">
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <polyline points="15 6 9 12 15 18"/>
+        </svg>
+      </button>
+      <div class="step-counter">Step 1 of 3</div>
+      <div></div>
+    </div>
+
+    <div class="scroll-area">
+
+      <div class="step-head">
+        <h1 class="step-heading">Add a Vault</h1>
+        <p class="step-sub">
+          A Vault is a wallet whose spending is locked behind a
+          script-enforced timelock, multiple keys, or both. Paste
+          the descriptor of your locked wallet below.
+        </p>
+      </div>
+
+      <label class="field-label" for="descriptor-input">Vault descriptor</label>
+      <div class="descriptor-input-wrap">
+        <textarea id="descriptor-input" class="descriptor-textarea"
+                  aria-label="Vault descriptor"
+                  aria-invalid="true">wsh(sortedmulti(2,[abc12345/48h/0h/0h/2h]xpub6E.../&lt;0;1&gt;/*,[def67890/48h/0h/0h/2h]xpub6F.../&lt;0;1&gt;/*,[fed98765/48h/0h/0h/2h]xpub6G.../&lt;0;1&gt;/*))</textarea>
+        <button class="paste-btn" type="button" aria-label="Paste from clipboard">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <rect x="9" y="3"  width="6"  height="4"  rx="1"/>
+            <rect x="5" y="5"  width="14" height="16" rx="2"/>
+          </svg>
+          Paste
+        </button>
+      </div>
+
+      <div class="alt-inputs">
+        <button class="alt-btn" type="button" aria-label="Scan a QR code with the camera">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <rect x="3"  y="3"  width="7" height="7" rx="1"/>
+            <rect x="14" y="3"  width="7" height="7" rx="1"/>
+            <rect x="3"  y="14" width="7" height="7" rx="1"/>
+            <line x1="14" y1="14" x2="14" y2="17"/>
+            <line x1="14" y1="20" x2="17" y2="20"/>
+            <line x1="17" y1="14" x2="17" y2="17"/>
+            <line x1="20" y1="17" x2="20" y2="20"/>
+          </svg>
+          Scan QR
+        </button>
+        <button class="alt-btn" type="button" aria-label="Upload a descriptor file">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M 14 3 H 7 a 2 2 0 0 0 -2 2 v 14 a 2 2 0 0 0 2 2 h 10 a 2 2 0 0 0 2 -2 V 8 Z"/>
+            <polyline points="14 3 14 8 19 8"/>
+            <line x1="12" y1="12" x2="12" y2="17"/>
+            <polyline points="10 14 12 12 14 14"/>
+          </svg>
+          Upload file
+        </button>
+      </div>
+
+    </div>
+
+    <div class="wizard-footer">
+      <div class="wizard-error deferred" role="alert">
+        <svg class="error-icon" viewBox="0 0 24 24" aria-hidden="true">
+          <circle cx="12" cy="12" r="10"/>
+          <polyline points="12 7 12 12 15 14"/>
+        </svg>
+        <div>
+          <p class="error-title">Multisig descriptors aren't supported yet.</p>
+          <p class="error-body">
+            This is a multisig descriptor (2-of-3). TallyKeep
+            doesn't onboard multisig Vaults yet — that's in an
+            upcoming iteration. Single-key Vaults with a
+            script-enforced timelock are supported today.
+          </p>
+        </div>
+      </div>
+      <button class="wizard-cta" type="button" disabled>Continue</button>
+    </div>
+
+  </div>
+</div>
+
+</body>
+</html>

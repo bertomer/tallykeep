@@ -1687,3 +1687,305 @@ of the name; if the user renames "Coldcard Strongbox" to "Office
 safe", the vendor metadata stays `coldcard` for downstream uses
 (security-health copy, declared-vs-observable framing).
 
+## Add Holding — Vault wizard
+
+Third per-type wizard. Reuses the same wizard shell (header,
+step counter, body, footer, hidden bottom-nav) introduced by the
+Purse wizard and refined for Strongbox. Drawn under ADR-0010 β
+2026-05-15; pending Rémy greenlight to flip mockups from review
+to validated.
+
+The v1 Vault wizard accepts both Vault shapes per ADR-0010:
+single-sig + script-enforced timelock, and multisig (with or
+without an additional timelock). The user pastes / scans /
+uploads the descriptor; the parser routes by shape; the Vault
+is registered. Pure-single-key-without-timelock redirects to
+Strongbox; multi-path miniscript / exotic constructs surface an
+unsupported-form error.
+
+**Vault Send is deferred for v1** regardless of shape, per
+ADR-0010; the Vault detail page surfaces balance + activity +
+unlock-countdown but Send is greyed out. The genuinely hard
+surface (multi-signer PSBT coordination, cosigner-status UI,
+partial-signature collection, chain-side timelock-check display)
+is folded into the dedicated Vault-Send iteration where all
+shapes are designed together.
+
+The Vault wizard is the first wizard in TallyKeep whose accept
+set covers multiple descriptor shapes. The branching happens at
+parse time — the user enters one textarea, and the parser routes
+to one of five parseback variants (single-sig + CLTV, single-sig
++ CSV, pure multisig, multisig + CLTV, multisig + CSV) or one of
+two error variants (single-key-no-timelock → Strongbox;
+unsupported form → contact us).
+
+### Vocabulary lock
+
+Inherited from the Purse / Strongbox wizards' "keys" framing.
+Vault-specific additions:
+
+- **"Vault"** — the friction-bearing Holding type. Per
+  ADR-0010 β, a Vault is a wallet whose spending requires
+  intentional friction: a script-enforced timelock, multiple
+  keys, or both. User-facing copy emphasises the
+  friction-as-defining-property (e.g. "wallet whose spending is
+  locked behind friction"), not the multisig-by-definition
+  framing of earlier drafts.
+- **"Timelock"** — surfaced in the parseback's row label as
+  either "Unlocks on" (CLTV / absolute) or "Each deposit locks
+  for" (CSV / relative). The shape-specific labels are honest
+  about the difference; we don't collapse them into a single
+  generic "Timelock" row, because the per-UTXO vs wallet-wide
+  unlock semantics matter and surface differently on Vault
+  detail later.
+- **"Coordinator" / "wallet you exported the descriptor from"**
+  — the source-of-truth wallet the user verifies against during
+  parseback. Liana / Bitcoin Core / Sparrow / Specter / a
+  miniscript-capable hardware wallet's companion app. The
+  parseback copy is intentionally generic ("the wallet you
+  exported this descriptor from") because the v1 source space
+  is wider than Strongbox's hardware-wallet-only assumption.
+
+### Wizard shape (3 steps, parity with Strongbox / Purse)
+
+Step counter "STEP 1 OF 3 / 2 OF 3 / 3 OF 3". Back chevron at
+step 1 returns to Home (picker dismissed); at step 2 returns to
+step 1; at step 3 (success) hidden — only path forward is
+"Done". Bottom-nav hidden during the wizard.
+
+**No vendor dropdown.** Unlike Strongbox, Vault's input screen
+has no vendor pick — a Vault descriptor may come from
+miniscript-coordinator software, from a hardware wallet's
+multisig export, or from any combination. The vendor-as-label
+bookkeeping that earns its place for Strongbox (single-vendor,
+hardware-wallet-driven) doesn't earn its place for Vault.
+Provenance, when relevant, surfaces post-creation on Vault
+detail (cosigner annotation in the multisig case; signing key's
+fingerprint in the single-sig case).
+
+**Sensitive-screen flag.** None of the Vault steps carry
+`sensitive-screen={true}`. The descriptor is public-key data; no
+recovery phrase is shown by this wizard. Same shell-uniformity
+posture as Strongbox.
+
+### Screens
+
+**Step 1 — `mobile_add_holding_vault_input.html`.** Heading
+"Add a Vault", sub stating the type plainly without leaking
+internal vocabulary ("A Vault is a wallet whose spending is
+locked behind a script-enforced timelock, multiple keys, or
+both."). **No inline help/hint banner** — earlier drafts
+carried an info-tinted "Accepted descriptors" banner naming the
+canonical miniscript shapes; Rémy's review (2026-05-15) flagged
+that the banner was inconsistent with the Purse / Strongbox
+wizards (which don't carry such banners) and that a
+product-wide "tap anything for detail" pattern is the right
+place for that kind of help. The banner was removed; the future
+pattern is captured in `future_iterations.md` as
+"Tap-anything-for-detail help affordance." **No third-party
+product names in user copy** — the descriptor's source software
+(Liana, Bitcoin Core, Sparrow, Specter, hardware-wallet
+exports, etc.) varies, isn't TallyKeep's to endorse, and
+shifts over time; copy refers generically to "the wallet you
+exported this descriptor from." Below the heading: descriptor
+textarea with placeholder showing a single-sig + CLTV example,
+plus the three input affordances grouped under it.
+
+Three input affordances:
+
+- **Paste** (always available, primary affordance — same shape
+  as Purse / Strongbox).
+- **Scan QR** (Capacitor-only — hidden in browser build per
+  absence-of-affordance discipline, ADR-0007). Multi-frame QR
+  (BBQr / UR2) for descriptors that exceed single-frame capacity
+  lands when the PSBT-by-QR roundtrip iteration ships;
+  single-frame QR works for typical single-sig + timelock
+  descriptors which are usually well under 1 KB.
+- **Upload file** (always available — coordinators export
+  `.json` / `.txt` descriptors).
+
+Continue button disabled until a non-empty parseable descriptor
+is in the textarea.
+
+**Step 1 — error variants.** Two error variants of step 1,
+selected by what the parser identifies in the pasted descriptor:
+
+- **`mobile_add_holding_vault_input_error_redirect.html`** —
+  user pasted a pure single-key descriptor with no timelock
+  (`wpkh(...)`, `pkh(...)`, single-key `tr(...)`, etc.). Warning
+  palette. Error title: "No timelock or multi-signature
+  detected." Body: "Set this up as a Strongbox instead. If you
+  meant to add a timelock, export the descriptor again with the
+  lock fragment." Secondary CTA "Set up as Strongbox" routes to
+  the Strongbox wizard. Mirror of the Strongbox-wizard's
+  multisig-redirect pattern, reversed.
+- **`mobile_add_holding_vault_input_error_inline.html`** — user
+  pasted something the parser couldn't classify as a supported
+  Vault shape (bare `multi(...)` without script wrapper,
+  multi-path miniscript, or unparseable text). Danger palette.
+  Error title: "Unsupported descriptor." (not "TallyKeep can't
+  read this as a Vault" — the failure is the input, not
+  TallyKeep, per Rémy's review 2026-05-15). The error region
+  lists the v1 supported forms (single-sig + timelock and
+  multisig variants) and points users with complex setups to a
+  "contact us" path.
+
+The earlier "multisig-deferred" error variant (drawn 2026-05-15,
+archived same day) is gone — under the broader β scope multisig
+descriptors are accepted in v1 onboarding, so the error has
+nothing to fire on.
+
+**Step 2 — `mobile_add_holding_vault_parseback.html` (unified).**
+One mockup covers all five Vault shape variants by filling four
+characteristic rows. Earlier drafts (2026-05-15) had a separate
+mockup per shape combination; Rémy's review surfaced that they
+were redundant — every variant filled the same row schema with
+different values, and the per-shape visual distinctions weren't
+load-bearing. The five drafts archived; the unified mockup
+supersedes them.
+
+Parse-card rows (always present, value-bearing):
+
+1. **Signers required** — "1 of 1" (single-sig shapes), "2 of 3"
+   / "3 of 5" / etc (multisig). The "1 of 1" value for
+   single-sig keeps the row schema uniform — parseback reads the
+   same way regardless of shape.
+2. **Signing keys** — comma-separated fingerprint list. One
+   entry for single-sig; n entries for multisig.
+3. **Script type** — "Native SegWit · P2WSH",
+   "Native SegWit · P2WSH miniscript", "Taproot · P2TR", etc.
+4. **Timelock** — value carries the type name inline: "None",
+   "CLTV — unlocks on block X (~ calendar date)" (absolute), or
+   "CSV — each deposit locks for N blocks (~ duration)"
+   (relative). Power user reads the script-level construct
+   (CLTV / CSV); casual user reads the calendar-shaped value.
+
+Auto-name templates (backend composes, UI renders the resulting
+string):
+
+- Single-sig + CLTV: "Vault unlocking {year}".
+- Single-sig + CSV: "{duration} Vault" (1-year, 6-month,
+  30-day as appropriate).
+- Pure multisig: "{M}-of-{N} Vault".
+- Multisig + CLTV: "{M}-of-{N} Vault unlocking {year}".
+- Multisig + CSV: "{M}-of-{N} Vault · {duration} lock".
+
+Year derived from parsed block height × ~10-min average,
+rounded. Duration translated to the largest natural unit
+(years ≥ 365 days, months ≥ 30 days, days otherwise). Increment
+suffix (` (2)`, ` (3)`) added at backend create time when
+auto-name would collide with an existing Vault.
+
+The mockup renders the **multisig + CLTV** combination
+(`2-of-3 Vault unlocking 2031`) because that case exercises
+every row meaningfully (signers required > 1; signing keys
+plural; script type carries "miniscript"; timelock present).
+Single-sig and pure-multisig cases drop respective row values
+to "1 of 1" / "None" but render the same schema.
+
+**Per-UTXO unlock semantics (CSV case) are not surfaced at
+parseback.** The "Timelock" row's "each deposit locks for"
+phrasing carries the gist; the Vault detail page renders the
+actual per-UTXO unlock schedule once funds arrive. Parseback's
+job is "do we agree on the parameters?", not "explain the
+consequences."
+
+CTA label "Looks right" — same tonal shift as Strongbox
+(confirming, not just proceeding).
+
+CTA label "Looks right" — same tonal shift as Strongbox
+(confirming, not just proceeding).
+
+**Step 3 — `mobile_add_holding_vault_success.html`.** Centred
+success indicator + heading "Vault added" + scan-row with
+Vault-coloured left stripe. Same shape as Strongbox / imported
+Purse success states. "Done" returns to Home; the new Vault
+appears in the Holdings list with a "Scanning…" status indicator
+inline until the chain scan completes. Shape-agnostic — the
+same success step renders for CLTV and CSV cases alike; the
+detail page handles the shape-specific UI.
+
+### Reconcilability gauntlet answers
+
+1. *Trust boundary:* phone screen (UI) + backend (descriptor
+   parse, descriptor registration, chain scan). The hardware
+   wallet / coordinator that emitted the descriptor sits outside
+   TallyKeep — the user is the bridge (paste / QR / file).
+   Backend stores the descriptor (public-key data plus
+   miniscript fragments); spending keys never cross to backend
+   per ADR-0009.
+2. *Keys:* spending key lives on the user's hardware wallet (for
+   the single-sig + timelock case, on one device; for the future
+   multisig case, on n devices). Never on any TallyKeep surface.
+   Vault detail surfaces unlock-countdown UI but doesn't touch
+   keys.
+3. *Self-hosted vs hosted:* identical from the phone's POV. Both
+   backends register the descriptor, scan the chain, and surface
+   balance + activity. Neither sees the spending key. The wizard
+   does not differentiate.
+4. *Confirmation honesty:* the success step uses "Vault added"
+   only after the backend has confirmed Holding creation (not
+   when the user taps "Looks right"). The "Scanning…" indicator
+   on the scan-row honestly communicates that balance is not yet
+   loaded; the home Holdings list shows the same indicator until
+   the scan completes. No "Active" / "Ready" claim before the
+   chain has been scanned. Vault Send is greyed out on detail
+   per ADR-0010 — no pretend-to-sign affordance.
+5. *Browser-only fallback:* paste, file upload, and parseback all
+   work in the browser. Scan QR is Capacitor-only (camera
+   plugin); hidden in browser per ADR-0007 absence-of-affordance.
+   The wizard is fully functional in the browser via paste /
+   file.
+6. *Open-source and reproducibility:* descriptor parsing uses
+   BDK's miniscript support (Rust, MIT/Apache-2.0). No
+   closed-source dependency in the Vault path. No TallyKeep
+   server-side secret involved in descriptor registration or
+   chain scan.
+
+### Notes
+
+**Three steps, not four.** Same convergence the Purse and
+Strongbox wizards reached: auto-name on parse-back, no dedicated
+label step. The `recovery_setup_notes` free-text field is set on
+Vault detail post-creation, same shape as Strongbox's
+`signing_device_label` or a Purse rename. Cosigner annotation
+(future multisig shape only) is also a Vault-detail concern, not
+a wizard step.
+
+**No vendor dropdown.** Single biggest UX divergence from
+Strongbox. The Vault input is descriptor-first because the
+descriptor's miniscript structure carries far more identifying
+information than the source vendor — at parseback the user sees
+the timelock shape and the key fingerprint, which together are
+more useful than a "from Coldcard" label would be. Vendor
+context becomes relevant post-creation if and when we surface
+cosigner-device annotation for multisig Vaults.
+
+**Branching at parse time, not at wizard entry.** The wizard
+opens onto a single input screen regardless of intended Vault
+shape. The parser branches on what's in the descriptor —
+single-sig+timelock to one of two parsebacks (CLTV / CSV),
+multisig (with or without timelock) to one of three parsebacks
+(pure-multisig / multisig+CLTV / multisig+CSV),
+single-sig-no-timelock to redirect, unsupported to inline error.
+This is intentional: the user thinks "I have this descriptor
+from my wallet"; the wizard handles classification. A
+shape-picker pre-step would be ergonomic noise.
+
+**Vault detail page is the home of unlock-countdown UI.** The
+parseback shows the lock parameters but doesn't compute "X days
+left" — that requires the chain tip, which is more usefully
+surfaced on Vault detail (a recurring view) than on parseback (a
+one-shot screen). Detail page surfaces:
+  - For CLTV: wallet-wide countdown to the unlock block.
+  - For CSV: per-UTXO unlock schedule sorted by earliest
+    spendable.
+Vault detail design is scoped to the next Vault iteration; the
+wizard hands off cleanly by registering the parsed
+`timelock_kind` and `timelock_value` for detail to consume.
+
+**No `sensitive-screen={true}` on any step.** Same as Strongbox.
+The wizard never exposes recovery material — spending keys live
+on the hardware wallet, on the user's side of the trust
+boundary.
+

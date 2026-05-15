@@ -86,6 +86,18 @@ def _strongbox_body() -> dict:
     return body
 
 
+WSH_CLTV_MAINNET = (
+    "wsh(and_v(v:pk("
+    "xpub6BosfCnifzxcFwrSzQiqu2DBVTshkCXacvNsWGYJVVhhawA7d4R5WSWGFNbi8Aw6ZRc1brxMyWMzG3DSSSSoekkudhUd9yLb6qx39T9nMdj"
+    "/3/*),after(840000)))"
+)
+WSH_CSV_MAINNET = (
+    "wsh(and_v(v:pk("
+    "xpub6BosfCnifzxcFwrSzQiqu2DBVTshkCXacvNsWGYJVVhhawA7d4R5WSWGFNbi8Aw6ZRc1brxMyWMzG3DSSSSoekkudhUd9yLb6qx39T9nMdj"
+    "/4/*),older(52560)))"
+)
+
+
 def _vault_body() -> dict:
     body = _purse_body(
         name="Long-term holdings",
@@ -100,10 +112,41 @@ def _vault_body() -> dict:
         "geographic_distribution": True,
         "inheritance_configured": True,
     }
-    body["required_signers"] = 2
-    body["total_signers"] = 3
-    body["timelock_blocks"] = 0
     body["recovery_setup_notes"] = "Co-signers in two locations."
+    return body
+
+
+def _vault_cltv_body() -> dict:
+    body = _purse_body(
+        name="CLTV vault",
+        expression=WSH_CLTV_MAINNET,
+        network="mainnet",
+    )
+    body["purpose"] = "long_term"
+    body.pop("purse_mode", None)
+    body["declared_security"] = {
+        "custody_model": "self_single",
+        "signing_model": "ceremonial",
+        "geographic_distribution": False,
+        "inheritance_configured": False,
+    }
+    return body
+
+
+def _vault_csv_body() -> dict:
+    body = _purse_body(
+        name="CSV vault",
+        expression=WSH_CSV_MAINNET,
+        network="mainnet",
+    )
+    body["purpose"] = "long_term"
+    body.pop("purse_mode", None)
+    body["declared_security"] = {
+        "custody_model": "self_single",
+        "signing_model": "ceremonial",
+        "geographic_distribution": False,
+        "inheritance_configured": False,
+    }
     return body
 
 
@@ -262,18 +305,37 @@ class TestCreateVault:
         assert response.status_code == 201, response.text
         result = response.json()
         assert result["holding_type"] == "vault"
+        # Signers derived from the 2-of-3 sortedmulti descriptor.
         assert result["required_signers"] == 2
         assert result["total_signers"] == 3
-        assert result["timelock_blocks"] == 0
+        # Pure multisig — no timelock.
+        assert result["timelock_kind"] is None
+        assert result["timelock_value"] is None
 
-    def test_create_vault_with_inconsistent_signers_rejected(
+    def test_create_cltv_vault_persists_timelock_metadata(self, app_with_db) -> None:
+        client, _ = app_with_db
+        response = client.post("/api/v1/holdings/vault", json=_vault_cltv_body())
+        assert response.status_code == 201, response.text
+        result = response.json()
+        assert result["holding_type"] == "vault"
+        assert result["timelock_kind"] == "cltv"
+        assert result["timelock_value"] == 840000
+
+    def test_create_csv_vault_persists_timelock_metadata(self, app_with_db) -> None:
+        client, _ = app_with_db
+        response = client.post("/api/v1/holdings/vault", json=_vault_csv_body())
+        assert response.status_code == 201, response.text
+        result = response.json()
+        assert result["holding_type"] == "vault"
+        assert result["timelock_kind"] == "csv"
+        assert result["timelock_value"] == 52560
+
+    def test_create_vault_with_zero_required_signers_rejected(
         self, app_with_db
     ) -> None:
         client, _ = app_with_db
         body = _vault_body()
-        # required > total
-        body["required_signers"] = 5
-        body["total_signers"] = 3
+        body["required_signers"] = 0  # Pydantic ge=1 rejects this
         response = client.post("/api/v1/holdings/vault", json=body)
         assert response.status_code == 422
 

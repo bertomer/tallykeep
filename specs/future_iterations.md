@@ -51,6 +51,61 @@ removed.
 
 ---
 
+## Iteration roadmap (rough sketch — not commitment)
+
+For Rémy's mental model, not for the coding agent. Sequence and
+scope will adjust as we learn. The roadmap targets the
+public-ship event (per ADR-0003); private-ship is reached when
+the relevant mobile UI iterations are stable enough and the
+Capacitor + auth + security-health work lands.
+
+### Pre-shipping iterations
+
+**Mobile UI design and dev-phase build:**
+1. **Onboarding + Home (empty + populated states)** — first-touch
+   flow plus landing.
+2. **Add Holding** — chooser + four type-specific flows.
+3. **Holding Detail** — per-type detail pages.
+4. **Send + Receive** — per Holding type, including PSBT
+   roundtrip for Strongbox and native sign for TallyKeep-managed
+   Purse on the device that holds the seed.
+5. **Activity + Categorization** — cross-Holding feed plus
+   per-Holding categorization.
+6. **Sweep Policy + Treasury view** — Account-originated sweeps
+   in the dev-phase scope.
+7. **Settings** — including the security-health system at least
+   for seed-backup warnings (private-ship gate).
+
+**Private-ship gate:**
+
+- Capacitor wrap + native plugins.
+- Authentication layer.
+- Security-health (seed-backup recovery flow per
+  `pre-implementation.md` item `seed-backup-disclosure`).
+- Self-review.
+
+**Pre-public-ship enhancements** (in personal-use phase, before
+public-ship):
+
+- Iterations driven by Rémy's own daily-use feedback.
+- Possible candidates: settlement-rails confirmation probability,
+  "tap to see under the hood" UI spine, others (see entries
+  below).
+
+### Public-ship event (ship-gate work bundle)
+
+See "Ship-gate meta-iteration" entry below. Bundles native
+signing, reproducible builds, app stores, F-Droid, brand,
+third-party audit, and (optionally) hosted-tier launch.
+
+### Post-shipping
+
+Feature updates per the post-shipping entries below (Blueprint,
+Lightning, DCA, equity-reference, etc., depending on user
+feedback and roadmap priorities).
+
+---
+
 ## Promoted
 
 Brief breadcrumbs for iterations whose full entries have moved
@@ -130,6 +185,73 @@ record.
   wizard reuses the pattern. Operational features (signing
   ceremony, blueprint analysis, declared-vs-observable mismatch
   warnings) stay deferred to the Vault-detail iteration.
+
+### Descriptor → Holding-type classification cleanup
+
+- **Captured:** 2026-05-15 (surfaced by the coding agent during
+  the Vault-wizard iteration; Rémy flagged the same friction
+  from his own read of the wizard codebase).
+- **Motivation:** The "given this descriptor, which Holding type
+  does it belong to?" decision is currently scattered. Some
+  classification runs in the backend (`descriptor-validate`
+  endpoint, structural-shape checks per `next_iteration.md`
+  Task 1), some in the frontend wizards (per-wizard accept-set
+  filters, bare-xpub auto-wrap, single-address rejection, redirect
+  routing). Logic is in places duplicated across wizards, in
+  places sharedly imported, in places re-implemented inline. The
+  coding agent reported this as "non-trivial" and a source of
+  drift when wizards' accept sets evolve. The Vault wizard
+  iteration added a third copy of the routing-error branching;
+  the Send-from-Account flow and the Purse upgrade path will
+  each touch the same decision surface again.
+- **Sketch:** Single backend endpoint — *"guess best Holding fit"*
+  (working name; e.g. `POST /api/v1/descriptors/classify` or a
+  shape extension of the existing `descriptor-validate`) — that
+  takes a pasted descriptor (or bare xpub) and returns a tagged
+  outcome:
+    - `best_fit: "purse" | "strongbox" | "vault" | null`
+    - the parser metadata already produced today
+      (`script_type`, `derivation_path`, `key_fingerprints`,
+      `required_signers`, `total_signers`, `timelock_kind`,
+      `timelock_value`, `signing_metadata_present`, …)
+    - rejection category when nothing fits
+      (`single_address_input`, `unsupported_form`,
+      `unparseable`).
+  Frontend wizards become **thin**: each wizard calls the
+  endpoint on paste / parse, compares `best_fit` to its own
+  type — match ⇒ continue to parseback; mismatch ⇒ redirect
+  popup to the correct wizard (single redirect-error pattern,
+  not three); `null` ⇒ inline unsupported-form error. The
+  per-wizard "is this descriptor for me?" branching disappears.
+  Bare-xpub auto-wrap, single-address rejection, miniscript
+  fragment detection — all collapse into the backend endpoint
+  and become testable in one place. The classification rules
+  in `next_iteration.md §Vault wizard Task 1` (structurally
+  aware: `or_i` / `or_d` / `thresh()` / hash fragments route
+  to `unsupported_form` regardless of timelock presence) become
+  the spec for this endpoint, not three wizards' worth of
+  parallel implementations.
+- **Touches:** `concerns/observation.md` or a new
+  concerns/classification.md module; `04_api_conventions.md` if a new
+  endpoint family is introduced; backend descriptor parser
+  (consolidates today's `descriptor-validate` + per-type
+  `Holding-create` validation into one classification surface);
+  three wizard frontend implementations (Purse / Strongbox /
+  Vault) get slimmer; `api/openapi.yaml` regenerates.
+- **Status:** idea
+- **Milestone:** pre-shipping (post-Vault-wizard, before the
+  Send / Receive iteration touches the same surface from the
+  Account side)
+- **Notes:** Worth pairing with a janitorial pass that grep-audits
+  the frontend for inline descriptor parsing / classification
+  logic and replaces each site with a call to the endpoint. The
+  audit is part of the iteration's acceptance — "no caller in
+  the frontend computes Holding-type fit from descriptor shape
+  itself; all fit decisions come from the endpoint." Worth doing
+  before the Purse upgrade path ships because that flow re-uses
+  the same classification (an imported seed-or-xprv must still
+  classify as Purse, not as a different type). If we add it
+  after, we eat the cost twice.
 
 ### Purse upgrade path (watch-only → on-device-imported)
 
@@ -655,16 +777,105 @@ record.
   feature update — credible reason to keep the app updated and a
   differentiator against most Bitcoin wallets.
 
-### Multisig descriptor support
+### Vault Send for all shapes
 
-- **Captured:** 2026-05 (from module 12, pre-retirement)
-- **Motivation:** Pre-shipping ships single-key only; Vault metadata
-  exists but the analyzer surfaces a discrepancy honestly.
-  Multisig adds first-class multi-key Vault support.
-- **Touches:** domain model, banking layer, UI vault flows, threat
-  model
-- **Status:** idea
+- **Captured:** 2026-05 (from module 12, pre-retirement). Re-scoped
+  2026-05-15 under ADR-0010 β: v1 ships Vault onboarding for both
+  shapes (single-sig + timelock; multisig with or without timelock)
+  via the Vault wizard. This iteration is now narrowly about Vault
+  Send — the genuinely hard surface — plus the Vault detail page
+  that hosts the Send affordance.
+- **Motivation:** Per ADR-0010 β, Vault Send is deferred
+  shape-agnostic because the multi-signer PSBT coordination,
+  cosigner-status UI, partial-signature collection, and
+  chain-side timelock-check display deserve their own design
+  pass. Shipping Send for both shapes together preserves Vault
+  detail UX uniformity — one detail page across shapes; Send
+  greyed-out in v1 lifts for both at the same time when this
+  iteration ships.
+- **Touches:** banking layer (PSBT construction + multi-signer
+  coordination + timelock-check at broadcast), UI Vault detail
+  page (full design lands here — currently a v1 placeholder),
+  UI Vault Send flow (compose / review / export / re-import /
+  broadcast across all five Vault shape variants), threat model
+  (PSBT roundtrip with chain-side timelock check; cosigner
+  coordination ceremony), brand / mockups (cosigner annotation
+  UI, per-signer-status UI, per-UTXO unlock ledger for CSV
+  shapes).
+- **Status:** sketched. v1 ships descriptor onboarding for all
+  five Vault shapes; this iteration picks up Vault detail + Send
+  for the same five shapes.
 - **Milestone:** post-shipping
+- **Notes:** "Promote a Strongbox to a Vault" migration lands here
+  too — a single-Holding type-relabel when the user adds multisig
+  to the descriptor (no on-chain action, the chain sees the same
+  descriptor before and after). Single-sig + timelock cannot be
+  promoted from Strongbox the same way (would require an on-chain
+  send to a new script).
+
+### Tap-anything-for-detail help affordance
+
+- **Captured:** 2026-05-15 (during Vault-wizard review, Rémy
+  flagged that ad-hoc info banners shouldn't be wizard-specific).
+- **Motivation:** New users encountering Bitcoin / TallyKeep
+  vocabulary (descriptor, miniscript, CLTV / CSV, xpub
+  fingerprint, etc.) benefit from contextual help — but
+  per-wizard inline hint banners create inconsistency and visual
+  noise. A product-wide pattern would let any noun, parameter
+  row, or field label expose a small ⓘ icon that, on tap,
+  reveals a short definition + "learn more" link. Lands once,
+  reused everywhere.
+- **Touches:** UI shell (new ⓘ icon component, expandable
+  inline panel or bottom-sheet), copy library (definitions per
+  concept), every wizard and detail page that surfaces
+  Bitcoin-native vocabulary.
+- **Status:** idea
+- **Milestone:** post-shipping. Worth surfacing once core
+  flows are validated and we know which concepts users
+  genuinely stall on.
+
+### Multi-path Vault descriptors (hot path + recovery path)
+
+- **Captured:** 2026-05-15 (during Vault-wizard brainstorm, ADR-0010
+  β).
+- **Motivation:** Real inheritance / anti-loss designs combine
+  multiple spending paths: e.g. `or(2-of-3 hot keys with short
+  CSV, 1-of-3 recovery key with longer CSV)`. v1 Vault accept set
+  is deliberately narrow — `m-of-n` optionally + a single
+  timelock — and rejects multi-path miniscript constructs
+  (or-trees, decaying multisig, hashlocks) with an explicit
+  "contact us" message. The use case is real; the design surface
+  is bigger than the v1 wizard's parseback shape supports.
+- **Touches:** Vault wizard accept set, parseback (multi-row
+  spending-path display), Vault detail (per-path unlock countdown,
+  per-path UTXO classification), threat model (recovery key
+  custody, alternate signer coordination), holdings/04_vault.md
+  vocabulary (`spending_paths` would replace the single
+  `timelock_kind` / `timelock_value` pair).
+- **Status:** idea
+- **Milestone:** post-shipping (after the multisig-descriptor +
+  Vault Send iteration; the cosigner-coordination UX from that
+  iteration is a dependency)
+
+### Usage-based feedback for long-term Vaults
+
+- **Captured:** 2026-05-15 (during Vault-wizard brainstorm, ADR-0010
+  β).
+- **Motivation:** A `purpose=long_term` Vault whose observed
+  outflow frequency contradicts the declared long-term intent is
+  a real declared-vs-observable mismatch — declaration is the
+  flag, observable is the spend frequency, the analyzer has
+  substance to flag. Surface as a security-health item suggesting
+  an on-chain timelock upgrade or migration to Strongbox when the
+  gap is wide enough. Honest variant of the rejected
+  soft-timelock-declaration idea.
+- **Touches:** security-health system (pending `seed-backup-
+  disclosure` arbitration), Vault detail (where the user sees the
+  warning), holdings/04_vault.md type-specific safeguards (already
+  captures this as deferred).
+- **Status:** idea
+- **Milestone:** post-shipping. Folds into the broader
+  security-health system iteration when that arbitration closes.
 
 ### Order placement on custodial providers
 
@@ -1808,21 +2019,11 @@ record.
   receiver gets BTC (or any combination). Settlement on actual
   Bitcoin, open protocol, multiple implementations possible, no
   federation (vs Liquid). Plausibly the future BTC-native trading
-  infrastructure; production-grade orderbook flows estimated 12–24
-  months from capture time. When mature, becomes a sourcing path
-  preferable to Liquid because of the trust model.
-- **Sketch:** Future integration in the sourcing-router. As
-  *consumer* first (RFQ to existing edge nodes). Operating our own
-  Taproot Assets edge node is a separate, larger commitment that
-  overlaps market-making territory — apply the "don't build
-  market-making" guardrail from the target-price-accumulation entry.
-- **Touches:** treasury layer, sourcing-router (blocks on the
-  router entry above), Lightning integration (blocks on the
-  Lightning entry)
-- **Status:** idea
-- **Milestone:** post-shipping — wait-and-watch
-- **Notes:** Re-verify Taproot Assets maturity annually. Bitcoin
-  trading infrastructure is currently roughly Lightning circa 2018
-  per source notes — primitives work, network forming, UX poor,
-  liquidity thin. Production-grade infrastructure estimated 2–4
-  years out from capture time.
+  infrastructure; production-grade infrastructure estimated 2–4 years out
+  from capture time.
+- **Touches:** sourcing layer (eventual), Lightning integration,
+  threat model (Lightning custody concerns)
+- **Status:** watch-and-wait
+- **Milestone:** post-shipping
+- **Notes:** Source claim from May 2026 sparring notes; re-verify
+  before any commit.

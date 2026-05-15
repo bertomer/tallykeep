@@ -1,0 +1,432 @@
+<!--
+  Title: Mobile — Add Vault · step 2 · Parse-back (multisig + CSV)
+  Status: review  (drawn 2026-05-15 under ADR-0010 β when scope
+                    expanded to include multisig onboarding in v1.
+                    Pending Rémy greenlight.)
+  Date last touched: 2026-05-15
+  Replaces: nothing on disk. Combines the multisig parseback shape
+            (mobile_add_holding_vault_parseback_pure_multisig.html)
+            with the CSV timelock row + per-UTXO note from
+            mobile_add_holding_vault_parseback_singlesig_csv.html.
+
+  Design notes:
+  - Step counter "STEP 2 OF 3".
+  - Auto-name preview at the top with Vault left stripe.
+    Auto-name derivation for multisig + CSV:
+      * "{M}-of-{N} Vault · {duration} lock" — e.g.
+        "2-of-3 Vault · 1-year lock". Middle-dot separates the
+        two friction axes for visual scannability.
+      * Duration translated from block count to the largest
+        natural unit (years ≥365 days, months ≥30 days, days
+        otherwise).
+  - Parse-card row ordering (top → bottom):
+      1. Required signers — multisig load-bearing
+      2. Each deposit locks for — with the verdigris dot accent
+      3. Script type
+      4. Cosigners — fingerprints truncated
+  - Per-UTXO explanatory note below the parse-card (above the
+    addresses card) — same shape as the single-sig + CSV variant.
+    The per-UTXO unlock model is unique to CSV (CLTV is
+    wallet-wide), so the note appears in both CSV variants and
+    neither CLTV variant.
+  - Verification copy points generically at the wallet the
+    descriptor was exported from.
+  - CTA label "Looks right".
+-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>TallyKeep — Mobile — Add Vault · 2 of 3 · Parse-back (multisig + CSV)</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="_shared/tokens.css">
+<link rel="stylesheet" href="_shared/shell.css">
+<style>
+  .phone-screen { background: var(--color-bg); }
+
+  .app-bar {
+    height: var(--mobile-app-bar);
+    flex-shrink: 0;
+    display: grid;
+    grid-template-columns: 44px 1fr 44px;
+    align-items: center;
+    padding: 0 var(--space-2);
+    background: var(--color-surface);
+    border-bottom: 1px solid var(--color-border);
+  }
+  .app-bar .back-btn {
+    width: 36px; height: 36px;
+    display: inline-flex; align-items: center; justify-content: center;
+    background: transparent; border: 0;
+    border-radius: var(--radius-md);
+    color: var(--color-text);
+    cursor: pointer;
+    justify-self: start;
+    margin-left: var(--space-2);
+  }
+  .app-bar .back-btn:hover { background: var(--color-bg); }
+  .app-bar .back-btn svg {
+    width: 22px; height: 22px;
+    stroke: currentColor; fill: none;
+    stroke-width: 2; stroke-linecap: round; stroke-linejoin: round;
+  }
+  .step-counter {
+    text-align: center;
+    font-size: var(--font-size-xs);
+    font-weight: var(--font-weight-semibold);
+    color: var(--color-text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    line-height: 1;
+  }
+
+  .scroll-area {
+    flex: 1;
+    overflow-y: auto;
+    padding: var(--space-5) var(--space-4);
+  }
+
+  .step-head { margin-bottom: var(--space-4); }
+  .step-heading {
+    font-size: var(--font-size-lg);
+    font-weight: var(--font-weight-semibold);
+    color: var(--color-text);
+    line-height: var(--line-height-tight);
+    margin: 0;
+    letter-spacing: -0.01em;
+  }
+  .step-sub {
+    font-size: var(--font-size-sm);
+    color: var(--color-text-muted);
+    line-height: var(--line-height-default);
+    margin: var(--space-2) 0 0;
+  }
+
+  .name-preview {
+    margin-bottom: var(--space-4);
+    padding: var(--space-3) var(--space-4);
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-left: 4px solid var(--color-holding-vault);
+    border-radius: var(--radius-md);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-3);
+  }
+  .name-preview .name-label {
+    font-size: var(--font-size-xs);
+    color: var(--color-text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    font-weight: var(--font-weight-semibold);
+    display: block;
+    margin-bottom: 2px;
+  }
+  .name-preview .name-value {
+    font-size: var(--font-size-base);
+    font-weight: var(--font-weight-semibold);
+    color: var(--color-text);
+  }
+  .name-preview .rename-btn {
+    background: transparent;
+    border: 1px solid var(--color-border-strong);
+    border-radius: var(--radius-pill);
+    padding: var(--space-1) var(--space-3);
+    font-family: inherit;
+    font-size: var(--font-size-xs);
+    font-weight: var(--font-weight-semibold);
+    color: var(--color-text);
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    flex-shrink: 0;
+  }
+  .name-preview .rename-btn:hover { background: var(--color-bg); }
+  .name-preview .rename-btn svg { width: 12px; height: 12px; stroke: currentColor; fill: none; stroke-width: 2; }
+
+  .parse-card {
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    padding: var(--space-4);
+    margin-bottom: var(--space-3);
+  }
+  .parse-card .row {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: var(--space-3);
+    padding: var(--space-2) 0;
+  }
+  .parse-card .row + .row { border-top: 1px solid var(--color-border); }
+  .parse-card .row .key {
+    font-size: var(--font-size-xs);
+    color: var(--color-text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    font-weight: var(--font-weight-semibold);
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-2);
+  }
+  .parse-card .row .key.timelock::before {
+    content: '';
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--color-holding-vault);
+    display: inline-block;
+  }
+  .parse-card .row .val {
+    font-size: var(--font-size-sm);
+    color: var(--color-text);
+    font-weight: var(--font-weight-medium);
+    text-align: right;
+  }
+  .parse-card .row .val.mono {
+    font-family: var(--font-mono);
+    font-weight: var(--font-weight-normal);
+  }
+  .parse-card .row .val.strong {
+    font-weight: var(--font-weight-semibold);
+    font-size: var(--font-size-base);
+    text-align: right;
+  }
+  .parse-card .row .val .approx {
+    display: block;
+    font-size: var(--font-size-xs);
+    color: var(--color-text-muted);
+    font-weight: var(--font-weight-normal);
+    margin-top: 2px;
+  }
+
+  .utxo-note {
+    margin-bottom: var(--space-3);
+    padding: var(--space-3);
+    background: var(--color-info-soft);
+    border: 1px solid var(--color-info-border);
+    border-radius: var(--radius-md);
+    color: var(--color-info-text-on-soft);
+    font-size: var(--font-size-sm);
+    line-height: var(--line-height-default);
+    display: flex;
+    gap: var(--space-2);
+    align-items: flex-start;
+  }
+  .utxo-note .note-icon {
+    width: 18px; height: 18px; flex-shrink: 0;
+    stroke: currentColor; fill: none;
+    stroke-width: 2; stroke-linecap: round; stroke-linejoin: round;
+    margin-top: 1px;
+  }
+  .utxo-note p { margin: 0; }
+
+  .addresses-card {
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    padding: var(--space-3) var(--space-4) var(--space-4);
+    margin-bottom: var(--space-2);
+  }
+  .addresses-card .card-title {
+    font-size: var(--font-size-xs);
+    color: var(--color-text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    font-weight: var(--font-weight-semibold);
+    margin: var(--space-2) 0 var(--space-2);
+  }
+  .addresses-card .card-sub {
+    font-size: var(--font-size-xs);
+    color: var(--color-text-dim);
+    line-height: var(--line-height-default);
+    margin: 0 0 var(--space-3);
+  }
+  .addr-row {
+    display: grid;
+    grid-template-columns: 18px 1fr 28px;
+    align-items: center;
+    gap: var(--space-2);
+    padding: var(--space-2) 0;
+  }
+  .addr-row + .addr-row { border-top: 1px solid var(--color-border); }
+  .addr-row .idx {
+    font-size: var(--font-size-xs);
+    color: var(--color-text-dim);
+    font-variant-numeric: tabular-nums;
+    text-align: right;
+  }
+  .addr-row .addr {
+    font-family: var(--font-mono);
+    font-size: var(--font-size-xs);
+    color: var(--color-text);
+    word-break: break-all;
+    line-height: 1.35;
+  }
+  .copy-icon-btn {
+    width: 28px; height: 28px;
+    display: inline-flex; align-items: center; justify-content: center;
+    background: transparent;
+    border: 0;
+    border-radius: var(--radius-sm);
+    color: var(--color-text-dim);
+    cursor: pointer;
+  }
+  .copy-icon-btn:hover { background: var(--color-bg); color: var(--color-text); }
+  .copy-icon-btn svg { width: 14px; height: 14px; stroke: currentColor; fill: none; stroke-width: 2; }
+
+  .wizard-footer {
+    flex-shrink: 0;
+    padding: var(--space-3) var(--space-4) var(--space-4);
+    background: var(--color-surface);
+    border-top: 1px solid var(--color-border);
+  }
+  .wizard-cta {
+    width: 100%;
+    padding: var(--space-3) var(--space-4);
+    background: var(--color-primary);
+    color: var(--color-on-primary);
+    border: 0;
+    border-radius: var(--radius-md);
+    font-family: inherit;
+    font-size: var(--font-size-base);
+    font-weight: var(--font-weight-semibold);
+    cursor: pointer;
+  }
+  .wizard-cta:hover { background: var(--color-primary-strong); }
+</style>
+</head>
+<body>
+
+<div class="mockup-meta">
+  <strong>Mobile — Add Vault · 2 of 3 · Parse-back (multisig + CSV)</strong> ·
+  <span class="status-review">review</span> ·
+  2026-05-15 · 360×800
+</div>
+
+<div class="phone-frame">
+  <div class="phone-screen">
+
+    <div class="app-bar">
+      <button class="back-btn" aria-label="Back to descriptor input">
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <polyline points="15 6 9 12 15 18"/>
+        </svg>
+      </button>
+      <div class="step-counter">Step 2 of 3</div>
+      <div></div>
+    </div>
+
+    <div class="scroll-area">
+
+      <div class="step-head">
+        <h1 class="step-heading">Here's what we read</h1>
+        <p class="step-sub">
+          This Vault requires multiple keys to spend AND locks
+          each deposit for a fixed duration. Check the parameters
+          match what you set when you built the descriptor.
+        </p>
+      </div>
+
+      <div class="name-preview" aria-label="Vault name preview">
+        <div>
+          <span class="name-label">Will be named</span>
+          <span class="name-value">2-of-3 Vault · 1-year lock</span>
+        </div>
+        <button class="rename-btn" type="button" aria-label="Rename this Vault">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M 4 20 L 4 16 L 16 4 L 20 8 L 8 20 Z"/>
+            <line x1="13" y1="7" x2="17" y2="11"/>
+          </svg>
+          Rename
+        </button>
+      </div>
+
+      <div class="parse-card" aria-label="Parsed descriptor metadata">
+        <div class="row">
+          <span class="key">Required signers</span>
+          <span class="val strong">2 of 3</span>
+        </div>
+        <div class="row">
+          <span class="key timelock">Each deposit locks for</span>
+          <span class="val strong">
+            52,560 blocks
+            <span class="approx">~ 365 days</span>
+          </span>
+        </div>
+        <div class="row">
+          <span class="key">Script type</span>
+          <span class="val">Native SegWit · P2WSH miniscript</span>
+        </div>
+        <div class="row">
+          <span class="key">Cosigners</span>
+          <span class="val mono">abc12345 · def67890 · fed98765</span>
+        </div>
+      </div>
+
+      <div class="utxo-note" role="note">
+        <svg class="note-icon" viewBox="0 0 24 24" aria-hidden="true">
+          <circle cx="12" cy="12" r="10"/>
+          <polyline points="12 7 12 12 15 14"/>
+        </svg>
+        <p>
+          Each Bitcoin you send to this Vault locks individually
+          from when it arrives on-chain. Vault detail will show
+          each deposit's unlock date once funds land.
+        </p>
+      </div>
+
+      <div class="addresses-card" aria-label="First derived addresses">
+        <div class="card-title">First three addresses</div>
+        <p class="card-sub">
+          Open the wallet you exported this descriptor from and
+          confirm these match its first three receive addresses.
+        </p>
+
+        <div class="addr-row">
+          <span class="idx">0</span>
+          <span class="addr">bc1q2a4c6e8g0i2k4m6o8q0s2u4w6y8z0b2d4f6h8j0l2n4p6r8t0v2x4z6b8d0f2h4</span>
+          <button class="copy-icon-btn" type="button" aria-label="Copy address 0">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <rect x="9" y="3"  width="6"  height="4"  rx="1"/>
+              <rect x="5" y="5"  width="14" height="16" rx="2"/>
+            </svg>
+          </button>
+        </div>
+        <div class="addr-row">
+          <span class="idx">1</span>
+          <span class="addr">bc1qj6l8n0p2r4t6v8x0z2b4d6f8h0j2l4n6p8r0t2v4x6z8b0d2f4h6j8l0n2p4r6t8</span>
+          <button class="copy-icon-btn" type="button" aria-label="Copy address 1">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <rect x="9" y="3"  width="6"  height="4"  rx="1"/>
+              <rect x="5" y="5"  width="14" height="16" rx="2"/>
+            </svg>
+          </button>
+        </div>
+        <div class="addr-row">
+          <span class="idx">2</span>
+          <span class="addr">bc1qv0x2z4b6d8f0h2j4l6n8p0r2t4v6x8z0b2d4f6h8j0l2n4p6r8t0v2x4z6b8d0f2</span>
+          <button class="copy-icon-btn" type="button" aria-label="Copy address 2">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <rect x="9" y="3"  width="6"  height="4"  rx="1"/>
+              <rect x="5" y="5"  width="14" height="16" rx="2"/>
+            </svg>
+          </button>
+        </div>
+      </div>
+
+    </div>
+
+    <div class="wizard-footer">
+      <button class="wizard-cta" type="button">Looks right</button>
+    </div>
+
+  </div>
+</div>
+
+</body>
+</html>

@@ -116,9 +116,12 @@ class StrongboxCreate(_HoldingCreateBase):
 
 class VaultCreate(_HoldingCreateBase):
     descriptors: list[DescriptorInput] = Field(..., min_length=1)
+    # timelock_kind / timelock_value are derived from the descriptor by the
+    # service; accepted here for forward-compat but the service overrides them.
+    timelock_kind: str | None = None
+    timelock_value: int | None = Field(default=None, ge=0)
     required_signers: int | None = Field(default=None, ge=1)
     total_signers: int | None = Field(default=None, ge=1)
-    timelock_blocks: int | None = Field(default=None, ge=0)
     recovery_setup_notes: str | None = Field(default=None, max_length=2000)
 
 
@@ -191,7 +194,8 @@ class HoldingResponse(BaseModel):
     # Vault
     required_signers: int | None = None
     total_signers: int | None = None
-    timelock_blocks: int | None = None
+    timelock_kind: str | None = None
+    timelock_value: int | None = None
     recovery_setup_notes: str | None = None
 
 

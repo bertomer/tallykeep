@@ -74,7 +74,8 @@ def _to_response(holding: Holding) -> HoldingResponse:
         signing_metadata_present=holding.signing_metadata_present,
         required_signers=holding.required_signers,
         total_signers=holding.total_signers,
-        timelock_blocks=holding.timelock_blocks,
+        timelock_kind=holding.timelock_kind,
+        timelock_value=holding.timelock_value,
         recovery_setup_notes=holding.recovery_setup_notes,
         purse_mode=holding.purse_mode,
     )
@@ -176,9 +177,6 @@ async def create_vault(
             display_order=body.display_order,
             descriptors=body.descriptors,
             adapter=_ADAPTER,
-            required_signers=body.required_signers,
-            total_signers=body.total_signers,
-            timelock_blocks=body.timelock_blocks,
             recovery_setup_notes=body.recovery_setup_notes,
         )
         session.commit()

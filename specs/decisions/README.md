@@ -62,3 +62,4 @@ iteration-done sanity sweep (`PROCESS.md §4.6`) checks it.
 - [0007 — Browser-first development with NativeBridge stubs](0007-browser-first-with-nativebridge.md) — Accepted
 - [0008 — Passphrase and recovery model (two-layer unlock)](0008-passphrase-and-recovery-model.md) — Accepted
 - [0009 — Key custody model](0009-key-custody-model.md) — Accepted; refines principle #6 of 00_README
+- [0010 — Vault type definition + Vault Send deferral](0010-vault-gated-until-multisig.md) — Accepted; migrated from `vault-pre-multisig-shape`

@@ -132,7 +132,7 @@ clarity, not in the primary labels.
 | Account | Like an exchange account | Money you've got at a custodial provider that you want to manage from here |
 | Purse | Like a checking account | An everyday wallet for spending and small amounts |
 | Strongbox | Like a savings account, but you hold the key | A safer spot for medium-term holdings, usually on a hardware wallet |
-| Vault | Like a safety-deposit box | A heavily-protected long-term holding, multi-key, used rarely |
+| Vault | Like a safety-deposit box or pension fund | A long-term holding whose spending requires friction — a script-enforced timelock, multiple keys, or both. Used rarely. |
 
 Purse has two seed origins per ADR-0006 (slug `purse-flavors`).
 The seed origin is a backend-stored intent field;
@@ -214,9 +214,20 @@ Type chooser → type-specific flow.
       clients with the capability to generate and securely store a
       seed (Capacitor on phone). Hidden on browser PWAs with a
       "this requires the TallyKeep app" message.
-- **Add Strongbox:** hardware wallet descriptor (paste / QR / wallet-
-  app handoff).
-- **Add Vault** (single-key only in dev phase): metadata + descriptor.
+- **Add Strongbox:** hardware-wallet descriptor (paste / QR /
+  wallet-app handoff). Accepts only pure single-key descriptors;
+  rejects multisig (redirect to Vault) and single-key + timelock
+  (redirect to Vault, per ADR-0010 β definition).
+- **Add Vault:** descriptor for a friction-bearing wallet
+  (paste / QR / file). v1 accepts both shapes: single-sig +
+  script-enforced timelock (CLTV `after()` or CSV `older()`),
+  and multisig (`wsh(multi(...))`, `wsh(sortedmulti(...))`,
+  `tr(multi_a(...))`) with or without an additional timelock.
+  Rejects pure single-key (redirect to Strongbox) and multi-path
+  miniscript (unsupported-form error). Per ADR-0010, Vault is
+  the friction-bearing Holding; **Vault Send is deferred** for
+  v1 regardless of shape — that's where the multi-signer
+  coordination UX lives.
 
 ### Holding detail
 
@@ -275,9 +286,13 @@ the underlying mechanic differs. Per type:
     4. Broadcast
     5. Confirmed
 
-- **Vault** — Five-step PSBT flow with multisig coordination at
-  step 3. Single-key Vault in the dev phase reduces to
-  Strongbox-shaped behavior; full multisig comes post-ship.
+- **Vault** — PSBT flow that branches by Vault shape (single-sig
+  PSBT roundtrip with chain-side timelock check for the
+  single-sig + timelock shape, multi-signer coordination for the
+  multisig shape). Deferred for v1 regardless of shape; Vault
+  detail's Send affordance is greyed out with "Vault spending
+  ships in a later iteration." Both shapes' Send flows are
+  designed together when the multisig iteration arrives.
 
 **Cross-platform behavior.** Only the TallyKeep-managed Purse on
 the Capacitor device that actually holds its seed signs natively
