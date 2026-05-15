@@ -1,4 +1,4 @@
-# Future iterations
+﻿# Future iterations
 
 The pot. Ideas captured during brainstorm sessions but flagged as
 later. Sharpening happens when an item is promoted to "Next iteration."
@@ -71,44 +71,28 @@ record.
   reuses the shared wizard-shell that lands here), then
   Vault wizard, then Account wizard.
 
+### Add Holding — Strongbox wizard
+
+- **Promoted:** 2026-05-14 (after the design-pass close —
+  Rémy greenlight on all 7 validated mockups).
+- **Full entry:** see `next_iteration.md` "Active iteration ·
+  Add Holding — Strongbox wizard". 7 validated mockups in
+  `UI/mockups/` (input default + two error states + advisory +
+  parse-back default + parse-back no-metadata + success);
+  `UI/mobile.md` Strongbox-wizard section locked; new
+  *advisory* footer-banner shape locked across sibling wizards
+  (warning palette, CTA enabled, lighter than redirect-error
+  band); a Strongbox-missing-signing-metadata item drafted under
+  the security-health entry in this file pending the surface
+  framing review Rémy opened 2026-05-14.
+- **Next in the wizard lineup after this ships:** Vault wizard
+  (framing pre-card + multisig-only validation, then the same
+  3-step shape), then Account wizard (different surface — ccxt
+  provider integration, no descriptor parser).
+
 ---
 
 ## Open
-
-### Add Holding — Strongbox wizard
-
-- **Captured:** 2026-05 (split 2026-05-13, see Purse-wizard
-  entry above).
-- **Motivation:** Buffer layer between hot Purse and ceremonial
-  Vault. Required for the declared-vs-observable security
-  analysis to operate on real cold-storage Holdings in dev phase.
-  Rémy specifically uses one personally, so it lands during
-  personal-use phase.
-- **Sketch:** 4-step wizard, parser shared with Purse watch-only.
-    1. *Descriptor input* — framing copy reads "Export an xpub
-       from your hardware wallet (Coldcard / Trezor / Ledger /
-       Jade) and paste it here. The hardware wallet keeps the
-       spending key." Single-address rejected.
-    2. *Parse-back* — same component as Purse.
-    3. *Label* — default suggestion + optional device-name
-       dropdown (Coldcard Mk4 / Trezor T / Trezor Safe 3 / Ledger
-       Nano / Jade / Other → free-text).
-    4. *Success* — "Signing happens on your hardware wallet when
-       you spend. The spending flow ships in a later iteration."
-  Reuses the shared wizard shell brought in by the Purse-wizard
-  iteration.
-- **Touches:** `UI/mobile.md` Add-Holding Strongbox section,
-  four new mockup files derived from Purse with adapted copy,
-  frontend wizard implementation. Backend already shipped by
-  scaffolding iteration. No new shell or bridge work.
-- **Status:** sharpened-ready-to-promote
-- **Milestone:** pre-shipping
-- **Notes:** Promote **second**. Most of the work is copy +
-  framing variants on top of the Purse pattern. Per-device export-
-  instruction cards (Coldcard / Trezor / etc. step-by-step guides)
-  are nice-to-have but deferred to a post-shipping polish
-  iteration — the dev-phase user is assumed to know how to export
-  an xpub from their hardware.
 
 ### Add Holding — Vault wizard
 
@@ -146,6 +130,73 @@ record.
   wizard reuses the pattern. Operational features (signing
   ceremony, blueprint analysis, declared-vs-observable mismatch
   warnings) stay deferred to the Vault-detail iteration.
+
+### Purse upgrade path (watch-only → on-device-imported)
+
+- **Captured:** 2026-05-13 (Purse-wizard design pass; sharpened
+  out of the original `pre-implementation.md` `purse-upgrade-path`
+  entry on 2026-05-14 once the design parts stabilised)
+- **Motivation:** When a `WATCH_ONLY` Purse becomes degraded —
+  source wallet shutting down (Mutiny), service deprecating
+  (Phoenix on some platforms), or the user just wants to spend
+  from TallyKeep — let the user import the source wallet's seed
+  so the *same* Purse becomes spendable. Better for the brand
+  than forcing a fresh `ON_DEVICE_TK_GENERATED` Purse + funds
+  migration.
+- **Sketch:**
+    - **Where it lives.** Affordance on the **Purse Detail
+      page**, not in the Add wizard. Watch-only Purses surface
+      a discoverable but greyed-out Send control; tapping
+      presents the upgrade flow ("Add the keys to this Purse
+      so you can spend from TallyKeep"). The wizard's job is
+      *registering* a new Purse; the upgrade is *transforming*
+      an existing one. Forcing both verbs through the same
+      wizard would either fork step 1 three ways or require a
+      bizarre "are you upgrading or registering?" step.
+    - **Input.** Textarea accepting BIP39 mnemonic (12 / 24
+      words) or master xprv. Inline validation against the
+      wallet whose descriptor is already imported — refuses
+      pastes that don't derive to the same descriptor.
+    - **Capacitor-only at ship**, with browser-fallback gating
+      per ADR-0007. The dev-mode `localStorage` stub from the
+      Purse-wizard iteration is acceptable for Rémy-only
+      personal-shipping but not the right shape for a
+      user-facing affordance.
+    - **Disclosure copy** (imported-seed case): *"TallyKeep
+      now stores a copy of these keys on this device. You
+      already have a backup from where you exported the seed
+      — keep it safe. Spending from both apps on the same
+      wallet without coordinating can cause failed broadcasts
+      (the protocol prevents double-spend; the UX gets
+      confusing)."*
+    - **Security-health surface** registers the imported Purse
+      with copy distinct from generated Purses (no "TallyKeep
+      gave you this seed" framing — the user got it
+      elsewhere).
+- **Touches:** `holdings/02_purse.md` (Add-Holding —
+  `ON_DEVICE_USER_IMPORTED` section), `UI/mobile.md` Purse
+  Detail section, `concerns/threat_model.md` Mobile addendum,
+  Capacitor NativeBridge `secureStorage` write path,
+  `seed-backup-disclosure` security-health item lockstep.
+- **Status:** sketched
+- **Milestone:** pre-shipping — lands during personal-use
+  phase, after Capacitor wrap. Sharpens once
+  `pre-implementation.md` `purse-upgrade-path` closes (the
+  structural question: mutable `purse_mode` vs separate
+  `spending_capability` flag).
+- **Open at sharpen time:**
+    - Disclosure copy lockstep with `seed-backup-disclosure`
+      — the imported-seed variant differs from the
+      TallyKeep-generated case.
+    - Double-spend UX timing — surface text only at upgrade
+      time, or also at first Send on an imported wallet?
+    - Capacitor gate posture: hide the upgrade affordance on
+      browser builds (gauntlet 5 absence-of-affordance) or
+      show with banner (gauntlet 5 honest gate)? Probably the
+      former.
+- **Notes:** ADR-0006 may need an editorial note or
+  amendment recording the `purse_mode` mutability relaxation
+  if the structural arbitration goes that way.
 
 ### Unlock flow cleanup
 
@@ -355,7 +406,7 @@ record.
 
 ### Hosted tier infrastructure
 
-- **Captured:** 2026-05 (from `design_decisions.md` §11, pre-merge);
+- **Captured:** 2026-05 (from design_decisions.md §11, pre-merge);
   sharpened during onboarding-screen-1 session 2026-05.
 - **Motivation:** Phone-only LatAm/Africa users without home labs.
   Primary growth path beyond personal use.
@@ -499,7 +550,7 @@ record.
 
 ### Lightning support
 
-- **Captured:** 2026-05 (from `design_decisions.md` §12, pre-merge)
+- **Captured:** 2026-05 (from design_decisions.md §12, pre-merge)
 - **Motivation:** Instant low-value spending. Mobile-first feature
   for daily-use markets where on-chain fees price out small payments.
 - **Sketch:** Breez SDK first; evaluate own LSP later (LSPS0/1/2).
@@ -515,12 +566,12 @@ record.
   post-shipping enhancement. Breez SDK license terms also need
   verification before commit.
 - **Notes:** Capacitor-only for spending per
-  `mobile_form_factor_decision.md`. If pre-shipping, increases the
+  mobile_form_factor_decision.md. If pre-shipping, increases the
   ship-gate scope significantly.
 
 ### DCA primitive
 
-- **Captured:** 2026-05 (from `design_decisions.md` §14, pre-merge)
+- **Captured:** 2026-05 (from design_decisions.md §14, pre-merge)
 - **Motivation:** **Dollar-Cost Averaging** — recurring scheduled
   purchases at fixed intervals regardless of price, to average out
   timing risk. Removes the no-Bitcoin-yet onboarding friction in
@@ -537,7 +588,7 @@ record.
 
 ### Equity reference unit
 
-- **Captured:** 2026-05 (from `design_decisions.md` §14, pre-merge)
+- **Captured:** 2026-05 (from design_decisions.md §14, pre-merge)
 - **Motivation:** Reframe "fiat is a bet on an economy" by displaying
   stack value in shares (AAPL, gold ounces). Differentiator vs other
   Bitcoin apps.
@@ -551,7 +602,7 @@ record.
 
 ### Inflation-adjusted graphs
 
-- **Captured:** 2026-05 (from `design_decisions.md` §14, pre-merge)
+- **Captured:** 2026-05 (from design_decisions.md §14, pre-merge)
 - **Motivation:** Show real value evolution agnostic of currency
   inflation. Differentiator.
 - **Sketch:** Holding detail page graph offers an
@@ -562,7 +613,7 @@ record.
 
 ### Retirement plan with timelock
 
-- **Captured:** 2026-05 (from `design_decisions.md` §14, pre-merge)
+- **Captured:** 2026-05 (from design_decisions.md §14, pre-merge)
 - **Motivation:** Bitcoin script-enforced lock period for long-term
   holdings, supporting structured retirement planning.
 - **Sketch:** New Holding sub-type or Vault variant with CSV/CLTV
@@ -631,7 +682,7 @@ record.
 ### Capacitor mobile wrapper
 
 - **Captured:** 2026-05 (originally module 12 v3, moved by
-  `mobile_form_factor_decision.md`)
+  mobile_form_factor_decision.md)
 - **Motivation:** Native plugin access (Keychain, biometric, camera,
   push). Required for TallyKeep-managed Purses (whose seeds live in
   the device's Keychain/Keystore) and for the private-ship event
@@ -783,12 +834,57 @@ record.
 
 - **Captured:** 2026-05 (pre-implementation item
   `seed-backup-disclosure`, plus broader scope from the original
-  `design_decisions.md` §9 Blueprint analysis)
+  design_decisions.md §9 Blueprint analysis)
+- **Framing review needed before sharpening** (Rémy 2026-05-14,
+  during the Strongbox-wizard advisory copy pass). "Security
+  health" as a product-design concept the user encounters
+  directly — a dedicated Home section / tab grouping these items
+  under that heading — is **not yet committed**. The current
+  entry assumes that surface; revisit whether the right model is
+  (a) the centralised "Security health" surface as sketched, or
+  (b) per-Holding inline surfacing (warnings live on the relevant
+  Holding's detail page, not in a generic dashboard), or
+  (c) some hybrid. Items themselves (missing signing metadata,
+  seed-backup-disclosure ack, declared-vs-observable mismatch,
+  Blueprint findings, hosted-tier privacy ack) all still need a
+  persistence home and a resolution path — that part is firm.
+  The user-facing taxonomy is the open question. Wizard-side
+  copy in the Strongbox-wizard iteration (`UI/mobile.md` Add
+  Holding — Strongbox wizard, Step 1 advisory) deliberately
+  avoids forward-referencing any specific surface until this
+  resolves.
 - **Motivation:** Several persistent items need a shared home so
   the user has one place to see ongoing security concerns, without
   any of them being silently hidden. Includes:
     - Purse seed not backed up (`seed-backup-disclosure`)
     - Strongbox used too frequently for spending (declared vs observable)
+    - **Strongbox missing signing metadata** — captured 2026-05-14
+      during the Strongbox-wizard design pass. Triggered when a
+      Strongbox is imported from a bare xpub (no `[fingerprint/path]`
+      brackets — typical of Trezor Suite "Show xpub", Ledger Live,
+      Phoenix "Wallet final", BlueWallet xpub export). Receiving
+      works; spending may need extra setup at the hardware-wallet
+      side because the PSBT `bip32_derivation` field can't be
+      populated cleanly. Item copy: *"Your '{vendor} Strongbox' is
+      missing signing metadata. Spending later may need an extra
+      step on your hardware wallet."* Item has a **"Fix this"**
+      affordance opening a small remediation sub-flow with two
+      paths: (a) **re-export from your HW wallet** with full
+      origin metadata (Coldcard Generic JSON / Sparrow descriptor
+      export / Trezor Suite Advanced → Descriptor / Ledger Live
+      equivalent / etc.) — user pastes or uploads; backend verifies
+      derived addresses still match the existing watched ones; same
+      Strongbox record updated in place. (b) **Manual entry**
+      (advanced): master fingerprint freetext input (8 hex chars,
+      validated case-insensitive), derivation path dropdown
+      (BIP 84 `m/84'/0'/0'` default + BIP 49 / BIP 44 / BIP 86 /
+      Custom escape hatch). Backend verifies derived addresses
+      match before persisting. Most users will pick re-export.
+      Strongbox-only — Purse doesn't surface this because TallyKeep
+      never signs for a watch-only Purse. The wizard-side
+      detection lands with the Strongbox-wizard iteration (parse-
+      back warning variant already mocked); the security-health
+      surface + the Fix-this sub-flow are this iteration's scope.
     - Vault metadata mismatch
     - Address reuse / dust / round-number outputs (Blueprint findings)
     - Hosted-tier privacy boundary not acknowledged
@@ -1211,4 +1307,522 @@ record.
   `banking.coin_selection_per_payment_override` feature flag. That
   default was set early in the spec and hasn't been revisited with
   current understanding of fee dynamics, privacy practice, and
-  target-market behavi
+  target-market behaviour. Worth a dedicated session before
+  public-ship to confirm or change.
+- **Sketch:** Walk through the trade-offs across the standard
+  algorithms (BranchAndBound, Single Random Draw, Knapsack, Largest
+  First) with current data — fee landscape, privacy implications,
+  expected wallet sizes for target users. Decide the default plus
+  per-profile overrides. If the default changes, document with an
+  ADR and update module 06.
+- **Touches:** banking layer (coin selection), profiles + flags,
+  threat model (privacy implications), tx composition tests
+- **Status:** sketched
+- **Milestone:** **pre-shipping** — between the private-ship event
+  and the public-ship event, during the personal-use phase. Rémy's
+  explicit ask: dedicated session in that window.
+- **Notes:** Per-payment override is gated behind the
+  `banking.coin_selection_per_payment_override` flag — power-user
+  territory. The question is whether the *default algorithm* is
+  right. Privacy-preferring defaults age well; fee-minimizing
+  defaults age noisily.
+
+### Possible Purse / Strongbox collapse
+
+- **Captured:** 2026-05 (from module 13 Q8, pre-retirement)
+- **Motivation:** The four-Holding-type model bets that the Purse vs
+  Strongbox distinction matters to a real user. The fiat-banking
+  parallel — where "checking" and "card balance" collapsed into one
+  account view long ago — suggests the bet might be wrong. If during
+  the personal-use phase Rémy finds himself choosing one over the
+  other arbitrarily, collapsing to a single "user-keys Holding" type
+  with a `signing_method` attribute (light vs ceremonial) reduces
+  the model to three types and may match how users actually think.
+- **Sketch:** Track during personal-use phase. If the distinction
+  feels artificial, draft a domain-model migration: collapse Purse
+  and Strongbox into a single Holding type with a `signing_method`
+  enum. Vocabulary lock means the rename is non-trivial — this would
+  need an ADR.
+- **Touches:** `02_domain_model.md`, `UI/README.md` Holding
+  vocabulary table, every iteration that referenced Purse / Strongbox
+  separately
+- **Status:** observation-mode (not active work)
+- **Milestone:** TBD — only acted on if the personal-use phase
+  signals duplication. Likely never; flagged anyway because the
+  vocabulary lock is foundational and worth re-examining once.
+- **Notes:** Touches the locked "Holdings are first-class and typed"
+  principle. Reducing four to three types is itself a re-litigation
+  of vocabulary; deserves an ADR if pursued.
+
+### Tor integration
+
+- **Captured:** 2026-05 (from module 13 Q15, pre-retirement)
+- **Motivation:** Privacy posture. Self-hosted users running their
+  own bitcoind already have the option of Tor-routed RPC; TallyKeep
+  itself doesn't currently route its outbound traffic (provider APIs,
+  rate feeds) through Tor.
+- **Sketch:** Optional, off by default. When enabled, all outbound
+  HTTPS requests (CustodialProvider APIs, optional rate feeds) route
+  through a configured Tor SOCKS proxy. Recommended in the hardening
+  guide; surfaced as a settings toggle.
+- **Touches:** networking layer, settings, hardening guide
+- **Status:** idea
+- **Milestone:** post-shipping
+- **Notes:** Some provider APIs block Tor exit nodes; UX needs to
+  fail gracefully and tell the user which provider blocked them.
+
+### Investment layer with structured yield (the "v5" sketch)
+
+- **Captured:** 2026-05 (from module 12 v5, pre-retirement)
+- **Motivation:** A constrained, contract-defined alternative to
+  the lending / yield zone the spec rejects by default. Multisig
+  vaults with discreet log contracts (DLCs) or LSP-mediated
+  structures, where the user always retains at least one key and a
+  clear unilateral exit path. Distinct from the simpler "Retirement
+  plan with timelock" entry — this is yield-bearing under a contract,
+  not just a CSV/CLTV lock.
+- **Sketch:** A sibling product to TallyKeep's banking app, sharing
+  deployment shell and possibly auth (post-public-ship). Own
+  database, own threat model, own regulatory analysis. Not a
+  generalization of the current banking-app domain.
+- **Touches:** new product surface, regulatory analysis,
+  legal counsel
+- **Status:** idea
+- **Milestone:** post-shipping (likely far post)
+- **Notes:** Requires legal review before scoping. The question is
+  whether enabling these structures from within the app makes us a
+  broker / arranger / custodian by some jurisdiction's reading. The
+  default reflexive answer is "no"; this entry forces that question
+  to be re-asked carefully if pursued. Rejected adjacent: lending,
+  borrowing, yield without contract-bound user-key retention.
+
+### Multi-server per single client
+
+- **Captured:** 2026-05 (during onboarding-screen-2 session, when
+  Rémy considered whether the server identifier needed to be
+  prominent on the paired-confirmation screen)
+- **Motivation:** Power-user case for the sovereignty audience.
+  Examples: home stack + parents' Umbrel for inheritance management,
+  home stack + work-pseudonym stack, home stack + traveling test
+  instance. Currently the architecture and onboarding assume
+  single-server-per-client (one paired stack, one device credential
+  in the Keychain). Extending to multi-server adds non-trivial UX
+  surface.
+- **Sketch:**
+    - **Connect screen extension.** Currently terminal — once paired,
+      the user lands on Home. Multi-server adds a Settings → "Paired
+      stacks" view + an "Add another stack" affordance that
+      re-runs the Connect flow without unpairing the existing one.
+    - **Switch-server affordance.** Top-level UI element (likely the
+      app bar or a Settings-rooted toggle) for moving between paired
+      stacks. Active stack's identifier prominent; inactive stacks
+      one tap away.
+    - **Per-stack data isolation.** Each paired stack has its own
+      device credential, its own observable Holdings, its own
+      cached state. The phone holds N credentials; the user picks
+      which is active.
+    - **Notification routing.** When push notifications land
+      (post-Lightning iteration), the notification has to indicate
+      which stack it's about — otherwise tapping a notification
+      lands on the wrong active context.
+    - **Paired stacks server-side.** The inverse problem: the
+      server's "paired devices" list shows N devices for the user.
+      That part already needs to exist for single-stack
+      revocation; multi-server doesn't change the server side.
+- **Touches:** mobile UI (Connect, Settings, app bar, Home),
+  device-credential storage shape (Keychain entry per stack vs
+  array), backend (no change — multi-server is a client-side
+  concern, the server doesn't know about other stacks the device
+  is paired with), `UI/mobile.md` Onboarding section, future
+  notification handler.
+- **Status:** idea
+- **Milestone:** **post-public-ship** (Rémy's call: "defers to after
+  public shipping for sure"). Not blocking for personal-use phase
+  or public-ship event. The single-server-per-client model is the
+  default and will likely cover the majority of public-ship users;
+  multi-server is power-user expansion.
+- **Notes:** Onboarding-screen-2 design assumes single-server when
+  rendering the paired-server identifier. If multi-server lands,
+  the paired-confirmation screen gains an "and your existing
+  stack(s)" line, or the Add-stack flow is folded into Settings
+  rather than re-running through Onboarding. Defer the design.
+
+---
+
+### Dynamic brand mark on first-touch surfaces
+
+- **Captured:** 2026-05 (during onboarding-screen-1 session, after
+  Rémy noted excitement about showcasing the dynamic mark)
+- **Motivation:** The brand v1 mark lock doc
+  (`brand/tallykeep_brand_mark_v1_lock.html` §5) already implements
+  a working tap-to-regenerate-grain interaction (~80 LOC, seeded
+  xorshift32 PRNG, both halves regenerate matching stripes — the
+  verification metaphor of split tally sticks made tactile, the
+  pedagogical heart of the brand). v1 sanctions it for the
+  **landing-page hero only**; everywhere else uses the locked
+  static seed. Extending the sanction to one or more first-touch
+  surfaces in the app would let new users experience the verification
+  metaphor at the moment of first arrival, which is structurally
+  the same shape of moment as a landing-page hero.
+- **Sketch:**
+    - **Connect screen (primary candidate, `mobile_onboarding_01_connect.html`).**
+      The screen's brand surface is `wordmark-icony` (the wordmark
+      with the canonical Y embedded between "tall" and "keep"),
+      not the bare icon. Make the whole wordmark area the tap
+      target; on tap, only the embedded Y's grain regenerates
+      (the "tall" and "keep" text stays static). This is a small
+      extension of brand v1 §5, which demoed the dynamic
+      interaction on the bare canonical icon — the same seeded
+      PRNG and rendering function applies, only the surrounding
+      typography changes. v1 → v2 lock-doc bump should explicitly
+      sanction the wordmark-icony embedded Y as a dynamic surface
+      alongside the bare icon. This is the user's first-touch
+      moment in the app; the metaphor lands hardest here, and zero
+      additional screen real estate is consumed (the brand mark
+      was already going to be there).
+    - **Settings → About / How it works (secondary candidate).**
+      A dedicated explainer page where the mark is the visual
+      anchor for "what tallykeep means as a verification primitive."
+      Less time-pressured than the Connect screen, more room for
+      the full caption ("The grain matches. A tally stick is split
+      from a single piece of wood. The pattern on both halves is
+      the proof — that's how you knew it was real.").
+    - **Other surfaces** (home page, Holding detail, etc.) stay
+      static-mark-with-locked-seed per the current brand rule.
+- **Touches:**
+    - **Brand:** v1 → v2 lock-doc bump for the mark, updating §5
+      "Landing-page interaction" to extend the sanction list. Per
+      `PROCESS.md §2.4`, pre-public-ship lock-doc edits are
+      allowed without an ADR; v1 → v2 is the convention. Update
+      the canonical SVG export in `brand/identity/` if any visual
+      detail changes (probably not — the dynamic component reuses
+      the canonical geometry).
+    - **Frontend:** SvelteKit component implementing the demo from
+      §5 of the lock doc. Mockups are static (per
+      `UI/mockups/README.md`); the dynamic version lands in code.
+    - **`UI/mobile.md` Onboarding section:** note that the Connect
+      screen's brand mark is the dynamic variant (when this
+      iteration ships).
+- **Status:** sketched
+- **Milestone:** **TBD** — best guess: pre-shipping (between
+  private-ship and public-ship), since the personal-use phase is
+  exactly when defining UX patterns get tested against daily use.
+  Could also pull forward into the Capacitor / private-ship
+  iteration if the wrapping work is touching this screen anyway.
+- **Notes:**
+    - Discoverability: the demo-hint text ("Tap to verify a new
+      pair") in the lock doc is for a documentation context; the
+      Connect screen probably wants a subtler hint (a one-time
+      pulse on first launch? no hint and trust the affordance is
+      noticed?). Sharpen during the iteration.
+    - Accessibility: keyboard-activate (`Enter` / `Space`) already
+      implemented in the lock doc demo. Carry forward.
+    - Animation budget: the lock doc uses an 180ms opacity
+      crossfade. Cheap enough on any phone. No perf concern.
+    - Content of the seed display ("seed · 7777" in the lock doc
+      demo) does not belong on the Connect screen — that's a
+      doc-context affordance for the lock doc only.
+
+---
+
+### "Tap to see under the hood" — UI spine pattern
+
+- **Captured:** 2026-05 (mid-conversation, exploring TallyKeep's
+  distinctive UI behavior)
+- **Motivation:** Bitcoin makes nearly every number a value with
+  nuance behind it (balance = pending + confirmed UTXOs;
+  confirmation count = probabilistic finality; fee = mempool
+  dynamics; rate = source + staleness). Most apps hide this nuance
+  to feel clean. TallyKeep's honest-abstraction principle says
+  don't hide; this pattern says surface on demand. Strong candidate
+  for the product's spine behavior — a behavior flowing through
+  every screen rather than a separate feature module. Aligns
+  directly with the settlement-rails / confirmation-probability
+  idea.
+- **Sketch:** every numeric or stateful element is tappable; tap
+  surfaces what's behind it.
+    - Tap a balance → UTXO breakdown, pending vs confirmed split
+    - Tap a confirmation count → probability framing with assumed
+      adversary hashpower and natural-orphan baseline visible
+    - Tap a fee tier → mempool dynamics, fee distribution,
+      expected time-to-confirm
+    - Tap a "via [source]" rate attribution → fetch timestamp,
+      last N quotes, divergence from another source
+    - Tap a security indicator (declared-vs-observable) → the chain
+      observation that produced the verdict
+    - Tap a Holding type badge → the banking analogy expanded
+- **Touches:** every UI surface (this is a spine pattern, not a
+  feature module)
+- **Status:** sketched — candidate for a defining UX pattern
+- **Milestone:** TBD — decision path is mockup iteration. If the
+  pattern feels natural after a few screens, becomes pre-shipping
+  (defining UX); if forced, drops or scopes down.
+- **Open questions (block commit-as-direction):**
+    - **Mobile friendliness.** Tap targets are premium on small
+      screens; "everything is tappable" risks accidental taps and
+      conflicts with scroll/swipe gestures. Maybe restricted to
+      specific element types only.
+    - **Visual signaling.** How do users know what's tappable
+      without cluttering every screen? Options to evaluate in
+      mockups: subtle dotted underline on tappable values; a
+      consistent color tint on tappable numbers; a single info
+      icon adjacent to tappable groups; long-press instead of tap;
+      a dedicated "explain mode" toggle that highlights everything
+      at once. None is obviously right; each has trade-offs.
+    - **Consistency of disclosure.** Every tappable should reveal
+      the same SHAPE of info (popover? bottom sheet? inline
+      expand?). Inconsistency would feel chaotic.
+    - **Discoverability.** If it's the spine, users need to know
+      about it. Onboarding mention? First-run hint? Or let them
+      discover by accident?
+
+---
+
+### Non-custodial sourcing router (best-execution for Bitcoin acquisition)
+
+- **Captured:** 2026-05 (sparring session captured verbatim in
+  `archive/2026-05_parking_notes_sourcing_and_decumulation.md`)
+- **Motivation:** Atomic-swap venues (SideSwap, Mostro, Boltz) and
+  custodial Accounts are paths to the same outcome — sats into a
+  Holding. Building a venue forks scope into protocol territory
+  currently being closed by Lightning Labs / Blockstream / Tether-
+  Bitfinex multi-year teams. Building a **router** that picks the
+  best path per transfer is the wedge: Smart Order Routing applied
+  to self-custody Bitcoin acquisition. Reinforces banking-grade
+  ergonomics; never asks the user the word "swap."
+- **Sketch:**
+    - Sourcing path becomes a first-class concept alongside
+      `CustodialProvider` Accounts. User sees a single banking-style
+      "transfer" UI; routing happens behind it.
+    - Evaluator inputs: amount, time tolerance, counterparty
+      preferences, depth, current quotes, user's connected providers.
+    - Suggested integration order: SideSwap (Liquid PSBT atomic
+      swaps — most production-ready) → Mostro (Nostr-based LN P2P)
+      → Boltz (quote service for BTC ↔ LN ↔ Liquid) → custodial
+      route + immediate sweep (the dev-phase path, becomes one
+      input among many).
+    - Compliance framing: **"never recustody," not "no KYC."** Most
+      realistic users KYC at the on-ramp anyway. The wedge is
+      "identity proven once at the on-ramp, funds stay sovereign
+      forever."
+- **Touches:** treasury layer, domain model (sourcing path
+  concept — possibly a new entity), UI sourcing flow, threat
+  model, regulatory posture
+- **Status:** sketched
+- **Milestone:** post-shipping (source notes explicitly v1.5+)
+- **Notes:**
+    - **Direct competitor on the sourcing side: Peach Bitcoin** —
+      mobile-first, Swiss, EU/LatAm/Africa coverage. Different
+      wedge (Peach is a venue; TallyKeep would be a router across
+      venues + custodial), but the closest market overlap. Study
+      feature set and traction before sharpening.
+    - **SideSwap caveat:** venue (matching server) is trusted; chain
+      (Liquid Federation, ~70 entities) is federated. If single-
+      vendor risk matters, build on the open Liquid PSBT swap
+      protocol itself (`docs.liquid.net/docs/swaps-and-smart-contracts`),
+      with LiquiDEX / TDEX as alternative consumers.
+    - **Vocabulary discipline.** "Swap" overloads three different
+      things in crypto: (1) atomic-swap primitive (HTLC/PTLC,
+      proper finance: DvP with simultaneous bilateral settlement);
+      (2) CLOB trading with atomic settlement (SideSwap, Bisq —
+      these are *trades*, not swaps); (3) AMM "swaps" (Uniswap-
+      style, different design school, doesn't fit the wedge —
+      impermanent loss, slippage on size, MEV). Integrate (2);
+      skip (3). Worth a vocabulary ADR when this entry sharpens.
+    - **Don't build a venue.** Source notes are emphatic — building
+      an orderbook fragments solo-builder scope across two
+      unrelated hard problems with no compounding leverage. The
+      router is the moat; protocols underneath are commodity
+      infrastructure to ride on.
+
+### Target-price accumulation (limit-bid sourcing)
+
+- **Captured:** 2026-05 (same sparring session as the sourcing-
+  router entry; archive file as above)
+- **Motivation:** Once instant-execution sourcing exists, the
+  natural follow-on is letting the user post a passive limit bid
+  at the price they're happy to buy at, routed to the best venue.
+  The fill IS the goal — no adverse-selection problem, no market-
+  making risk. Banking-grade framing: **"Set the price you want
+  to buy at. We route your bid to the best venue. Fill auto-sweeps
+  to Strongbox."** Same liquidity-contribution effect as market-
+  makers without the structural risk story.
+- **Sketch:** New SourcingPolicy variant (sibling to instant-
+  sourcing): limit-price bid posted to the routed venue, listening
+  for fill, on-fill triggers auto-sweep to the destination Holding.
+  Cancel / amend affordances. Execution-uncertainty disclosure
+  honest — bid at X, BTC rallies past X without touching it →
+  user watched from sidelines, capital locked. That's the cost of
+  being a patient buyer, which is what the target user signed up
+  for.
+- **Touches:** treasury layer, sourcing-router (blocks on the entry
+  above), UI sourcing flow, threat model
+- **Status:** sketched
+- **Milestone:** post-shipping (sequencable: instant-execution
+  router first, limit-price router after — source notes frame as
+  v1 → v1.5)
+- **Notes:**
+    - **Vocabulary lock candidates (sharpen alongside brand voice
+      work):**
+        - ❌ "Earn the spread" — misleading. Real spread capture
+          (50–200 bps on thin books) requires posting both sides
+          and getting filled on both = market making. Likely trips
+          AMF/CSSF marketing rules in EU.
+        - ✅ "Skip the taker fee" — honest. User saves the venue's
+          taker fee (typically 0.2%) by being a maker. Fee saving,
+          not spread capture.
+    - **Do not build market-making.** Onboarding clients into a
+      structurally losing game dressed as "earn the maker fee" =
+      reputational damage. Strict distinction in source notes:
+      target-price accumulation is single-sided and aligned with
+      directional view; market-making is two-sided and faces
+      adverse selection on thin books.
+    - Reference precedents: Strike's "buy the dip," Swan's limit
+      orders. Neither does this well in a self-custody, route-
+      across-venues shape.
+
+### Decumulation + planning layer (the fourth product layer)
+
+- **Captured:** 2026-05 (same sparring session; archive file as above)
+- **Motivation:** TallyKeep's three current layers (savings /
+  banking / trading) cover accumulation and current spending.
+  They don't cover decumulation — "how do I spend this when I no
+  longer earn." Pensions are roughly 70% decumulation, 30% growth;
+  current spec is the opposite. Vault-as-pension is **segment-
+  dependent**: in high-inflation economies (Argentina, Turkey,
+  Nigeria, Lebanon) the Vault IS the pension because the local
+  "risk-free fiat asset" doesn't exist; in EU the Vault
+  *complements* traditional pension infrastructure (PEA / PER /
+  assurance-vie give tax wrappers self-custody can't replicate
+  without becoming a PSAN/CASP custodian — which would destroy
+  the self-custody thesis).
+- **Sketch:** SweepPolicy in reverse, same primitive. Vault /
+  Strongbox as source, Account / Purse as sink, scheduled or
+  trigger-driven. Three additions beyond raw periodic sweep:
+    1. **Buffer layer (bucket strategy from CFP literature).**
+       12–24 months of declared monthly spend in stable form
+       (Purse, plus possibly a small stablecoin sleeve depending
+       on resolution of the "stablecoins as transit" candidate
+       principle below). Replenish when BTC is up. Textbook fix
+       for **sequence-of-returns risk** — the classic retirement-
+       finance failure mode (force-selling stack at the bottom
+       during drawdowns).
+    2. **Dynamic withdrawal rate.** Even the simple "draw 4% of
+       vault annually, recalculate yearly" beats fixed-EUR/month
+       substantially. Guyton-Klinger guardrails or variable-
+       percentage-withdrawal as a policy layer on top of
+       SweepPolicy.
+    3. **Tax-aware projection.** France: 30% PFU on crypto capital
+       gains. **Show** projected tax events alongside projected
+       purchasing power; do not **advise** (configurable
+       simulator, not "we recommend X% per year" — that crosses
+       AMF rules on personalized financial advice).
+- **Touches:** new product layer (significant enough to warrant
+  its own spec scope — likely a new top-level concern, e.g.
+  concerns/decumulation.md, or a sibling subdirectory to
+  `holdings/` / `concerns/` if it grows multi-file; exact module
+  shape decided at sharpen time), domain model (SweepPolicy
+  direction + new Buffer / WithdrawalRate entities), treasury
+  layer (cap-gains tagging in LedgerEntry), UI (calculator +
+  planning view), threat model, regulatory framing
+- **Status:** sketched
+- **Milestone:** post-shipping (far post — needs a population of
+  users who have accumulated enough to plan decumulation)
+- **Notes:**
+    - **Regulatory framing locked in source notes:** frame as
+      **configurable calculator + automation the user drives**,
+      never as personalized advice. AMF actively polices
+      personalized financial advice in France.
+    - **"Without any risk" doesn't appear in user-facing copy.**
+      BTC has volatility (60–80% drawdowns are historically
+      normal), regulatory, and operational risk (lost keys,
+      multisig coordination). Source notes flag the language as
+      trip-wire for MiCA marketing rules in EU. Candidate brand-
+      voice guardrail.
+    - Segment-driven UX: Argentine schoolteacher vs French
+      employee with a PER have different decumulation needs. The
+      planning view exploration for each is itself a sharpening-
+      session when this entry promotes.
+    - Direct-BTC-payment as a withdrawal path is bonus; off-ramp
+      is the realistic default for the foreseeable future (BTC
+      direct-pay still <5% of normal household spend even in
+      target markets, per source notes).
+    - Adjacent to but distinct from the existing "Retirement plan
+      with timelock" entry. Timelock is the script-enforced
+      lock-period mechanic on a Holding; this entry is the
+      consumption-planning layer on top of accumulated Holdings.
+      They compose.
+
+### PSD2 / Open Banking integration for fiat-leg verification
+
+- **Captured:** 2026-05 (same sparring session — EU-specific angle
+  on the non-custodial sourcing question; archive file as above)
+- **Motivation:** Every "P2P BTC-fiat" platform (Bisq, HodlHodl,
+  Peach, Mostro) faces the same asymmetry: BTC leg is verifiable
+  on-chain, fiat leg isn't — atomicity is cryptographically
+  impossible, so they all bolt on a multisig + arbitrator pattern
+  resolving fiat disputes socially. **PSD2 Access-to-Account (AIS)
+  APIs** let a regulated entity programmatically verify "€X landed
+  in this IBAN from that IBAN at this timestamp." Not trustless —
+  bank and AISP are trust anchors — but **collapses ~95% of fiat-
+  receipt disputes into automated resolution.** No existing P2P
+  platform has built this properly. If TallyKeep is EU-domiciled
+  and partners with an AISP (Tink, TrueLayer, Bridge by Bud) or
+  holds an AISP license itself, there's a real wedge for the
+  sourcing-router's EU-fiat-input path.
+- **Sketch:**
+    - For the EU sourcing-router path on P2P venues: when the user
+      receives fiat into their connected IBAN as part of a P2P
+      sell-side leg, the AISP integration verifies receipt
+      automatically and releases the BTC leg from escrow without
+      arbitrator involvement.
+    - Two licensing paths: (a) partner with an existing AISP —
+      lower regulatory cost, dependency on the partner; (b) become
+      AISP-licensed under ACPR — higher cost, fewer dependencies,
+      real moat.
+    - Honest disclosure: AISP + bank are trust anchors; the
+      "atomicity" here is regulatory-grade, not cryptographic.
+- **Touches:** treasury layer, sourcing-router (blocks on the
+  router entry above), regulatory posture (AISP licensing is a
+  real regime change), threat model, new external dependency
+- **Status:** idea
+- **Milestone:** post-shipping
+- **Notes:**
+    - **Hostage to the sourcing-router entry sharpening + a
+      separate regulatory analysis** of AISP licensing cost (PSD2
+      AIS under ACPR in France — the lighter end of the payment-
+      services regime; PSP authorization is heavier and not the
+      target here). Verify current ACPR / PSD2 framework before
+      committing.
+    - Why no P2P platform has built it: most are non-EU or pre-
+      EU-presence, and the AISP path is real work. This entry is
+      what "EU domicile is a wedge instead of a tax" looks like
+      for TallyKeep on the sourcing side.
+
+### Taproot Assets on Lightning sourcing (wait-and-watch)
+
+- **Captured:** 2026-05 (same sparring session; archive file as above)
+- **Motivation:** Per source notes (verify before relying), USDT
+  went live on Lightning mainnet Q1 2026 via Taproot Assets. RFQ-
+  based atomic conversion at edge nodes — sender pays USDT,
+  receiver gets BTC (or any combination). Settlement on actual
+  Bitcoin, open protocol, multiple implementations possible, no
+  federation (vs Liquid). Plausibly the future BTC-native trading
+  infrastructure; production-grade orderbook flows estimated 12–24
+  months from capture time. When mature, becomes a sourcing path
+  preferable to Liquid because of the trust model.
+- **Sketch:** Future integration in the sourcing-router. As
+  *consumer* first (RFQ to existing edge nodes). Operating our own
+  Taproot Assets edge node is a separate, larger commitment that
+  overlaps market-making territory — apply the "don't build
+  market-making" guardrail from the target-price-accumulation entry.
+- **Touches:** treasury layer, sourcing-router (blocks on the
+  router entry above), Lightning integration (blocks on the
+  Lightning entry)
+- **Status:** idea
+- **Milestone:** post-shipping — wait-and-watch
+- **Notes:** Re-verify Taproot Assets maturity annually. Bitcoin
+  trading infrastructure is currently roughly Lightning circa 2018
+  per source notes — primitives work, network forming, UX poor,
+  liquidity thin. Production-grade infrastructure estimated 2–4
+  years out from capture time.

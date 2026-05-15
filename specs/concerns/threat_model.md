@@ -338,4 +338,4 @@ addendum.
 - **Remote access for self-hosters** — when remote access is added (recommended via WireGuard or Tailscale), API-layer auth becomes required: token-based, not passwords. TLS is required for any traffic beyond localhost, even over an encrypted tunnel.
 - **Order placement on custodial providers** — when order placement is added, a new threat class appears (loss via malicious orders). Dry-run mode and per-order confirmation become required defaults; auto-execution behind extra gates.
 - **Multi-user support** — if ever considered, the entire threat model is revisited. User isolation, per-user secret storage, audit trails become first-class concerns. Not in any current iteration plan.
-- **Investment layer with structured yield** (per `future_iterations.md`) — multisig vault primitives with structured collaboration (DLCs, LSP-m
+- **Investment layer with structured yield** (per `future_iterations.md`) — multisig vault primitives with structured collaboration (DLCs, LSP-mediated arrangements) introduce counterparty risk that does not exist today. Requires its own threat model.

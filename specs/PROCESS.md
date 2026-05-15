@@ -92,30 +92,22 @@ Anything not in canonical, path-to-target, or `decisions/` is
 either a working draft or archived history. The next agent
 should never need to read `archive/` to do its job.
 
-**Three universes of state, three homes.** Because the spec is
-read by agents who need to know not just *what TallyKeep is*
-but *where it is right now*:
+**Spec state vs code state.** Canonical docs describe the
+**target** state — the product TallyKeep is converging on. The
+**live** state is the code itself (plus `api/openapi.yaml`,
+which is the frozen API contract per ADR-0004). The bridge
+between them is `shipped.md` (a brief human-readable note when
+something lands) and the **"deferred" marker** in canonical
+docs, which forward-references either `future_iterations.md`
+(parked idea) or `pre-implementation.md` (blocked on
+arbitration).
 
-- **Target state** — the canonical specs above. Describes the
-  product we are building toward. Features marked "deferred"
-  here are target behavior that hasn't shipped yet, with a
-  pointer to where the work is tracked.
-- **Current state** — the **code**, plus the OpenAPI export
-  from the running backend, plus `shipped.md` for a quick
-  human-readable history of what closed out. The code is what
-  is actually live.
-- **Open decisions** — `pre-implementation.md` (must-decide,
-  blocking) and `future_iterations.md` (parked ideas). The
-  decisions not yet made; what TallyKeep *might* be.
-
-The bridge between target and current is the **"deferred"
-marker** in canonical specs and the iteration cycle (§4.4).
-An iteration implements a slice of target → current; on
-closeout, the slice's "deferred" marker comes out of the
-canonical specs and a condensed entry lands in `shipped.md`.
 The spec never describes "what's live today" separately from
 "what's target" — that would require sync-discipline we know
-we can't maintain.
+we can't maintain. An iteration implements a slice of target →
+live; on closeout, the slice's "deferred" marker comes out of
+the canonical specs and a condensed entry lands in
+`shipped.md` (per §4.4).
 
 ---
 
@@ -519,7 +511,7 @@ Most checks are mechanical and run via
 (Linux/Mac). Either is sufficient; the two are kept in sync.
 A few seconds either way.
 
-Checklist (the script implements these six):
+Checklist (the script implements these seven):
 
 1. **OpenAPI matches code.** If the iteration touched any
    endpoint, schema, SSE event, error type, or locked-state
@@ -538,9 +530,12 @@ Checklist (the script implements these six):
    removed mockups taken out.
 4. **No broken backtick file refs.** Cross-references like
    `\`02_domain_model.md\`` resolve to a real file, in
-   non-archive docs. Archive references are exempt;
-   retired-filename references in ADRs (kept for historical
-   context) pass via the script's allow-list.
+   non-archive docs. Archive references are exempt. Retired
+   filenames (e.g. `\`09_feature_flags.md\``,
+   `\`12_roadmap.md\``) are accepted **only inside `decisions/`**,
+   where ADRs legitimately preserve them as historical record;
+   the same reference in a current canonical doc is treated as
+   drift to fix.
 5. **No "Decided" parallel ledger.** `pre-implementation.md`
    contains only Open items. Closed items left the file (to
    ADR or canonical doc edits, per §4.7).
@@ -550,16 +545,18 @@ Checklist (the script implements these six):
    were updated in the same change, and the file's "Last
    touched" stamp was bumped. The script flags any lock doc
    whose mtime is newer than `tokens.css`.
+7. **Tail well-formedness.** Catches the recurring
+   tool-corruption failure (silent mid-paragraph truncation,
+   duplicated tail, file ending with a dangling header).
+   Heuristic — flags a non-archive `.md` whose last non-blank
+   line is a markdown header, ends with a hyphenated word cut
+   to 1-3 letters (`LSP-m`), or is a short line (<40 chars)
+   ending in an alphabetic character with no terminator. False
+   positives are fixable by adding a period or restructuring;
+   false negatives still need a human eye on large edits.
 
 If any check fails, the iteration isn't done. Fix in the same
 commit, not as a TODO. Drift is a bug, not a chore (per §4.2).
-
-**Post-edit tail hygiene** is tracked separately from the
-sanity sweep — see Rémy's project context. The recurring
-tool-corruption failure (trailing NUL bytes after a refactor,
-silent mid-paragraph truncation) is an agent-tool quirk to
-watch for after large edits, not a spec-drift signal the sweep
-catches.
 
 ### 4.7 Open arbitration is explicit
 

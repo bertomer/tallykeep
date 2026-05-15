@@ -75,6 +75,8 @@ class Holding:
 
     # Strongbox metadata
     signing_device_label: str | None = None
+    vendor: str | None = None
+    signing_metadata_present: bool | None = None
 
     # Vault metadata
     required_signers: int | None = None
@@ -126,8 +128,13 @@ class Holding:
                     f"custody_model=THIRD_PARTY"
                 )
 
-        if self.holding_type != HoldingType.STRONGBOX and self.signing_device_label is not None:
-            raise ValueError("signing_device_label is only valid on Strongbox holdings")
+        if self.holding_type != HoldingType.STRONGBOX:
+            if self.signing_device_label is not None:
+                raise ValueError("signing_device_label is only valid on Strongbox holdings")
+            if self.vendor is not None:
+                raise ValueError("vendor is only valid on Strongbox holdings")
+            if self.signing_metadata_present is not None:
+                raise ValueError("signing_metadata_present is only valid on Strongbox holdings")
 
         if self.holding_type != HoldingType.VAULT:
             self._reject_vault_metadata()
@@ -151,6 +158,10 @@ class Holding:
     def _reject_strongbox_metadata(self) -> None:
         if self.signing_device_label is not None:
             raise ValueError("signing_device_label is only valid on Strongbox holdings")
+        if self.vendor is not None:
+            raise ValueError("vendor is only valid on Strongbox holdings")
+        if self.signing_metadata_present is not None:
+            raise ValueError("signing_metadata_present is only valid on Strongbox holdings")
 
     def _validate_vault_metadata(self) -> None:
         # Either both signer fields set, or neither.

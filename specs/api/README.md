@@ -60,7 +60,7 @@ silently overwrite the contract with the wrong state.
   shipped state.
 - When work needs a backend change, the change is listed as part
   of the relevant iteration in `../next_iteration.md` (per ADR-0002,
-  replacing the older `UI/backend_deltas.md` proposal).
+  replacing the older UI/backend_deltas.md proposal).
 - The iteration is not complete until the OpenAPI matches the code.
 - Manual edits to `openapi.yaml` are forbidden. If it's
   wrong, the backend is wrong; fix it there.

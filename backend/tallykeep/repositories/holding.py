@@ -54,6 +54,8 @@ def _row_to_domain(
             if subtype.get("purse_mode") else None
         ),
         signing_device_label=subtype.get("signing_device_label"),
+        vendor=subtype.get("vendor"),
+        signing_metadata_present=subtype.get("signing_metadata_present"),
         required_signers=subtype.get("required_signers"),
         total_signers=subtype.get("total_signers"),
         timelock_blocks=subtype.get("timelock_blocks"),
@@ -67,6 +69,10 @@ def _build_subtype_data(holding: Holding) -> dict[str, Any]:
     if holding.holding_type == HoldingType.STRONGBOX:
         if holding.signing_device_label is not None:
             payload["signing_device_label"] = holding.signing_device_label
+        if holding.vendor is not None:
+            payload["vendor"] = holding.vendor
+        if holding.signing_metadata_present is not None:
+            payload["signing_metadata_present"] = holding.signing_metadata_present
     elif holding.holding_type == HoldingType.VAULT:
         if holding.required_signers is not None:
             payload["required_signers"] = holding.required_signers

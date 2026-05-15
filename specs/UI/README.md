@@ -13,7 +13,7 @@ appropriately for its surface. When this file is silent on something
 platform-specific, the platform spec decides.
 
 This doc absorbed the cross-platform content from the retired
-`UI/design_decisions.md` (now under `archive/UI/`) during the
+UI/design_decisions.md (now under `archive/UI/`) during the
 consolidation merge. The retirement and consolidation are recorded
 in ADR-0001 and ADR-0002.
 
@@ -430,6 +430,4 @@ Rémy 2026-05:
   the public-ship event per ADR-0003).
 - Future iterations and parked ideas — see `future_iterations.md`.
 - The threat-model implications of mobile and the Capacitor build
-  — see `concerns/threat_model.md` §Mobile addendum.
-nd the Capacitor build
   — see `concerns/threat_model.md` §Mobile addendum.

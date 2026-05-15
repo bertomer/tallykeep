@@ -112,18 +112,33 @@ fi
 # ---- 4. No broken backtick file refs in non-archive docs ----
 section "Backtick file refs resolve"
 broken=0
-allow_list='^(\.\.\._v([0-9]+|N)_lock\.html|\.\.\._fiat_(off|on)\.html|colors\.md|typography\.md|tallykeep_<.+>_v<N>_<status>\.(html|md)|<artifact>_v<N>_<status>\.(html|md)|<voice-piece>_v<N>_<status>\.md|mobile_<flow>_<state>\.html|UI/backend_deltas\.md|backend_deltas\.md|backlog\.md|NNNN-title\.md|NNNN-short-title\.md|09_profiles_and_flags\.md|11_ux_flows\.md|12_roadmap\.md|13_open_questions\.md|14_context_handoff\.md|design_decisions\.md|mobile_form_factor_decision\.md|spec_amendments\.md|handoff\.md|mobile_v1\.md|UI/design_decisions\.md|UI/handoff\.md|UI/mobile_form_factor_decision\.md|UI/drafts/spec_amendments\.md|specs/.+|drafts/spec_amendments\.md|04_api_surface\.md)$'
+# Tier 1: always-allowed placeholders (illustrative naming examples).
+allow_anywhere='^(\.\.\._v([0-9]+|N)_lock\.html|\.\.\._fiat_(off|on)\.html|colors\.md|typography\.md|tallykeep_<.+>_v<N>_<status>\.(html|md)|<artifact>_v<N>_<status>\.(html|md)|<voice-piece>_v<N>_<status>\.md|mobile_<flow>_<state>\.html|NNNN-title\.md|NNNN-short-title\.md)$'
+# Tier 2: retired filenames - acceptable only inside decisions/ where
+# ADRs preserve them as historical record. Same name in a current
+# canonical doc is drift.
+allow_decisions_only='^(specs/)?(09_profiles_and_flags\.md|09_feature_flags\.md|11_ux_flows\.md|12_roadmap\.md|13_open_questions\.md|14_context_handoff\.md|04_api_surface\.md|05_savings_layer\.md|06_banking_layer\.md|07_trading_layer\.md|08_lightning_placeholder\.md|10_threat_model\.md|design_decisions\.md|mobile_form_factor_decision\.md|spec_amendments\.md|handoff\.md|mobile_v1\.md|UI/design_decisions\.md|UI/handoff\.md|UI/mobile_form_factor_decision\.md|UI/drafts/spec_amendments\.md|drafts/spec_amendments\.md|UI/backend_deltas\.md|backend_deltas\.md|backlog\.md)$'
 while IFS= read -r f; do
+  in_decisions=0
+  case "$f" in
+    ./decisions/*|decisions/*) in_decisions=1 ;;
+  esac
   while IFS= read -r ref; do
     target="${ref//\`/}"
-    if echo "$target" | grep -qE "$allow_list"; then
+    if echo "$target" | grep -qE "$allow_anywhere"; then
+      continue
+    fi
+    if [ "$in_decisions" -eq 1 ] && echo "$target" | grep -qE "$allow_decisions_only"; then
       continue
     fi
     dir="$(dirname "$f")"
     if [ -e "${dir}/${target}" ] || [ -e "./${target}" ]; then
       continue
     fi
-    basename_match=$(find . -name "$(basename "$target")" -print 2>/dev/null | head -1)
+    # basename-anywhere fallback, EXCLUDING archive/ so retired-only
+    # filenames fail here. ADRs that legitimately reference retired
+    # names go through the decisions-only allow-list above.
+    basename_match=$(find . -path ./archive -prune -o -name "$(basename "$target")" -print 2>/dev/null | head -1)
     if [ -z "$basename_match" ]; then
       fail "$f references missing \`$target\`"
       broken=$((broken + 1))
@@ -155,6 +170,46 @@ if [ -f UI/mockups/_shared/tokens.css ]; then
 else
   fail "UI/mockups/_shared/tokens.css is missing"
 fi
+
+# ---- 7. Tail well-formedness (post-edit truncation detection) ----
+# Catches the failure mode PROCESS.md 4.6 calls out: an agent edit
+# silently truncates the end of a file mid-word or ends with a
+# dangling header. Heuristic; false positives are easier to whitelist
+# than truncations are to spot by eye.
+section "Tail well-formedness"
+tail_issues=0
+while IFS= read -r f; do
+  # last non-blank line, trimmed
+  last_line=$(awk 'NF { line = $0 } END { print line }' "$f")
+  # bash-portable trim
+  last_trim="${last_line#"${last_line%%[![:space:]]*}"}"
+  last_trim="${last_trim%"${last_trim##*[![:space:]]}"}"
+  [ -z "$last_trim" ] && continue
+
+  rel="${f#./}"
+
+  # Signal 1: file ends on a markdown header (heading without body)
+  if echo "$last_trim" | grep -qE '^#+[[:space:]]'; then
+    fail "$rel ends with a header (no body after it): '$last_trim'"
+    tail_issues=$((tail_issues + 1))
+    continue
+  fi
+
+  # Signal 2: ends with a hyphenated word cut to 1-3 letters
+  if echo "$last_trim" | grep -qE -- '-[A-Za-z]{1,3}$'; then
+    fail "$rel last line ends mid-hyphenated-word: '$last_trim'"
+    tail_issues=$((tail_issues + 1))
+    continue
+  fi
+
+  # Signal 3: short line (<40 chars) ending in alpha with no terminator
+  if [ "${#last_trim}" -lt 40 ] && echo "$last_trim" | grep -qE '[A-Za-z]$'; then
+    fail "$rel last line looks truncated (short, no terminator): '$last_trim'"
+    tail_issues=$((tail_issues + 1))
+    continue
+  fi
+done < <(find . -path ./archive -prune -o -name '*.md' -print 2>/dev/null)
+[ "$tail_issues" -eq 0 ] && ok "no truncated tails in non-archive docs"
 
 # ---- summary ----
 echo

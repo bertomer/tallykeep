@@ -13,7 +13,7 @@ working agreement in `PROCESS.md`, screen-by-screen detail is
 authored alongside each iteration's mockups, not pre-specified
 upfront. The active iteration's scope lives in `next_iteration.md`.
 
-The original module 11 (`11_ux_flows.md`) carried screen-by-screen
+The original module 11 (11_ux_flows.md) carried screen-by-screen
 ASCII layouts that predated the current mobile-first thinking and
 the UI/README cross-platform decisions. That module retires in
 the consolidation merge; its content is not ported here. Mockups
@@ -1313,3 +1313,377 @@ write bug during this session. The closure is a minimal-fidelity
 reconstruction from project context (BDK, scure libs already referenced
 elsewhere). Restore from git history if a more accurate version is
 needed. -->
+
+---
+
+## Add Holding — Strongbox wizard
+
+Second per-type wizard. Reuses the wizard shell introduced by the
+Purse wizard (header, step counter, body, footer, sensitive-screen
+flag, hidden bottom-nav). Design pass closed 2026-05-14 (all 7
+mockups validated); promoted to `next_iteration.md` as the active
+coding iteration.
+
+The Strongbox wizard covers a single creation path: the user
+pastes / scans / uploads a watch-only descriptor (or bare xpub)
+exported from a hardware wallet, and TallyKeep registers a
+Strongbox-typed Holding against it. No generate path — Strongbox
+spending keys live on the user's hardware wallet, never on any
+TallyKeep surface (per ADR-0009 key-custody zones). The
+`signing_device_label` free-form note ("Coldcard Mk4 in safe")
+is set on the Strongbox detail page post-creation, not in the
+wizard — same shape as renaming a Purse later. Holding the
+wizard at three steps preserves parity with the Purse pattern.
+
+### Vocabulary lock
+
+Inherited from the Purse-wizard vocabulary lock (2026-05-13):
+"keys" stays the user-facing abstract term for spending
+capability ("the hardware wallet keeps the spending key"). One
+Strongbox-specific addition:
+
+- **"Hardware wallet"** — user-facing term for the external
+  signing device (Coldcard, Trezor, Ledger, Jade, BitBox02,
+  airgapped laptop running Sparrow / Electrum, Specter DIY).
+  Used in the vendor dropdown label and step copy. The
+  domain-model term `signing_device_label` is internal only.
+- **"Descriptor"** — singular field label on step 1, dropping
+  the Purse wizard's "Descriptor or xpub". Hardware wallets
+  export output descriptors more commonly than bare xpubs; the
+  shorter label is honest about the typical input shape
+  without rejecting bare xpubs (the backend parser accepts
+  both, same as Purse).
+
+### Wizard shape (3 steps, parity with Purse)
+
+Step counter "STEP 1 OF 3 / 2 OF 3 / 3 OF 3". Back chevron at
+step 1 returns to Home (picker dismissed); at step 2 returns to
+step 1; at step 3 (success) hidden — only path forward is
+"Done". Bottom-nav hidden during the wizard.
+
+**Sensitive-screen flag.** None of the Strongbox steps carry
+`sensitive-screen={true}`. The descriptor is public-key data; no
+recovery phrase is ever shown by this wizard (no generate path).
+The wizard shell still inherits the same flag mechanism so the
+Capacitor layer wiring is component-uniform with Purse — it
+just always passes `false`.
+
+### Screens
+
+**Step 1 — `mobile_add_holding_strongbox_input.html`.** Heading
+"Add a Strongbox", no Generate accent card (the Purse
+two-paths-from-the-top layout collapses to one path). Vendor
+dropdown directly under the heading, optional with "Don't
+specify" as the production default (rendered "Coldcard" in this
+mockup for narrative realism). Vendor list (alphabetical, matching
+the Purse dropdown's discipline): Airgapped laptop · BitBox02 ·
+Coldcard · Jade · Ledger · Sparrow (as signer) · Specter DIY ·
+Trezor · Other · Don't specify. The list is broad on purpose —
+provenance is a bookkeeping label, not a capability filter. The
+backend parser doesn't care which vendor produced the descriptor;
+this metadata just drives the auto-name on step 2 and the
+vendor-specific export-instruction hint banner below.
+
+Picking a vendor surfaces a wallet-specific hint banner inline,
+same content shape as the Purse Phoenix hint — title + body with
+step-by-step export instructions and any vendor-specific gotchas.
+Coldcard hint is locked in the input mockup; remaining vendor
+hints land in the production component (`Advanced/Tools → Export
+Wallet → Generic JSON` for Coldcard; `Settings → Wallet info →
+Show xpub` for Trezor Suite; analogous paths for Ledger Live,
+Jade, BitBox02, etc.). "Other…" surfaces a generic prompt rather
+than a per-device walkthrough.
+
+Below the vendor block: descriptor textarea with three input
+affordances grouped under it.
+
+- **Paste button** inside the textarea's top-right consumes
+  `NativeBridge.clipboard.paste()` (same hook as Purse).
+- **Scan QR button** opens the camera via Capacitor (`Native​
+  Bridge.camera.scanQR()`). Browser build **hides** this button
+  (absence-of-affordance per ADR-0007 / gauntlet 5). The mockup
+  renders the Capacitor target — both buttons visible.
+- **Upload file button** opens a file picker for `.txt`, `.json`,
+  or `.psbt`-adjacent descriptor exports. Always available in both
+  builds — file system access is the common-denominator import
+  channel for Coldcard SD card, Sparrow exports, Specter, and
+  airgapped-laptop flows.
+
+QR earns its place in Strongbox because hardware wallets *display*
+QRs precisely because they're offline (Coldcard, Jade, BitBox02,
+Specter DIY all export descriptors via QR). The Purse wizard
+doesn't surface QR because Purse descriptors come from hot wallets
+that live on the same phone (Phoenix, BlueWallet, Mutiny, Sparrow
+hot mode) and expose a "Copy descriptor" button instead. The
+asymmetry is honest, not arbitrary.
+
+Primary CTA "Continue" disabled until textarea non-empty.
+
+**Step 1 footer-banner states.** Three distinct shapes — locked
+across the wizard for future per-type sibling reuse:
+
+- `mobile_add_holding_strongbox_input_error_inline.html` — **inline
+  error** pattern. Triggers on single-address rejection ("That's a
+  single Bitcoin address. TallyKeep tracks wallets, not isolated
+  addresses — export the wallet descriptor or xpub from your
+  hardware wallet and paste that instead.") and on unparseable
+  text (generic shape). Danger palette, textarea border tinted
+  danger, vendor hint banner hidden (error region carries the
+  informational role). Primary CTA **disabled** (blocking —
+  structural input invalid). Duplicate-descriptor case adds a
+  secondary "Open it instead" CTA in the error region linking to
+  the existing Holding (per the Purse pattern; not rendered as a
+  separate mockup in this iteration but the component carries
+  the affordance).
+- `mobile_add_holding_strongbox_input_error_redirect.html` —
+  **redirect error** pattern (multisig rejection). Warning
+  palette (not danger — input is structurally valid, just belongs
+  in Vault). Error block carries a "Set up as Vault" secondary
+  CTA routing the user out of this wizard back to the picker,
+  then into the Vault wizard. Primary "Continue" stays present
+  but **disabled** (blocking — input belongs in a different
+  wizard). Pattern locked across sibling wizards (Vault rejects
+  single-key with the inverse redirect; Account doesn't apply).
+- `mobile_add_holding_strongbox_input_advisory_no_metadata.html` —
+  **advisory** pattern (new shape, locked here). Triggers when
+  the backend descriptor-validate parses the input successfully
+  but the descriptor lacks key-origin brackets — typical for bare
+  zpubs from Trezor Suite "Show xpub", Ledger Live, Phoenix
+  "Wallet final", BlueWallet xpub view. Warning palette, smaller
+  / lighter visual treatment than the redirect-error band (xs
+  font, tighter padding, single compact paragraph, no secondary
+  CTA inside). Primary CTA **enabled** — non-blocking,
+  informational. Copy: *"**Missing derivation metadata.** Your
+  hardware wallet may refuse to sign transactions with this
+  descriptor. Receiving funds will work as expected. Re-export
+  your descriptor to enable signing, or continue as is."* Voice is declarative, consequence-first
+  (the user-visible impact — hardware-wallet refusal — comes
+  before the technical cause), banking-grade per
+  `brand/tallykeep_about_v1_draft.md` reference points
+  (Revolut / Wise / Qonto / N26). Vendor hint banner stays
+  visible alongside (hint = how to export from this wallet,
+  advisory = what we noticed about the paste — two different
+  conceptual roles).
+
+  No forward-reference to any specific resolution surface in the
+  banner. The user gets two clear actions ("re-export" /
+  "continue as is") and the in-wizard signal continues on step 2
+  via the tinted Derivation row. Where the warning persists
+  post-Holding-create and how the user later resolves it is a
+  design question carried by the security-health iteration in
+  `future_iterations.md` — flagged there as needing rework
+  before the user-facing surface lands, since "Security health"
+  as a product-design concept users encounter directly is not
+  yet committed (Rémy 2026-05-14).
+
+  Why this is Strongbox-only and not Purse: TallyKeep coordinates
+  PSBT signing for Strongbox (per `holdings/03_strongbox.md`
+  §"Send flow"), so missing `bip32_derivation` data in the PSBT
+  causes interop friction at spend time. TallyKeep never signs
+  for a watch-only Purse — the user spends from their hot wallet
+  directly — so the same descriptor shape has zero spending-time
+  consequences on the Purse side.
+
+  Why the advisory lives at step 1 and not step 2: surfacing
+  this on parse-back after the user clicks Continue feels like a
+  gotcha ("AH YOU MESSED UP" — Rémy 2026-05-14). Step 1 advisory
+  lets the user re-export now if they want to spend later, or
+  proceed knowing the trade-off. Step 2 then just confirms what
+  TallyKeep couldn't determine (Derivation row tinted in warning
+  palette — see Step 2 below) without repeating the lecture.
+
+**Step 2 — `mobile_add_holding_strongbox_parseback.html`.** Two
+variants in this iteration:
+
+- *Default* (`mobile_add_holding_strongbox_parseback.html`) —
+  descriptor carried full key-origin brackets, all parsed fields
+  populated.
+- *Missing signing metadata* (`mobile_add_holding_strongbox_parseback_no_metadata.html`) —
+  same screen, but reached after the user continued past the
+  step-1 advisory. The backend wrapped the bare xpub in the
+  script-type descriptor BDK needs (`wpkh(zpub.../0/*)#checksum`)
+  and stored the master-fingerprint / derivation-path columns
+  NULL. **No warning banner on this step** — the user was already
+  informed at step 1; repeating the lecture here would be a
+  gotcha. The "Derivation" row in the parse-card alone renders in
+  the warning palette: yellow-tinted row background bleeding to
+  the card edges, "not provided" in warning text colour, small
+  inline info icon for users who want to re-read the why. Other
+  parse-card rows stay neutral. CTA "Looks right" enabled — the
+  user proceeds; the security-health item gets created server-
+  side on Holding-create so the same warning surfaces on Home
+  under the security-health heading with a "Fix this" affordance
+  (remediation sub-flow specified in `future_iterations.md`
+  Security-health entry).
+
+Both variants share the same shape. The screen lands with the
+**auto-name preview at the top**, directly under the heading:
+"Will be named '{auto-name}' [Rename]" — the name-preview row
+carries the 4 px iron left stripe (`--color-holding-strongbox`).
+Tap Rename to edit inline.
+
+Auto-name derivation:
+
+- Vendor picked: "{Vendor} Strongbox" (e.g. "Coldcard Strongbox",
+  "Trezor Strongbox", "Ledger Strongbox", "Sparrow Strongbox").
+  Mirrors Purse "{Source} Purse" construction. Most users will
+  accept the derived name without renaming.
+- Vendor = "Don't specify": script-type fallback — "Native SegWit
+  Strongbox" / "Taproot Strongbox" / etc. Same fallback rule as
+  the Purse wizard's "Don't specify" path.
+- Multiple Strongboxes with same vendor: increment at backend
+  create time ("Coldcard Strongbox 2"), same convention as
+  "TallyKeep Purse 2".
+
+Verification copy emphasises hardware-wallet verification
+specifically: "Open your hardware wallet (or Sparrow / Specter /
+its companion app) and confirm these match the wallet's first
+three receive addresses." This matches the receive-flow
+verify-on-device discipline in `holdings/03_strongbox.md` —
+TallyKeep showing addresses on the phone screen isn't proof on
+its own; the hardware wallet's own display is the reference.
+
+Below the name-preview: the parse-card (script type, derivation
+path, master-key summary truncated) and the addresses-card
+(first three derived addresses with tap-to-copy). Same components
+as Purse parse-back. CTA label "Looks right".
+
+**Step 3 — `mobile_add_holding_strongbox_success.html`.** Same
+confirmation-honesty shape (gauntlet 4) as Purse imported success:
+the screen acknowledges Holding *registration* only, not balance
+load. Iron stripe on the scanning row, heading "Strongbox added",
+sub-copy about the chain scan, spinner-row "Scanning… · balance
+will appear on Home shortly". CTA: "Done" — returns to Home where
+the new row appears with the populated-home "Scanning…" status
+indicator; row updates to show balance when scan completes. No
+auto-redirect.
+
+No "signing happens on your hardware wallet" disclosure on
+success. Send / Receive iterations ship separately; their copy
+will handle verify-on-device and PSBT-roundtrip discipline.
+Saying it on the success screen would invite users to look for a
+Send button that isn't built yet.
+
+### Reconcilability gauntlet answers
+
+1. **Trust boundary.** Phone screen (UI). The descriptor textarea
+   and the name (auto-derived, optionally edited inline on
+   step 2) are local UI state until step 2's "Looks right" tap.
+   Backend interactions at:
+   - Step 1 *Continue*: `POST /api/v1/descriptors/validate` to
+     parse the descriptor and detect single-address / multisig /
+     unparseable cases. Pure parser — no state mutation. Same
+     endpoint as Purse.
+   - Step 2 *Looks right*: `POST /api/v1/holdings/strongbox` to
+     create the Holding (with the auto-derived or user-renamed
+     name and vendor metadata if picked) and kick off the
+     chain-scan job.
+   QR scan and file upload are device-side reads — the camera /
+   file picker plugin reads the descriptor text into the
+   textarea, then step 1 proceeds normally. No additional
+   network surface beyond the standard descriptor-validate path.
+
+2. **Keys and secrets.** **None on any wizard surface.** Strongbox
+   keys live on the user's hardware wallet, in the user's
+   custody zone (ADR-0009). The wizard accepts public-key data
+   only — output descriptors, xpubs. The descriptor itself is
+   not a secret; it's the public projection of the wallet's
+   address space. The spending keys never touch any TallyKeep
+   surface (backend, Capacitor, browser). No biometric prompt,
+   no secure-storage write, no localStorage stub. This is the
+   cleanest wizard in the four-type set from a custody-surface
+   perspective.
+
+3. **Self-hosted vs hosted.** Identical phone-side flow. The
+   Holding-create and descriptor-validate endpoints behave
+   identically per `01_architecture.md`. The hosted-tier
+   privacy boundary (TallyKeep operators can read descriptors
+   at rest) is disclosed at hosted-tier onboarding, not at Add
+   Strongbox time. Same boundary as Purse watch-only.
+
+4. **Confirmation honesty.** Three deliberate honesty beats:
+   - Step 2 *parse-back* frames itself as "Here's what **we
+     read**" and invites the user to verify against the hardware
+     wallet's own display (not just another wallet app). The
+     user does the verification; TallyKeep shows its work.
+   - Step 3 *success* acknowledges Holding registration, **not**
+     balance load. The "Scanning…" hint and the populated-home
+     row treatment carry the truth across the boundary — the
+     Holding exists, the chain scan is still running.
+   - Success copy does **not** preview Send capability. Sending
+     from a Strongbox requires PSBT roundtrip with the hardware
+     wallet, which ships in a later iteration. No "you can spend
+     from this Strongbox now" implied; no Send button stubbed in.
+   No "Sent ✓" / "Confirmed" semantics in this wizard — those
+   come with the Strongbox-Send iteration.
+
+5. **Browser-only fallback.** Strongbox is fully browser-
+   compatible *except* for QR scan (Capacitor camera plugin
+   only). Browser build hides the Scan QR button per
+   absence-of-affordance — no banner, no honest gate, just the
+   button isn't there. Paste and Upload-file work in both
+   builds. The honest browser-build path: user copy-pastes the
+   descriptor from their HW companion app (Trezor Suite, Ledger
+   Live, Sparrow, Specter), or uploads the descriptor file. The
+   shipped behaviour matches the gauntlet-5 discipline —
+   capability degradation is *visible* (button absent), not
+   silent (button shown, click does nothing).
+
+6. **Open-source and reproducibility.** No closed-source
+   dependency. Descriptor parsing reuses the Purse wizard's BDK
+   miniscript path. Camera-plugin and file-picker plugins are
+   Capacitor community plugins (MIT-licensed) — in-tree
+   buildable, no closed deps on the Strongbox path. The QR
+   decoder library used by the camera plugin will be confirmed
+   MIT or Apache-2 at Capacitor-wrap iteration time; the
+   Strongbox wizard's browser-build path doesn't depend on it.
+
+### Notes
+
+**Three steps, not four.** The future-iterations sketch
+captured 2026-05 proposed four steps with a dedicated "Label"
+step. That sketch predated the Purse-wizard convergence to three
+steps (2026-05-13), where the dedicated label step retired in
+favour of the auto-name preview on parse-back. Strongbox follows
+the locked Purse pattern: name preview on step 2, inline rename,
+no separate label step. The `signing_device_label` free-form
+note ("in safe at home") is set on Strongbox detail post-
+creation, same way a Purse gets renamed there.
+
+**Vendor dropdown discipline.** Same shape as the Purse source
+dropdown: optional, alphabetical, broad list, "Don't specify"
+default in production, "Other…" tail for the long-tail. Vendor
+drives the auto-name and the per-vendor export-instruction hint
+banner. It does **not** filter the parser, gate any capability,
+or alter the backend descriptor-validate path. The vendor is a
+bookkeeping label — same vocabulary the user uses when
+describing their setup ("my Coldcard"), surfaced consistently in
+the Holdings list, the Strongbox detail page, and any future
+declared-vs-observable warning copy ("your declared 'Coldcard'
+Strongbox has had …").
+
+**QR scan justified for Strongbox, not retroactive for Purse.**
+QR earns its place in Strongbox because hardware wallets export
+descriptors via QR (Coldcard, Jade, BitBox02, Specter DIY all do
+this natively — it's the canonical airgapped transport). Purse
+descriptors come from hot wallets on the same phone where
+clipboard / Copy-descriptor is the natural channel. The
+asymmetry is intentional. Adding QR to the Purse wizard later
+remains an option, but it doesn't earn its place there in the
+current scope.
+
+**No `sensitive-screen={true}` on any step.** The shell flag
+exists for screens where a recovery phrase is exposed (Purse
+generate path). Strongbox never exposes recovery material — the
+keys live on the hardware wallet, on the user's side of the
+trust boundary. Inheriting the flag mechanism keeps component
+uniformity with Purse; the value is always `false`.
+
+**Auto-rename is non-mutable post-creation? No — same as Purse.**
+The user can rename the Strongbox from its detail page later, no
+constraint. The auto-name is a default, not a lock. Vendor
+metadata (if picked) persists on the Holding record independently
+of the name; if the user renames "Coldcard Strongbox" to "Office
+safe", the vendor metadata stays `coldcard` for downstream uses
+(security-health copy, declared-vs-observable framing).
+

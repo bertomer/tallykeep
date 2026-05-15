@@ -135,6 +135,19 @@ export const biometric = {
 };
 
 // ---------------------------------------------------------------------------
+// Capabilities — runtime feature detection.
+// Browser build: canScanQR is false (no camera plugin). Capacitor: true.
+// ---------------------------------------------------------------------------
+
+export const capabilities = {
+  canScanQR(): boolean {
+    if (DEV_MODE) return false;
+    // Capacitor: check Capacitor.isNativePlatform() + Camera plugin availability.
+    return false;
+  },
+};
+
+// ---------------------------------------------------------------------------
 // QR scanner stub
 // ---------------------------------------------------------------------------
 
@@ -148,6 +161,33 @@ export const qrScanner = {
       return null;
     }
     throw new Error('qrScanner.scan: Capacitor not available');
+  },
+};
+
+// ---------------------------------------------------------------------------
+// File picker — always available (browser: <input type="file">, Capacitor:
+// @capacitor/filesystem or native file chooser at private-ship).
+// Accepts a list of MIME types or extensions. Returns the file content as a
+// string, or null if the user cancelled.
+// ---------------------------------------------------------------------------
+
+export const filePicker = {
+  async pick(accept: string = '.txt,.json'): Promise<string | null> {
+    return new Promise((resolve) => {
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.accept = accept;
+      input.onchange = () => {
+        const file = input.files?.[0];
+        if (!file) { resolve(null); return; }
+        const reader = new FileReader();
+        reader.onload = (e) => resolve((e.target?.result as string) ?? null);
+        reader.onerror = () => resolve(null);
+        reader.readAsText(file);
+      };
+      input.oncancel = () => resolve(null);
+      input.click();
+    });
   },
 };
 

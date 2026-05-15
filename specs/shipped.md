@@ -14,6 +14,39 @@ commit.
 
 ---
 
+## 2026-05-15 — Add Holding · Strongbox wizard
+
+`POST /api/v1/descriptors/validate` response extended with
+`signing_metadata_present: bool` (true when descriptor carries
+`[fingerprint/path]` key-origin brackets; false for bare
+xpub/zpub wraps). `POST /api/v1/holdings/strongbox` extended with
+optional `vendor` (slug from 9 locked values) and optional
+`signing_metadata_present` flag, both persisted in
+`subtype_data` JSONB. Unknown vendor slug returns 422.
+
+Frontend: `/holding/new/strongbox/+page.svelte` — full 3-step
+wizard. Step 1: vendor dropdown (10 options with per-vendor export
+hint banners) + descriptor textarea + Paste / Upload file /
+Scan QR (Capacitor-only, hidden in browser via
+`capabilities.canScanQR()` absence-of-affordance). Bare-key
+advisory fires immediately from `bareKeyDetected` derived; full
+`signing_metadata_present: false` advisory fires after validate.
+Step 2: iron-stripe auto-name preview + parse-card (Derivation row
+tinted warning when no signing metadata) + tap-to-copy addresses.
+Step 3: success with chain-scan spinner row. Auto-wrap for bare
+xpub/zpub/ypub/tpub. `NativeBridge` extended with
+`capabilities.canScanQR()` and `filePicker.pick()`.
+
+Tests: 3 new backend integration tests for the validate flag
+(`signing_metadata_present` true/false, multisig), 3 for
+strongbox-create vendor/metadata persistence and unknown-slug
+rejection. Sweep: 17 pre-existing spec drift fixes (stale backtick
+refs, `specs/`-prefix gap in allowlist, truncated ADR-0007 tail).
+OpenAPI regenerated (138 kB, `signing_metadata_present` in
+`ValidateDescriptorResponse`).
+
+---
+
 ## 2026-05-14 — Purse-mode rename (janitorial)
 
 Domain entity rename: `PurseSeedOrigin` → `PurseMode`, field

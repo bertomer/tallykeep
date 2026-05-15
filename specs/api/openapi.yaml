@@ -38,7 +38,7 @@ paths:
         '401':
           description: Bad passphrase
         '503':
-          description: Crypto parameters not initialized — first run required
+          description: "Crypto parameters not initialized â\x80\x94 first run required"
         '422':
           description: Validation Error
           content:
@@ -449,12 +449,12 @@ paths:
       summary: Global Holdings Summary
       description: "Fortune view: per-Holding summary plus cross-Holding rollups.\n\
         \nSpec module 05: \"the global view always shows the per-Holding\nbreakdown\
-        \ alongside the total. No silent consolidation.\" We honour\nthat — the response\
-        \ includes the full summary list, not just the\ntotals.\n\nHoldings are sorted\
-        \ by custody tier (Account → Purse → Strongbox → Vault),\nthen by display_order\
-        \ within each tier. Each entry carries:\n  - meta: type-specific label (provider\
-        \ name / device label / m-of-n)\n  - scan_status: \"n/a\" | \"scanning\" |\
-        \ \"scanned\""
+        \ alongside the total. No silent consolidation.\" We honour\nthat â\x80\x94\
+        \ the response includes the full summary list, not just the\ntotals.\n\nHoldings\
+        \ are sorted by custody tier (Account â\x86\x92 Purse â\x86\x92 Strongbox\
+        \ â\x86\x92 Vault),\nthen by display_order within each tier. Each entry carries:\n\
+        \  - meta: type-specific label (provider name / device label / m-of-n)\n \
+        \ - scan_status: \"n/a\" | \"scanning\" | \"scanned\""
       operationId: global_holdings_summary_api_v1_holdings_summary_global_get
       parameters:
       - name: include_archived
@@ -627,7 +627,7 @@ paths:
     post:
       tags:
       - descriptors
-      summary: Validate a BIP 380 descriptor — pure parser, no state mutation.
+      summary: "Validate a BIP 380 descriptor â\x80\x94 pure parser, no state mutation."
       description: 'Validate a descriptor expression and return its parsed properties.
 
 
@@ -884,21 +884,12 @@ paths:
       tags:
       - descriptors
       summary: Rescan Descriptor
-      description: 'Run a one-shot scan of bitcoind''s UTXO set against this descriptor.
-
-
-        Persists newly-discovered UTXOs, the OnChainTransactions that produced
-
-        them, and a LedgerEntry per UTXO with `direction=INCOMING`. Re-runs are
-
-        idempotent (UTXOs upsert by (txid, vout); LedgerEntries de-dupe per
-
-        holding by source_reference).
-
-
-        Synchronous in M5.2 — moved to a job queue in M5.3 once we wire the
-
-        worker process for the live ZMQ listener.'
+      description: "Run a one-shot scan of bitcoind's UTXO set against this descriptor.\n\
+        \nPersists newly-discovered UTXOs, the OnChainTransactions that produced\n\
+        them, and a LedgerEntry per UTXO with `direction=INCOMING`. Re-runs are\n\
+        idempotent (UTXOs upsert by (txid, vout); LedgerEntries de-dupe per\nholding\
+        \ by source_reference).\n\nSynchronous in M5.2 â\x80\x94 moved to a job queue\
+        \ in M5.3 once we wire the\nworker process for the live ZMQ listener."
       operationId: rescan_descriptor_api_v1_descriptors__descriptor_id__rescan_post
       parameters:
       - name: descriptor_id
@@ -1318,14 +1309,9 @@ paths:
       tags:
       - utxos
       summary: Utxo Hygiene
-      description: 'Return the persisted hygiene flags plus a per-flag recommendation.
-
-
-        Recommendations follow spec module 05''s templates. The endpoint is
-
-        advisory — callers may show, dismiss, or surface them however they
-
-        like.'
+      description: "Return the persisted hygiene flags plus a per-flag recommendation.\n\
+        \nRecommendations follow spec module 05's templates. The endpoint is\nadvisory\
+        \ â\x80\x94 callers may show, dismiss, or surface them however they\nlike."
       operationId: utxo_hygiene_api_v1_utxos__utxo_id__hygiene_get
       parameters:
       - name: utxo_id
@@ -1506,14 +1492,10 @@ paths:
       tags:
       - ledger-entries
       summary: Patch Ledger Entry
-      description: 'Update category / counterparty_label / note.
-
-
-        Setting `category` flips the entry from "pending" to "confirmed" and
-
-        stamps `categorized_at`. Setting `category` is the only way to bind
-
-        a category — `suggested_category` is informational.'
+      description: "Update category / counterparty_label / note.\n\nSetting `category`\
+        \ flips the entry from \"pending\" to \"confirmed\" and\nstamps `categorized_at`.\
+        \ Setting `category` is the only way to bind\na category â\x80\x94 `suggested_category`\
+        \ is informational."
       operationId: patch_ledger_entry_api_v1_ledger_entries__entry_id__patch
       parameters:
       - name: entry_id
@@ -1972,7 +1954,7 @@ paths:
       tags:
       - banking
       summary: Get Invoice Qr
-      description: Render the BIP21 URI as a 400×400 PNG QR code.
+      description: "Render the BIP21 URI as a 400Ã\x97400 PNG QR code."
       operationId: get_invoice_qr_api_v1_banking_invoices__invoice_id__qr_get
       parameters:
       - name: invoice_id
@@ -2518,16 +2500,11 @@ paths:
       tags:
       - analysis
       summary: Utxo Blueprint
-      description: 'Per-UTXO blueprint (richer than the /utxos/{id}/hygiene shape).
-
-
-        Currently a stub; the per-UTXO hygiene endpoint already covers the
-
-        flag list + recommendations. v2 will add per-flag historic context
-
-        (when did the address first see reuse, what was the fee rate when DUST
-
-        was computed, etc.) — not load-bearing for v1.'
+      description: "Per-UTXO blueprint (richer than the /utxos/{id}/hygiene shape).\n\
+        \nCurrently a stub; the per-UTXO hygiene endpoint already covers the\nflag\
+        \ list + recommendations. v2 will add per-flag historic context\n(when did\
+        \ the address first see reuse, what was the fee rate when DUST\nwas computed,\
+        \ etc.) â\x80\x94 not load-bearing for v1."
       operationId: utxo_blueprint_api_v1_analysis_utxo__utxo_id__get
       parameters:
       - name: utxo_id
@@ -3082,10 +3059,8 @@ components:
       additionalProperties: false
       type: object
       title: ConfigurationResponse
-      description: 'Full configuration response — every section is always present,
-        fields default
-
-        to None when no override exists.'
+      description: "Full configuration response â\x80\x94 every section is always\
+        \ present, fields default\nto None when no override exists."
     ConfigurationUpdate:
       properties:
         bitcoind:
@@ -3111,8 +3086,8 @@ components:
       additionalProperties: false
       type: object
       title: ConfigurationUpdate
-      description: Partial update — every section is optional, every field within
-        optional.
+      description: "Partial update â\x80\x94 every section is optional, every field\
+        \ within optional."
     ConfirmationRequiredResponse:
       properties:
         requires_confirmation:
@@ -3342,22 +3317,14 @@ components:
       - expression
       - network
       title: DescriptorInput
-      description: 'Single descriptor specification at holding-creation time.
-
-
-        `gap_limit` is the number of consecutive unused addresses we derive when
-
-        importing a descriptor. The BIP 44 standard is 20 (also the BDK / Sparrow
-
-        / Electrum default); capped at 40 (2× the standard) to leave headroom for
-
-        power users who''ve issued a few extra addresses outside the app, without
-
-        inviting nonsense workflows that pre-derive thousands of addresses. Users
-
-        who''ve issued addresses far past the default gap need a manual-address-
-
-        registration path — deferred to v2 (see CONTEXT.md).'
+      description: "Single descriptor specification at holding-creation time.\n\n\
+        `gap_limit` is the number of consecutive unused addresses we derive when\n\
+        importing a descriptor. The BIP 44 standard is 20 (also the BDK / Sparrow\n\
+        / Electrum default); capped at 40 (2Ã\x97 the standard) to leave headroom\
+        \ for\npower users who've issued a few extra addresses outside the app, without\n\
+        inviting nonsense workflows that pre-derive thousands of addresses. Users\n\
+        who've issued addresses far past the default gap need a manual-address-\n\
+        registration path â\x80\x94 deferred to v2 (see CONTEXT.md)."
     DescriptorPatch:
       properties:
         name:
@@ -3645,6 +3612,16 @@ components:
           - type: string
           - type: 'null'
           title: Signing Device Label
+        vendor:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Vendor
+        signing_metadata_present:
+          anyOf:
+          - type: boolean
+          - type: 'null'
+          title: Signing Metadata Present
         required_signers:
           anyOf:
           - type: integer
@@ -4567,6 +4544,17 @@ components:
             maxLength: 200
           - type: 'null'
           title: Signing Device Label
+        vendor:
+          anyOf:
+          - type: string
+            maxLength: 50
+          - type: 'null'
+          title: Vendor
+        signing_metadata_present:
+          anyOf:
+          - type: boolean
+          - type: 'null'
+          title: Signing Metadata Present
       additionalProperties: false
       type: object
       required:
@@ -5061,11 +5049,15 @@ components:
             type: string
           type: array
           title: First Addresses
+        signing_metadata_present:
+          type: boolean
+          title: Signing Metadata Present
       type: object
       required:
       - script_type
       - is_multisig
       - first_addresses
+      - signing_metadata_present
       title: ValidateDescriptorResponse
     ValidationError:
       properties:
@@ -5181,4 +5173,3 @@ components:
       - address
       - is_whitelisted
       title: WhitelistVerificationOut
-

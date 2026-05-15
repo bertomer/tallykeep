@@ -86,6 +86,9 @@ class ValidateDescriptorRequest(BaseModel):
     network: Network
 
 
+_KEY_ORIGIN_PATTERN = re.compile(r'\[')
+
+
 class ValidateDescriptorResponse(BaseModel):
     script_type: str
     is_multisig: bool
@@ -93,6 +96,7 @@ class ValidateDescriptorResponse(BaseModel):
     total_signers: int | None = None
     timelocks: None = None
     first_addresses: list[str]
+    signing_metadata_present: bool
 
 
 @router.post(
@@ -147,6 +151,11 @@ async def validate_descriptor(body: ValidateDescriptorRequest) -> ValidateDescri
         parsed.address_type.value, parsed.address_type.value
     )
 
+    # Key-origin brackets ([fingerprint/path]) present → signing metadata available.
+    # Their absence means the descriptor was built from a bare xpub/zpub/ypub with no
+    # derivation info, so hardware wallets may refuse to sign PSBTs for it.
+    signing_metadata_present = bool(_KEY_ORIGIN_PATTERN.search(expr))
+
     return ValidateDescriptorResponse(
         script_type=script_type,
         is_multisig=parsed.is_multisig,
@@ -154,6 +163,7 @@ async def validate_descriptor(body: ValidateDescriptorRequest) -> ValidateDescri
         total_signers=parsed.total_signers,
         timelocks=None,
         first_addresses=first_addresses,
+        signing_metadata_present=signing_metadata_present,
     )
 
 

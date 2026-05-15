@@ -268,10 +268,16 @@ def create_strongbox(
     descriptors: list[DescriptorInput],
     adapter: DescriptorAdapter,
     signing_device_label: str | None,
+    vendor: str | None = None,
+    signing_metadata_present: bool | None = None,
 ) -> Holding:
     subtype_data: dict = {}
     if signing_device_label is not None:
         subtype_data["signing_device_label"] = signing_device_label
+    if vendor is not None:
+        subtype_data["vendor"] = vendor
+    if signing_metadata_present is not None:
+        subtype_data["signing_metadata_present"] = signing_metadata_present
     return _create_holding_with_descriptors(
         session,
         holding_type=HoldingType.STRONGBOX,
@@ -284,7 +290,11 @@ def create_strongbox(
         descriptors=descriptors,
         adapter=adapter,
         subtype_data=subtype_data,
-        extra_holding_kwargs={"signing_device_label": signing_device_label},
+        extra_holding_kwargs={
+            "signing_device_label": signing_device_label,
+            "vendor": vendor,
+            "signing_metadata_present": signing_metadata_present,
+        },
     )
 
 

@@ -89,7 +89,8 @@ sequence in `PROCESS.md §4.4` stages 3–5.
 
 ## Active iteration
 
-No active coding iteration.
+No active iteration. See `future_iterations.md` for the next
+candidate to promote and sharpen.
 
 ---
 

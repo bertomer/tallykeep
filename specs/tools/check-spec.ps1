@@ -150,29 +150,46 @@ if (Test-Path $indexHtml) {
 # ---- 4. No broken backtick file refs in non-archive docs ----
 Section "Backtick file refs resolve"
 
-# Allow-list: documented placeholder / illustrative names that
-# intentionally don't resolve to a file (naming-convention examples,
-# template placeholders, retired-file references kept for historical
-# context in ADRs).
-$allowList = @(
-    '\.\.\._v(\d+|N)_lock\.html',
-    '\.\.\._fiat_(off|on)\.html',
-    'colors\.md',
-    'typography\.md',
+# Two allow-list tiers:
+#
+# 1. Always-allow: documented placeholder / illustrative names that
+#    intentionally don't resolve (template naming examples).
+#    Legitimate in any doc.
+$allowAnywhereList = @(
+    # naming-convention placeholders
+    '\.\.\._v(\d+|N)_lock\.html',           # "..._v1_lock.html" patterns
+    '\.\.\._fiat_(off|on)\.html',           # "..._fiat_off.html" patterns
+    'colors\.md',                            # illustrative ("a colors.md")
+    'typography\.md',                        # illustrative
     'tallykeep_<.+>_v<N>_<status>\.(html|md)',
     '<artifact>_v<N>_<status>\.(html|md)',
     '<voice-piece>_v<N>_<status>\.md',
     'mobile_<flow>_<state>\.html',
-    'UI/backend_deltas\.md',
-    'backend_deltas\.md',
-    'backlog\.md',
     'NNNN-title\.md',
-    'NNNN-short-title\.md',
+    'NNNN-short-title\.md'
+) -join '|'
+$allowAnywhereRegex = "^($allowAnywhereList)`$"
+
+# 2. Decisions-only-allow: retired filenames that ADRs legitimately
+#    reference as historical record. NOT acceptable in current
+#    canonical docs (00-04, holdings/, concerns/, UI/, brand/) —
+#    those should reference the current name. Scoped to decisions/
+#    only to surface drift in canonical docs.
+$allowDecisionsOnlyList = @(
+    # retired module filenames (the 2026-05 spec reshape)
     '09_profiles_and_flags\.md',
+    '09_feature_flags\.md',                  # renamed to concerns/feature_flags.md
     '11_ux_flows\.md',
     '12_roadmap\.md',
     '13_open_questions\.md',
     '14_context_handoff\.md',
+    '04_api_surface\.md',
+    '05_savings_layer\.md',
+    '06_banking_layer\.md',
+    '07_trading_layer\.md',
+    '08_lightning_placeholder\.md',
+    '10_threat_model\.md',
+    # retired UI files (consolidation merge)
     'design_decisions\.md',
     'mobile_form_factor_decision\.md',
     'spec_amendments\.md',
@@ -182,11 +199,13 @@ $allowList = @(
     'UI/handoff\.md',
     'UI/mobile_form_factor_decision\.md',
     'UI/drafts/spec_amendments\.md',
-    'specs/.+',
     'drafts/spec_amendments\.md',
-    '04_api_surface\.md'
+    # planned-then-rejected proposals
+    'UI/backend_deltas\.md',                 # ADR-0001 §4 proposal, retired per ADR-0002
+    'backend_deltas\.md',
+    'backlog\.md'                            # ADR-0002 alternative, not adopted
 ) -join '|'
-$allowRegex = "^($allowList)`$"
+$allowDecisionsOnlyRegex = "^(?:specs/)?($allowDecisionsOnlyList)`$"
 
 $broken = 0
 $mdFiles = Get-ChildItem -Path . -Recurse -File -Filter "*.md" -ErrorAction SilentlyContinue |
@@ -200,20 +219,28 @@ foreach ($file in $mdFiles) {
     if (-not $refs) { continue }
 
     $fileDir = Split-Path -Parent $file.FullName
+    $inDecisions = $file.FullName -match '[\\/]decisions[\\/]'
 
     foreach ($ref in $refs) {
-        # already resolved by allow-list?
-        if ($ref -match $allowRegex) { continue }
+        # tier 1: always-allowed placeholders
+        if ($ref -match $allowAnywhereRegex) { continue }
+
+        # tier 2: retired names — only acceptable inside decisions/
+        if ($inDecisions -and $ref -match $allowDecisionsOnlyRegex) { continue }
 
         # try relative to file dir, then to specs root
         $candA = Join-Path $fileDir $ref
         $candB = Join-Path $specsDir $ref
         if ((Test-Path $candA) -or (Test-Path $candB)) { continue }
 
-        # try basename anywhere INCLUDING archive — historical refs
-        # in ADRs are legitimate as long as the file exists somewhere.
+        # try basename anywhere NON-archive — covers refs that name
+        # a file by basename only when it lives elsewhere in the tree.
+        # archive/ is excluded so retired-only filenames fail here;
+        # ADRs that legitimately reference retired names go through
+        # the decisions-only allow-list above.
         $basename = Split-Path -Leaf $ref
         $matchedFile = Get-ChildItem -Path $specsDir -Recurse -File -Filter $basename -ErrorAction SilentlyContinue |
+                       Where-Object { $_.FullName -notmatch '[\\/]archive[\\/]' } |
                        Select-Object -First 1
         if (-not $matchedFile) {
             $relFile = Get-RelPath $file.FullName
@@ -264,6 +291,63 @@ if (Test-Path $tokens) {
     }
 } else {
     Fail "$tokens is missing"
+}
+
+# ---- 7. Tail well-formedness (post-edit truncation detection) ----
+# Catches the failure mode PROCESS.md 4.6 calls out: an agent edit
+# silently truncates the end of a file mid-word, or duplicates a tail.
+# Heuristics catch the obvious shapes; manual review is the final
+# guard. False positives are easier to whitelist than truncations are
+# to spot by eye.
+Section "Tail well-formedness"
+$tailIssues = 0
+$mdFilesForTail = Get-ChildItem -Path . -Recurse -File -Filter "*.md" -ErrorAction SilentlyContinue |
+    Where-Object { $_.FullName -notmatch '[\\/]archive[\\/]' }
+
+foreach ($file in $mdFilesForTail) {
+    $lines = Get-Content $file.FullName
+    if (-not $lines -or $lines.Count -eq 0) { continue }
+
+    # Walk from the end; find the last non-blank line.
+    $lastLine = $null
+    for ($i = $lines.Count - 1; $i -ge 0; $i--) {
+        $candidate = $lines[$i]
+        if ($null -ne $candidate -and $candidate.Trim() -ne '') {
+            $lastLine = $candidate
+            break
+        }
+    }
+    if ($null -eq $lastLine) { continue }
+    $lastTrim = $lastLine.Trim()
+    $relFile = Get-RelPath $file.FullName
+
+    # Signal 1: file ends with a markdown header (heading with no body).
+    # A complete doc almost never ends on a heading.
+    if ($lastTrim -match '^#+\s') {
+        Fail "$relFile ends with a header (no body after it): '$lastTrim'"
+        $tailIssues++
+        continue
+    }
+
+    # Signal 2: ends with a hyphenated word cut after 1-3 letters,
+    # e.g. "LSP-m", "co-s". Strong truncation signature.
+    if ($lastTrim -match '-[A-Za-z]{1,3}$') {
+        Fail "$relFile last line ends mid-hyphenated-word: '$lastTrim'"
+        $tailIssues++
+        continue
+    }
+
+    # Signal 3: short line (<40 chars) ending in an alphabetic char
+    # with no terminator. Catches abrupt single-word truncations
+    # like "Capacitor f" or "behavi".
+    if ($lastTrim.Length -lt 40 -and $lastTrim -match '[A-Za-z]$') {
+        Fail "$relFile last line looks truncated (short, no terminator): '$lastTrim'"
+        $tailIssues++
+        continue
+    }
+}
+if ($tailIssues -eq 0) {
+    Ok "no truncated tails in non-archive docs"
 }
 
 # ---- summary ----

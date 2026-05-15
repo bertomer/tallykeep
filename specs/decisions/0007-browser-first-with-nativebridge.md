@@ -71,4 +71,4 @@ land before touching UI work.
 - `UI/README.md` — Send / Receive flows reflecting NativeBridge
   gating
 - `decisions/0003-personal-use-phase.md` — phase model that this
-  ADR sits inside
+  ADR sits inside.

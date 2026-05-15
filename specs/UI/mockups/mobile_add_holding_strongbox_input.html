@@ -1,0 +1,427 @@
+<!--
+  Title: Mobile — Add Strongbox · step 1 (default — descriptor input)
+  Status: validated  (Rémy greenlight 2026-05-14 closing the
+                      Strongbox-wizard design pass)
+  Date last touched: 2026-05-14
+  Replaces: nothing on disk; first Strongbox-wizard draft. Derives
+            structurally from mobile_add_holding_purse_input.html
+            (Purse wizard pattern locked 2026-05-13).
+
+  Design notes:
+  - 3-step wizard, parity with Purse. Step counter "STEP 1 OF 3".
+    Auto-name lives on step 2 (parse-back); no dedicated label
+    step. The signing-device-label free-form note ("in safe at
+    home") is set on the Strongbox detail page post-creation, not
+    in the wizard — same shape as renaming a Purse later.
+  - No Generate path. Strongbox keys live on the user's hardware
+    wallet; TallyKeep never generates them. The "Generate fresh"
+    accent card from the Purse wizard is absent — replaced by the
+    vendor dropdown sitting directly under the heading.
+  - Vendor dropdown is OPTIONAL ("Don't specify" is the default
+    value in production; this mockup renders Coldcard selected
+    for narrative realism — the iconic hardware wallet most users
+    will recognise). Picking a vendor (a) drives the auto-name on
+    step 2 ("{Vendor} Strongbox" — e.g. "Coldcard Strongbox") and
+    (b) surfaces a vendor-specific export-instruction hint banner
+    inline.
+  - Wallet-tip text (rendered when a vendor is picked) carries
+    device-specific export instructions. The Coldcard example
+    text is locked here; the other vendor instructions land
+    alongside their option in the production component. Trezor /
+    Ledger don't natively offer QR descriptor export → their hint
+    text emphasises the companion-app text-copy path.
+  - Three input affordances: paste textarea (default), Upload
+    file button (always available — many HW wallets export a
+    `.txt` or `.json` descriptor file; Coldcard SD-card, Sparrow,
+    Specter all use this path), Scan QR button (Capacitor-only).
+    Browser build hides the Scan QR button per gauntlet 5
+    (absence-of-affordance, no honest banner — Capacitor is
+    where the camera plugin lives). This file represents the
+    Capacitor target.
+  - "Other…" in the vendor dropdown surfaces a generic hint
+    ("Most hardware wallets export an xpub or output descriptor
+    — check the wallet's manual for 'export wallet' or 'show
+    xpub'") rather than a per-device walkthrough.
+  - Bottom-nav hidden during the wizard, per shell convention.
+  - Step 1 back-chevron returns to Home (picker dismissed).
+
+  Strongbox-vs-Purse divergences logged here so the coding agent
+  can derive cleanly from the Purse wizard component:
+    1. No Generate accent card.
+    2. No "Import from another wallet" section label — there's
+       only one path (paste), so the label is noise.
+    3. Vendor dropdown options differ (hardware wallets, not hot
+       wallets).
+    4. Two extra input-method affordances (Upload file, Scan QR
+       Capacitor-only).
+    5. The textarea label switches from "Descriptor or xpub" to
+       just "Descriptor" — hardware wallets export output
+       descriptors more often than bare xpubs, and the label
+       keeps both possible without over-explaining.
+-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>TallyKeep — Mobile — Add Strongbox · 1 of 3 · Input</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="_shared/tokens.css">
+<link rel="stylesheet" href="_shared/shell.css">
+<style>
+  .phone-screen { background: var(--color-bg); }
+
+  /* ---------- Wizard header ---------- */
+  .app-bar {
+    height: var(--mobile-app-bar);
+    flex-shrink: 0;
+    display: grid;
+    grid-template-columns: 44px 1fr 44px;
+    align-items: center;
+    padding: 0 var(--space-2);
+    background: var(--color-surface);
+    border-bottom: 1px solid var(--color-border);
+  }
+  .app-bar .back-btn {
+    width: 36px; height: 36px;
+    display: inline-flex; align-items: center; justify-content: center;
+    background: transparent; border: 0;
+    border-radius: var(--radius-md);
+    color: var(--color-text);
+    cursor: pointer;
+    justify-self: start;
+    margin-left: var(--space-2);
+  }
+  .app-bar .back-btn:hover { background: var(--color-bg); }
+  .app-bar .back-btn svg {
+    width: 22px; height: 22px;
+    stroke: currentColor; fill: none;
+    stroke-width: 2; stroke-linecap: round; stroke-linejoin: round;
+  }
+  .step-counter {
+    text-align: center;
+    font-size: var(--font-size-xs);
+    font-weight: var(--font-weight-semibold);
+    color: var(--color-text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    line-height: 1;
+  }
+
+  .scroll-area {
+    flex: 1;
+    overflow-y: auto;
+    padding: var(--space-4) var(--space-4) var(--space-5);
+  }
+
+  .step-head { margin-bottom: var(--space-4); }
+  .step-heading {
+    font-size: var(--font-size-lg);
+    font-weight: var(--font-weight-semibold);
+    color: var(--color-text);
+    line-height: var(--line-height-tight);
+    margin: 0;
+    letter-spacing: -0.01em;
+  }
+
+  /* ---------- Vendor picker ---------- */
+  .source-block { margin-bottom: var(--space-4); }
+  .field-label {
+    font-size: var(--font-size-xs);
+    color: var(--color-text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    font-weight: var(--font-weight-semibold);
+    display: block;
+    margin: var(--space-2) 0 var(--space-2);
+  }
+  .field-label .optional {
+    text-transform: none;
+    color: var(--color-text-dim);
+    font-weight: var(--font-weight-normal);
+    letter-spacing: 0;
+    margin-left: var(--space-2);
+  }
+  .select-wrap { position: relative; }
+  .select-wrap select {
+    width: 100%;
+    padding: var(--space-3);
+    background: var(--color-surface);
+    border: 1px solid var(--color-border-strong);
+    border-radius: var(--radius-md);
+    font-family: inherit;
+    font-size: var(--font-size-base);
+    color: var(--color-text);
+    appearance: none;
+    cursor: pointer;
+  }
+  .select-wrap select:focus {
+    outline: none;
+    border-color: var(--color-border-focus);
+    box-shadow: 0 0 0 2px var(--color-primary-soft);
+  }
+  .select-wrap::after {
+    content: '';
+    position: absolute;
+    top: 50%; right: var(--space-3);
+    width: 8px; height: 8px;
+    border-right: 2px solid var(--color-text-muted);
+    border-bottom: 2px solid var(--color-text-muted);
+    transform: translateY(-75%) rotate(45deg);
+    pointer-events: none;
+  }
+
+  /* ---------- Vendor-specific hint banner ---------- */
+  .wallet-hint {
+    margin-top: var(--space-3);
+    padding: var(--space-3);
+    background: var(--color-info-soft);
+    border: 1px solid var(--color-info-border);
+    border-radius: var(--radius-md);
+    color: var(--color-info-text-on-soft);
+    font-size: var(--font-size-sm);
+    line-height: var(--line-height-default);
+    display: flex;
+    gap: var(--space-2);
+    align-items: flex-start;
+  }
+  .wallet-hint .hint-icon {
+    width: 18px; height: 18px; flex-shrink: 0;
+    stroke: currentColor; fill: none;
+    stroke-width: 2; stroke-linecap: round; stroke-linejoin: round;
+    margin-top: 1px;
+  }
+  .wallet-hint .hint-title {
+    font-weight: var(--font-weight-semibold);
+    margin: 0 0 2px;
+  }
+  .wallet-hint .hint-body { margin: 0; }
+  .wallet-hint code {
+    font-family: var(--font-mono);
+    font-size: 0.95em;
+    background: rgba(0,0,0,0.04);
+    padding: 1px 4px;
+    border-radius: var(--radius-sm);
+  }
+
+  /* ---------- Descriptor input ---------- */
+  .descriptor-block { margin-top: var(--space-3); }
+  .descriptor-input-wrap { position: relative; }
+  .descriptor-textarea {
+    width: 100%;
+    min-height: 120px;
+    padding: var(--space-3);
+    padding-right: 72px;
+    background: var(--color-surface);
+    border: 1px solid var(--color-border-strong);
+    border-radius: var(--radius-md);
+    font-family: var(--font-mono);
+    font-size: var(--font-size-sm);
+    color: var(--color-text);
+    line-height: 1.5;
+    resize: vertical;
+  }
+  .descriptor-textarea::placeholder { color: var(--color-text-dim); }
+  .descriptor-textarea:focus {
+    outline: none;
+    border-color: var(--color-border-focus);
+    box-shadow: 0 0 0 2px var(--color-primary-soft);
+  }
+  .paste-btn {
+    position: absolute;
+    top: var(--space-2);
+    right: var(--space-2);
+    padding: var(--space-1) var(--space-3);
+    background: var(--color-surface);
+    border: 1px solid var(--color-border-strong);
+    border-radius: var(--radius-pill);
+    font-family: inherit;
+    font-size: var(--font-size-xs);
+    font-weight: var(--font-weight-semibold);
+    color: var(--color-text);
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+  }
+  .paste-btn:hover { background: var(--color-bg); }
+  .paste-btn svg { width: 12px; height: 12px; stroke: currentColor; fill: none; stroke-width: 2; }
+
+  /* ---------- Alt-input affordances (QR + file) ---------- */
+  .alt-inputs {
+    margin-top: var(--space-3);
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--space-2);
+  }
+  .alt-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-2);
+    padding: var(--space-2) var(--space-3);
+    background: var(--color-surface);
+    border: 1px solid var(--color-border-strong);
+    border-radius: var(--radius-md);
+    font-family: inherit;
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-weight-medium);
+    color: var(--color-text);
+    cursor: pointer;
+  }
+  .alt-btn:hover { background: var(--color-bg); }
+  .alt-btn svg {
+    width: 16px; height: 16px;
+    stroke: currentColor; fill: none;
+    stroke-width: 2; stroke-linecap: round; stroke-linejoin: round;
+  }
+
+  /* ---------- Wizard footer ---------- */
+  .wizard-footer {
+    flex-shrink: 0;
+    padding: var(--space-3) var(--space-4) var(--space-4);
+    background: var(--color-surface);
+    border-top: 1px solid var(--color-border);
+  }
+  .wizard-cta {
+    width: 100%;
+    padding: var(--space-3) var(--space-4);
+    background: var(--color-primary);
+    color: var(--color-on-primary);
+    border: 0;
+    border-radius: var(--radius-md);
+    font-family: inherit;
+    font-size: var(--font-size-base);
+    font-weight: var(--font-weight-semibold);
+    cursor: pointer;
+  }
+  .wizard-cta:hover { background: var(--color-primary-strong); }
+  .wizard-cta:disabled {
+    background: var(--color-border);
+    color: var(--color-text-dim);
+    cursor: not-allowed;
+  }
+</style>
+</head>
+<body>
+
+<div class="mockup-meta">
+  <strong>Mobile — Add Strongbox · 1 of 3 · Input</strong> ·
+  <span class="status-validated">validated</span> ·
+  2026-05-14 · 360×800
+</div>
+
+<div class="phone-frame">
+  <div class="phone-screen">
+
+    <div class="app-bar">
+      <button class="back-btn" aria-label="Back to Home">
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <polyline points="15 6 9 12 15 18"/>
+        </svg>
+      </button>
+      <div class="step-counter">Step 1 of 3</div>
+      <div></div>
+    </div>
+
+    <div class="scroll-area">
+
+      <div class="step-head">
+        <h1 class="step-heading">Add a Strongbox</h1>
+      </div>
+
+      <div class="source-block">
+        <label class="field-label" for="vendor-pick">
+          Hardware wallet <span class="optional">optional</span>
+        </label>
+        <div class="select-wrap">
+          <select id="vendor-pick">
+            <option value="">Don't specify</option>
+            <option value="airgapped">Airgapped laptop</option>
+            <option value="bitbox02">BitBox02</option>
+            <option value="coldcard" selected>Coldcard</option>
+            <option value="jade">Jade</option>
+            <option value="ledger">Ledger</option>
+            <option value="sparrow-signer">Sparrow (as signer)</option>
+            <option value="specter-diy">Specter DIY</option>
+            <option value="trezor">Trezor</option>
+            <option value="other">Other…</option>
+          </select>
+        </div>
+
+        <!-- Vendor-specific hint banner (renders when a vendor is picked).
+             Coldcard is the example case rendered here. -->
+        <div class="wallet-hint" role="note">
+          <svg class="hint-icon" viewBox="0 0 24 24" aria-hidden="true">
+            <circle cx="12" cy="12" r="10"/>
+            <line x1="12" y1="8"  x2="12" y2="13"/>
+            <line x1="12" y1="16" x2="12" y2="16.5"/>
+          </svg>
+          <div>
+            <p class="hint-title">From Coldcard — export the wallet descriptor.</p>
+            <p class="hint-body">
+              On Coldcard: <code>Advanced/Tools → Export Wallet →
+              Generic JSON</code> to SD card, or <code>Export Wallet
+              → QR</code> if your model supports it. Use Scan QR or
+              Upload file below.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <div class="descriptor-block">
+        <label class="field-label" for="descriptor-input">Descriptor</label>
+        <div class="descriptor-input-wrap">
+          <textarea id="descriptor-input" class="descriptor-textarea"
+                    placeholder="wpkh([abc12345/84h/0h/0h]xpub6CUGRUo..."
+                    aria-label="Descriptor"></textarea>
+          <button class="paste-btn" type="button" aria-label="Paste from clipboard">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <rect x="9" y="3"  width="6"  height="4"  rx="1"/>
+              <rect x="5" y="5"  width="14" height="16" rx="2"/>
+            </svg>
+            Paste
+          </button>
+        </div>
+
+        <!-- Alt-input affordances. Scan QR is hidden in browser build
+             per ADR-0007 absence-of-affordance; this mockup represents
+             the Capacitor target. -->
+        <div class="alt-inputs">
+          <button class="alt-btn" type="button" aria-label="Scan a QR code with the camera">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <rect x="3"  y="3"  width="7" height="7" rx="1"/>
+              <rect x="14" y="3"  width="7" height="7" rx="1"/>
+              <rect x="3"  y="14" width="7" height="7" rx="1"/>
+              <line x1="14" y1="14" x2="14" y2="17"/>
+              <line x1="14" y1="20" x2="17" y2="20"/>
+              <line x1="17" y1="14" x2="17" y2="17"/>
+              <line x1="20" y1="17" x2="20" y2="20"/>
+            </svg>
+            Scan QR
+          </button>
+          <button class="alt-btn" type="button" aria-label="Upload a descriptor file">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M 14 3 H 7 a 2 2 0 0 0 -2 2 v 14 a 2 2 0 0 0 2 2 h 10 a 2 2 0 0 0 2 -2 V 8 Z"/>
+              <polyline points="14 3 14 8 19 8"/>
+              <line x1="12" y1="12" x2="12" y2="17"/>
+              <polyline points="10 14 12 12 14 14"/>
+            </svg>
+            Upload file
+          </button>
+        </div>
+      </div>
+
+    </div>
+
+    <div class="wizard-footer">
+      <button class="wizard-cta" type="button" disabled>Continue</button>
+    </div>
+
+  </div>
+</div>
+
+</body>
+</html>

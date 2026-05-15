@@ -70,6 +70,8 @@ def _to_response(holding: Holding) -> HoldingResponse:
         descriptor_ids=list(holding.descriptor_ids),
         custodial_provider_id=holding.custodial_provider_id,
         signing_device_label=holding.signing_device_label,
+        vendor=holding.vendor,
+        signing_metadata_present=holding.signing_metadata_present,
         required_signers=holding.required_signers,
         total_signers=holding.total_signers,
         timelock_blocks=holding.timelock_blocks,
@@ -142,6 +144,8 @@ async def create_strongbox(
             descriptors=body.descriptors,
             adapter=_ADAPTER,
             signing_device_label=body.signing_device_label,
+            vendor=body.vendor,
+            signing_metadata_present=body.signing_metadata_present,
         )
         session.commit()
     except DescriptorAlreadyExists as exc:

@@ -15,7 +15,7 @@ from __future__ import annotations
 from datetime import datetime
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from tallykeep.schemas.treasury import CustodialProviderInput
 from tallykeep.domain.enums import (
@@ -85,9 +85,33 @@ class PurseCreate(_HoldingCreateBase):
     descriptors: list[DescriptorInput] = Field(..., min_length=1)
 
 
+STRONGBOX_VENDOR_SLUGS: frozenset[str] = frozenset({
+    "coldcard",
+    "trezor",
+    "ledger",
+    "jade",
+    "bitbox02",
+    "specter_diy",
+    "sparrow",
+    "airgapped_laptop",
+    "other",
+})
+
+
 class StrongboxCreate(_HoldingCreateBase):
     descriptors: list[DescriptorInput] = Field(..., min_length=1)
     signing_device_label: str | None = Field(default=None, max_length=200)
+    vendor: str | None = Field(default=None, max_length=50)
+    signing_metadata_present: bool | None = None
+
+    @model_validator(mode="after")
+    def _validate_vendor_slug(self) -> "StrongboxCreate":
+        if self.vendor is not None and self.vendor not in STRONGBOX_VENDOR_SLUGS:
+            raise ValueError(
+                f"Unknown vendor slug '{self.vendor}'. "
+                f"Accepted values: {sorted(STRONGBOX_VENDOR_SLUGS)}"
+            )
+        return self
 
 
 class VaultCreate(_HoldingCreateBase):
@@ -161,6 +185,8 @@ class HoldingResponse(BaseModel):
 
     # Strongbox
     signing_device_label: str | None = None
+    vendor: str | None = None
+    signing_metadata_present: bool | None = None
 
     # Vault
     required_signers: int | None = None

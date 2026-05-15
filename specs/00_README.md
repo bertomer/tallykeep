@@ -50,7 +50,14 @@ is dropped in favor of those events. The active iteration's scope
 lives in `next_iteration.md`; the deferred backlog with milestone
 tags lives in `future_iterations.md`.
 
-### Currently in scope (dev phase)
+### Dev-phase target scope
+
+What the dev phase aims to converge on. This is target state
+per `PROCESS.md §1` — not a checklist of what's live today.
+Already shipped lives in `shipped.md`; deferred items live in
+`future_iterations.md` with a milestone tag; questions
+blocking work live in `pre-implementation.md`.
+
 - Watch-only Holdings (Account, Purse, Strongbox, Vault) with descriptor-based wallets
 - Node integration via local `bitcoind` JSON-RPC plus ZeroMQ subscription for live chain events
 - PSBT construction, export (file and QR), re-import, and broadcast

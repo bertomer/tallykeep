@@ -227,4 +227,25 @@ Auto-sweep from Purse is post-shipping in current scope (see
 `future_iterations.md` "Holding-to-Holding sweeps beyond
 Account-originated").
 
-## Type-speci
+## Type-specific safeguards
+
+None at the Purse-type level. The relevant hygiene checks
+(address reuse, dust, suspected consolidation) apply to all
+non-Account Holdings and live in `concerns/observation.md`.
+
+The seed-backup disclosure (pending `seed-backup-disclosure`
+arbitration) is Purse-specific in that it applies to
+`ON_DEVICE_TK_GENERATED` and `ON_DEVICE_USER_IMPORTED` Purses —
+both modes where TallyKeep holds the seed.
+
+## Deferred
+
+| Item | Tracked in |
+|---|---|
+| Pairing-based PSBT roundtrip between TallyKeep instances | `future_iterations.md` |
+| Auto-sweep from an on-device Purse (and the broader Holding-to-Holding sweep UX) | `future_iterations.md` "Holding-to-Holding sweeps beyond Account-originated" |
+| `ON_DEVICE_USER_IMPORTED` upgrade flow details | `pre-implementation.md` `purse-upgrade-path` |
+| Seed-backup disclosure full system | `pre-implementation.md` `seed-backup-disclosure` |
+| Lightning support per Purse | `concerns/lightning_placeholder.md` + `future_iterations.md` "Lightning support" |
+| Receive in static / merchant mode | `future_iterations.md` |
+| Possible Purse / Strongbox vocabulary collapse (observation mode) | `future_iterations.md` "Possible Purse / Strongbox collapse" |

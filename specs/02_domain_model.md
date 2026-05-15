@@ -654,7 +654,7 @@ class UserProfile:
 
 There is **no** preset / tier / named-identity concept on
 `UserProfile`. Initial flag values are seeded by onboarding answers
-(see `09_feature_flags.md`); after onboarding the user toggles
+(see `concerns/feature_flags.md`); after onboarding the user toggles
 individual flags from Settings. The configuration is just the
 configuration.
 

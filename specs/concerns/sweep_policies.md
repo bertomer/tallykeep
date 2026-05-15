@@ -273,4 +273,34 @@ The same primitive supports user-driven rebalancing. Examples:
 
 Mechanics differ from Account-source sweeps: the SweepEngine
 constructs a PaymentRequest, the user signs (in-app on
-Capacitor f
+Capacitor for on-device Purses, externally for Strongbox / Vault),
+broadcast happens via the normal outflow flow. The sweep is
+driven by the policy but the signing remains user-controlled.
+
+UX for non-Account-source sweeps is deferred (per
+`future_iterations.md` "Holding-to-Holding sweeps beyond
+Account-originated"). The architectural primitive ships pre-
+shipping; only the UI surface is deferred.
+
+## What the user sees (target UX)
+
+The Treasury view shows, per Account Holding:
+
+- Active SweepPolicy summaries ("Auto-sweep weekly every Friday
+  at 03:00 to Strongbox").
+- "Sweep now" button.
+- Recent sweep history with status badges.
+
+For non-Account Holdings with outgoing SweepPolicies
+(rebalancing), the same panel appears on the Holding's detail
+page when that UX ships.
+
+Specific layout and component naming lives in `UI/README.md`
+and the iteration that ships the sweep-creation UI.
+
+## Deferred
+
+| Item | Tracked in |
+|---|---|
+| UX for Holding-to-Holding sweeps (non-Account source) | `future_iterations.md` "Holding-to-Holding sweeps beyond Account-originated" |
+| DCA (recurring scheduled purchases) — depends on order placement | `future_iterations.md` "DCA primitive" |

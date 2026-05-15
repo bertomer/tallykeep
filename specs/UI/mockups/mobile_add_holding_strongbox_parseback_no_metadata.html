@@ -1,0 +1,419 @@
+<!--
+  Title: Mobile — Add Strongbox · step 2 · Parse-back (no signing metadata)
+  Status: validated  (Rémy greenlight 2026-05-14 closing the
+                      Strongbox-wizard design pass)
+  Date last touched: 2026-05-14
+  Replaces: an earlier draft on disk that surfaced a full warning
+            banner between parse-card and addresses-card. Rémy's
+            call 2026-05-14: don't repeat the warning post-commit
+            — the user was already informed at step 1's advisory.
+            Step 2 just confirms what TallyKeep couldn't determine.
+
+  Design notes:
+  - Variant of mobile_add_holding_strongbox_parseback.html for the
+    bare-xpub case where master-fingerprint + derivation-path
+    columns are NULL. Triggered when the user continued past the
+    step-1 advisory (mobile_add_holding_strongbox_input_advisory_no_metadata.html).
+  - The user has ALREADY been informed at step 1. Step 2 doesn't
+    repeat the lecture — it just shows honestly which row we
+    couldn't fill: the "Derivation" row in the parse-card renders
+    in the warning palette ("not provided" in warning text colour,
+    yellow tinted row background, small info icon). Other rows
+    stay neutral.
+  - No separate warning banner. The row tint is the cue.
+    Information density on parse-back stays tight — name preview,
+    parse-card, addresses-card, CTA. Same shape as the default
+    parse-back.
+  - Resolution surface for this warning post-Holding-create is TBD
+    pending the security-health iteration's framing review (Rémy
+    pushed back 2026-05-14 on "Security health" as a product-
+    design concept the user encounters directly). The advisory's
+    in-wizard signal continues here via the row tint; where the
+    user later acts on it is the security-health iteration's call.
+  - Auto-name still derives from the vendor pick. This mockup
+    renders Trezor — paired with the step-1 advisory mockup which
+    also renders Trezor (consistent narrative: user came from
+    Trezor Suite "Show xpub", saw advisory at step 1, chose to
+    continue, lands here).
+  - Tap-target on the row's info icon could open a small inline
+    explanation in production (concrete copy lands when the
+    resolution surface above is settled — until then, leaving the
+    icon as a visual cue without a specific tooltip target).
+    Static mockup leaves the icon present without the expand
+    state.
+-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>TallyKeep — Mobile — Add Strongbox · 2 of 3 · Parse-back (no metadata)</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="_shared/tokens.css">
+<link rel="stylesheet" href="_shared/shell.css">
+<style>
+  .phone-screen { background: var(--color-bg); }
+
+  .app-bar {
+    height: var(--mobile-app-bar);
+    flex-shrink: 0;
+    display: grid;
+    grid-template-columns: 44px 1fr 44px;
+    align-items: center;
+    padding: 0 var(--space-2);
+    background: var(--color-surface);
+    border-bottom: 1px solid var(--color-border);
+  }
+  .app-bar .back-btn {
+    width: 36px; height: 36px;
+    display: inline-flex; align-items: center; justify-content: center;
+    background: transparent; border: 0;
+    border-radius: var(--radius-md);
+    color: var(--color-text);
+    cursor: pointer;
+    justify-self: start;
+    margin-left: var(--space-2);
+  }
+  .app-bar .back-btn:hover { background: var(--color-bg); }
+  .app-bar .back-btn svg {
+    width: 22px; height: 22px;
+    stroke: currentColor; fill: none;
+    stroke-width: 2; stroke-linecap: round; stroke-linejoin: round;
+  }
+  .step-counter {
+    text-align: center;
+    font-size: var(--font-size-xs);
+    font-weight: var(--font-weight-semibold);
+    color: var(--color-text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    line-height: 1;
+  }
+
+  .scroll-area {
+    flex: 1;
+    overflow-y: auto;
+    padding: var(--space-5) var(--space-4);
+  }
+
+  .step-head { margin-bottom: var(--space-4); }
+  .step-heading {
+    font-size: var(--font-size-lg);
+    font-weight: var(--font-weight-semibold);
+    color: var(--color-text);
+    line-height: var(--line-height-tight);
+    margin: 0;
+    letter-spacing: -0.01em;
+  }
+  .step-sub {
+    font-size: var(--font-size-sm);
+    color: var(--color-text-muted);
+    line-height: var(--line-height-default);
+    margin: var(--space-2) 0 0;
+  }
+
+  /* ---------- Auto-name preview (iron stripe) ---------- */
+  .name-preview {
+    margin-bottom: var(--space-4);
+    padding: var(--space-3) var(--space-4);
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-left: 4px solid var(--color-holding-strongbox);
+    border-radius: var(--radius-md);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-3);
+  }
+  .name-preview .name-label {
+    font-size: var(--font-size-xs);
+    color: var(--color-text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    font-weight: var(--font-weight-semibold);
+    display: block;
+    margin-bottom: 2px;
+  }
+  .name-preview .name-value {
+    font-size: var(--font-size-base);
+    font-weight: var(--font-weight-semibold);
+    color: var(--color-text);
+  }
+  .name-preview .rename-btn {
+    background: transparent;
+    border: 1px solid var(--color-border-strong);
+    border-radius: var(--radius-pill);
+    padding: var(--space-1) var(--space-3);
+    font-family: inherit;
+    font-size: var(--font-size-xs);
+    font-weight: var(--font-weight-semibold);
+    color: var(--color-text);
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    flex-shrink: 0;
+  }
+  .name-preview .rename-btn:hover { background: var(--color-bg); }
+  .name-preview .rename-btn svg { width: 12px; height: 12px; stroke: currentColor; fill: none; stroke-width: 2; }
+
+  /* ---------- Parse-back card ---------- */
+  .parse-card {
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    padding: var(--space-4);
+    margin-bottom: var(--space-3);
+    overflow: hidden;
+  }
+  .parse-card .row {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: var(--space-3);
+    padding: var(--space-2) 0;
+  }
+  .parse-card .row + .row { border-top: 1px solid var(--color-border); }
+  .parse-card .row .key {
+    font-size: var(--font-size-xs);
+    color: var(--color-text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    font-weight: var(--font-weight-semibold);
+  }
+  .parse-card .row .val {
+    font-size: var(--font-size-sm);
+    color: var(--color-text);
+    font-weight: var(--font-weight-medium);
+    text-align: right;
+  }
+  .parse-card .row .val.mono {
+    font-family: var(--font-mono);
+    font-weight: var(--font-weight-normal);
+  }
+
+  /* Advisory row tint — only the Derivation row carries this in the
+     no-metadata variant. Bleed the warning background to the card
+     edges via negative margin matching the card's horizontal
+     padding, so the tint reads as a band, not a floating pill. */
+  .parse-card .row.advisory {
+    background: var(--color-warning-soft);
+    margin-left: calc(-1 * var(--space-4));
+    margin-right: calc(-1 * var(--space-4));
+    padding-left: var(--space-4);
+    padding-right: var(--space-4);
+  }
+  .parse-card .row.advisory + .row { border-top-color: var(--color-warning-border); }
+  .parse-card .row.advisory .val { color: var(--color-warning-text-on-soft); }
+  .parse-card .row.advisory .val-with-icon {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .parse-card .row.advisory .info-icon {
+    width: 14px; height: 14px;
+    stroke: currentColor; fill: none;
+    stroke-width: 2; stroke-linecap: round; stroke-linejoin: round;
+    flex-shrink: 0;
+    cursor: pointer;
+  }
+
+  /* ---------- Addresses card ---------- */
+  .addresses-card {
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    padding: var(--space-3) var(--space-4) var(--space-4);
+    margin-bottom: var(--space-2);
+  }
+  .addresses-card .card-title {
+    font-size: var(--font-size-xs);
+    color: var(--color-text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    font-weight: var(--font-weight-semibold);
+    margin: var(--space-2) 0 var(--space-2);
+  }
+  .addresses-card .card-sub {
+    font-size: var(--font-size-xs);
+    color: var(--color-text-dim);
+    line-height: var(--line-height-default);
+    margin: 0 0 var(--space-3);
+  }
+  .addr-row {
+    display: grid;
+    grid-template-columns: 18px 1fr 28px;
+    align-items: center;
+    gap: var(--space-2);
+    padding: var(--space-2) 0;
+  }
+  .addr-row + .addr-row { border-top: 1px solid var(--color-border); }
+  .addr-row .idx {
+    font-size: var(--font-size-xs);
+    color: var(--color-text-dim);
+    font-variant-numeric: tabular-nums;
+    text-align: right;
+  }
+  .addr-row .addr {
+    font-family: var(--font-mono);
+    font-size: var(--font-size-xs);
+    color: var(--color-text);
+    word-break: break-all;
+    line-height: 1.35;
+  }
+  .copy-icon-btn {
+    width: 28px; height: 28px;
+    display: inline-flex; align-items: center; justify-content: center;
+    background: transparent;
+    border: 0;
+    border-radius: var(--radius-sm);
+    color: var(--color-text-dim);
+    cursor: pointer;
+  }
+  .copy-icon-btn:hover { background: var(--color-bg); color: var(--color-text); }
+  .copy-icon-btn svg { width: 14px; height: 14px; stroke: currentColor; fill: none; stroke-width: 2; }
+
+  /* ---------- Wizard footer ---------- */
+  .wizard-footer {
+    flex-shrink: 0;
+    padding: var(--space-3) var(--space-4) var(--space-4);
+    background: var(--color-surface);
+    border-top: 1px solid var(--color-border);
+  }
+  .wizard-cta {
+    width: 100%;
+    padding: var(--space-3) var(--space-4);
+    background: var(--color-primary);
+    color: var(--color-on-primary);
+    border: 0;
+    border-radius: var(--radius-md);
+    font-family: inherit;
+    font-size: var(--font-size-base);
+    font-weight: var(--font-weight-semibold);
+    cursor: pointer;
+  }
+  .wizard-cta:hover { background: var(--color-primary-strong); }
+</style>
+</head>
+<body>
+
+<div class="mockup-meta">
+  <strong>Mobile — Add Strongbox · 2 of 3 · Parse-back (no signing metadata)</strong> ·
+  <span class="status-validated">validated</span> ·
+  2026-05-14 · 360×800
+</div>
+
+<div class="phone-frame">
+  <div class="phone-screen">
+
+    <div class="app-bar">
+      <button class="back-btn" aria-label="Back to descriptor input">
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <polyline points="15 6 9 12 15 18"/>
+        </svg>
+      </button>
+      <div class="step-counter">Step 2 of 3</div>
+      <div></div>
+    </div>
+
+    <div class="scroll-area">
+
+      <div class="step-head">
+        <h1 class="step-heading">Here's what we read</h1>
+        <p class="step-sub">
+          Check the first addresses match what your hardware wallet
+          (or its companion app) shows. If they don't, go back and
+          re-check the descriptor.
+        </p>
+      </div>
+
+      <div class="name-preview" aria-label="Strongbox name preview">
+        <div>
+          <span class="name-label">Will be named</span>
+          <span class="name-value">Trezor Strongbox</span>
+        </div>
+        <button class="rename-btn" type="button" aria-label="Rename this Strongbox">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M 4 20 L 4 16 L 16 4 L 20 8 L 8 20 Z"/>
+            <line x1="13" y1="7" x2="17" y2="11"/>
+          </svg>
+          Rename
+        </button>
+      </div>
+
+      <div class="parse-card" aria-label="Parsed descriptor metadata">
+        <div class="row">
+          <span class="key">Script type</span>
+          <span class="val">Native SegWit · P2WPKH</span>
+        </div>
+        <div class="row advisory" aria-label="Derivation path not provided in the descriptor">
+          <span class="key">Derivation</span>
+          <span class="val val-with-icon">
+            not provided
+            <svg class="info-icon" viewBox="0 0 24 24" aria-label="About missing derivation"
+                 role="img">
+              <circle cx="12" cy="12" r="10"/>
+              <line x1="12" y1="8"  x2="12" y2="13"/>
+              <line x1="12" y1="16" x2="12" y2="16.5"/>
+            </svg>
+          </span>
+        </div>
+        <div class="row">
+          <span class="key">Master key</span>
+          <span class="val mono">zpub6r…fT8Qn</span>
+        </div>
+      </div>
+
+      <div class="addresses-card" aria-label="First derived addresses">
+        <div class="card-title">First three addresses</div>
+        <p class="card-sub">
+          Open your hardware wallet (or Sparrow / Specter / its
+          companion app) and confirm these match the wallet's first
+          three receive addresses.
+        </p>
+
+        <div class="addr-row">
+          <span class="idx">0</span>
+          <span class="addr">bc1q8u3g9z6smr3hvcz5h0d6ehlz59rgkc8eq2nyff</span>
+          <button class="copy-icon-btn" type="button" aria-label="Copy address 0">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <rect x="9" y="3"  width="6"  height="4"  rx="1"/>
+              <rect x="5" y="5"  width="14" height="16" rx="2"/>
+            </svg>
+          </button>
+        </div>
+        <div class="addr-row">
+          <span class="idx">1</span>
+          <span class="addr">bc1q3vrxw8r60q5z2t8sd9xtuq3lnejwm0nczf9cdr</span>
+          <button class="copy-icon-btn" type="button" aria-label="Copy address 1">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <rect x="9" y="3"  width="6"  height="4"  rx="1"/>
+              <rect x="5" y="5"  width="14" height="16" rx="2"/>
+            </svg>
+          </button>
+        </div>
+        <div class="addr-row">
+          <span class="idx">2</span>
+          <span class="addr">bc1qz8nu0s7g5w9kphx2cm6mu4dljxv6trzfg2vmpw</span>
+          <button class="copy-icon-btn" type="button" aria-label="Copy address 2">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <rect x="9" y="3"  width="6"  height="4"  rx="1"/>
+              <rect x="5" y="5"  width="14" height="16" rx="2"/>
+            </svg>
+          </button>
+        </div>
+      </div>
+
+    </div>
+
+    <div class="wizard-footer">
+      <button class="wizard-cta" type="button">Looks right</button>
+    </div>
+
+  </div>
+</div>
+
+</body>
+</html>

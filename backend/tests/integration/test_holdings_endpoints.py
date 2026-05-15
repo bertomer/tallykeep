@@ -227,6 +227,33 @@ class TestCreateStrongbox:
         # discrepancy in M5).
         assert response.status_code == 201
 
+    def test_create_strongbox_with_vendor_persists_slug(self, app_with_db) -> None:
+        client, _ = app_with_db
+        body = _strongbox_body()
+        body["vendor"] = "coldcard"
+        response = client.post("/api/v1/holdings/strongbox", json=body)
+        assert response.status_code == 201, response.text
+        assert response.json()["vendor"] == "coldcard"
+
+    def test_create_strongbox_with_signing_metadata_present_false(
+        self, app_with_db
+    ) -> None:
+        client, _ = app_with_db
+        body = _strongbox_body()
+        body["signing_metadata_present"] = False
+        response = client.post("/api/v1/holdings/strongbox", json=body)
+        assert response.status_code == 201, response.text
+        assert response.json()["signing_metadata_present"] is False
+
+    def test_create_strongbox_with_unknown_vendor_slug_rejected(
+        self, app_with_db
+    ) -> None:
+        client, _ = app_with_db
+        body = _strongbox_body()
+        body["vendor"] = "unknownvendor"
+        response = client.post("/api/v1/holdings/strongbox", json=body)
+        assert response.status_code == 422
+
 
 class TestCreateVault:
     def test_create_persists_multisig_metadata(self, app_with_db) -> None:

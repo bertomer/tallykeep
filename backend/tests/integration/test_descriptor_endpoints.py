@@ -361,3 +361,60 @@ def test_validate_invalid_expression_returns_parse_error(app_with_db) -> None:
     assert response.status_code == 422
     detail = response.json()["detail"]
     assert detail["error_code"] == "PARSE_ERROR"
+
+
+# --- signing_metadata_present flag -------------------------------------------
+
+# Descriptor with key-origin brackets ([fingerprint/path]) — hardware wallets
+# export these when the user selects "export descriptor" rather than just xpub.
+_WPKH_WITH_KEY_ORIGIN = (
+    "wpkh([abc12345/84h/0h/0h]"
+    "xpub6BosfCnifzxcFwrSzQiqu2DBVTshkCXacvNsWGYJVVhhawA7d4R5WSWGFNbi8Aw6ZRc1brxMyWMzG3DSSSSoekkudhUd9yLb6qx39T9nMdj"
+    "/0/*)"
+)
+
+
+def test_validate_full_descriptor_with_key_origin_sets_flag_true(app_with_db) -> None:
+    client, _ = app_with_db
+    response = client.post(
+        "/api/v1/descriptors/validate",
+        json={"input": _WPKH_WITH_KEY_ORIGIN, "network": "mainnet"},
+    )
+    assert response.status_code == 200, response.text
+    data = response.json()
+    assert data["script_type"] == "p2wpkh"
+    assert data["is_multisig"] is False
+    assert data["signing_metadata_present"] is True
+
+
+def test_validate_bare_xpub_descriptor_sets_flag_false(app_with_db) -> None:
+    client, _ = app_with_db
+    response = client.post(
+        "/api/v1/descriptors/validate",
+        json={"input": WPKH_MAINNET, "network": "mainnet"},
+    )
+    assert response.status_code == 200, response.text
+    data = response.json()
+    assert data["signing_metadata_present"] is False
+
+
+def test_validate_multisig_descriptor_returns_is_multisig_true(app_with_db) -> None:
+    client, _ = app_with_db
+    response = client.post(
+        "/api/v1/descriptors/validate",
+        json={"input": _WSH_MULTISIG, "network": "mainnet"},
+    )
+    assert response.status_code == 200, response.text
+    data = response.json()
+    assert data["is_multisig"] is True
+    assert data["signing_metadata_present"] is False
+
+
+def test_validate_single_address_returns_typed_error(app_with_db) -> None:
+    client, _ = app_with_db
+    response = client.post(
+        "/api/v1/descriptors/validate",
+        json={"input": "1A1zP1eP5QGefi2DMPTfTL5SLmv7Divf", "network": "mainnet"},
+    )
+    assert response.status_code == 422
+    assert response.json()["detail"]["error_code"] == "SINGLE_ADDRESS_INPUT"

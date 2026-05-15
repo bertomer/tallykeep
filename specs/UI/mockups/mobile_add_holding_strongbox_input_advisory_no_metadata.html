@@ -1,0 +1,435 @@
+<!--
+  Title: Mobile — Add Strongbox · step 1 · advisory (no signing metadata)
+  Status: validated  (Rémy greenlight 2026-05-14 closing the
+                      Strongbox-wizard design pass — final advisory
+                      copy locked: "Missing derivation metadata. /
+                      Your hardware wallet may refuse to sign
+                      transactions with this descriptor. /
+                      Receiving funds will work as expected. /
+                      Re-export your descriptor to enable signing,
+                      or continue as is.")
+  Date last touched: 2026-05-14
+  Replaces: nothing on disk. Sibling to the input default and the
+            two error variants. Introduces the "advisory" shape
+            (warning palette, CTA enabled) that sits between the
+            blocking-error and the no-issue states.
+
+  Design notes:
+  - Triggers when the backend descriptor-validate parses the pasted
+    input successfully BUT the descriptor carries no key-origin
+    brackets (no `[fingerprint/path]`). Typical sources: Trezor
+    Suite "Show xpub", Ledger Live xpub view, Phoenix "Wallet
+    final", BlueWallet xpub export.
+  - The user is told BEFORE they commit. Surfacing this on step 2
+    after the user has clicked Continue would feel like a gotcha
+    ("AH YOU MESSED UP" — Rémy 2026-05-14). Step 1 advisory lets
+    the user re-export now if they want to spend later, or
+    proceed knowing the trade-off.
+  - Three distinct footer-error shapes now exist in the wizard:
+    1. **Inline error** (single address) — danger palette, CTA
+       disabled. Blocking; structural input invalid.
+    2. **Redirect error** (multisig) — warning palette, CTA
+       disabled, secondary redirect CTA inside the error region.
+       Blocking; input belongs in a different wizard.
+    3. **Advisory** (this state — missing metadata) — warning
+       palette, CTA ENABLED, smaller / lighter visual treatment.
+       Non-blocking; informational. New pattern, locked here.
+  - Visual differentiation from the redirect error: smaller font
+    (xs vs sm), tighter padding, no secondary CTA inside, no big
+    title-and-body two-line structure. One-paragraph advisory in
+    a compact band above the enabled Continue button.
+  - Vendor hint banner stays visible alongside the advisory. The
+    two have different conceptual roles: hint banner is *about
+    the wallet* (how to export); advisory is *about what was
+    pasted* (we noticed something). The hint banner content for
+    Trezor (rendered here) specifically points at the
+    "Show descriptor" path that produces a full descriptor, so
+    a re-paste via that path resolves the advisory naturally.
+  - Vendor rendered as Trezor (most common bare-xpub origin via
+    Trezor Suite's default xpub view).
+  - The pasted value is shown as a bare zpub — backend wraps it
+    in `wpkh(zpub.../0/*)#checksum` server-side; the descriptor
+    column stores the wrapped form; master_fingerprint and
+    derivation_path columns stay NULL.
+-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>TallyKeep — Mobile — Add Strongbox · 1 of 3 · No-metadata advisory</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="_shared/tokens.css">
+<link rel="stylesheet" href="_shared/shell.css">
+<style>
+  .phone-screen { background: var(--color-bg); }
+
+  .app-bar {
+    height: var(--mobile-app-bar);
+    flex-shrink: 0;
+    display: grid;
+    grid-template-columns: 44px 1fr 44px;
+    align-items: center;
+    padding: 0 var(--space-2);
+    background: var(--color-surface);
+    border-bottom: 1px solid var(--color-border);
+  }
+  .app-bar .back-btn {
+    width: 36px; height: 36px;
+    display: inline-flex; align-items: center; justify-content: center;
+    background: transparent; border: 0;
+    border-radius: var(--radius-md);
+    color: var(--color-text);
+    cursor: pointer;
+    justify-self: start;
+    margin-left: var(--space-2);
+  }
+  .app-bar .back-btn svg {
+    width: 22px; height: 22px;
+    stroke: currentColor; fill: none;
+    stroke-width: 2; stroke-linecap: round; stroke-linejoin: round;
+  }
+  .step-counter {
+    text-align: center;
+    font-size: var(--font-size-xs);
+    font-weight: var(--font-weight-semibold);
+    color: var(--color-text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    line-height: 1;
+  }
+
+  .scroll-area {
+    flex: 1;
+    overflow-y: auto;
+    padding: var(--space-4) var(--space-4) var(--space-5);
+  }
+
+  .step-head { margin-bottom: var(--space-4); }
+  .step-heading {
+    font-size: var(--font-size-lg);
+    font-weight: var(--font-weight-semibold);
+    color: var(--color-text);
+    line-height: var(--line-height-tight);
+    margin: 0;
+    letter-spacing: -0.01em;
+  }
+
+  .source-block { margin-bottom: var(--space-4); }
+  .field-label {
+    font-size: var(--font-size-xs);
+    color: var(--color-text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    font-weight: var(--font-weight-semibold);
+    display: block;
+    margin: var(--space-2) 0 var(--space-2);
+  }
+  .field-label .optional {
+    text-transform: none;
+    color: var(--color-text-dim);
+    font-weight: var(--font-weight-normal);
+    letter-spacing: 0;
+    margin-left: var(--space-2);
+  }
+  .select-wrap { position: relative; }
+  .select-wrap select {
+    width: 100%;
+    padding: var(--space-3);
+    background: var(--color-surface);
+    border: 1px solid var(--color-border-strong);
+    border-radius: var(--radius-md);
+    font-family: inherit;
+    font-size: var(--font-size-base);
+    color: var(--color-text);
+    appearance: none;
+    cursor: pointer;
+  }
+  .select-wrap::after {
+    content: '';
+    position: absolute;
+    top: 50%; right: var(--space-3);
+    width: 8px; height: 8px;
+    border-right: 2px solid var(--color-text-muted);
+    border-bottom: 2px solid var(--color-text-muted);
+    transform: translateY(-75%) rotate(45deg);
+    pointer-events: none;
+  }
+
+  /* ---------- Vendor-specific hint banner ---------- */
+  .wallet-hint {
+    margin-top: var(--space-3);
+    padding: var(--space-3);
+    background: var(--color-info-soft);
+    border: 1px solid var(--color-info-border);
+    border-radius: var(--radius-md);
+    color: var(--color-info-text-on-soft);
+    font-size: var(--font-size-sm);
+    line-height: var(--line-height-default);
+    display: flex;
+    gap: var(--space-2);
+    align-items: flex-start;
+  }
+  .wallet-hint .hint-icon {
+    width: 18px; height: 18px; flex-shrink: 0;
+    stroke: currentColor; fill: none;
+    stroke-width: 2; stroke-linecap: round; stroke-linejoin: round;
+    margin-top: 1px;
+  }
+  .wallet-hint .hint-title {
+    font-weight: var(--font-weight-semibold);
+    margin: 0 0 2px;
+  }
+  .wallet-hint .hint-body { margin: 0; }
+  .wallet-hint em {
+    font-style: normal;
+    font-weight: var(--font-weight-semibold);
+  }
+
+  /* ---------- Descriptor input ---------- */
+  .descriptor-block { margin-top: var(--space-3); }
+  .descriptor-input-wrap { position: relative; }
+  .descriptor-textarea {
+    width: 100%;
+    min-height: 120px;
+    padding: var(--space-3);
+    padding-right: 72px;
+    background: var(--color-surface);
+    border: 1px solid var(--color-border-strong);
+    border-radius: var(--radius-md);
+    font-family: var(--font-mono);
+    font-size: var(--font-size-sm);
+    color: var(--color-text);
+    line-height: 1.5;
+    resize: vertical;
+  }
+  .descriptor-textarea:focus {
+    outline: none;
+    border-color: var(--color-border-focus);
+    box-shadow: 0 0 0 2px var(--color-primary-soft);
+  }
+  .paste-btn {
+    position: absolute;
+    top: var(--space-2);
+    right: var(--space-2);
+    padding: var(--space-1) var(--space-3);
+    background: var(--color-surface);
+    border: 1px solid var(--color-border-strong);
+    border-radius: var(--radius-pill);
+    font-family: inherit;
+    font-size: var(--font-size-xs);
+    font-weight: var(--font-weight-semibold);
+    color: var(--color-text);
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+  }
+  .paste-btn svg { width: 12px; height: 12px; stroke: currentColor; fill: none; stroke-width: 2; }
+
+  /* ---------- Alt-input affordances ---------- */
+  .alt-inputs {
+    margin-top: var(--space-3);
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--space-2);
+  }
+  .alt-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-2);
+    padding: var(--space-2) var(--space-3);
+    background: var(--color-surface);
+    border: 1px solid var(--color-border-strong);
+    border-radius: var(--radius-md);
+    font-family: inherit;
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-weight-medium);
+    color: var(--color-text);
+    cursor: pointer;
+  }
+  .alt-btn svg {
+    width: 16px; height: 16px;
+    stroke: currentColor; fill: none;
+    stroke-width: 2; stroke-linecap: round; stroke-linejoin: round;
+  }
+
+  /* ---------- Wizard footer with advisory ---------- */
+  .wizard-footer {
+    flex-shrink: 0;
+    padding: var(--space-3) var(--space-4) var(--space-4);
+    background: var(--color-surface);
+    border-top: 1px solid var(--color-border);
+  }
+
+  /* Advisory shape: lighter than the redirect-error band — smaller
+     padding, smaller font, no big title-and-body two-line layout.
+     Single compact paragraph in warning palette. CTA stays
+     enabled below. */
+  .wizard-advisory {
+    margin-bottom: var(--space-3);
+    padding: var(--space-2) var(--space-3);
+    background: var(--color-warning-soft);
+    border: 1px solid var(--color-warning-border);
+    border-radius: var(--radius-md);
+    color: var(--color-warning-text-on-soft);
+    font-size: var(--font-size-xs);
+    line-height: 1.4;
+    display: flex;
+    gap: var(--space-2);
+    align-items: flex-start;
+  }
+  .wizard-advisory .adv-icon {
+    width: 14px; height: 14px; flex-shrink: 0;
+    stroke: currentColor; fill: none;
+    stroke-width: 2; stroke-linecap: round; stroke-linejoin: round;
+    margin-top: 1px;
+  }
+  .wizard-advisory .adv-body { margin: 0; }
+  .wizard-advisory .adv-body strong { font-weight: var(--font-weight-semibold); }
+
+  .wizard-cta {
+    width: 100%;
+    padding: var(--space-3) var(--space-4);
+    background: var(--color-primary);
+    color: var(--color-on-primary);
+    border: 0;
+    border-radius: var(--radius-md);
+    font-family: inherit;
+    font-size: var(--font-size-base);
+    font-weight: var(--font-weight-semibold);
+    cursor: pointer;
+  }
+  .wizard-cta:hover { background: var(--color-primary-strong); }
+</style>
+</head>
+<body>
+
+<div class="mockup-meta">
+  <strong>Mobile — Add Strongbox · 1 of 3 · Advisory (no signing metadata)</strong> ·
+  <span class="status-validated">validated</span> ·
+  2026-05-14 · 360×800
+</div>
+
+<div class="phone-frame">
+  <div class="phone-screen">
+
+    <div class="app-bar">
+      <button class="back-btn" aria-label="Back to Home">
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <polyline points="15 6 9 12 15 18"/>
+        </svg>
+      </button>
+      <div class="step-counter">Step 1 of 3</div>
+      <div></div>
+    </div>
+
+    <div class="scroll-area">
+
+      <div class="step-head">
+        <h1 class="step-heading">Add a Strongbox</h1>
+      </div>
+
+      <div class="source-block">
+        <label class="field-label" for="vendor-pick">
+          Hardware wallet <span class="optional">optional</span>
+        </label>
+        <div class="select-wrap">
+          <select id="vendor-pick">
+            <option value="">Don't specify</option>
+            <option value="airgapped">Airgapped laptop</option>
+            <option value="bitbox02">BitBox02</option>
+            <option value="coldcard">Coldcard</option>
+            <option value="jade">Jade</option>
+            <option value="ledger">Ledger</option>
+            <option value="sparrow-signer">Sparrow (as signer)</option>
+            <option value="specter-diy">Specter DIY</option>
+            <option value="trezor" selected>Trezor</option>
+            <option value="other">Other…</option>
+          </select>
+        </div>
+
+        <div class="wallet-hint" role="note">
+          <svg class="hint-icon" viewBox="0 0 24 24" aria-hidden="true">
+            <circle cx="12" cy="12" r="10"/>
+            <line x1="12" y1="8"  x2="12" y2="13"/>
+            <line x1="12" y1="16" x2="12" y2="16.5"/>
+          </svg>
+          <div>
+            <p class="hint-title">From Trezor — show the descriptor, not just the xpub.</p>
+            <p class="hint-body">
+              In Trezor Suite, open <em>Advanced view</em> and choose
+              <em>Show descriptor</em> for a complete export that
+              includes derivation info needed for spending.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <div class="descriptor-block">
+        <label class="field-label" for="descriptor-input">Descriptor</label>
+        <div class="descriptor-input-wrap">
+          <textarea id="descriptor-input" class="descriptor-textarea"
+                    aria-label="Descriptor">zpub6r2yk5b8VVnGSepg1k3Z2yY1q5jNJ7Hb9wF5dMaP3aF9pXfT8Qn</textarea>
+          <button class="paste-btn" type="button" aria-label="Paste from clipboard">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <rect x="9" y="3"  width="6"  height="4"  rx="1"/>
+              <rect x="5" y="5"  width="14" height="16" rx="2"/>
+            </svg>
+            Paste
+          </button>
+        </div>
+
+        <div class="alt-inputs">
+          <button class="alt-btn" type="button" aria-label="Scan a QR code with the camera">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <rect x="3"  y="3"  width="7" height="7" rx="1"/>
+              <rect x="14" y="3"  width="7" height="7" rx="1"/>
+              <rect x="3"  y="14" width="7" height="7" rx="1"/>
+              <line x1="14" y1="14" x2="14" y2="17"/>
+              <line x1="14" y1="20" x2="17" y2="20"/>
+              <line x1="17" y1="14" x2="17" y2="17"/>
+              <line x1="20" y1="17" x2="20" y2="20"/>
+            </svg>
+            Scan QR
+          </button>
+          <button class="alt-btn" type="button" aria-label="Upload a descriptor file">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M 14 3 H 7 a 2 2 0 0 0 -2 2 v 14 a 2 2 0 0 0 2 2 h 10 a 2 2 0 0 0 2 -2 V 8 Z"/>
+              <polyline points="14 3 14 8 19 8"/>
+              <line x1="12" y1="12" x2="12" y2="17"/>
+              <polyline points="10 14 12 12 14 14"/>
+            </svg>
+            Upload file
+          </button>
+        </div>
+      </div>
+
+    </div>
+
+    <div class="wizard-footer">
+      <div class="wizard-advisory" role="note">
+        <svg class="adv-icon" viewBox="0 0 24 24" aria-hidden="true">
+          <circle cx="12" cy="12" r="10"/>
+          <line x1="12" y1="8"  x2="12" y2="13"/>
+          <line x1="12" y1="16" x2="12" y2="16.5"/>
+        </svg>
+        <p class="adv-body">
+          <strong>Missing derivation metadata.</strong>
+          Your hardware wallet may refuse to sign transactions with
+          this descriptor. Receiving funds will work as expected.
+          Re-export your descriptor to enable signing, or continue
+          as is.
+        </p>
+      </div>
+      <button class="wizard-cta" type="button">Continue</button>
+    </div>
+
+  </div>
+</div>
+
+</body>
+</html>
