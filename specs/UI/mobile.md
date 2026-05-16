@@ -1989,3 +1989,288 @@ The wizard never exposes recovery material — spending keys live
 on the hardware wallet, on the user's side of the trust
 boundary.
 
+---
+
+## Add Holding — Account wizard
+
+Fourth and final per-type wizard. Reuses the same wizard shell
+introduced by Purse and refined for Strongbox / Vault. Design
+pass closed 2026-05-16 (Rémy greenlight on all four validated
+mockups); ships under ADR-0011 (2-key credential model) with
+v1 scope narrowed to Kraken.
+
+Unlike the descriptor-based wizards, the Account wizard does
+not parse a descriptor — it pairs TallyKeep with a user-created
+API key on the connected provider. The matrix of decisions the
+earlier Account-wizard drafts struggled with (Read-only vs
+Read+Withdraw permission, whitelist target picker, provider-side
+whitelist verification, no-Holdings handling) is retired by
+ADR-0011's 2-key model: this wizard captures **only the
+read-only credential**. The withdrawal credential is configured
+separately post-onboarding via the Account detail page's
+Withdraw affordance, in its own design pass (captured in
+`future_iterations.md` "Account withdrawal-key sub-flow").
+
+### Vocabulary lock
+
+- **"Provider"** — the user-facing umbrella term for the
+  connected service. Covers exchanges, brokers, and custodial
+  banks. Earlier drafts used "exchange," which is too narrow
+  (Swissquote is a broker; Lemon is a payments app; both are
+  legitimate `CustodialProvider` adapters). The Add Holding
+  picker's row description ("Held at an exchange or broker. They
+  hold the keys; you see balances.") stays as-is — provider is
+  the wizard-internal vocab, the picker stays banking-natural.
+- **"API Key" / "Private Key"** — TallyKeep's two input field
+  labels carry the provider's exact field names as muted
+  aliases (e.g., "Kraken: Clé API" / "Kraken: Clé privée") so
+  users mapping from the provider's create-key dialog don't
+  need to translate. Per-provider aliases live alongside the
+  adapter registration.
+- **"Read-only key"** — the credential captured by this wizard.
+  Wizard copy is explicit about this scope and forward-
+  references the separate withdrawal-key configuration without
+  insisting.
+- **"Auto-sweep"** — TallyKeep's term for SweepPolicy-driven
+  withdrawal. Surfaces only on the Step 3 capability-gated
+  suggestion card. The fuller policy concept lives in
+  `concerns/sweep_policies.md`.
+
+### Wizard shape (3 steps, parity with Purse / Strongbox / Vault)
+
+Step counter "STEP 1 OF 3 / 2 OF 3 / 3 OF 3". Back chevron at
+Step 1 returns to the Add Holding picker (sheet redismissed);
+at Step 2 returns to Step 1; at Step 3 (success) hidden — only
+path forward is "Done". Bottom-nav hidden during the wizard.
+
+**Sensitive-screen flag.** None of the Account-wizard steps
+carry `sensitive-screen={true}`. The API Key and Private Key
+strings are credentials with provider-side rate limits and
+whitelist defenses, not recovery material in the wallet-seed
+sense. Same shell-uniformity posture as Strongbox / Vault. The
+Private-Key input does hide its value by default (password
+field with reveal toggle) — that's a UX-level concern handled
+in the input component, not a screen-level sensitive-flag.
+
+### Screens
+
+**Step 1 — `mobile_add_holding_account_01_connect.html`.**
+Heading "Connect a provider," sub naming the breadth ("An
+exchange, broker, or custodial bank where you hold funds.
+TallyKeep observes your balance with a read-only key.
+Automated withdrawal can be configured separately."). Provider
+dropdown (searchable; v1 list = Kraken only — see ADR-0011 for
+the v1 scope cut). Per-provider helper banner appears once a
+provider is selected (info palette, compressed): create the
+read-only key on the provider, name it `TallyKeep Read`, enable
+only the balance-query permission, leave everything else off.
+Sub-banner warning (warning palette) about the provider's
+shown-once behavior: copy both keys before closing the dialog;
+losing one means deleting the key and creating a new one. Two
+input fields below: API Key (plain text input + Paste icon) and
+Private Key (password input + reveal eye-icon + Paste icon, no
+Copy affordance per the privacy-first-reveal memory). Continue
+disabled until both fields are non-empty.
+
+On Continue, the backend validates the credential against the
+provider's key-permissions endpoint:
+
+- Auth failure → inline error "Invalid API Key or Private Key,"
+  user re-pastes.
+- Permission overage (any permission beyond the single
+  balance-query scope) → danger band, see error variant below.
+- OK → backend persists encrypted credential, fires initial
+  poll, advances to Step 2.
+
+**Step 1 — error variant
+`mobile_add_holding_account_01_connect_error_overage.html`.**
+Same screen with a danger band below the credentials. Title
+"This key has too many permissions." Body explains TallyKeep's
+minimum-exposure posture, lists the specific overage
+permissions detected (verbatim from the provider's key-
+permissions response, using the provider's permission names),
+and tells the user to replace the keys on the provider with
+ones that have only the balance-query permission ticked.
+
+**Tap-to-clear coding rule (Rémy 2026-05-16).** When the user
+focuses either input field (API Key or Private Key) after a
+rejection, the implementation must clear **both** fields and
+dismiss the danger band in the same motion. The two keys are
+a *pair* from a single provider dialog; once rejected, they're
+deadweight. Holding stale text alongside a danger band creates
+half-stale state that confuses. Clean reset is honest. The tap-
+to-clear fires on focus event, not on edit, so the reset is
+visible the moment the user signals intent-to-edit. Paste-button
+usage doesn't trigger an additional clear (paste overwrites
+cleanly).
+
+**Step 2 — `mobile_add_holding_account_02_parseback.html`.**
+Heading "Here's what we read," sub "Last check before we save
+it — does this match what you set up on Kraken?". Auto-name
+preview card with the limestone left-stripe (`--color-holding-
+account`); value template "{Provider} account" with collision
+suffix; inline rename affordance.
+
+Parse-card rows, three on this step:
+
+1. **Provider** — display name only. No region / market
+   qualifier (earlier draft had "Global · USD / EUR / GBP pairs"
+   under Kraken; dropped — invented flavor text without a clean
+   generalization to other providers, plus the provider name
+   alone is sufficient identification).
+2. **Permission** — "Observe only" with the muted qualifier
+   "Read-only — this key cannot move funds." Scoped to *this
+   key*, not to TallyKeep in general — earlier draft said
+   "TallyKeep can watch, cannot move funds" which contradicted
+   the very-next-step auto-sweep suggestion. The 2-key model
+   makes the scoping precise.
+3. **Other assets** — cap-and-overflow display of non-BTC
+   balances detected at the provider ("USDT, ETH, ADA, + N
+   more"). Hidden when zero other assets. Earlier draft listed
+   asset values verbatim ("USDT 1,234 · ETH 0.05") and didn't
+   scale (a 150-position account would render awful). The
+   cap-and-overflow pattern confirms multi-asset detection
+   without committing to a values display; Account detail
+   handles the full multi-asset surface per pre-implementation
+   `multi-asset-aggregation`.
+
+No BTC balance row on this step — moves to Step 3 as the
+headline value.
+
+No withdrawal mention on this step. The wizard's single
+deferred-withdrawal forward-reference lives in Step 1's sub-
+heading. Step 2 is for confirmation, not for surfacing future
+capabilities.
+
+CTA label "Looks right" — same tonal shift as Purse / Strongbox
+/ Vault parsebacks (confirming, not just proceeding).
+
+**Step 3 — `mobile_add_holding_account_03_success.html`.**
+Centred success indicator + heading "{Provider} account
+connected" + sub "Your balance is live. It'll appear on Home
+alongside your other Holdings." Below the heading: headline
+balance card with the limestone left-stripe — single-unit
+display per the user's home `currency_preference` (sats by
+default, BTC if the user has switched; mockup renders the sats
+default). No spinner row — the balance was already polled at
+Step 1's credential validation.
+
+**Capability-gated suggestion card** below the balance card.
+Rendered iff the connected provider's adapter has
+`supports_withdrawal_keys = true`. Card carries:
+
+- Heading: "Keep these sats under your control"
+- Body: "{Provider} supports automated withdrawals. Let
+  TallyKeep move your balance to one of your Holdings when it
+  crosses a threshold you set."
+- Outlined CTA button: "Set up auto-sweep" — routes to the
+  withdrawal sub-flow.
+
+For providers with `supports_withdrawal_keys = false`, the
+suggestion card is absent (absence-of-affordance per ADR-0007).
+Step 3 then collapses to balance card + Done.
+
+Primary CTA in the wizard footer: "Done" — returns to Home,
+new Account appears in the Holdings list with the polled
+balance.
+
+### Reconcilability gauntlet answers
+
+1. *Trust boundary:* phone screen (UI) + backend (credential
+   validation, encrypted credential storage, polling against
+   the provider's API). The user's account at the provider sits
+   outside TallyKeep — TallyKeep is a client to the provider's
+   API on the user's behalf, with the user's own credentials.
+   The provider sees TallyKeep's IP and the API key; it does
+   not see the user's TallyKeep passphrase or any other
+   TallyKeep secret.
+2. *Keys and secrets:* the read-only API credential (API Key +
+   Private Key strings from the provider) lives encrypted at
+   rest on the TallyKeep backend, encrypted under the user's
+   passphrase per `03_data_model.md`. The Private Key string is
+   never re-displayed after Account creation; Account detail
+   shows only the last-4 characters for identification.
+   TallyKeep never has the user's provider-account password,
+   2FA secret, or any other credential beyond the API key pair.
+3. *Self-hosted vs hosted:* identical from the phone's POV.
+   Both backends store the encrypted credential, run the
+   polling schedule, and surface balance changes. Neither has
+   plaintext access to the credential outside of the
+   passphrase-unlocked session. Hosted-tier privacy notice (per
+   the onboarding hosted-welcome screen) covers the
+   "operationally TallyKeep-hosted backend sees this account's
+   activity" disclosure.
+4. *Confirmation honesty:* the success step's "{Provider}
+   account connected" message is shown only after the backend
+   has confirmed credential persistence AND the initial poll
+   has returned a balance — no optimistic claim before the
+   provider has actually confirmed the credential works. The
+   parseback's "Read-only — this key cannot move funds" copy
+   is honest about the wizard-scoped credential's actual
+   capability; it does not claim TallyKeep has no withdrawal
+   capability in general (which would contradict the
+   suggestion card on the next step and the withdrawal sub-flow
+   path).
+5. *Browser-only fallback:* the wizard is fully functional in
+   the browser build. No Capacitor-only capability is exercised
+   — no QR scan (irrelevant; API credentials are not standard
+   QR payloads), no biometric, no native secure-storage. The
+   passphrase-encrypted credential storage is uniform across
+   browser PWA and Capacitor.
+6. *Open-source and reproducibility:* credential validation
+   uses the open-source `ccxt` library (Python, MIT-licensed)
+   for provider API access. No closed-source dependency on the
+   Account path. The `CustodialProviderAdapter` ABC keeps
+   provider integrations swappable; adding an adapter is a
+   localized change.
+
+### Notes
+
+**Three steps, not four.** Sharpened during the design pass
+2026-05-16. Earlier drafts had a separate provider step and a
+separate credentials step; the collapse fixes three problems
+that surfaced in review: redundant guidance (Step 1's helper
+banner already taught the user; the dedicated credentials step
+re-stated it), a forgotten paste-warning (the shown-once warning
+belongs at the paste moment), and broken parity with
+Purse / Strongbox / Vault (3-step wizards). The collapsed Step 1
+carries the provider dropdown, helper banner, shown-once
+warning, and both credential inputs in a single coherent screen.
+
+**Read-only-only by design, per ADR-0011.** This wizard scopes
+deliberately narrower than the Account Holding type's full
+capability. The withdrawal credential is a separate
+configuration moment, on a separate user timeline, with its own
+design pass. The wizard's single forward-reference to that
+deferred capability lives in Step 1's sub-heading (informational)
+and the Step 3 suggestion card (actionable, capability-gated).
+Two mentions across the whole flow; both load-bearing. Earlier
+drafts over-leaked the deferred-withdrawal message across all
+four prior steps and got flagged for it.
+
+**Capability matrix drives wizard UI.** The provider's
+`supports_withdrawal_keys` flag gates the Step 3 suggestion
+card's visibility (absence-of-affordance for unsupported
+providers). The `whitelist_read_api` flag does not surface in
+the wizard at all — it's a withdrawal-sub-flow concern, where
+it drives the destination-picker UX (Kraken: read existing
+whitelist; Bitstamp / no-API: manual user attestation). Both
+flags live in the adapter registration; frontend reads them
+via the treasury providers endpoint.
+
+**Bitstamp deferred at v1, not architecturally cut.** The v1
+provider dropdown lists only Kraken. Bitstamp moves to the
+"Additional CustodialProvider adapters" iteration in
+`future_iterations.md` — same iteration that covers Lemon,
+Buenbit, Belo, Coinbase, Swissquote. Backend adapter is
+unchanged at the contract level; the dropdown filter is the
+scope-tightening surface.
+
+**No vendor dropdown for the credential source.** Strongbox
+has a vendor dropdown because the descriptor's source (Coldcard,
+Ledger, etc.) carries meaningful metadata. Account's credential
+source is the user's account at the provider — no equivalent
+metadata pre-paste. The provider dropdown at the top of Step 1
+is the only "which thing am I connecting" affordance the wizard
+needs.
+

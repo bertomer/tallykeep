@@ -746,6 +746,29 @@ Show "executions count" $execs.Count
 $supported = Invoke-RestMethod -Uri "$BaseUrl/api/v1/custodial-providers/supported" -Headers $Headers
 Show "supported adapters" ($supported.supported -join ", ")
 
+# 15.12 Provider capability matrix (Account wizard — GET /treasury/providers)
+$providerCaps = Invoke-RestMethod -Uri "$BaseUrl/api/v1/treasury/providers" -Headers $Headers
+Show "treasury/providers count" $providerCaps.Count
+$krakenCap = $providerCaps | Where-Object { $_.slug -eq "kraken" }
+Show "kraken supports_withdrawal_keys" $krakenCap.supports_withdrawal_keys
+Show "kraken whitelist_read_api"       $krakenCap.whitelist_read_api
+
+# 15.13 Account validate — bad credentials must return 422 (no DB write)
+Section "15.13 holdings/account/validate (bad creds → 422)"
+$validateBody = @{
+    adapter_id = "kraken"
+    api_key    = "smoke-test-invalid-key"
+    api_secret = "smoke-test-invalid-secret"
+} | ConvertTo-Json -Compress
+try {
+    Invoke-RestMethod -Method Post -Uri "$BaseUrl/api/v1/holdings/account/validate" `
+        -ContentType 'application/json' -Body $validateBody -Headers $Headers | Out-Null
+    Show "validate bad creds" "(unexpected 2xx!)"
+} catch {
+    $sc = $_.Exception.Response.StatusCode.value__
+    Show "validate bad creds → 422" ($sc -eq 422)
+}
+
 
 # --- 16. Jobs endpoints (M8.1) -----------------------------------------------
 

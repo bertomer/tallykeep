@@ -548,7 +548,7 @@ Most checks are mechanical and run via
 (Linux/Mac). Either is sufficient; the two are kept in sync.
 A few seconds either way.
 
-Checklist (the script implements these seven):
+Checklist (the script implements these eight):
 
 1. **OpenAPI matches code.** If the iteration touched any
    endpoint, schema, SSE event, error type, or locked-state
@@ -591,6 +591,16 @@ Checklist (the script implements these seven):
    ending in an alphabetic character with no terminator. False
    positives are fixable by adding a period or restructuring;
    false negatives still need a human eye on large edits.
+8. **Edit sync (mtime).** For every canonical doc listed in
+   `next_iteration.md` under `#### Affected canonical docs`,
+   check that the file's mtime is within 7 days of
+   `next_iteration.md`'s own mtime. Files older than that are
+   flagged as "possible un-flushed edit" — the failure mode per
+   §4.8 where the Cowork file tool reports success but disk
+   doesn't move. Recover via the §4.8 heredoc pattern: `Read`
+   the intended state, then `cat > file <<'EOF' ... EOF` over
+   the bash mount. Mockup files (`UI/mockups/...`) are exempt
+   (they have their own index check, #3).
 
 If any check fails, the iteration isn't done. Fix in the same
 commit, not as a TODO. Drift is a bug, not a chore (per §4.2).
@@ -614,6 +624,51 @@ If an agent encounters a question whose answer is not in the
 spec, the answer goes into `pre-implementation.md` (if it
 needs Rémy's arbitration) or `future_iterations.md` (if it's
 a capturable idea for later) — not into the agent's head.
+
+
+### 4.8 File-edit reliability — heredoc for large existing-doc edits
+
+The Cowork file tools (Edit, Write) sometimes fail to flush
+content to the bash mount when applied repeatedly to long
+existing markdown files. Symptom: the Read tool shows the
+intended post-edit content, but bash reads see stale or
+mid-content-truncated text on disk. The §4.6 sanity sweep's
+tail-well-formedness check (#7) catches some cases; the
+mtime check (#8) catches the rest.
+
+**Rule.** For edits to existing canonical markdown docs longer
+than ~200 lines (`holdings/*.md`, `concerns/*.md`,
+`UI/mobile.md`, `UI/README.md`, `PROCESS.md`,
+`next_iteration.md`, `future_iterations.md`), prefer bash
+heredoc over the Edit / Write tools when the change exceeds a
+couple of lines:
+
+```bash
+cat > /path/to/specs/file.md <<'EOF'
+<full intended file content>
+EOF
+```
+
+The single-quoted `'EOF'` prevents shell expansion (backticks,
+dollar signs, brackets inside markdown stay literal). The
+write goes directly through the bash mount; no buffer-and-
+flush dance.
+
+**For new files** (ADRs, mockup HTML, mermaid diagrams, fresh
+sub-spec modules) the `Write` tool is reliable. The bug
+manifests on repeated `Edit` operations against existing long
+files, not on single-shot `Write` of a fresh path.
+
+**For small targeted edits (< ~10 lines changed)** the Edit
+tool is acceptable, but verify the change landed by running
+`tools/check-spec.sh` (or `.ps1`) immediately afterward. If
+check #7 or #8 flags the file, recover via the heredoc pattern.
+
+**Operational rule of thumb.** If you find yourself making
+more than 3-4 Edits to the same canonical markdown doc in a
+single session, stop, do a final `Read` to capture the
+intended state, and rewrite the file via bash heredoc. The
+risk of silent truncation accumulates with edit count.
 
 ---
 

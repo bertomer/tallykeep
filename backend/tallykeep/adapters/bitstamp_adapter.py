@@ -55,6 +55,11 @@ def _ts_to_dt(ts_ms: int | None, fallback: datetime) -> datetime:
 class BitstampAdapter(CustodialProviderAdapter):
     """ccxt-backed Bitstamp adapter (spec module 07)."""
 
+    adapter_slug = "bitstamp"
+    display_name = "Bitstamp"
+    supports_withdrawal_keys = True
+    whitelist_read_api = False  # Bitstamp whitelist is web-UI only
+
     def __init__(self, api_key: str, api_secret: str, api_passphrase: str | None = None) -> None:
         self._exchange: ccxt.bitstamp = ccxt.bitstamp(
             {

@@ -23,6 +23,24 @@ class UnsupportedAdapterError(ValueError):
     """Raised when an adapter_id is not in the registry."""
 
 
+def list_provider_capabilities() -> list[dict]:
+    """Return the capability matrix for all registered adapters.
+
+    Result is sorted by adapter_slug for stable ordering. Used by
+    GET /api/v1/treasury/providers to populate the wizard's provider dropdown
+    and gate Step 3's suggestion card.
+    """
+    return [
+        {
+            "slug": slug,
+            "display_name": cls.display_name,
+            "supports_withdrawal_keys": cls.supports_withdrawal_keys,
+            "whitelist_read_api": cls.whitelist_read_api,
+        }
+        for slug, cls in sorted(_REGISTRY.items())
+    ]
+
+
 def build_adapter(
     adapter_id: str,
     *,
@@ -47,4 +65,5 @@ __all__ = [
     "SUPPORTED_ADAPTER_IDS",
     "UnsupportedAdapterError",
     "build_adapter",
+    "list_provider_capabilities",
 ]

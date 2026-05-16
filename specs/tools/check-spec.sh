@@ -211,6 +211,52 @@ while IFS= read -r f; do
 done < <(find . -path ./archive -prune -o -name '*.md' -print 2>/dev/null)
 [ "$tail_issues" -eq 0 ] && ok "no truncated tails in non-archive docs"
 
+# ---- 8. Edit sync (mtime against current iteration) ----
+# Catches the buffering failure PROCESS.md section 4.6 + 4.8 describe:
+# the Cowork file tool reports a successful Edit but the bytes don't
+# reach the bash mount. Files listed in next_iteration.md as affected
+# should have been touched recently; stale mtime = un-flushed edit.
+section "Edit sync (mtime)"
+if [ ! -f next_iteration.md ]; then
+  ok "next_iteration.md missing; skipping sync check"
+else
+  ni_mtime=$(stat -c %Y next_iteration.md 2>/dev/null || stat -f %m next_iteration.md 2>/dev/null)
+  if [ -z "$ni_mtime" ]; then
+    ok "could not read next_iteration.md mtime; skipping"
+  else
+    # 7-day window in seconds
+    threshold=$((ni_mtime - 604800))
+    # Extract backtick-quoted file paths under "#### Affected canonical docs"
+    # until the next "#### " or "## " or "---" or EOF.
+    affected=$(awk '
+      /^#### Affected canonical docs/ { in_block = 1; next }
+      in_block && /^#### / { in_block = 0 }
+      in_block && /^## / { in_block = 0 }
+      in_block && /^---/ { in_block = 0 }
+      in_block { print }
+    ' next_iteration.md | grep -oE '`[A-Za-z0-9_./-]+\.(md|yaml|yml)`' | tr -d '`' | sort -u)
+    sync_issues=0
+    checked=0
+    while IFS= read -r f; do
+      [ -z "$f" ] && continue
+      [ ! -f "$f" ] && continue
+      # skip mockup files (covered by check #3)
+      case "$f" in
+        UI/mockups/*) continue ;;
+      esac
+      file_mtime=$(stat -c %Y "$f" 2>/dev/null || stat -f %m "$f" 2>/dev/null)
+      [ -z "$file_mtime" ] && continue
+      checked=$((checked + 1))
+      if [ "$file_mtime" -lt "$threshold" ]; then
+        days_old=$(( (ni_mtime - file_mtime) / 86400 ))
+        fail "$f mtime is ${days_old} days older than next_iteration.md - possible un-flushed edit (per PROCESS.md 4.8, recover via bash heredoc)"
+        sync_issues=$((sync_issues + 1))
+      fi
+    done <<<"$affected"
+    [ $sync_issues -eq 0 ] && ok "${checked} canonical doc(s) checked, all in sync with current iteration"
+  fi
+fi
+
 # ---- summary ----
 echo
 if [ "$fail_count" -eq 0 ]; then

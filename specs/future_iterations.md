@@ -124,7 +124,8 @@ record.
 - **Next in the wizard lineup after this ships:** Strongbox
   wizard (copy + framing variant on the Purse pattern,
   reuses the shared wizard-shell that lands here), then
-  Vault wizard, then Account wizard.
+  Vault wizard, then Account wizard. (Account wizard
+  promoted 2026-05-16 — see `next_iteration.md`.)
 
 ### Add Holding — Strongbox wizard
 
@@ -142,8 +143,27 @@ record.
   framing review Rémy opened 2026-05-14.
 - **Next in the wizard lineup after this ships:** Vault wizard
   (framing pre-card + multisig-only validation, then the same
-  3-step shape), then Account wizard (different surface — ccxt
-  provider integration, no descriptor parser).
+  3-step shape), then Account wizard (different surface, ccxt
+  provider integration, no descriptor parser). The Account
+  wizard was promoted 2026-05-16 — see `next_iteration.md`.
+
+### Add Holding — Account wizard
+
+- **Promoted:** 2026-05-16 (after the design-pass close — Rémy
+  greenlight on all four validated mockups).
+- **Full entry:** see `next_iteration.md` "Active iteration ·
+  Add Holding — Account wizard". Four validated mockups in
+  `UI/mockups/` (the `mobile_add_holding_account_*.html` set:
+  connect default, connect overage error, parseback, success);
+  `UI/mobile.md` Account-wizard section locked;
+  `decisions/0011-account-two-key-model.md` recording the
+  foundational shift.
+- **Scope shift from the rough sketch:** the v1 list cut from
+  {Kraken, Bitstamp} to {Kraken} only (Bitstamp moves to the
+  "Additional CustodialProvider adapters" entry above). The
+  wizard captures only the read-only credential; the withdrawal
+  credential is its own sub-flow ("Account withdrawal-key
+  sub-flow" entry below) reachable from Account detail.
 
 ---
 
@@ -1287,22 +1307,97 @@ record.
 
 ### Additional CustodialProvider adapters
 
-- **Captured:** 2026-05 (from module 12 v1.1, pre-retirement)
-- **Motivation:** Pre-shipping ships Kraken and Bitstamp. Broader
-  coverage matters for target markets — Bitfinex has Argentine
-  users; Coinbase Advanced has US/EU coverage; LatAm-native venues
-  (Lemon, Buenbit, Belo, Ripio) are higher priority for the
-  Argentina launch than Coinbase.
-- **Sketch:** Each adapter is a ccxt wrapper with adapter-specific
-  fixtures and integration tests. LatAm-native venues likely need
-  custom adapters where ccxt doesn't cover them.
-- **Touches:** treasury layer adapters, integration test harness
+- **Captured:** 2026-05 (from module 12 v1.1, pre-retirement);
+  revised 2026-05-16 (Account-wizard iteration cut Bitstamp from
+  v1 to focus on Kraken-first ship).
+- **Motivation:** Pre-shipping currently ships Kraken only. Broader
+  coverage matters for target markets — Bitstamp's whitelist-via-
+  web-UI shape needs the withdrawal sub-flow's manual-attestation
+  branch; Bitfinex has Argentine users; Coinbase Advanced has US /
+  EU coverage; LatAm-native venues (Lemon, Buenbit, Belo, Ripio)
+  are higher priority for the Argentina launch than Coinbase.
+- **Sketch:** Each adapter is a ccxt wrapper (or custom client for
+  non-ccxt venues — see the separate Swissquote entry) with
+  adapter-specific fixtures, integration tests, and a per-provider
+  helper-banner copy block (Step 1 of the Add Account wizard
+  swaps banner content based on the picked adapter). Each adapter
+  declares its `supports_withdrawal_keys` and `whitelist_read_api`
+  capabilities at registration; the wizard reads them to gate
+  Step 3's suggestion card and the withdrawal sub-flow's UX.
+- **Touches:** treasury layer adapters, integration test harness,
+  Add Account wizard provider dropdown, per-provider helper-banner
+  copy registry.
 - **Status:** idea
-- **Milestone:** post-shipping (some may be pre-shipping if a
-  specific target-market launch needs them)
+- **Milestone:** post-shipping (Bitstamp specifically: pre-public-
+  ship if user demand surfaces; the v1 cut was scope-tightening,
+  not architectural).
 - **Notes:** Priority order is market-driven. Argentine launch
-  → Lemon, Buenbit, Ripio, Belo first. Bitfinex / Coinbase Advanced
-  if user demand surfaces.
+  → Lemon, Buenbit, Ripio, Belo first. Bitstamp is the lowest-
+  friction next addition because the adapter is already
+  contract-compatible with the treasury layer; it just lost the
+  dropdown slot in v1. Bitfinex / Coinbase Advanced if user
+  demand surfaces.
+
+### Account withdrawal-key sub-flow
+
+- **Captured:** 2026-05-16 (deferred during the Account-wizard
+  design pass; design pass close locked the wizard's read-only-
+  only scope, but the withdrawal capability still needs its own
+  design pass to ship before SweepPolicy-on-Account work begins).
+- **Motivation:** Per ADR-0011, the Account Holding type carries
+  a separate withdrawal credential and provider-side whitelist
+  configuration. The Add Account wizard does not capture these
+  (its read-only-only scope is deliberate). The Account detail
+  page's Withdraw affordance is the canonical discovery surface
+  but routes to a sub-flow that doesn't exist yet — until it
+  ships, the Withdraw button is greyed-out with a tap-prompt
+  ("coming in a later iteration"), and SweepPolicies on Account
+  Holdings run in watch-and-advise mode only.
+- **Sketch:** Likely 3–4 steps, reachable from Account detail OR
+  from the Add Account wizard's Step 3 capability-gated
+  suggestion card:
+  1. **Whitelist destination.** Cross-reference UI: list the
+     user's existing TK Holdings (Strongbox / Vault / Purse) as
+     candidate destinations with verification badges, plus a
+     "paste external address" affordance, plus the provider's
+     fetched whitelist (when `whitelist_read_api = true` — Kraken)
+     OR a manual attestation checkbox (when
+     `whitelist_read_api = false` — Bitstamp). Picking a TK
+     Holding derives its next-unused address; pasting external
+     accepts any address the user has whitelisted on the
+     provider's side.
+  2. **Withdrawal credential paste.** API Key + Private Key
+     fields, paste pattern parity with the Add Account wizard's
+     Step 1. Backend validates the credential has *only* the
+     provider's withdraw permission (plus the provider-required
+     balance-query scope where applicable — Kraken needs both).
+     Overage rejected with the same locked-copy pattern as the
+     read-only credential's overage error.
+  3. **Confirmation / parseback.** Recap the destination, the
+     credential's permission scope, and the activation conditions.
+  4. **Success.** Withdraw becomes active on Account detail;
+     SweepPolicy creation surfaces full act-mode options.
+- **Touches:** new sub-flow design + mockups, `holdings/01_account.md`
+  withdrawal-credential and outflow sections (reference the
+  shipped sub-flow), `concerns/sweep_policies.md` Account-source
+  branch (act-mode unlocked when `withdraw_credential_id` is
+  non-null), Account detail page (Withdraw button activation
+  logic), Treasury-view iteration's SweepPolicy creation flow.
+- **Status:** sketched (the design discussion in the 2026-05-16
+  brainstorm produced the decision-tree; sharpening needs its own
+  session covering Holdings cross-reference UI, Bitstamp manual-
+  attestation branch, withdrawal-key tap-to-clear coding rule).
+- **Milestone:** pre-shipping (private-ship gate — Rémy needs
+  this to actually use auto-sweep on his own Kraken Account).
+- **Notes:** Touches the `concerns/sweep_policies.md` open
+  arbitration `sweep-validator-extended-rules` indirectly (the
+  validator can ground its warnings against this sub-flow's
+  output — confirmed whitelisted destination, scoped credential
+  presence). The "Bitstamp can't verify whitelists via API"
+  asymmetry is real and lives in this sub-flow's design pass;
+  the wizard does not touch it.
+
+
 
 ### Custom adapter for non-ccxt venues (Swissquote and similar)
 

@@ -87,3 +87,16 @@ invalid multisig
 ```
 multi(2,[3442193e]xpub661MyMwAqRbcFtXgS5sYJABqqG9YLmC4Q1Rdap9gSE8NqtwybGhePY2gZ29ESFjqJoCu1Rupje8YtGqsefD265TMg7usUDFdp6W1EGMcet8,[bd16bee5]xpub661MyMwAqRbcFW31YEwpkMuc5THy2PSt5bDMsktWQcFF8syAmRUapSCGu8ED9W6oDMSgv6Zz8idoc4a6mr8BDzTJY47LJhkJ8UB7WEGuduB,[41d63b50]xpub661MyMwAqRbcEZVB4dScxMAdx6d4nFc9nvyvH3v4gJL378CSRZiYmhRoP7mBy6gSPSCYk6SzXPTf3ND1cZAceL7SfJ1Z3GC8vBgp2epUt13)
 ```
+
+
+"Clé API" kraken Read only:
+/pJocMLmaycttdUo5D1KkWF09t8rOGVUCajxkOmtsQignWT6HSGdNain
+
+"Clé privée" Kraken Read only:
+JffOPc5A/rKk5YQWE588eC/UNbtQya9xt8INe4/FMGyZN83EK1mHva8jwPxs/wRZOtGIK9cTqCnsyaRalLif7A==
+
+"Clé API" kraken Withdrawal only:
+bd4pcvVPyOem3l5k9+NV3/nEH2b2QHyVuddJCxpW5WiZ9iBcQRLmkgi0
+
+"Clé privée" Kraken Withdrawal only:
+qRiDRMEYytD/oXc0vFUpQ70k7s/HEucnAM0geZNSTip8Ly0Z0CmSumA6KS+/6wKSt6GdS0lkvqo2u3pBsPMVEQ==

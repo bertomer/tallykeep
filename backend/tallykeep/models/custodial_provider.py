@@ -56,9 +56,10 @@ class CustodialProviderRow(Base):
     can_withdraw: Mapped[bool] = mapped_column(
         nullable=False, server_default=text("FALSE")
     )
-    whitelist_address: Mapped[str] = mapped_column(String(100), nullable=False)
-    whitelist_address_descriptor_id: Mapped[UUID] = mapped_column(
-        ForeignKey("descriptor.id", ondelete="RESTRICT"), nullable=False
+    # Nullable: populated by the withdrawal sub-flow (ADR-0011), not at wizard creation.
+    whitelist_address: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    whitelist_address_descriptor_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("descriptor.id", ondelete="RESTRICT"), nullable=True
     )
     whitelist_verified: Mapped[bool] = mapped_column(
         nullable=False, server_default=text("FALSE")

@@ -14,6 +14,38 @@ commit.
 
 ---
 
+## 2026-05-16 — Add Holding · Account wizard
+
+3-step wizard at `/holding/new/account` lets a user connect a Kraken
+account with a read-only API key. Step 1 validates credentials against a
+new `POST /api/v1/holdings/account/validate` endpoint (no DB write) and
+rejects any key with permissions beyond Query Funds, showing the raw
+Kraken permission strings verbatim in the danger band. Step 2 confirms
+the parseback (provider, permission level, other-asset cap-and-overflow);
+Step 3 shows the polled BTC balance and the capability-gated auto-sweep
+suggestion card. Step 2's "Looks right" CTA is the only point that writes
+to the DB (`POST /api/v1/holdings/account`). Home now displays Account
+holding BTC balance from `last_known_balance_sats`.
+
+Backend: `POST /api/v1/holdings/account/validate` (new); Kraken adapter
+permission detection rewritten — primary path via `privatePostGetApiKeyInfo`
+(ccxt 4.5.54, bumped from 4.4.57), corrected fallback probes using
+`privatePost*` prefix throughout; `binascii.Error` caught in `_call()` and
+mapped to `ProviderAuthError`; `NoReadPermissionError` added for keys that
+lack Query Funds scope entirely; raw permission strings returned verbatim
+so all extra scopes appear in the danger band. `global_holdings_summary`
+fixed to read `last_known_balance_sats` for Account rows. `list_holdings`
+fixed for Account holdings that require a `CustodialProviderRow` join.
+
+Frontend: validate-first wizard pattern; `loadingLabel="Connecting…"` on
+Step 1 CTA; tap-to-clear fires on `onfocus` + `onclick` + `ontouchstart`;
+three distinct 422 messages (no read permission / bad credentials / generic);
+409 overage message checks `data.detail.code` (FastAPI wraps detail).
+
+Canonical docs touched at closeout: `api/openapi.yaml`.
+
+---
+
 ## 2026-05-16 — Add Holding · Vault wizard (all initial shapes)
 
 `POST /api/v1/descriptors/validate` response extended with

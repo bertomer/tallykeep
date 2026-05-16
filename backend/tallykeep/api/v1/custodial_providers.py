@@ -7,7 +7,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
-from tallykeep.adapters.adapter_registry import SUPPORTED_ADAPTER_IDS
+from tallykeep.adapters.adapter_registry import SUPPORTED_ADAPTER_IDS, list_provider_capabilities
 from tallykeep.api.dependencies import get_db_session, get_secret_store
 from tallykeep.infrastructure.secrets import SecretStore
 from tallykeep.schemas.treasury import (
@@ -51,6 +51,17 @@ def _provider_to_out(p) -> CustodialProviderOut:  # type: ignore[no-untyped-def]
 @router.get("/custodial-providers/supported")
 async def supported_providers() -> dict:  # type: ignore[type-arg]
     return {"supported": SUPPORTED_ADAPTER_IDS}
+
+
+@router.get("/treasury/providers")
+async def treasury_providers() -> list[dict]:  # type: ignore[type-arg]
+    """Return the capability matrix for all registered custodial provider adapters.
+
+    Each entry: {slug, display_name, supports_withdrawal_keys, whitelist_read_api}.
+    The wizard reads this at entry to populate the provider dropdown and gate
+    Step 3's auto-sweep suggestion card.
+    """
+    return list_provider_capabilities()
 
 
 @router.get("/custodial-providers/{provider_id}", response_model=CustodialProviderOut)

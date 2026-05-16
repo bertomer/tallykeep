@@ -1,0 +1,29 @@
+flowchart TD
+
+Start([User taps Account tile in Add Holding picker])
+Start --> S1
+
+S1["Step 1 - Connect<br/>Provider dropdown - v1 Kraken only<br/>Sub-heading forward-references<br/>'automated withdrawal can be configured separately'<br/>Helper banner - create read-only key on Kraken Pro<br/>name it TallyKeep Read, tick ONLY Query funds<br/>Shown-once warning - copy keys before closing<br/>(softened: lose one means recreate, not disaster)<br/>API Key plain input<br/>Private Key password with reveal toggle"]
+S1 --> S1_Val{Backend validates<br/>against provider}
+
+S1_Val -->|Auth fails| Err_Auth[Inline error - Invalid API Key or Private Key]
+Err_Auth -.->|Fix input| S1
+
+S1_Val -->|Permission overage| Err_Overage["Hard reject<br/>Key has more than Query funds enabled.<br/>Create a new key on the provider<br/>with ONLY Query funds and re-paste."]
+Err_Overage -.->|Replace credential| S1
+
+S1_Val -->|OK| S1_Persist["Persist encrypted credential.<br/>Initial poll - BTC balance<br/>plus read-only other-asset summary."]
+
+S1_Persist --> S2
+
+S2["Step 2 - Parseback<br/>Recap card - Account-stripe limestone:<br/>Provider (name only, no region)<br/>Permission - Read-only, this key cannot move funds<br/>Other assets - cap-and-overflow display<br/>USDT, ETH, ADA, + N more<br/>Auto-name preview - editable inline<br/>No withdrawal mention here - confirmation step only"]
+S2 -->|Looks right| S3
+
+S3["Step 3 - Success<br/>Success indicator + heading<br/>Headline balance card - SINGLE unit per user pick<br/>Capability-gated suggestion card - limestone stripe:<br/>shown IFF provider supports_withdrawal_keys=true<br/>'Keep these sats under your control'<br/>'Kraken supports automated withdrawals...'<br/>'Set up auto-sweep' CTA (outlined button)<br/>Done primary CTA in footer routes to Home"]
+S3 -->|Done| Home([Home])
+S3 -.->|Set up auto-sweep| Sweep([Withdrawal sub-flow - designed separately])
+
+%% Withdrawal sub-flow is its own design pass, reachable from
+%% the greyed-out Withdraw button on Account detail. Out of
+%% scope for this iteration's mockups - captured in
+%% future_iterations.md as the follow-up.

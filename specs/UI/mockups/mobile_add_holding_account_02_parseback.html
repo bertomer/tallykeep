@@ -1,0 +1,324 @@
+<!--
+  Title: Mobile — Add Account · step 2 · Parse-back (recap + auto-name)
+  Status: validated  (Rémy greenlight 2026-05-16 closing the
+                      Account-wizard design pass)
+  Date last touched: 2026-05-16
+  Replaces: own earlier draft at filename …_03_parseback.html. Step
+            renumbered after Step 1 (Provider) + Step 2 (Credentials)
+            collapsed into the single Step 1 (Connect).
+
+  Design notes:
+  - Step counter "STEP 2 OF 3" — parity with Purse/Strongbox/Vault.
+  - Same parse-card shape as the Strongbox / Vault parsebacks:
+    name-preview at top with Holding-coloured left stripe,
+    fixed-schema rows below.
+  - Account stripe colour = limestone (#9c9388, palette v2 §4) —
+    the per-Holding-type accent for the auto-name preview.
+  - Auto-name template: "{Provider} account" with the provider's
+    display name. Backend appends " (2)", " (3)", … if a collision
+    exists, same pattern as the Vault five-shape auto-name. Mockup
+    renders the no-collision case ("Kraken account").
+  - Parse-card rows — THREE on this step (down from four).
+    Rémy 2026-05-16: BTC balance moves to the Success step
+    (Step 3), where it's the headline value of "what we have."
+    Showing it here AND on success was incoherent given we
+    already have the balance from credential validation; the split
+    is "what did Kraken confirm about this connection" (here) vs
+    "what's the home-page-populating value" (next step).
+      1. **Provider** — display name only. Earlier drafts had a
+         region qualifier ("Global · USD / EUR / GBP pairs") under
+         the name; dropped because (a) it was invented flavor text
+         I couldn't justify across providers, and (b) the provider
+         name alone is sufficient identification.
+      2. **Permission** — plain-language: "Read-only — this key
+         cannot move funds." Earlier draft said "TallyKeep can
+         watch — cannot move funds"; that contradicted the very-
+         next-step auto-sweep suggestion (TallyKeep CAN move funds
+         with a separate withdrawal key). Scoping the limitation
+         to *this key* preserves accuracy.
+      3. **Other assets** — read-only summary of non-BTC balances.
+         Cap-and-overflow display: list up to 3 currency tickers,
+         then "+ N more". Earlier draft listed asset values
+         verbatim ("USDT 1,234 · ETH 0.05") — Rémy 2026-05-16
+         flagged the scaling risk (150-position account renders
+         awful). The cap-and-overflow pattern scales gracefully
+         while still confirming "yes we're looking at the right
+         account with the right multi-asset shape". Hide the row
+         entirely if zero other assets. Multi-asset display open
+         per pre-implementation `multi-asset-aggregation`; the
+         Account detail page will render these explicitly.
+  - NO withdrawal mention on this step. Step 2 is for "did we
+    read this right?" confirmation; surfacing the deferred-
+    withdrawal forward-reference here dilutes that focus. The
+    single in-wizard mention lives on Step 1's description
+    (forward-reference) and the actionable CTA lives on Step 3
+    (success — the "what's next?" moment). Rémy 2026-05-16.
+  - Verification copy refers to "the key you just created on
+    Kraken" generically — no third-party product wording beyond
+    the provider name.
+  - CTA label "Looks right" — same tonal shift as the other
+    wizards (confirming, not just proceeding).
+-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>TallyKeep — Mobile — Add Account · 2 of 3 · Parse-back</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="_shared/tokens.css">
+<link rel="stylesheet" href="_shared/shell.css">
+<style>
+  .phone-screen { background: var(--color-bg); }
+
+  /* ---------- App bar ---------- */
+  .app-bar {
+    height: var(--mobile-app-bar);
+    flex-shrink: 0;
+    display: grid;
+    grid-template-columns: 44px 1fr 44px;
+    align-items: center;
+    padding: 0 var(--space-2);
+    background: var(--color-surface);
+    border-bottom: 1px solid var(--color-border);
+  }
+  .app-bar .back-btn {
+    width: 36px; height: 36px;
+    display: inline-flex; align-items: center; justify-content: center;
+    background: transparent; border: 0;
+    border-radius: var(--radius-md);
+    color: var(--color-text);
+    cursor: pointer;
+    justify-self: start;
+    margin-left: var(--space-2);
+  }
+  .app-bar .back-btn:hover { background: var(--color-bg); }
+  .app-bar .back-btn svg {
+    width: 22px; height: 22px;
+    stroke: currentColor; fill: none;
+    stroke-width: 2; stroke-linecap: round; stroke-linejoin: round;
+  }
+  .step-counter {
+    text-align: center;
+    font-size: var(--font-size-xs);
+    font-weight: var(--font-weight-semibold);
+    color: var(--color-text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    line-height: 1;
+  }
+
+  /* ---------- Scroll area ---------- */
+  .scroll-area {
+    flex: 1;
+    overflow-y: auto;
+    padding: var(--space-5) var(--space-4);
+  }
+
+  .step-head { margin-bottom: var(--space-4); }
+  .step-heading {
+    font-size: var(--font-size-lg);
+    font-weight: var(--font-weight-semibold);
+    color: var(--color-text);
+    line-height: var(--line-height-tight);
+    margin: 0;
+    letter-spacing: -0.01em;
+  }
+  .step-sub {
+    font-size: var(--font-size-sm);
+    color: var(--color-text-muted);
+    line-height: var(--line-height-default);
+    margin: var(--space-2) 0 0;
+  }
+
+  /* ---------- Name preview (limestone stripe for Account) ---------- */
+  .name-preview {
+    margin-bottom: var(--space-4);
+    padding: var(--space-3) var(--space-4);
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-left: 4px solid var(--color-holding-account);
+    border-radius: var(--radius-md);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-3);
+  }
+  .name-preview .name-label {
+    font-size: var(--font-size-xs);
+    color: var(--color-text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    font-weight: var(--font-weight-semibold);
+    display: block;
+    margin-bottom: 2px;
+  }
+  .name-preview .name-value {
+    font-size: var(--font-size-base);
+    font-weight: var(--font-weight-semibold);
+    color: var(--color-text);
+  }
+  .name-preview .rename-btn {
+    background: transparent;
+    border: 1px solid var(--color-border-strong);
+    border-radius: var(--radius-pill);
+    padding: var(--space-1) var(--space-3);
+    font-family: inherit;
+    font-size: var(--font-size-xs);
+    font-weight: var(--font-weight-semibold);
+    color: var(--color-text);
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    flex-shrink: 0;
+  }
+  .name-preview .rename-btn:hover { background: var(--color-bg); }
+  .name-preview .rename-btn svg { width: 12px; height: 12px; stroke: currentColor; fill: none; stroke-width: 2; }
+
+  /* ---------- Parse card ---------- */
+  .parse-card {
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    padding: var(--space-4);
+    margin-bottom: var(--space-3);
+  }
+  .parse-card .row {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: var(--space-3);
+    padding: var(--space-2) 0;
+  }
+  .parse-card .row + .row { border-top: 1px solid var(--color-border); }
+  .parse-card .row .key {
+    font-size: var(--font-size-xs);
+    color: var(--color-text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    font-weight: var(--font-weight-semibold);
+    flex-shrink: 0;
+    min-width: 110px;
+  }
+  .parse-card .row .val {
+    font-size: var(--font-size-sm);
+    color: var(--color-text);
+    font-weight: var(--font-weight-medium);
+    text-align: right;
+  }
+  .parse-card .row .val .approx,
+  .parse-card .row .val .qualifier {
+    display: block;
+    font-size: var(--font-size-xs);
+    color: var(--color-text-muted);
+    font-weight: var(--font-weight-normal);
+    margin-top: 2px;
+  }
+  .parse-card .row .val.amount {
+    font-variant-numeric: tabular-nums;
+    font-weight: var(--font-weight-semibold);
+  }
+
+
+  /* ---------- Wizard footer ---------- */
+  .wizard-footer {
+    flex-shrink: 0;
+    padding: var(--space-3) var(--space-4) var(--space-4);
+    background: var(--color-surface);
+    border-top: 1px solid var(--color-border);
+  }
+  .wizard-cta {
+    width: 100%;
+    padding: var(--space-3) var(--space-4);
+    background: var(--color-primary);
+    color: var(--color-on-primary);
+    border: 0;
+    border-radius: var(--radius-md);
+    font-family: inherit;
+    font-size: var(--font-size-base);
+    font-weight: var(--font-weight-semibold);
+    cursor: pointer;
+  }
+  .wizard-cta:hover { background: var(--color-primary-strong); }
+</style>
+</head>
+<body>
+
+<div class="mockup-meta">
+  <strong>Mobile — Add Account · 2 of 3 · Parse-back</strong> ·
+  <span class="status-validated">validated</span> ·
+  2026-05-16 · 360×800
+</div>
+
+<div class="phone-frame">
+  <div class="phone-screen">
+
+    <div class="app-bar">
+      <button class="back-btn" aria-label="Back to credentials">
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <polyline points="15 6 9 12 15 18"/>
+        </svg>
+      </button>
+      <div class="step-counter">Step 2 of 3</div>
+      <div></div>
+    </div>
+
+    <div class="scroll-area">
+
+      <div class="step-head">
+        <h1 class="step-heading">Here's what we read</h1>
+        <p class="step-sub">
+          Last check before we save it — does this match what you
+          set up on Kraken?
+        </p>
+      </div>
+
+      <div class="name-preview" aria-label="Account name preview">
+        <div>
+          <span class="name-label">Will be named</span>
+          <span class="name-value">Kraken account</span>
+        </div>
+        <button class="rename-btn" type="button" aria-label="Rename this Account">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M 4 20 L 4 16 L 16 4 L 20 8 L 8 20 Z"/>
+            <line x1="13" y1="7" x2="17" y2="11"/>
+          </svg>
+          Rename
+        </button>
+      </div>
+
+      <div class="parse-card" aria-label="What the key gives us">
+        <div class="row">
+          <span class="key">Provider</span>
+          <span class="val">Kraken</span>
+        </div>
+        <div class="row">
+          <span class="key">Permission</span>
+          <span class="val">
+            Observe only
+            <span class="qualifier">Read-only — this key cannot move funds</span>
+          </span>
+        </div>
+        <div class="row">
+          <span class="key">Other assets</span>
+          <span class="val">
+            USDT, ETH, ADA, +&nbsp;9&nbsp;more
+            <span class="qualifier">Read-only summary · not actionable from TallyKeep</span>
+          </span>
+        </div>
+      </div>
+
+    </div>
+
+    <div class="wizard-footer">
+      <button class="wizard-cta" type="button">Looks right</button>
+    </div>
+
+  </div>
+</div>
+
+</body>
+</html>

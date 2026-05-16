@@ -350,6 +350,60 @@ if ($tailIssues -eq 0) {
     Ok "no truncated tails in non-archive docs"
 }
 
+# ---- 8. Edit sync (mtime against current iteration) ----
+# Catches the buffering failure PROCESS.md sections 4.6 + 4.8 describe:
+# the Cowork file tool reports a successful Edit but the bytes do not
+# reach the bash mount. Files listed in next_iteration.md as affected
+# should have been touched recently; stale mtime = un-flushed edit.
+Section "Edit sync (mtime)"
+$nextIter = "next_iteration.md"
+if (-not (Test-Path $nextIter)) {
+    Ok "$nextIter missing; skipping sync check"
+} else {
+    $niMtime = (Get-Item $nextIter).LastWriteTime
+    $thresholdMtime = $niMtime.AddDays(-7)
+
+    # Extract files listed under "#### Affected canonical docs" block
+    # until next "#### " or "## " or "---" or EOF.
+    $lines = Get-Content $nextIter
+    $inBlock = $false
+    $affectedRefs = @()
+    foreach ($line in $lines) {
+        if ($line -match '^#### Affected canonical docs') {
+            $inBlock = $true
+            continue
+        }
+        if ($inBlock) {
+            if ($line -match '^#### ' -or $line -match '^## ' -or $line -match '^---') {
+                $inBlock = $false
+                continue
+            }
+            $refMatches = [regex]::Matches($line, '`([A-Za-z0-9_./-]+\.(?:md|yaml|yml))`')
+            foreach ($m in $refMatches) {
+                $affectedRefs += $m.Groups[1].Value
+            }
+        }
+    }
+    $affectedRefs = $affectedRefs | Sort-Object -Unique
+
+    $syncIssues = 0
+    $checked = 0
+    foreach ($ref in $affectedRefs) {
+        if ($ref -like 'UI/mockups/*') { continue }
+        if (-not (Test-Path $ref)) { continue }
+        $fileMtime = (Get-Item $ref).LastWriteTime
+        $checked++
+        if ($fileMtime -lt $thresholdMtime) {
+            $daysOld = [int]($niMtime - $fileMtime).TotalDays
+            Fail "$ref mtime is $daysOld days older than next_iteration.md - possible un-flushed edit (per PROCESS.md section 4.8, recover via bash heredoc)"
+            $syncIssues++
+        }
+    }
+    if ($syncIssues -eq 0) {
+        Ok "$checked canonical doc(s) checked, all in sync with current iteration"
+    }
+}
+
 # ---- summary ----
 Write-Host ""
 if ($script:failCount -eq 0) {

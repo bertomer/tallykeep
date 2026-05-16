@@ -410,17 +410,34 @@ def list_holdings(
     purpose: Purpose | None = None,
     include_archived: bool = False,
 ) -> list[Holding]:
+    from sqlalchemy import select as _sa_select
+    from tallykeep.models.custodial_provider import CustodialProviderRow
+
     rows = holding_repo.list_holdings(
         session,
         holding_type=holding_type,
         purpose=purpose,
         include_archived=include_archived,
     )
+
+    # Batch-resolve custodial_provider_id for all Account rows in one query.
+    account_row_ids = [row.id for row in rows if row.holding_type == HoldingType.ACCOUNT.value]
+    cp_by_holding: dict[UUID, UUID] = {}
+    if account_row_ids:
+        cp_rows = session.execute(
+            _sa_select(CustodialProviderRow.holding_id, CustodialProviderRow.id).where(
+                CustodialProviderRow.holding_id.in_(account_row_ids)
+            )
+        ).all()
+        cp_by_holding = {r.holding_id: r.id for r in cp_rows}
+
     holdings: list[Holding] = []
     for row in rows:
         descriptor_ids = descriptor_repo.descriptor_ids_for_holding(session, row.id)
+        custodial_provider_id = cp_by_holding.get(row.id) if row.holding_type == HoldingType.ACCOUNT.value else None
         holdings.append(
-            holding_repo.to_domain(row, descriptor_ids=descriptor_ids)
+            holding_repo.to_domain(row, descriptor_ids=descriptor_ids,
+                                   custodial_provider_id=custodial_provider_id)
         )
     return holdings
 

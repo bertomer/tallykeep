@@ -32,12 +32,16 @@ from tallykeep.schemas.holding import (
     StrongboxCreate,
     VaultCreate,
 )
+from tallykeep.schemas.treasury import AccountCreateOut, AccountValidateIn, AccountValidateOut
 from tallykeep.services import holding_service, treasury_service
 from tallykeep.services.holding_service import HoldingServiceError
 from tallykeep.services.treasury_service import (
+    NoReadPermissionError,
+    OveragePermissionsDetected,
     ProviderConnectionError,
     TreasuryServiceError,
     TradePermissionsDetected,
+    validate_account_credentials,
 )
 
 
@@ -189,33 +193,89 @@ async def create_vault(
     return _to_response(holding)
 
 
-@router.post("/holdings/account", response_model=HoldingResponse, status_code=201)
+@router.post("/holdings/account/validate", response_model=AccountValidateOut, status_code=200)
+async def validate_account_holding_credentials(
+    body: AccountValidateIn,
+) -> AccountValidateOut:
+    """Validate API credentials against the provider without writing to the DB.
+
+    Step 1 "Continue" of the Account wizard calls this. No holding is created.
+    Step 2 "Looks right" calls POST /holdings/account to commit.
+    """
+    try:
+        btc_balance_sats, other_balances = validate_account_credentials(
+            adapter_id=body.adapter_id,
+            api_key=body.api_key,
+            api_secret=body.api_secret,
+            api_passphrase=body.api_passphrase,
+        )
+    except OveragePermissionsDetected as exc:
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "code": "overage_permissions",
+                "extra_permissions": exc.extra_permissions,
+                "message": str(exc),
+            },
+        ) from exc
+    except TradePermissionsDetected as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    except NoReadPermissionError as exc:
+        raise HTTPException(
+            status_code=422,
+            detail={"code": "no_read_permission", "message": str(exc)},
+        ) from exc
+    except ProviderConnectionError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+    except TreasuryServiceError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    sorted_assets = sorted(other_balances.keys())
+    return AccountValidateOut(
+        adapter_id=body.adapter_id,
+        btc_balance_sats=btc_balance_sats,
+        other_asset_tickers=sorted_assets[:3],
+        other_asset_total_count=len(sorted_assets),
+    )
+
+
+@router.post("/holdings/account", response_model=AccountCreateOut, status_code=201)
 async def create_account_holding(
     body: AccountCreate,
     session: Session = Depends(get_db_session),
     secret_store: SecretStore = Depends(get_secret_store),
-) -> HoldingResponse:
+) -> AccountCreateOut:
     cp = body.custodial_provider
     try:
-        holding, _ = treasury_service.create_account_holding(
-            session,
-            name=body.name,
-            description=body.description,
-            purpose=body.purpose,
-            declared_security=_claim_from_input(body.declared_security),
-            display_color=body.display_color,
-            display_order=body.display_order,
-            provider_kind=cp.provider_kind,
-            display_name=cp.display_name,
-            adapter_id=cp.adapter_id,
-            api_key=cp.api_key,
-            api_secret=cp.api_secret,
-            api_passphrase=cp.api_passphrase,
-            whitelist_address=cp.whitelist_address,
-            whitelist_address_descriptor_id=cp.whitelist_address_descriptor_id,
-            secret_store=secret_store,
+        holding, provider, btc_balance_sats, other_balances = (
+            treasury_service.create_account_holding(
+                session,
+                name=body.name,
+                description=body.description,
+                purpose=body.purpose,
+                declared_security=_claim_from_input(body.declared_security),
+                display_color=body.display_color,
+                display_order=body.display_order,
+                provider_kind=cp.provider_kind,
+                display_name=cp.display_name,
+                adapter_id=cp.adapter_id,
+                api_key=cp.api_key,
+                api_secret=cp.api_secret,
+                api_passphrase=cp.api_passphrase,
+                secret_store=secret_store,
+            )
         )
         session.commit()
+    except OveragePermissionsDetected as exc:
+        session.rollback()
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "code": "overage_permissions",
+                "extra_permissions": exc.extra_permissions,
+                "message": str(exc),
+            },
+        ) from exc
     except TradePermissionsDetected as exc:
         session.rollback()
         raise HTTPException(status_code=409, detail=str(exc)) from exc
@@ -225,7 +285,22 @@ async def create_account_holding(
     except TreasuryServiceError as exc:
         session.rollback()
         raise HTTPException(status_code=422, detail=str(exc)) from exc
-    return _to_response(holding)
+
+    # Build cap-and-overflow other-asset summary (top 3 + count).
+    sorted_assets = sorted(other_balances.keys())
+    top_three = sorted_assets[:3]
+    total_count = len(sorted_assets)
+
+    return AccountCreateOut(
+        holding_id=holding.id,
+        provider_id=provider.id,
+        name=holding.name,
+        adapter_id=cp.adapter_id,
+        display_name=cp.display_name,
+        btc_balance_sats=btc_balance_sats,
+        other_asset_tickers=top_three,
+        other_asset_total_count=total_count,
+    )
 
 
 # --- cross-type list / get / patch / archive / change-type -------------------
@@ -302,14 +377,17 @@ async def global_holdings_summary(
                 utxo_repo.list_for_descriptor(session, d.id, only_unspent=True)
             )
 
-        # meta: type-specific human label
+        # meta: type-specific human label; Account balance comes from CustodialProvider,
+        # not UTXOs (Account holdings have no descriptors).
         if h.holding_type == HoldingType.ACCOUNT:
-            provider_name: str | None = session.execute(
-                _select(CustodialProviderRow.display_name).where(
-                    CustodialProviderRow.holding_id == h.id
-                )
-            ).scalar_one_or_none()
-            meta: str | None = provider_name
+            cp_row = session.execute(
+                _select(
+                    CustodialProviderRow.display_name,
+                    CustodialProviderRow.last_known_balance_sats,
+                ).where(CustodialProviderRow.holding_id == h.id)
+            ).one_or_none()
+            meta: str | None = cp_row.display_name if cp_row else None
+            confirmed = cp_row.last_known_balance_sats if cp_row else 0
         elif h.holding_type == HoldingType.STRONGBOX:
             meta = h.signing_device_label
         elif h.holding_type == HoldingType.VAULT:

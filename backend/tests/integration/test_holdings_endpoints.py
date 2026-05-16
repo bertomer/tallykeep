@@ -7,6 +7,8 @@ internals.
 
 from __future__ import annotations
 
+from unittest.mock import MagicMock, patch
+
 import pytest
 
 from tallykeep.models import HoldingRow, HoldingTypeChangeLogRow
@@ -351,6 +353,37 @@ class TestCreateVault:
         assert "multisig" in response.text.lower()
 
 
+def _account_body(
+    *,
+    api_key: str = "key",
+    api_secret: str = "secret",
+) -> dict:
+    return {
+        "name": "Kraken main",
+        "purpose": "transit",
+        "declared_security": {
+            "custody_model": "third_party",
+            "signing_model": "not_applicable",
+        },
+        "display_color": "#f59e0b",
+        "display_order": 0,
+        "custodial_provider": {
+            "provider_kind": "exchange",
+            "display_name": "Kraken",
+            "adapter_id": "kraken",
+            "api_key": api_key,
+            "api_secret": api_secret,
+        },
+    }
+
+
+def _clean_perms(extra: list[str] | None = None) -> MagicMock:
+    return MagicMock(
+        can_read=True, can_trade=False, can_withdraw=False,
+        detected_extra_permissions=extra or [],
+    )
+
+
 class TestCreateAccount:
     def test_create_account_missing_custodial_provider_returns_422(self, app_with_db) -> None:
         client, _ = app_with_db
@@ -364,6 +397,188 @@ class TestCreateAccount:
         }
         response = client.post("/api/v1/holdings/account", json=body)
         assert response.status_code == 422
+
+    def test_create_account_read_only_key_returns_201_with_balance(
+        self, app_with_db
+    ) -> None:
+        client, _ = app_with_db
+        mock_adapter = MagicMock()
+        mock_adapter.get_permissions.return_value = _clean_perms()
+        mock_adapter.get_balance.return_value = 2_500_000
+        mock_adapter.get_other_balances.return_value = {"ETH": "1.2", "USDC": "500"}
+
+        with patch(
+            "tallykeep.services.treasury_service.build_adapter",
+            return_value=mock_adapter,
+        ):
+            response = client.post("/api/v1/holdings/account", json=_account_body())
+
+        assert response.status_code == 201, response.text
+        data = response.json()
+        assert data["btc_balance_sats"] == 2_500_000
+        assert set(data["other_asset_tickers"]) == {"ETH", "USDC"}
+        assert data["other_asset_total_count"] == 2
+        assert "holding_id" in data
+        assert "provider_id" in data
+
+    def test_create_account_invalid_credentials_returns_422(
+        self, app_with_db
+    ) -> None:
+        from tallykeep.adapters.custodial_provider_adapter import ProviderAuthError
+
+        client, _ = app_with_db
+        mock_adapter = MagicMock()
+        mock_adapter.get_permissions.side_effect = ProviderAuthError("invalid key")
+
+        with patch(
+            "tallykeep.services.treasury_service.build_adapter",
+            return_value=mock_adapter,
+        ):
+            response = client.post("/api/v1/holdings/account", json=_account_body())
+
+        assert response.status_code == 422
+
+    def test_create_account_overage_withdraw_funds_returns_409(
+        self, app_with_db
+    ) -> None:
+        client, _ = app_with_db
+        mock_adapter = MagicMock()
+        mock_adapter.get_permissions.return_value = _clean_perms(["Withdraw funds"])
+
+        with patch(
+            "tallykeep.services.treasury_service.build_adapter",
+            return_value=mock_adapter,
+        ):
+            response = client.post("/api/v1/holdings/account", json=_account_body())
+
+        assert response.status_code == 409
+        data = response.json()["detail"]
+        assert data["code"] == "overage_permissions"
+        assert "Withdraw funds" in data["extra_permissions"]
+
+    def test_create_account_overage_trade_and_margin_returns_409(
+        self, app_with_db
+    ) -> None:
+        client, _ = app_with_db
+        mock_adapter = MagicMock()
+        mock_adapter.get_permissions.return_value = _clean_perms(["Trade", "Margin"])
+
+        with patch(
+            "tallykeep.services.treasury_service.build_adapter",
+            return_value=mock_adapter,
+        ):
+            response = client.post("/api/v1/holdings/account", json=_account_body())
+
+        assert response.status_code == 409
+        data = response.json()["detail"]
+        assert data["code"] == "overage_permissions"
+        assert set(data["extra_permissions"]) == {"Trade", "Margin"}
+
+
+def _validate_body(
+    *,
+    adapter_id: str = "kraken",
+    api_key: str = "key",
+    api_secret: str = "secret",
+) -> dict:
+    return {"adapter_id": adapter_id, "api_key": api_key, "api_secret": api_secret}
+
+
+class TestValidateAccountCredentials:
+    def test_validate_clean_read_only_key_returns_200_with_balance(
+        self, app_with_db
+    ) -> None:
+        client, _ = app_with_db
+        mock_adapter = MagicMock()
+        mock_adapter.get_permissions.return_value = _clean_perms()
+        mock_adapter.get_balance.return_value = 1_800_000
+        mock_adapter.get_other_balances.return_value = {"ETH": "0.5"}
+
+        with patch(
+            "tallykeep.services.treasury_service.build_adapter",
+            return_value=mock_adapter,
+        ):
+            response = client.post(
+                "/api/v1/holdings/account/validate", json=_validate_body()
+            )
+
+        assert response.status_code == 200, response.text
+        data = response.json()
+        assert data["btc_balance_sats"] == 1_800_000
+        assert data["other_asset_tickers"] == ["ETH"]
+        assert data["other_asset_total_count"] == 1
+        assert "holding_id" not in data
+
+    def test_validate_invalid_credentials_returns_422(self, app_with_db) -> None:
+        client, _ = app_with_db
+        from tallykeep.adapters.custodial_provider_adapter import ProviderAuthError
+        mock_adapter = MagicMock()
+        mock_adapter.get_permissions.side_effect = ProviderAuthError("bad key")
+
+        with patch(
+            "tallykeep.services.treasury_service.build_adapter",
+            return_value=mock_adapter,
+        ):
+            response = client.post(
+                "/api/v1/holdings/account/validate", json=_validate_body()
+            )
+
+        assert response.status_code == 422
+
+    def test_validate_overage_withdraw_funds_returns_409(self, app_with_db) -> None:
+        client, _ = app_with_db
+        mock_adapter = MagicMock()
+        mock_adapter.get_permissions.return_value = _clean_perms(["Withdraw funds"])
+
+        with patch(
+            "tallykeep.services.treasury_service.build_adapter",
+            return_value=mock_adapter,
+        ):
+            response = client.post(
+                "/api/v1/holdings/account/validate", json=_validate_body()
+            )
+
+        assert response.status_code == 409
+        data = response.json()["detail"]
+        assert data["code"] == "overage_permissions"
+        assert "Withdraw funds" in data["extra_permissions"]
+
+    def test_validate_overage_trade_and_margin_returns_409(
+        self, app_with_db
+    ) -> None:
+        client, _ = app_with_db
+        mock_adapter = MagicMock()
+        mock_adapter.get_permissions.return_value = _clean_perms(["Trade", "Margin"])
+
+        with patch(
+            "tallykeep.services.treasury_service.build_adapter",
+            return_value=mock_adapter,
+        ):
+            response = client.post(
+                "/api/v1/holdings/account/validate", json=_validate_body()
+            )
+
+        assert response.status_code == 409
+        data = response.json()["detail"]
+        assert data["code"] == "overage_permissions"
+        assert set(data["extra_permissions"]) == {"Trade", "Margin"}
+
+    def test_validate_does_not_create_holding(self, app_with_db) -> None:
+        client, _ = app_with_db
+        mock_adapter = MagicMock()
+        mock_adapter.get_permissions.return_value = _clean_perms()
+        mock_adapter.get_balance.return_value = 0
+        mock_adapter.get_other_balances.return_value = {}
+
+        with patch(
+            "tallykeep.services.treasury_service.build_adapter",
+            return_value=mock_adapter,
+        ):
+            client.post("/api/v1/holdings/account/validate", json=_validate_body())
+
+        holdings = client.get("/api/v1/holdings").json()
+        account_holdings = [h for h in holdings if h["holding_type"] == "account"]
+        assert account_holdings == []
 
 
 # --- list / get / patch / archive / change-type --------------------------------

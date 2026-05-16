@@ -82,7 +82,24 @@ class CustodialProviderAdapter(ABC):
 
     Each concrete implementation absorbs per-provider API quirks so that
     TallyKeep's service layer never sees ccxt directly.
+
+    Class-level capability declarations (ADR-0011): every adapter declares its
+    provider's capabilities so the treasury providers endpoint can surface them
+    without instantiating an adapter (which requires live credentials).
     """
+
+    # --- Capability matrix (class-level; override in each adapter) --------------
+
+    #: Provider slug — matches the adapter_id in the registry.
+    adapter_slug: str = ""
+    #: Human-readable name shown in the UI.
+    display_name: str = ""
+    #: Provider supports a withdrawal-key API (drives Step 3 suggestion card).
+    supports_withdrawal_keys: bool = False
+    #: Provider exposes a programmatic address-whitelist read API.
+    whitelist_read_api: bool = False
+
+    # --- Abstract interface -------------------------------------------------------
 
     @abstractmethod
     def get_permissions(self) -> ProviderPermissions:

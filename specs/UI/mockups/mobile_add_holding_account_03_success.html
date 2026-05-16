@@ -1,0 +1,299 @@
+<!--
+  Title: Mobile — Add Account · step 3 · Success (balance headline)
+  Status: validated  (Rémy greenlight 2026-05-16 closing the
+                      Account-wizard design pass)
+  Date last touched: 2026-05-16
+  Replaces: own earlier draft at filename …_04_success.html.
+            First review surfaced two issues:
+              1. The spinner ("Polling Kraken…") was fiction —
+                 we already have the balance from credential
+                 validation at Step 1. The previous parseback
+                 (Step 2) showed the same balance, then this
+                 step pretended to fetch it again. Incoherent.
+              2. The "Enable auto-sweep now" secondary CTA was
+                 part of a pattern that over-leaked the
+                 withdrawal-deferred message across the wizard.
+            Second review (same day) reinstated the auto-sweep
+            CTA — but as a deliberate suggestion card on Step 3
+            (the "what's next?" moment), NOT as a generic
+            secondary CTA. Rémy: "this makes more sense once
+            the client finished the onboarding". The card carries
+            sovereignty-framed copy ("keep these sats under your
+            control") that connects auto-sweep to TallyKeep's
+            self-custody premise without being preachy.
+
+  Design notes:
+  - Step counter "STEP 3 OF 3".
+  - No back-chevron — only forward (per Strongbox / Vault pattern).
+  - Layout: success indicator + heading + sub + headline balance
+    card + primary CTA. No spinner row, no secondary CTA.
+  - The BTC balance is the new headline. We already polled at
+    Step 1 (credential validation); Step 2 showed permission and
+    multi-asset summary; this step closes the recap loop with
+    "this is what's in your account, and it'll show on Home".
+  - Balance presentation: SINGLE unit, tabular-nums (per
+    brand/README typography conventions). Earlier draft showed
+    sats AND BTC together; Rémy 2026-05-16 flagged this as
+    redundant — the user has explicitly picked their preferred
+    unit on Home (sats or BTC), and the wizard should respect
+    that pick. Production reads the user's `currency_preference`
+    from runtime state and renders the corresponding unit only.
+    Mockup renders sats (the spec default per the cross-platform
+    direction in UI/README.md).
+  - "Done" — primary CTA, routes to Home. Earlier draft labelled
+    this "Open Account", which Rémy flagged as misleading
+    (reads like a banking transaction). Matches the Strongbox /
+    Vault success pattern.
+  - Suggestion card sits between the balance card and the wizard
+    footer. Limestone left-stripe matches the balance card —
+    visual continuity ("these are both about your Account"):
+      - heading: "Keep these sats under your control"
+      - body: provider-specific framing ("Kraken supports
+        automated withdrawals. Let TallyKeep move your balance
+        to one of your Holdings when it crosses a threshold you
+        set.") — Rémy 2026-05-16: the suggestion is conditional
+        on the connected provider's withdrawal-API capability,
+        not generic auto-sweep. The body names the provider
+        explicitly so the user understands this is a Kraken-
+        supported feature, not a generic TK promise.
+      - CTA button: "Set up auto-sweep"
+    Tapping routes to the withdrawal-enabling sub-flow (designed
+    separately, post-shipping iteration).
+  - **Capability-gated visibility**: this suggestion card is
+    rendered IFF the connected provider has
+    `supports_withdrawal_keys: true` in the per-provider
+    capability matrix. For providers without withdrawal-API
+    support (none in v1), the card is absent — the success step
+    just shows balance + "Done". Bitstamp (whitelist-read API
+    missing, withdrawal-key API present): card IS rendered;
+    sub-flow handles the manual-whitelist friction internally.
+-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>TallyKeep — Mobile — Add Account · 3 of 3 · Success</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="_shared/tokens.css">
+<link rel="stylesheet" href="_shared/shell.css">
+<style>
+  .phone-screen { background: var(--color-bg); }
+
+  .app-bar {
+    height: var(--mobile-app-bar);
+    flex-shrink: 0;
+    display: grid;
+    grid-template-columns: 44px 1fr 44px;
+    align-items: center;
+    padding: 0 var(--space-2);
+    background: var(--color-surface);
+    border-bottom: 1px solid var(--color-border);
+  }
+  .app-bar .placeholder { width: 44px; }
+  .step-counter {
+    text-align: center;
+    font-size: var(--font-size-xs);
+    font-weight: var(--font-weight-semibold);
+    color: var(--color-text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    line-height: 1;
+  }
+
+  .scroll-area {
+    flex: 1;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+  }
+  .success-body {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: var(--space-6) var(--space-5);
+    gap: var(--space-3);
+    text-align: center;
+  }
+  .success-heading {
+    font-size: var(--font-size-lg);
+    font-weight: var(--font-weight-semibold);
+    color: var(--color-text);
+    line-height: var(--line-height-tight);
+    margin: var(--space-3) 0 0;
+  }
+  .success-sub {
+    font-size: var(--font-size-sm);
+    color: var(--color-text-muted);
+    line-height: var(--line-height-default);
+    max-width: 280px;
+    margin: 0;
+  }
+
+  /* ---------- Headline balance card ---------- */
+  .balance-card {
+    margin-top: var(--space-5);
+    padding: var(--space-4) var(--space-5);
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-left: 4px solid var(--color-holding-account);
+    border-radius: var(--radius-md);
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    text-align: left;
+    min-width: 260px;
+  }
+  .balance-card .balance-label {
+    font-size: var(--font-size-xs);
+    color: var(--color-text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    font-weight: var(--font-weight-semibold);
+    margin-bottom: var(--space-1);
+  }
+  .balance-card .balance-amount {
+    font-size: var(--font-size-2xl);
+    font-weight: var(--font-weight-bold);
+    color: var(--color-text);
+    font-variant-numeric: tabular-nums;
+    line-height: var(--line-height-tight);
+    letter-spacing: -0.01em;
+  }
+  .balance-card .balance-amount .unit {
+    font-size: var(--font-size-base);
+    font-weight: var(--font-weight-semibold);
+    color: var(--color-text-muted);
+    margin-left: var(--space-1);
+  }
+  .balance-card .balance-approx {
+    font-size: var(--font-size-sm);
+    color: var(--color-text-muted);
+    margin-top: 2px;
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* ---------- Suggestion card (auto-sweep) ---------- */
+  .suggestion-card {
+    margin-top: var(--space-5);
+    padding: var(--space-4);
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-left: 4px solid var(--color-holding-account);
+    border-radius: var(--radius-md);
+    text-align: left;
+    min-width: 260px;
+    max-width: 320px;
+  }
+  .suggestion-card .suggestion-title {
+    font-size: var(--font-size-base);
+    font-weight: var(--font-weight-semibold);
+    color: var(--color-text);
+    margin: 0 0 var(--space-2);
+    line-height: var(--line-height-tight);
+  }
+  .suggestion-card .suggestion-body {
+    font-size: var(--font-size-sm);
+    color: var(--color-text-muted);
+    line-height: var(--line-height-default);
+    margin: 0 0 var(--space-3);
+  }
+  .suggestion-card .suggestion-cta {
+    width: 100%;
+    padding: var(--space-2) var(--space-3);
+    background: transparent;
+    color: var(--color-primary-strong);
+    border: 1px solid var(--color-primary);
+    border-radius: var(--radius-md);
+    font-family: inherit;
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-weight-semibold);
+    cursor: pointer;
+  }
+  .suggestion-card .suggestion-cta:hover {
+    background: var(--color-primary-soft);
+  }
+
+  /* ---------- Wizard footer (single primary CTA) ---------- */
+  .wizard-footer {
+    flex-shrink: 0;
+    padding: var(--space-3) var(--space-4) var(--space-4);
+    background: var(--color-surface);
+    border-top: 1px solid var(--color-border);
+  }
+  .wizard-cta {
+    width: 100%;
+    padding: var(--space-3) var(--space-4);
+    background: var(--color-primary);
+    color: var(--color-on-primary);
+    border: 0;
+    border-radius: var(--radius-md);
+    font-family: inherit;
+    font-size: var(--font-size-base);
+    font-weight: var(--font-weight-semibold);
+    cursor: pointer;
+  }
+  .wizard-cta:hover { background: var(--color-primary-strong); }
+</style>
+</head>
+<body>
+
+<div class="mockup-meta">
+  <strong>Mobile — Add Account · 3 of 3 · Success</strong> ·
+  <span class="status-validated">validated</span> ·
+  2026-05-16 · 360×800
+</div>
+
+<div class="phone-frame">
+  <div class="phone-screen">
+
+    <div class="app-bar">
+      <div class="placeholder"></div>
+      <div class="step-counter">Step 3 of 3</div>
+      <div class="placeholder"></div>
+    </div>
+
+    <div class="scroll-area">
+      <div class="success-body">
+
+        <div class="success-indicator lg" aria-hidden="true">✓</div>
+
+        <h1 class="success-heading">Kraken account connected</h1>
+        <p class="success-sub">
+          Your balance is live. It'll appear on Home alongside
+          your other Holdings.
+        </p>
+
+        <div class="balance-card" aria-label="Current BTC balance on Kraken">
+          <span class="balance-label">BTC balance</span>
+          <span class="balance-amount">5 123 456<span class="unit">sats</span></span>
+        </div>
+
+        <div class="suggestion-card" aria-label="Suggested next step">
+          <h2 class="suggestion-title">Keep these sats under your control</h2>
+          <p class="suggestion-body">
+            Kraken supports automated withdrawals. Let TallyKeep
+            move your balance to one of your Holdings when it
+            crosses a threshold you set.
+          </p>
+          <button class="suggestion-cta" type="button">
+            Set up auto-sweep
+          </button>
+        </div>
+
+      </div>
+    </div>
+
+    <div class="wizard-footer">
+      <button class="wizard-cta" type="button">Done</button>
+    </div>
+
+  </div>
+</div>
+
+</body>
+</html>

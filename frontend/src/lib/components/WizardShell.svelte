@@ -17,6 +17,7 @@
     showBack?: boolean;
     onBack?: () => void;
     ctaLabel: string;
+    loadingLabel?: string;
     ctaDisabled?: boolean;
     loading?: boolean;
     onCta: () => void;
@@ -30,6 +31,7 @@
     showBack = true,
     onBack = () => history.back(),
     ctaLabel,
+    loadingLabel = 'Saving…',
     ctaDisabled = false,
     loading = false,
     onCta,
@@ -66,10 +68,20 @@
     <button
       class="wz-cta"
       class:wz-cta--disabled={ctaDisabled}
+      class:wz-cta--loading={loading}
       onclick={onCta}
       disabled={ctaDisabled || loading}
     >
-      {#if loading}Saving…{:else}{ctaLabel}{/if}
+      {#if loading}
+        <svg class="wz-spinner" viewBox="0 0 24 24" aria-hidden="true">
+          <circle cx="12" cy="12" r="9" fill="none" stroke="currentColor"
+                  stroke-width="2.5" stroke-linecap="round"
+                  stroke-dasharray="28 56" />
+        </svg>
+        {loadingLabel}
+      {:else}
+        {ctaLabel}
+      {/if}
     </button>
   </div>
 
@@ -149,5 +161,23 @@
     background: var(--color-border);
     color: var(--color-text-dim);
     cursor: not-allowed;
+  }
+  .wz-cta--loading {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-2);
+    opacity: 0.85;
+    cursor: wait;
+  }
+
+  @keyframes wz-spin {
+    to { transform: rotate(360deg); }
+  }
+  .wz-spinner {
+    width: 18px;
+    height: 18px;
+    flex-shrink: 0;
+    animation: wz-spin 0.8s linear infinite;
   }
 </style>

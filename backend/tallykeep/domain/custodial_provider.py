@@ -6,13 +6,14 @@ CustodialProvider.
 
 Invariants enforced here:
   - Permissions: can_read must be True and can_trade must be False (the v1 doctrine).
-  - whitelist_address_descriptor_id is required.
   - Credential references are reference strings into the secret store, never values.
+  - whitelist_address is nullable — it is populated by the withdrawal sub-flow
+    (ADR-0011: 2-key model), not at the Add Account wizard step.
 """
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 from uuid import UUID
 
@@ -24,17 +25,16 @@ class ProviderPermissions:
     can_read: bool
     can_trade: bool
     can_withdraw: bool
+    # Verbatim names of detected over-permissions (e.g. "Withdraw funds", "Trade").
+    # Populated by adapters during get_permissions(); used by the service to build
+    # the hard-reject error message for the wizard's danger band.
+    detected_extra_permissions: list[str] = field(default_factory=list)
 
     def __post_init__(self) -> None:
-        # Spec module 02 / 07: v1 refuses to register a CustodialProvider whose API
-        # credential has trade permissions enabled. Enforced here so any code path
-        # that constructs ProviderPermissions cannot bypass it.
         if not self.can_read:
             raise ValueError("ProviderPermissions.can_read must be True")
         if self.can_trade:
-            raise ValueError(
-                "ProviderPermissions.can_trade must be False in v1 (no order placement)"
-            )
+            raise ValueError("ProviderPermissions.can_trade must be False (ADR-0011)")
 
 
 @dataclass
@@ -48,9 +48,10 @@ class CustodialProvider:
     api_secret_reference: str
     api_passphrase_reference: str | None  # some providers use a third credential
     permissions: ProviderPermissions
-    whitelist_address: str  # only address funds can be withdrawn to
-    whitelist_address_descriptor_id: UUID  # the Descriptor that owns the whitelist
-    whitelist_verified: bool  # True if verify_whitelist() confirmed the address
+    # whitelist_address is None until the withdrawal sub-flow runs (ADR-0011).
+    whitelist_address: str | None
+    whitelist_address_descriptor_id: UUID | None
+    whitelist_verified: bool
     is_active: bool
     last_polled_at: datetime | None
     last_error: str | None
@@ -61,8 +62,6 @@ class CustodialProvider:
     def __post_init__(self) -> None:
         if not self.adapter_id:
             raise ValueError("CustodialProvider adapter_id is required")
-        if not self.whitelist_address:
-            raise ValueError("CustodialProvider whitelist_address is required")
         if not self.api_credential_reference or not self.api_secret_reference:
             raise ValueError(
                 "CustodialProvider api_credential_reference and api_secret_reference "

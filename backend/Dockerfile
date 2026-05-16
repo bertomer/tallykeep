@@ -44,7 +44,7 @@ RUN pip install --upgrade pip \
         "bdkpython==2.3.1" \
         "pyzmq==26.2.0" \
         "qrcode[pil]==8.0" \
-        "ccxt==4.4.57" \
+        "ccxt==4.5.54" \
         "pytest==8.3.4" \
         "pytest-asyncio==0.25.0" \
         "pytest-cov==6.0.0" \

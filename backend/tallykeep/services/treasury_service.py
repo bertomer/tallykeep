@@ -63,6 +63,23 @@ class TradePermissionsDetected(TreasuryServiceError):
     """Registration rejected because the API key has trade permissions."""
 
 
+class OveragePermissionsDetected(TradePermissionsDetected):
+    """Read-only credential has permissions beyond Query funds (ADR-0011).
+
+    Carries the verbatim Kraken permission names for the wizard's danger band.
+    """
+
+    def __init__(self, extra_permissions: list[str]) -> None:
+        super().__init__(
+            f"Key has extra permissions: {', '.join(extra_permissions)}"
+        )
+        self.extra_permissions = extra_permissions
+
+
+class NoReadPermissionError(TreasuryServiceError):
+    """Key is valid but lacks Query Funds (read) scope."""
+
+
 class ProviderConnectionError(TreasuryServiceError):
     """Wrapped adapter error surfaced at the API layer."""
 
@@ -158,6 +175,56 @@ def _compute_safety_warnings(
 # --- Account Holding creation ---------------------------------------------------
 
 
+def validate_account_credentials(
+    *,
+    adapter_id: str,
+    api_key: str,
+    api_secret: str,
+    api_passphrase: str | None = None,
+) -> tuple[int, dict[str, str]]:
+    """Validate API credentials against the provider without any DB writes.
+
+    Steps:
+    1. Validate adapter_id.
+    2. Build adapter with provided credentials.
+    3. get_permissions() — reject with OveragePermissionsDetected if overage.
+    4. Fetch initial BTC balance + other-asset balances.
+
+    Returns (btc_balance_sats, other_balances).
+    Raises TreasuryServiceError, OveragePermissionsDetected, ProviderConnectionError.
+    """
+    try:
+        adapter = build_adapter(
+            adapter_id, api_key=api_key, api_secret=api_secret, api_passphrase=api_passphrase
+        )
+    except UnsupportedAdapterError as exc:
+        raise TreasuryServiceError(str(exc)) from exc
+
+    try:
+        perms = adapter.get_permissions()
+    except ProviderAuthError as exc:
+        if "permission denied" in str(exc).lower():
+            raise NoReadPermissionError(
+                "This key has no Query Funds (read) access. "
+                "TallyKeep needs a key with only 'Query funds' ticked on Kraken Pro."
+            ) from exc
+        raise TreasuryServiceError(f"Provider authentication failed: {exc}") from exc
+    except ProviderError as exc:
+        raise ProviderConnectionError(f"Could not reach provider: {exc}") from exc
+
+    if perms.detected_extra_permissions:
+        raise OveragePermissionsDetected(perms.detected_extra_permissions)
+
+    try:
+        btc_balance_sats = adapter.get_balance()
+        other_balances = adapter.get_other_balances()
+    except ProviderError:
+        btc_balance_sats = 0
+        other_balances = {}
+
+    return btc_balance_sats, other_balances
+
+
 def create_account_holding(
     session: Session,
     *,
@@ -173,59 +240,45 @@ def create_account_holding(
     api_key: str,
     api_secret: str,
     api_passphrase: str | None,
-    whitelist_address: str,
-    whitelist_address_descriptor_id: UUID,
     secret_store: SecretStore,
-) -> tuple[Holding, CustodialProvider]:
-    """Create an Account Holding + CustodialProvider.
+) -> tuple[Holding, CustodialProvider, int, dict[str, str]]:
+    """Create an Account Holding + CustodialProvider (2-key model, ADR-0011).
 
-    Flow (spec module 07):
-    1. Validate adapter_id.
-    2. Build adapter with provided credentials.
-    3. get_permissions() — reject if can_trade=True.
-    4. verify_whitelist() — set whitelist_verified accordingly.
-    5. Store credentials in the secret store under generated references.
-    6. Persist Holding + CustodialProvider rows.
+    Validates credentials via validate_account_credentials, then persists
+    the Holding + CustodialProvider rows (whitelist fields null until the
+    withdrawal sub-flow, ADR-0011).
+
+    Returns (holding, provider, btc_balance_sats, other_balances).
     """
-    try:
-        adapter = build_adapter(
-            adapter_id, api_key=api_key, api_secret=api_secret, api_passphrase=api_passphrase
-        )
-    except UnsupportedAdapterError as exc:
-        raise TreasuryServiceError(str(exc)) from exc
+    btc_balance_sats, other_balances = validate_account_credentials(
+        adapter_id=adapter_id,
+        api_key=api_key,
+        api_secret=api_secret,
+        api_passphrase=api_passphrase,
+    )
 
-    try:
-        perms = adapter.get_permissions()
-    except ProviderAuthError as exc:
-        raise TreasuryServiceError(f"Provider authentication failed: {exc}") from exc
-    except ProviderError as exc:
-        raise ProviderConnectionError(f"Could not reach provider: {exc}") from exc
-
-    if perms.can_trade:
-        raise TradePermissionsDetected(
-            "This API credential has trade permissions enabled. Create a new credential "
-            "with only 'query funds' and 'withdraw funds' enabled."
-        )
-
-    # Try whitelist verification (best-effort; failure recorded but not blocking).
-    whitelist_result = adapter.verify_whitelist(whitelist_address)
-    whitelist_verified = whitelist_result.is_whitelisted
-
-    # Persist credentials
+    # Persist credentials (read-only key only; withdrawal key comes later).
     holding_id = uuid4()
     provider_id = uuid4()
-    cred_ref = f"provider:{provider_id}:api_key"
-    secret_ref = f"provider:{provider_id}:api_secret"
+    cred_ref = f"provider:{provider_id}:read_api_key"
+    secret_ref = f"provider:{provider_id}:read_api_secret"
     passphrase_ref: str | None = None
 
     try:
         secret_store.set_secret(cred_ref, api_key.encode())
         secret_store.set_secret(secret_ref, api_secret.encode())
         if api_passphrase is not None:
-            passphrase_ref = f"provider:{provider_id}:api_passphrase"
+            passphrase_ref = f"provider:{provider_id}:read_api_passphrase"
             secret_store.set_secret(passphrase_ref, api_passphrase.encode())
     except LockedError as exc:
         raise TreasuryServiceError("Secret store is locked; unlock before registering a provider") from exc
+
+    # Build a read-only ProviderPermissions (no trade, no withdraw).
+    read_only_perms = ProviderPermissions(
+        can_read=True,
+        can_trade=False,
+        can_withdraw=False,
+    )
 
     # Persist Holding
     now = datetime.now(UTC)
@@ -258,7 +311,7 @@ def create_account_holding(
     )
     session.flush()
 
-    # Persist CustodialProvider
+    # Persist CustodialProvider (whitelist fields null until withdrawal sub-flow).
     provider = CustodialProvider(
         id=provider_id,
         holding_id=holding_id,
@@ -268,20 +321,20 @@ def create_account_holding(
         api_credential_reference=cred_ref,
         api_secret_reference=secret_ref,
         api_passphrase_reference=passphrase_ref,
-        permissions=perms,
-        whitelist_address=whitelist_address,
-        whitelist_address_descriptor_id=whitelist_address_descriptor_id,
-        whitelist_verified=whitelist_verified,
+        permissions=read_only_perms,
+        whitelist_address=None,
+        whitelist_address_descriptor_id=None,
+        whitelist_verified=False,
         is_active=True,
-        last_polled_at=None,
+        last_polled_at=now,
         last_error=None,
-        last_known_balance_sats=None,
+        last_known_balance_sats=btc_balance_sats,
         created_at=now,
         updated_at=now,
     )
     cp_repo.create(session, provider)
 
-    return holding, provider
+    return holding, provider, btc_balance_sats, other_balances
 
 
 # --- CustodialProvider CRUD ----------------------------------------------------
@@ -754,12 +807,15 @@ def execute_sweep_now(
 __all__ = [
     "TreasuryServiceError",
     "TradePermissionsDetected",
+    "OveragePermissionsDetected",
     "ProviderNotFound",
     "PolicyNotFound",
     "ExecutionNotFound",
+    "NoReadPermissionError",
     "ProviderConnectionError",
     "PolicyHasUnacknowledgedWarnings",
     "WrongExecutionStatus",
+    "validate_account_credentials",
     "create_account_holding",
     "get_provider",
     "list_providers",

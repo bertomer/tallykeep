@@ -371,6 +371,38 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/holdings/account/validate:
+    post:
+      tags:
+      - holdings
+      summary: Validate Account Holding Credentials
+      description: 'Validate API credentials against the provider without writing
+        to the DB.
+
+
+        Step 1 "Continue" of the Account wizard calls this. No holding is created.
+
+        Step 2 "Looks right" calls POST /holdings/account to commit.'
+      operationId: validate_account_holding_credentials_api_v1_holdings_account_validate_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AccountValidateIn'
+        required: true
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AccountValidateOut'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
   /api/v1/holdings/account:
     post:
       tags:
@@ -389,7 +421,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/HoldingResponse'
+                $ref: '#/components/schemas/AccountCreateOut'
         '422':
           description: Validation Error
           content:
@@ -627,15 +659,14 @@ paths:
     post:
       tags:
       - descriptors
-      summary: Validate a BIP 380 descriptor — pure parser, no state mutation.
-      description: 'Validate a descriptor expression and return its parsed properties.
-
-
-        Accepts single-key and multisig BIP 380 descriptors.
-
-        Returns a typed 422 error when given a bare bitcoin address instead of
-
-        a descriptor (error_code: SINGLE_ADDRESS_INPUT).'
+      summary: Validate a BIP 380 descriptor and return Vault routing metadata.
+      description: "Validate a descriptor expression and return its parsed properties.\n\
+        \nAccepts single-key, multisig, and miniscript (timelock) BIP 380 descriptors.\n\
+        Returns a typed 422 error when given a bare bitcoin address instead of\na\
+        \ descriptor (error_code: SINGLE_ADDRESS_INPUT).\n\n`parse_category` signals\
+        \ the routing intent for wizard UIs:\n- \"parseback_ready\": valid Vault shape\
+        \ — wizard advances to parseback.\n- \"single_key_no_timelock\": valid Strongbox\
+        \ shape — Vault wizard redirects;\n  Strongbox wizard proceeds normally."
       operationId: validate_descriptor_api_v1_descriptors_validate_post
       requestBody:
         content:
@@ -1011,6 +1042,31 @@ paths:
                 type: object
                 title: Response Supported Providers Api V1 Custodial Providers Supported
                   Get
+  /api/v1/treasury/providers:
+    get:
+      tags:
+      - custodial-providers
+      summary: Treasury Providers
+      description: 'Return the capability matrix for all registered custodial provider
+        adapters.
+
+
+        Each entry: {slug, display_name, supports_withdrawal_keys, whitelist_read_api}.
+
+        The wizard reads this at entry to populate the provider dropdown and gate
+
+        Step 3''s auto-sweep suggestion card.'
+      operationId: treasury_providers_api_v1_treasury_providers_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                items:
+                  type: object
+                type: array
+                title: Response Treasury Providers Api V1 Treasury Providers Get
   /api/v1/custodial-providers/{provider_id}:
     get:
       tags:
@@ -2814,6 +2870,109 @@ components:
       - declared_security
       - custodial_provider
       title: AccountCreate
+    AccountCreateOut:
+      properties:
+        holding_id:
+          type: string
+          format: uuid
+          title: Holding Id
+        provider_id:
+          type: string
+          format: uuid
+          title: Provider Id
+        name:
+          type: string
+          title: Name
+        adapter_id:
+          type: string
+          title: Adapter Id
+        display_name:
+          type: string
+          title: Display Name
+        btc_balance_sats:
+          type: integer
+          title: Btc Balance Sats
+        other_asset_tickers:
+          items:
+            type: string
+          type: array
+          title: Other Asset Tickers
+        other_asset_total_count:
+          type: integer
+          title: Other Asset Total Count
+      type: object
+      required:
+      - holding_id
+      - provider_id
+      - name
+      - adapter_id
+      - display_name
+      - btc_balance_sats
+      - other_asset_tickers
+      - other_asset_total_count
+      title: AccountCreateOut
+      description: Response for POST /holdings/account — includes the wizard's initial
+        poll data.
+    AccountValidateIn:
+      properties:
+        adapter_id:
+          type: string
+          maxLength: 50
+          minLength: 1
+          title: Adapter Id
+        api_key:
+          type: string
+          minLength: 1
+          title: Api Key
+        api_secret:
+          type: string
+          minLength: 1
+          title: Api Secret
+        api_passphrase:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Api Passphrase
+      additionalProperties: false
+      type: object
+      required:
+      - adapter_id
+      - api_key
+      - api_secret
+      title: AccountValidateIn
+      description: 'Request body for POST /holdings/account/validate.
+
+
+        Validates API credentials against the provider without any DB writes.
+
+        The wizard calls this on Step 1 "Continue"; only Step 2 "Looks right"
+
+        calls the create endpoint.'
+    AccountValidateOut:
+      properties:
+        adapter_id:
+          type: string
+          title: Adapter Id
+        btc_balance_sats:
+          type: integer
+          title: Btc Balance Sats
+        other_asset_tickers:
+          items:
+            type: string
+          type: array
+          title: Other Asset Tickers
+        other_asset_total_count:
+          type: integer
+          title: Other Asset Total Count
+      type: object
+      required:
+      - adapter_id
+      - btc_balance_sats
+      - other_asset_tickers
+      - other_asset_total_count
+      title: AccountValidateOut
+      description: Response for POST /holdings/account/validate — balance preview,
+        no holding created.
     AddressListResponse:
       properties:
         addresses:
@@ -3165,15 +3324,6 @@ components:
           - type: string
           - type: 'null'
           title: Api Passphrase
-        whitelist_address:
-          type: string
-          maxLength: 100
-          minLength: 10
-          title: Whitelist Address
-        whitelist_address_descriptor_id:
-          type: string
-          format: uuid
-          title: Whitelist Address Descriptor Id
       additionalProperties: false
       type: object
       required:
@@ -3182,11 +3332,16 @@ components:
       - adapter_id
       - api_key
       - api_secret
-      - whitelist_address
-      - whitelist_address_descriptor_id
       title: CustodialProviderInput
-      description: Embedded in AccountCreate; wired to CustodialProvider at creation
-        time.
+      description: 'Embedded in AccountCreate (2-key model, ADR-0011).
+
+
+        The read-only-only wizard captures only the provider identity and the
+
+        read-only API credentials. Whitelist fields are not present at this stage
+        —
+
+        they are populated by the withdrawal sub-flow (future iteration).'
     CustodialProviderOut:
       properties:
         id:
@@ -3212,11 +3367,15 @@ components:
           type: boolean
           title: Can Withdraw
         whitelist_address:
-          type: string
+          anyOf:
+          - type: string
+          - type: 'null'
           title: Whitelist Address
         whitelist_address_descriptor_id:
-          type: string
-          format: uuid
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
           title: Whitelist Address Descriptor Id
         whitelist_verified:
           type: boolean
@@ -3645,6 +3804,16 @@ components:
           - type: string
           - type: 'null'
           title: Signing Device Label
+        vendor:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Vendor
+        signing_metadata_present:
+          anyOf:
+          - type: boolean
+          - type: 'null'
+          title: Signing Metadata Present
         required_signers:
           anyOf:
           - type: integer
@@ -3655,11 +3824,16 @@ components:
           - type: integer
           - type: 'null'
           title: Total Signers
-        timelock_blocks:
+        timelock_kind:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Timelock Kind
+        timelock_value:
           anyOf:
           - type: integer
           - type: 'null'
-          title: Timelock Blocks
+          title: Timelock Value
         recovery_setup_notes:
           anyOf:
           - type: string
@@ -4567,6 +4741,17 @@ components:
             maxLength: 200
           - type: 'null'
           title: Signing Device Label
+        vendor:
+          anyOf:
+          - type: string
+            maxLength: 50
+          - type: 'null'
+          title: Vendor
+        signing_metadata_present:
+          anyOf:
+          - type: boolean
+          - type: 'null'
+          title: Signing Metadata Present
       additionalProperties: false
       type: object
       required:
@@ -5053,20 +5238,52 @@ components:
           - type: integer
           - type: 'null'
           title: Total Signers
-        timelocks:
-          type: 'null'
-          title: Timelocks
+        timelock_kind:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Timelock Kind
+        timelock_value:
+          anyOf:
+          - type: integer
+          - type: 'null'
+          title: Timelock Value
+        cosigner_fingerprints:
+          items:
+            type: string
+          type: array
+          title: Cosigner Fingerprints
+          default: []
+        auto_name:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Auto Name
+        parse_category:
+          type: string
+          title: Parse Category
+          default: single_key_no_timelock
         first_addresses:
           items:
             type: string
           type: array
           title: First Addresses
+        signing_metadata_present:
+          type: boolean
+          title: Signing Metadata Present
       type: object
       required:
       - script_type
       - is_multisig
       - first_addresses
+      - signing_metadata_present
       title: ValidateDescriptorResponse
+      description: "Validate response.\n\n`parse_category`:\n  - \"parseback_ready\"\
+        \ — descriptor is a valid Vault shape (multisig and/or timelock).\n    The\
+        \ Vault wizard advances to parseback.\n  - \"single_key_no_timelock\" — descriptor\
+        \ is a valid single-key wallet without\n    timelock. The Vault wizard redirects\
+        \ to Strongbox; the Strongbox wizard proceeds.\n\nUnsupported / unparseable\
+        \ descriptors still return 422 (PARSE_ERROR /\nUNSUPPORTED_DESCRIPTOR / SINGLE_ADDRESS_INPUT)."
     ValidationError:
       properties:
         loc:
@@ -5121,6 +5338,17 @@ components:
           type: array
           minItems: 1
           title: Descriptors
+        timelock_kind:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Timelock Kind
+        timelock_value:
+          anyOf:
+          - type: integer
+            minimum: 0.0
+          - type: 'null'
+          title: Timelock Value
         required_signers:
           anyOf:
           - type: integer
@@ -5133,12 +5361,6 @@ components:
             minimum: 1.0
           - type: 'null'
           title: Total Signers
-        timelock_blocks:
-          anyOf:
-          - type: integer
-            minimum: 0.0
-          - type: 'null'
-          title: Timelock Blocks
         recovery_setup_notes:
           anyOf:
           - type: string

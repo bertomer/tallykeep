@@ -25,6 +25,7 @@ from tallykeep.domain.sweep_policy import SafetyWarning
 from tallykeep.services.treasury_service import (
     TreasuryServiceError,
     TradePermissionsDetected,
+    OveragePermissionsDetected,
     _compute_safety_warnings,
 )
 
@@ -267,72 +268,118 @@ def test_acknowledgement_lost_on_message_change() -> None:
 # --- Account creation ----------------------------------------------------------
 
 
-def test_create_account_holding_rejects_trade_permissions(monkeypatch) -> None:  # type: ignore[no-untyped-def]
-    """create_account_holding raises TradePermissionsDetected when the adapter
-    reports can_trade=True."""
-    from tallykeep.infrastructure.secrets import InMemorySecretStore
-    from tallykeep.services.treasury_service import create_account_holding
+def _account_creation_args(store, adapter_id: str = "kraken") -> dict:
+    return dict(
+        session=MagicMock(),
+        name="Test",
+        description=None,
+        purpose=Purpose.SPENDING,
+        declared_security=SecurityClaim(
+            custody_model=CustodyModel.THIRD_PARTY,
+            signing_model=SigningModel.NOT_APPLICABLE,
+        ),
+        display_color="#000000",
+        display_order=0,
+        provider_kind=MagicMock(),
+        display_name="Test Exchange",
+        adapter_id=adapter_id,
+        api_key="key",
+        api_secret="secret",
+        api_passphrase=None,
+        secret_store=store,
+    )
 
+
+def _read_only_store():
+    from tallykeep.infrastructure.secrets import InMemorySecretStore
     store = InMemorySecretStore()
     store.initialize("test")
+    return store
 
+
+def test_create_account_holding_rejects_trade_permissions(monkeypatch) -> None:  # type: ignore[no-untyped-def]
+    """create_account_holding raises TradePermissionsDetected when the adapter
+    reports can_trade=True via detected_extra_permissions."""
+    from tallykeep.services.treasury_service import create_account_holding
+
+    store = _read_only_store()
     mock_adapter = MagicMock()
     mock_adapter.get_permissions.return_value = MagicMock(
-        can_read=True, can_trade=True, can_withdraw=False
+        can_read=True, can_trade=True, can_withdraw=False,
+        detected_extra_permissions=["Trade"],
     )
 
     with patch("tallykeep.services.treasury_service.build_adapter", return_value=mock_adapter):
         with pytest.raises(TradePermissionsDetected):
-            create_account_holding(
-                MagicMock(),
-                name="Test",
-                description=None,
-                purpose=Purpose.SPENDING,
-                declared_security=SecurityClaim(
-                    custody_model=CustodyModel.THIRD_PARTY,
-                    signing_model=SigningModel.NOT_APPLICABLE,
-                ),
-                display_color="#000000",
-                display_order=0,
-                provider_kind=MagicMock(),
-                display_name="Test Exchange",
-                adapter_id="kraken",
-                api_key="key",
-                api_secret="secret",
-                api_passphrase=None,
-                whitelist_address="tb1q...",
-                whitelist_address_descriptor_id=uuid4(),
-                secret_store=store,
-            )
+            create_account_holding(**_account_creation_args(store))
 
 
 def test_create_account_holding_rejects_unknown_adapter() -> None:
     """Unsupported adapter_id raises TreasuryServiceError, not a bare ValueError."""
-    from tallykeep.infrastructure.secrets import InMemorySecretStore
     from tallykeep.services.treasury_service import create_account_holding
 
-    store = InMemorySecretStore()
-    store.initialize("test")
-
     with pytest.raises(TreasuryServiceError, match="Unsupported adapter"):
-        create_account_holding(
-            MagicMock(),
-            name="Test",
-            description=None,
-            purpose=Purpose.SPENDING,
-            declared_security=SecurityClaim(
-                custody_model=CustodyModel.THIRD_PARTY,
-                signing_model=SigningModel.NOT_APPLICABLE,
-            ),
-            display_color="#000000",
-            display_order=0,
-            provider_kind=MagicMock(),
-            display_name="Test Exchange",
-            adapter_id="nonexistent_exchange_xyz",
-            api_key="key",
-            api_secret="secret",
-            api_passphrase=None,
-            whitelist_address="tb1q...",
-            whitelist_address_descriptor_id=uuid4(),
-            secret_store=store,
-        )
+        create_account_holding(**_account_creation_args(_read_only_store(), adapter_id="nonexistent_xyz"))
+
+
+def test_create_account_holding_ok_returns_balance_tuple() -> None:
+    """Read-only key with no extra permissions succeeds and returns balance data."""
+    from tallykeep.services.treasury_service import create_account_holding
+
+    store = _read_only_store()
+    mock_adapter = MagicMock()
+    mock_adapter.get_permissions.return_value = MagicMock(
+        can_read=True, can_trade=False, can_withdraw=False,
+        detected_extra_permissions=[],
+    )
+    mock_adapter.get_balance.return_value = 1_500_000
+    mock_adapter.get_other_balances.return_value = {"ETH": "1.5", "SOL": "10.0"}
+
+    with patch("tallykeep.services.treasury_service.build_adapter", return_value=mock_adapter):
+        with patch("tallykeep.services.treasury_service.cp_repo") as mock_cp, \
+             patch("tallykeep.services.treasury_service.holding_repo"):
+            mock_cp.create.return_value = None
+            holding, provider, btc_sats, other = create_account_holding(
+                **_account_creation_args(store)
+            )
+
+    assert btc_sats == 1_500_000
+    assert set(other.keys()) == {"ETH", "SOL"}
+    assert provider.whitelist_address is None
+    assert provider.whitelist_address_descriptor_id is None
+
+
+def test_create_account_holding_overage_withdraw_funds() -> None:
+    """Key with 'Withdraw funds' is rejected with OveragePermissionsDetected."""
+    from tallykeep.services.treasury_service import create_account_holding
+
+    store = _read_only_store()
+    mock_adapter = MagicMock()
+    mock_adapter.get_permissions.return_value = MagicMock(
+        can_read=True, can_trade=False, can_withdraw=True,
+        detected_extra_permissions=["Withdraw funds"],
+    )
+
+    with patch("tallykeep.services.treasury_service.build_adapter", return_value=mock_adapter):
+        with pytest.raises(OveragePermissionsDetected) as exc_info:
+            create_account_holding(**_account_creation_args(store))
+
+    assert exc_info.value.extra_permissions == ["Withdraw funds"]
+
+
+def test_create_account_holding_overage_multiple_permissions() -> None:
+    """Key with Trade + Margin is rejected; all detected names are reported."""
+    from tallykeep.services.treasury_service import create_account_holding
+
+    store = _read_only_store()
+    mock_adapter = MagicMock()
+    mock_adapter.get_permissions.return_value = MagicMock(
+        can_read=True, can_trade=True, can_withdraw=False,
+        detected_extra_permissions=["Trade", "Margin"],
+    )
+
+    with patch("tallykeep.services.treasury_service.build_adapter", return_value=mock_adapter):
+        with pytest.raises(OveragePermissionsDetected) as exc_info:
+            create_account_holding(**_account_creation_args(store))
+
+    assert set(exc_info.value.extra_permissions) == {"Trade", "Margin"}
