@@ -246,3 +246,4 @@ Brand: wordmark-icony viewBox v1 → v2 (tightened from 460 to
 Closeout: OpenAPI regenerated, `tools/check-spec.ps1` created
 and passing (6 checks), smoke-test updated with device-credential
 auth headers and a principles-acknowledgment section.
+sion.

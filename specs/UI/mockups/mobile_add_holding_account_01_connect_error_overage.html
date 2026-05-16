@@ -2,8 +2,15 @@
   Title: Mobile — Add Account · step 1 (connect — overage rejected error state)
   Status: validated  (Rémy greenlight 2026-05-16 closing the
                       Account-wizard design pass; tap-to-clear
-                      coding rule documented below)
-  Date last touched: 2026-05-16
+                      coding rule documented below.
+                      Observation-scope amendment per ADR-0012:
+                      helper-banner and danger-band overage copy
+                      updated in place 2026-05-17 to require Query
+                      funds AND Query ledger entries — the
+                      observation set; tap-to-clear behaviour,
+                      structural shape, and overage-rejection
+                      semantics unchanged.)
+  Date last touched: 2026-05-17
   Replaces: nothing on disk. Sibling shape to the other wizards' inline
             error variants (e.g.
             mobile_add_holding_strongbox_input_error_inline.html).
@@ -11,11 +18,13 @@
   Design notes:
   - User flow that lands here:
       1. User filled both fields on _01_connect.html with a key that
-         had Withdraw funds (or Trade, Margin, Futures, Earn) enabled.
+         had Withdraw funds (or Trade, Margin, Futures, Earn) enabled
+         on top of the observation permissions.
       2. Tapped Continue.
       3. Backend called Kraken's key-permissions endpoint, found
-         extra permissions beyond Query funds, returned a hard-reject
-         response.
+         permissions outside the locked observation set
+         (Query funds + Query ledger entries per ADR-0012), returned
+         a hard-reject response.
   - Same chrome and layout as _01_connect.html — provider dropdown,
     helper banner, shown-once warning, credentials section. The
     difference is a danger band below the credentials, above the
@@ -24,8 +33,9 @@
       - Title: short, definite ("This key has too many permissions")
       - Body: which extra permissions were detected (specific —
         backend knows exactly which boxes are ticked, surfaces them
-        by name), what to do (create a fresh key with only Query
-        funds).
+        by name), what to do (create a fresh key with only the
+        observation set — Query funds + Query ledger entries on
+        Kraken).
       - No CTA inside the band — the user re-pastes new credentials
         and re-taps Continue.
   - Continue button stays enabled (so re-paste-then-tap-Continue
@@ -331,7 +341,7 @@
 <div class="mockup-meta">
   <strong>Mobile — Add Account · 1 of 3 · Connect — Overage error</strong> ·
   <span class="status-validated">validated</span> ·
-  2026-05-16 · 360×800
+  2026-05-17 · 360×800
 </div>
 
 <div class="phone-frame">
@@ -383,7 +393,8 @@
           <p class="hint-body">
             <strong>Settings → Connection and API → Create an API key.</strong>
             Name it <code>TallyKeep Read</code> and tick
-            <strong>only</strong> <code>Query funds</code>.
+            <strong>only</strong> <code>Query funds</code> and
+            <code>Query ledger entries</code>.
           </p>
         </div>
       </div>
@@ -460,7 +471,8 @@
           </ul>
           <p class="danger-body" style="margin-top: var(--space-2);">
             Replace these keys on Kraken Pro with ones that have
-            <strong>ONLY</strong> <code>Query funds</code> ticked.
+            <strong>ONLY</strong> <code>Query funds</code> and
+            <code>Query ledger entries</code> ticked.
             Then paste the new pair here.
           </p>
         </div>

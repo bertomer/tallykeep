@@ -6,7 +6,7 @@ A self-hosted, Bitcoin-first application that integrates three personal-finance 
 
 - **Savings** — watch-only multi-Holding view over user-controlled Bitcoin, with UTXO hygiene flags, transaction categorization, and security-claim verification (declared vs observable).
 - **Payment** — on-chain Bitcoin send and receive via PSBT (signed on an external device, or on the Capacitor client for Purses with on-device keys per ADR-0009). Lightning support is deferred to a future iteration behind a defined interface (see `concerns/lightning_placeholder.md`).
-- **Treasury** — read + withdrawal balance aggregation across custodial providers (centralized exchanges and brokers), plus policy-driven auto-sweep between any two Holdings ("minimum-exposure"). Direct trading from custodian (order placement) is **not** in scope and is captured for much later — TallyKeep is a treasury surface, not a trading terminal.
+- **Treasury** — balance aggregation across custodial providers (centralized exchanges and brokers) with native BTC flow control in both directions: outflow (Account → TK Holding, via the provider's withdraw API) and inflow (TK Holding → Account, via PSBT broadcast to a pinned deposit address). Both directions are driven by SweepPolicies (scheduled or threshold-triggered) and by manual one-off actions on the Account detail page. Direct trading from the custodian (buy/sell order routing) is **not** in scope and is captured for much later — TallyKeep is a treasury surface, not a trading terminal.
 
 Banking is the *whole* product — these three are its functional surfaces.
 
@@ -29,7 +29,7 @@ Marketing voice should foreground the first two layers — concrete utility for 
 1. **Honest abstraction.** Reuse familiar banking vocabulary in the UI; surface Bitcoin reality in detail panes; never hide consequences.
 2. **Holdings are first-class and typed.** Account, Purse, Strongbox, Vault are not labels — they are distinct types in the domain, each with its own creation flow, security profile, and operational rules.
 3. **Declared security versus observable security.** The user declares what each Holding is supposed to be; the analyzer continuously checks whether the on-chain reality matches the declaration. Discrepancies are surfaced.
-4. **Minimum-exposure trading.** Custodial providers are pass-through liquidity, not storage. Funds leave them as fast as policy allows.
+4. **BTC-only at the provider boundary.** Account flows operate on BTC only. TallyKeep never initiates, holds, or transfers fiat; fiat balances at the provider are read-only display only. Withdraw and Deposit are both native Account capabilities, driven by SweepPolicies (bi-directional) or by manual one-off actions.
 5. **Generalized SweepPolicy.** Not just "exchange to cold." Any Holding to any Holding, with a safety validator that warns about risky configurations but never blocks. The user is the final authority; the validator just makes sure they know what they are doing before they do it.
 6. **No custody of funds. Key custody is bounded and explicit.** TallyKeep never custodies user funds and never creates user accounts on TallyKeep infrastructure. Where signing keys live is a four-zone model (per ADR-0009):
    - *Backend:* never holds spending keys, ever. Holds descriptors (public-key info), custodial-provider API credentials (encrypted at rest with the user's passphrase), configuration.
@@ -61,7 +61,7 @@ blocking work live in `pre-implementation.md`.
 - Watch-only Holdings (Account, Purse, Strongbox, Vault) with descriptor-based wallets
 - Node integration via local `bitcoind` JSON-RPC plus ZeroMQ subscription for live chain events
 - PSBT construction, export (file and QR), re-import, and broadcast
-- Custodial provider integration (Kraken, Bitstamp) via the ccxt library — read + withdrawal-to-whitelist permissions; **no order placement**, ever. Withdrawal is in dev-phase scope because SweepPolicies need it.
+- Custodial provider integration (Kraken, Bitstamp) via the ccxt library — observation (balance + ledger entries, both read-only at the provider, per ADR-0012) plus withdrawal-to-whitelist plus deposit-to-pinned-address. **No order placement at the provider** — the user trades on the provider's site directly. Both BTC flows (Withdraw and Deposit) are in dev-phase scope because SweepPolicies need both directions.
 - Generalized sweep policies between any two Holdings, with a safety validator that warns but does not block
 - Live blockchain scanning and user-driven transaction categorization
 - UTXO hygiene flags computed in the backend (address reuse, dust, change larger than payment, suspected consolidation) — UI surface deferred per `future_iterations.md`

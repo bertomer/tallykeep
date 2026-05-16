@@ -1,34 +1,50 @@
 # Sweep policies — cross-Holding automated rebalancing
 
-The **SweepPolicy** primitive moves value automatically from one
+The **SweepPolicy** primitive moves BTC automatically from one
 Holding to another under specified conditions. Generalized:
-**any Holding to any Holding**, with a safety validator that
-warns but never blocks. The user is the final authority.
+**any Holding to any Holding**, in any direction, with a safety
+validator that warns but never blocks. The user is the final
+authority.
 
 ## Why this primitive matters
 
-Two product patterns are powered by the same primitive:
+The primitive powers three product patterns natively, all in
+dev-phase scope at the architectural level:
 
-- **Minimum-exposure trading** (the bread-and-butter pre-shipping
-  use case) — Account → Strongbox/Vault. The CustodialProvider
-  is pass-through liquidity; SweepPolicies enforce *get the BTC
-  off the provider as fast as policy allows.* See
-  `holdings/01_account.md` for the Account-side product
-  principle.
-- **Holding-to-Holding rebalancing** — e.g. Strongbox → Purse
-  ("top up the spending stack"), Purse → Strongbox ("daily
-  spending bounded"), Strongbox → Vault ("promote to long-term").
-  **Purse-on-device → anywhere is in dev-phase scope** (sweep
-  fires on the Capacitor device that holds the seed; biometric
-  prompt + native sign + broadcast). **Strongbox- and
-  Vault-source sweeps stay scheduled-reminder shape** (no
-  auto-execution; the user signs externally) — architecturally
+- **Outflow** (Account → TK Holding) — sweeping BTC off a
+  custodial provider into a self-custody Holding. The bread-and-
+  butter accumulation pattern. Fires the provider's withdraw API
+  via the Account's withdrawal credential.
+- **Inflow** (TK Holding → Account) — sending BTC to a custodial
+  provider from a self-custody Holding. The bread-and-butter
+  decumulation pattern — schedule BTC deposits to the provider
+  ahead of selling on the provider's site. Composes a PSBT on
+  the source-Holding side, broadcasts to the Account's pinned
+  deposit address.
+- **Inter-Holding rebalancing** (TK Holding → TK Holding) — e.g.
+  Strongbox → Purse ("top up the spending stack"), Purse →
+  Strongbox ("daily spending bounded"), Strongbox → Vault
+  ("promote to long-term"). PSBT-driven on both sides.
+
+The directionality is unconstrained at the type level. Whether a
+specific direction makes sense is the user's call; the validator
+makes sure they know what they're doing.
+
+**Source-side signing capability gates auto-execution:**
+
+- **Account source** (outflow) — auto-executes via the provider's
+  withdraw API.
+- **Purse-on-device source** (inflow or rebalance, on the
+  Capacitor device that holds the seed) — auto-executes via
+  biometric prompt + native sign + broadcast.
+- **Strongbox / Vault source** — reduces to a scheduled reminder
+  (no auto-execution; the user signs externally). Architecturally
   present, UI surface deferred per `future_iterations.md`
   "Holding-to-Holding sweeps beyond Account-originated".
 
-The Treasury layer is the primary user of this primitive (for
-Account → non-Account sweeps), but the primitive itself is
-cross-cutting.
+The Treasury layer is the primary user of the primitive for
+Account-touching flows (outflow and inflow); the same primitive
+also drives rebalancing between TK Holdings.
 
 ## Trigger types
 
@@ -143,13 +159,15 @@ When `treasury.sweep.triggered` fires (from the scheduler) or
 
 ### 3. Dispatch (per source-Holding-type)
 
-The dispatch differs by source:
+Dispatch differs by source — destination kind (Account vs TK
+Holding) determines where the BTC lands but does not change the
+source-side dispatch:
 
 | Source | Dispatch |
 |---|---|
-| **Account** | Call `CustodialProviderAdapter.withdraw(amount, whitelist_address)`. The adapter wraps ccxt and normalizes provider quirks. |
-| **TallyKeep-managed / External-imported Purse** on the device holding the seed | Construct a PaymentRequest (`concerns/outflow.md`), sign in-app via NativeBridge with biometric prompt, broadcast. |
-| **Strongbox / Vault** | Construct a PaymentRequest awaiting external signing. Reduces to a **scheduled reminder** — see "Non-auto sweeps" below. |
+| **Account** (outflow only — Account-source policies always have a TK-Holding destination per the whitelist invariant) | Call `CustodialProviderAdapter.withdraw(amount, whitelist_address)`. The adapter wraps ccxt and normalizes provider quirks. |
+| **TallyKeep-managed / External-imported Purse** on the device holding the seed (inflow or rebalance) | Construct a PaymentRequest (`concerns/outflow.md`), sign in-app via NativeBridge with biometric prompt, broadcast to the destination address. For inflow, the destination address is the destination Account's `deposit_address`; for rebalance, it's a derived address of the destination TK Holding. |
+| **Strongbox / Vault** (inflow or rebalance) | Construct a PaymentRequest awaiting external signing; destination address resolved the same way as above. Reduces to a **scheduled reminder** — see "Non-auto sweeps" below. |
 | **TallyKeep-managed / External-imported Purse** on any other client, or **External-watch-only Purse** | Sweep cannot execute. UX surfaces "go sign on the device that holds the seed" or "spending happens in the source wallet." |
 
 On dispatch, set `sweep_execution.status=DISPATCHED` and store
@@ -261,39 +279,57 @@ sweep_execution.status = COMPLETED
 LedgerEntry suggested category = CUSTODIAL_WITHDRAWAL
 ```
 
-## Inter-Holding rebalancing (Holding-to-Holding)
+## Inflow and inter-Holding rebalancing (PSBT-driven dispatch)
 
-The same primitive supports user-driven rebalancing. Examples:
+The same primitive supports any sweep whose source is a TK
+Holding (Purse / Strongbox / Vault). The destination can be
+another TK Holding (rebalancing) or a custodial Account
+(inflow / scheduled decumulation). Examples:
 
-- Strongbox → Purse, top up to 50,000 sats every Monday.
+- Strongbox → Purse, top up to 50,000 sats every Monday
+  (rebalance).
 - Purse → Strongbox, threshold-based when daily-spending
-  balance exceeds a cap.
+  balance exceeds a cap (rebalance).
 - Strongbox → Vault, threshold-based when reserve exceeds
-  600,000 sats ("promote to long-term").
+  600,000 sats ("promote to long-term"; rebalance).
+- Purse → Kraken Account, 0.01 BTC monthly to fund scheduled
+  selling on the provider's site (inflow / decumulation).
+- Strongbox → Kraken Account, threshold-based when reserve
+  exceeds a chosen ceiling and the user wants to monetize
+  partially (inflow / decumulation).
 
-Mechanics differ from Account-source sweeps: the SweepEngine
-constructs a PaymentRequest, the user signs (in-app on
-Capacitor for on-device Purses, externally for Strongbox / Vault),
-broadcast happens via the normal outflow flow. The sweep is
-driven by the policy but the signing remains user-controlled.
+Mechanics: the SweepEngine constructs a PaymentRequest, the user
+signs (in-app on Capacitor for on-device Purses, externally for
+Strongbox / Vault), broadcast happens via the normal outflow
+flow. The destination address resolution depends on the
+destination Holding type: a TK Holding yields a derived address
+from its descriptor; an Account yields its `deposit_address`
+pinned by the user.
 
-UX for non-Account-source sweeps is deferred (per
+UX for non-Account-source sweeps (the source-side composition,
+review, sign, broadcast surface) is deferred (per
 `future_iterations.md` "Holding-to-Holding sweeps beyond
-Account-originated"). The architectural primitive ships pre-
-shipping; only the UI surface is deferred.
+Account-originated", which now covers both inter-Holding
+rebalancing and TK → Account inflow). The architectural
+primitive ships pre-shipping; the UI surface for these flows
+follows once Send / Receive iterations land.
 
 ## What the user sees (target UX)
 
-The Treasury view shows, per Account Holding:
+The Account detail page shows, per Account:
 
-- Active SweepPolicy summaries ("Auto-sweep weekly every Friday
-  at 03:00 to Strongbox").
-- "Sweep now" button.
-- Recent sweep history with status badges.
+- Active outflow SweepPolicy summaries ("Auto-sweep weekly
+  every Friday at 03:00 to Strongbox").
+- Active inflow SweepPolicy summaries ("Deposit 0.01 BTC
+  monthly from Purse").
+- Withdraw and Deposit one-off actions (per
+  `holdings/01_account.md` §"What the user sees").
+- Recent activity from the observation ledger including
+  TK-initiated sweep executions (both directions).
 
-For non-Account Holdings with outgoing SweepPolicies
-(rebalancing), the same panel appears on the Holding's detail
-page when that UX ships.
+For TK Holdings with outgoing SweepPolicies (rebalance or
+inflow), the same panel appears on the Holding's detail page
+when that UX ships.
 
 Specific layout and component naming lives in `UI/README.md`
 and the iteration that ships the sweep-creation UI.

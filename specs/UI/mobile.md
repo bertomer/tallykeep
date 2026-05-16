@@ -2063,7 +2063,9 @@ dropdown (searchable; v1 list = Kraken only — see ADR-0011 for
 the v1 scope cut). Per-provider helper banner appears once a
 provider is selected (info palette, compressed): create the
 read-only key on the provider, name it `TallyKeep Read`, enable
-only the balance-query permission, leave everything else off.
+only the observation-permission set (for Kraken, `Query funds`
+and `Query ledger entries` per ADR-0012), leave everything else
+off.
 Sub-banner warning (warning palette) about the provider's
 shown-once behavior: copy both keys before closing the dialog;
 losing one means deleting the key and creating a new one. Two
@@ -2077,8 +2079,9 @@ provider's key-permissions endpoint:
 
 - Auth failure → inline error "Invalid API Key or Private Key,"
   user re-pastes.
-- Permission overage (any permission beyond the single
-  balance-query scope) → danger band, see error variant below.
+- Permission overage (any permission beyond the locked
+  observation set) or underage (any required observation
+  permission missing) → danger band, see error variant below.
 - OK → backend persists encrypted credential, fires initial
   poll, advances to Step 2.
 
@@ -2090,7 +2093,8 @@ minimum-exposure posture, lists the specific overage
 permissions detected (verbatim from the provider's key-
 permissions response, using the provider's permission names),
 and tells the user to replace the keys on the provider with
-ones that have only the balance-query permission ticked.
+ones that have only the observation set ticked (for Kraken,
+`Query funds` and `Query ledger entries`).
 
 **Tap-to-clear coding rule (Rémy 2026-05-16).** When the user
 focuses either input field (API Key or Private Key) after a

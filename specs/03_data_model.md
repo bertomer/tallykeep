@@ -166,7 +166,7 @@ CREATE TABLE custodial_provider (
     api_secret_reference VARCHAR(200) NOT NULL,
     api_passphrase_reference VARCHAR(200),
     can_read BOOLEAN NOT NULL DEFAULT TRUE CHECK (can_read = TRUE),
-    can_trade BOOLEAN NOT NULL DEFAULT FALSE CHECK (can_trade = FALSE),  -- locked invariant: no order placement
+    can_trade BOOLEAN NOT NULL DEFAULT FALSE CHECK (can_trade = FALSE),  -- locked invariant: TallyKeep does not route orders at the provider
     can_withdraw BOOLEAN NOT NULL DEFAULT FALSE,
     whitelist_address VARCHAR(100) NOT NULL,
     whitelist_address_descriptor_id UUID NOT NULL REFERENCES descriptor(id),

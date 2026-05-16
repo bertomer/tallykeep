@@ -21,16 +21,25 @@
     margin: 0 0 var(--space-6);
     max-width: 720px;
   }
-  .filters {
+  .filter-row {
     display: flex;
     gap: var(--space-3);
-    margin-bottom: var(--space-5);
+    margin-bottom: var(--space-3);
     flex-wrap: wrap;
     align-items: center;
+  }
+  .filter-row:last-of-type {
+    margin-bottom: var(--space-5);
   }
   .filter-label {
     font-size: var(--font-size-sm);
     color: var(--color-text-muted);
+    min-width: 64px;
+  }
+  #group-filters {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-3);
   }
   .filter-btn {
     padding: var(--space-1) var(--space-3);
@@ -48,7 +57,7 @@
   }
   .grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
     gap: var(--space-5);
   }
   .card {
@@ -93,18 +102,35 @@
   .badge-draft     { background: var(--color-warning-soft); color: var(--color-warning); }
   .badge-review    { background: var(--color-info-soft);    color: var(--color-info); }
   .badge-validated { background: var(--color-success-soft); color: var(--color-success); }
+  /*
+    Preview sizing — tuned so every card shows the complete phone-screen
+    including the bottom nav and any primary CTA above it.
+
+    Each mockup body lays out as:
+      padding-top  : var(--space-7) = 48px
+      phone-frame  : 360 × 800 (border-box)
+      padding-bot. : var(--space-7) = 48px
+      sides        : var(--space-4) = 16px each
+    => body content area is exactly 392 × 896. The iframe is pinned to
+    that size and scaled by JS to fit the card width, and the .preview
+    aspect-ratio matches so there is no spare body-background showing
+    above/below the phone-frame. If you change the body padding in
+    _shared/shell.css, update IFRAME_W / IFRAME_H below in lockstep.
+  */
   .preview {
     width: 100%;
-    height: 340px;
+    aspect-ratio: 392 / 896;
     overflow: hidden;
     position: relative;
     background: #cbd5e1;
   }
   .preview iframe {
-    width: 200%;
-    height: 200%;
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 392px;
+    height: 896px;
     border: 0;
-    transform: scale(0.5);
     transform-origin: top left;
     pointer-events: none;
   }
@@ -137,130 +163,191 @@
   across screens (colors, type, spacing, navigation, conventions).
 </p>
 
-<div class="filters">
-  <span class="filter-label">Filter:</span>
-  <button class="filter-btn active" data-filter="all">All</button>
-  <button class="filter-btn" data-filter="draft">Draft</button>
-  <button class="filter-btn" data-filter="review">Review</button>
-  <button class="filter-btn" data-filter="validated">Validated</button>
+<div class="filter-row">
+  <span class="filter-label">Section:</span>
+  <div id="group-filters"></div>
+</div>
+<div class="filter-row">
+  <span class="filter-label">Status:</span>
+  <button class="filter-btn active" data-status="all">All</button>
+  <button class="filter-btn" data-status="draft">Draft</button>
+  <button class="filter-btn" data-status="review">Review</button>
+  <button class="filter-btn" data-status="validated">Validated</button>
 </div>
 
 <div id="grid" class="grid"></div>
 
 <script>
+  // Section pills — ordered by user lifecycle, not by spec drafting
+  // order. Adding a new group? Add it here in lifecycle position, then
+  // reference its id from each new mockup entry's `group` field.
+  const GROUPS = [
+    { id: 'onboarding',  label: 'Onboarding' },
+    { id: 'unlock',      label: 'Unlock' },
+    { id: 'home',        label: 'Home' },
+    { id: 'add-holding', label: 'Add holding' },
+    { id: 'account',     label: 'Account wizard' },
+    { id: 'purse',       label: 'Purse wizard' },
+    { id: 'strongbox',   label: 'Strongbox wizard' },
+    { id: 'vault',       label: 'Vault wizard' },
+  ];
+
   // Mockup index — update when adding or removing files.
-  // Each entry: { file, title, status (draft|review|validated) }
+  // Each entry: { file, title, status (draft|review|validated), group }
+  // `group` MUST match an id in GROUPS above. No ad-hoc groups.
   const mockups = [
     { file: 'mobile_onboarding_01_connect.html',
       title: 'Onboarding 01 — Connect',
-      status: 'validated' },
+      status: 'validated', group: 'onboarding' },
     { file: 'mobile_onboarding_02_paired.html',
       title: 'Onboarding 02 — Paired (initial)',
-      status: 'validated' },
+      status: 'validated', group: 'onboarding' },
     { file: 'mobile_onboarding_02_paired_biometric_done.html',
       title: 'Onboarding 02 — Biometric enabled',
-      status: 'validated' },
+      status: 'validated', group: 'onboarding' },
     { file: 'mobile_onboarding_02_paired_skip_confirm.html',
       title: 'Onboarding 02 — Skip-biometric confirm',
-      status: 'validated' },
+      status: 'validated', group: 'onboarding' },
     { file: 'mobile_onboarding_02_paired_no_biometric.html',
       title: 'Onboarding 02 — No biometric capacity',
-      status: 'validated' },
+      status: 'validated', group: 'onboarding' },
     { file: 'mobile_unlock_biometric.html',
       title: 'Unlock — biometric default',
-      status: 'validated' },
+      status: 'validated', group: 'unlock' },
     { file: 'mobile_unlock_passphrase.html',
       title: 'Unlock — passphrase entry',
-      status: 'validated' },
+      status: 'validated', group: 'unlock' },
     { file: 'mobile_home_empty.html',
       title: 'Home — empty',
-      status: 'validated' },
+      status: 'validated', group: 'home' },
     { file: 'mobile_home_populated.html',
       title: 'Home — populated (one row per type)',
-      status: 'validated' },
+      status: 'validated', group: 'home' },
     { file: 'mobile_add_holding_picker.html',
       title: 'Add Holding — picker (sheet over Home empty)',
-      status: 'validated' },
+      status: 'validated', group: 'add-holding' },
     { file: 'mobile_add_holding_coming_soon.html',
       title: 'Add Holding — coming-soon stub (Purse shown; parameterized in production)',
-      status: 'validated' },
+      status: 'validated', group: 'add-holding' },
     { file: 'mobile_add_holding_purse_input.html',
       title: 'Add Purse · 1 of 3 — Input (Generate + Import)',
-      status: 'validated' },
+      status: 'validated', group: 'purse' },
     { file: 'mobile_add_holding_purse_input_error_inline.html',
       title: 'Add Purse · 1 of 3 — Inline error (single address)',
-      status: 'validated' },
+      status: 'validated', group: 'purse' },
     { file: 'mobile_add_holding_purse_input_error_redirect.html',
       title: 'Add Purse · 1 of 3 — Redirect error (multisig → Vault)',
-      status: 'validated' },
+      status: 'validated', group: 'purse' },
     { file: 'mobile_add_holding_purse_generate.html',
       title: 'Add Purse · 1 of 3 — Generate (alt path, pre-reveal)',
-      status: 'validated' },
+      status: 'validated', group: 'purse' },
     { file: 'mobile_add_holding_purse_generate_revealed.html',
       title: 'Add Purse · 1 of 3 — Generate (alt path, revealed)',
-      status: 'validated' },
+      status: 'validated', group: 'purse' },
     { file: 'mobile_add_holding_purse_parseback.html',
       title: 'Add Purse · 2 of 3 — Parse-back (with auto-name preview)',
-      status: 'validated' },
+      status: 'validated', group: 'purse' },
     { file: 'mobile_add_holding_purse_success_imported.html',
       title: 'Add Purse · 3 of 3 — Success (imported / watch-only)',
-      status: 'validated' },
+      status: 'validated', group: 'purse' },
     { file: 'mobile_add_holding_purse_success_generated.html',
       title: 'Add Purse · 3 of 3 — Success (TallyKeep-generated)',
-      status: 'validated' },
+      status: 'validated', group: 'purse' },
     { file: 'mobile_add_holding_strongbox_input.html',
       title: 'Add Strongbox · 1 of 3 — Input (vendor + descriptor + QR/file)',
-      status: 'validated' },
+      status: 'validated', group: 'strongbox' },
     { file: 'mobile_add_holding_strongbox_input_error_inline.html',
       title: 'Add Strongbox · 1 of 3 — Inline error (single address)',
-      status: 'validated' },
+      status: 'validated', group: 'strongbox' },
     { file: 'mobile_add_holding_strongbox_input_error_redirect.html',
       title: 'Add Strongbox · 1 of 3 — Redirect error (multisig → Vault)',
-      status: 'validated' },
+      status: 'validated', group: 'strongbox' },
     { file: 'mobile_add_holding_strongbox_input_advisory_no_metadata.html',
       title: 'Add Strongbox · 1 of 3 — Advisory (no signing metadata)',
-      status: 'validated' },
+      status: 'validated', group: 'strongbox' },
     { file: 'mobile_add_holding_strongbox_parseback.html',
       title: 'Add Strongbox · 2 of 3 — Parse-back (with auto-name preview)',
-      status: 'validated' },
+      status: 'validated', group: 'strongbox' },
     { file: 'mobile_add_holding_strongbox_parseback_no_metadata.html',
       title: 'Add Strongbox · 2 of 3 — Parse-back (Derivation row tinted)',
-      status: 'validated' },
+      status: 'validated', group: 'strongbox' },
     { file: 'mobile_add_holding_strongbox_success.html',
       title: 'Add Strongbox · 3 of 3 — Success',
-      status: 'validated' },
+      status: 'validated', group: 'strongbox' },
     { file: 'mobile_add_holding_vault_input.html',
       title: 'Add Vault · 1 of 3 — Input (descriptor)',
-      status: 'validated' },
+      status: 'validated', group: 'vault' },
     { file: 'mobile_add_holding_vault_input_error_redirect.html',
       title: 'Add Vault · 1 of 3 — Redirect error (single-key no timelock → Strongbox)',
-      status: 'validated' },
+      status: 'validated', group: 'vault' },
     { file: 'mobile_add_holding_vault_input_error_inline.html',
       title: 'Add Vault · 1 of 3 — Inline error (unsupported descriptor)',
-      status: 'validated' },
+      status: 'validated', group: 'vault' },
     { file: 'mobile_add_holding_vault_parseback.html',
       title: 'Add Vault · 2 of 3 — Parse-back (unified, covers all shapes)',
-      status: 'validated' },
+      status: 'validated', group: 'vault' },
     { file: 'mobile_add_holding_vault_success.html',
       title: 'Add Vault · 3 of 3 — Success',
-      status: 'validated' },
+      status: 'validated', group: 'vault' },
     { file: 'mobile_add_holding_account_01_connect.html',
       title: 'Add Account · 1 of 3 — Connect (provider + credentials, default)',
-      status: 'validated' },
+      status: 'validated', group: 'account' },
     { file: 'mobile_add_holding_account_01_connect_error_overage.html',
       title: 'Add Account · 1 of 3 — Connect (key has too many permissions)',
-      status: 'validated' },
+      status: 'validated', group: 'account' },
     { file: 'mobile_add_holding_account_02_parseback.html',
       title: 'Add Account · 2 of 3 — Parse-back (provider + permission + multi-asset)',
-      status: 'validated' },
+      status: 'validated', group: 'account' },
     { file: 'mobile_add_holding_account_03_success.html',
       title: 'Add Account · 3 of 3 — Success (balance + capability-gated auto-sweep CTA)',
-      status: 'validated' },
+      status: 'validated', group: 'account' },
   ];
 
+  // Body content area for each mockup (see CSS comment above .preview).
+  // Keep in lockstep with _shared/shell.css body padding + phone-frame.
+  const IFRAME_W = 392;
+  const IFRAME_H = 896;
+
   const grid = document.getElementById('grid');
-  const filterButtons = document.querySelectorAll('.filter-btn');
-  let currentFilter = 'all';
+  const groupFiltersEl = document.getElementById('group-filters');
+  let currentStatus = 'all';
+  let currentGroup = 'all';
+
+  // Build the Section pill row. "All" first, then only the groups that
+  // have at least one mockup (so we don't ship dead pills).
+  function buildGroupFilters() {
+    const present = new Set(mockups.map(m => m.group));
+    const pills = [{ id: 'all', label: 'All' }]
+      .concat(GROUPS.filter(g => present.has(g.id)));
+    groupFiltersEl.innerHTML = pills.map(p => `
+      <button class="filter-btn ${p.id === 'all' ? 'active' : ''}"
+              data-group="${p.id}">${p.label}</button>
+    `).join('');
+    // Warn (in console) about entries pointing at unknown group ids so
+    // the agent notices a typo without breaking the page.
+    const known = new Set(GROUPS.map(g => g.id));
+    for (const m of mockups) {
+      if (!known.has(m.group)) {
+        console.warn(`Mockup "${m.file}" has unknown group "${m.group}". ` +
+                     `Add it to GROUPS, or fix the typo.`);
+      }
+    }
+  }
+
+  // ResizeObserver scales each iframe to fit its preview width while
+  // keeping the body content area visible 1:1 (no overflow, no extra
+  // body background showing below the phone-frame).
+  const previewRO = new ResizeObserver(entries => {
+    for (const e of entries) {
+      const iframe = e.target.querySelector('iframe');
+      if (iframe) {
+        // Force iframe natural size + scale (defensive — also set in CSS).
+        iframe.style.width  = IFRAME_W + 'px';
+        iframe.style.height = IFRAME_H + 'px';
+        iframe.style.transform = `scale(${e.contentRect.width / IFRAME_W})`;
+      }
+    }
+  });
 
   function render() {
     if (mockups.length === 0) {
@@ -274,14 +361,15 @@
     }
 
     grid.innerHTML = '';
-    const filtered = currentFilter === 'all'
-      ? mockups
-      : mockups.filter(m => m.status === currentFilter);
+    const filtered = mockups.filter(m =>
+      (currentStatus === 'all' || m.status === currentStatus) &&
+      (currentGroup  === 'all' || m.group  === currentGroup)
+    );
 
     if (filtered.length === 0) {
       grid.innerHTML = `
         <div class="empty" style="grid-column: 1 / -1;">
-          No mockups in status "${currentFilter}".
+          No mockups match the current filters.
         </div>`;
       return;
     }
@@ -303,17 +391,29 @@
           <iframe src="${m.file}" loading="lazy"></iframe>
         </div>`;
       grid.appendChild(card);
+      previewRO.observe(card.querySelector('.preview'));
     }
   }
 
-  filterButtons.forEach(btn => {
-    btn.addEventListener('click', () => {
-      currentFilter = btn.dataset.filter;
-      filterButtons.forEach(b => b.classList.toggle('active', b === btn));
+  function wireFilters() {
+    document.addEventListener('click', e => {
+      const btn = e.target.closest('.filter-btn');
+      if (!btn) return;
+      if (btn.dataset.status !== undefined) {
+        currentStatus = btn.dataset.status;
+        document.querySelectorAll('[data-status]').forEach(b =>
+          b.classList.toggle('active', b === btn));
+      } else if (btn.dataset.group !== undefined) {
+        currentGroup = btn.dataset.group;
+        document.querySelectorAll('[data-group]').forEach(b =>
+          b.classList.toggle('active', b === btn));
+      }
       render();
     });
-  });
+  }
 
+  buildGroupFilters();
+  wireFilters();
   render();
 </script>
 </body>

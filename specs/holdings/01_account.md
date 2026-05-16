@@ -11,14 +11,17 @@ manages keys with the provider, not with TallyKeep. TallyKeep
 holds only the API credentials, encrypted at rest with the user's
 passphrase.
 
-**Credential model (ADR-0011):** Account credentials are split
-across two independent provider-side API keys, each scoped to one
-capability. The **read-only key** is mandatory and captured at
-onboarding (Add Account wizard). The **withdrawal key** is
-optional and configured separately, post-onboarding, via the
-Account detail page's Withdraw affordance. Both are stored
-encrypted on TallyKeep; neither has more permissions than the one
-TallyKeep operation it serves.
+**Credential model (ADR-0011, observation scope per ADR-0012):**
+Account credentials are split across two independent provider-side
+API keys, each scoped to one TK capability. The **read-only key**
+is mandatory and captured at onboarding (Add Account wizard); it
+carries the provider's full observation-permission set (balance
+query + ledger query for Kraken — both read-only, neither can move
+funds). The **withdrawal key** is optional and configured
+separately, post-onboarding, via the Account detail page's
+Withdraw affordance. Both are stored encrypted on TallyKeep;
+neither carries permissions beyond the one TK capability it serves
+(observation or withdrawal).
 
 ## Vocabulary
 
@@ -26,21 +29,43 @@ TallyKeep operation it serves.
 > framing carried through the spec since `00_README.md` to keep
 > custodial Holdings honest about their custody model.
 
-## Product principle: minimum-exposure trading
+## Product principle: BTC flow control between TK and the venue
 
-The CustodialProvider is **pass-through liquidity, not storage**.
-The design assumption: the user has placed (or will place) the
-trade manually on the provider's website. TallyKeep's job is to
-enforce *get the BTC off the provider as fast as policy allows.*
+An Account is the bridge between TallyKeep's self-custody zone and
+a custodial provider's BTC liquidity. TallyKeep's job is **BTC
+flow control in both directions** between the user's other Holdings
+and the venue:
 
-This is what distinguishes Account Holdings from a portfolio
-tracker. Order placement (`ccxt.create_order` and all trade
-endpoints) is **never called**; the API credential is registered
-with withdrawal-only permissions and Account creation rejects
-credentials with trade / margin / staking / futures permissions
-enabled. Order placement is captured in `future_iterations.md`
-("Order placement on custodial providers") and requires fresh
-regulatory evaluation before commit.
+- **Outflow** (Account → TK Holding) — sweeping BTC off the
+  provider into self-custody, typically after the user bought
+  BTC on the provider's site. Driven by SweepPolicies with
+  source = Account or by manual Withdraw on the Account detail
+  page.
+- **Inflow** (TK Holding → Account) — sending BTC to the provider
+  from a self-custody Holding, typically because the user is
+  about to sell on the provider's site to exit to fiat. Driven by
+  SweepPolicies with destination = Account or by manual Deposit
+  on the Account detail page.
+
+Both directions are native Account capabilities. Both operate on
+BTC only.
+
+**Locked principle: BTC only, no fiat operations.** TallyKeep never
+initiates, holds, or transfers fiat. Fiat balances at the provider
+are read-only display surface (consolidation rows, fiat-denominated
+thresholds in SweepPolicies). The fiat side of any sell trade
+happens on the provider's site, by the user, outside TallyKeep —
+TallyKeep observes the BTC balance change between two cycles.
+
+**Out of current scope: order placement at the provider.** TallyKeep
+does not route buy/sell orders on the user's behalf. The natural
+use case for order routing crosses the fiat boundary (BTC ↔ fiat
+trades), which is locked out. Order placement is therefore captured
+for much-later consideration in `future_iterations.md` ("Order
+placement on custodial providers"), gated on a separate regulatory
+evaluation if pursued. This is a scope cut, not a principle — the
+Account credential model and adapter shape do not preclude future
+order-placement work if regulatory ground is cleared.
 
 ## What an Account does
 
@@ -49,28 +74,47 @@ regulatory evaluation before commit.
   mandatory and captured at onboarding; the withdrawal
   credential is optional and configured separately later (see
   "Credentials — 2-key model" below).
-- **Polls** the provider's API on a schedule (default 10 min,
-  configurable 1–60 min) plus on demand. One polling call
-  fetches: current BTC balance, recent withdrawal history,
-  recent deposit history, other-asset balances (read-only).
-  This is the only source of truth about the Account — there is
-  no chain scan for an Account, because the Account doesn't have
-  a descriptor and TallyKeep doesn't know which on-chain
-  addresses belong to the user at the provider. Polling uses
-  the read-only credential.
+- **Observes** the provider's state on a schedule (default 10
+  min, configurable 1–60 min) plus on demand. One observation
+  cycle fetches: current BTC balance and other-asset balances
+  (the provider's balance endpoint), plus new ledger entries
+  since the last cycle (the provider's ledger endpoint —
+  deposits, withdrawals, trades, fees, transfers, all unified
+  in one feed). The ledger feed is the activity source for the
+  Account detail page's Operations tab. This is the only source
+  of truth about the Account — there is no chain scan for an
+  Account, because the Account doesn't have a descriptor and
+  TallyKeep doesn't know which on-chain addresses belong to the
+  user at the provider. Observation uses the read-only
+  credential's observation-permission set (per ADR-0012).
 - **Surfaces balance changes** by comparing the latest poll's
   balance to the previous one. A delta fires
   `treasury.custodial.balance_changed` (typically the result of
   a manual buy on the provider's website, a deposit, or an
   external withdrawal). The "detect" verb here = "noticed a
   balance change between two polls"; not chain scanning.
-- **Withdraws** to the pre-whitelisted destination address when
-  a SweepPolicy fires (see `concerns/sweep_policies.md`) or on
-  manual user request — **only when the Account has a
-  withdrawal credential configured** (post-onboarding via the
-  withdrawal sub-flow). Accounts without a withdrawal credential
-  watch-and-advise like external-key Holdings; SweepPolicies on
-  them fire as notifications, not as API calls.
+- **Withdraws** BTC to the pre-whitelisted destination address
+  when an outflow SweepPolicy fires (see
+  `concerns/sweep_policies.md`) or on manual user request via
+  the Account detail page's Withdraw affordance. Requires the
+  withdrawal credential to be configured (per the 2-key model;
+  see "Credentials" below). Accounts without a withdrawal
+  credential land outflow SweepPolicies in watch-and-advise
+  mode — the trigger fires, the user is told to act, but no
+  API call is made.
+- **Receives deposits** from the user's other Holdings. The
+  source-Holding side composes and signs a PSBT (Strongbox /
+  Vault / Purse machinery, no Account-side credential needed),
+  broadcasts as a regular outgoing Bitcoin transaction to the
+  Account's **pinned deposit address**. Driven by inflow
+  SweepPolicies (source = TK Holding, destination = this
+  Account) or by manual Deposit on the Account detail page.
+  TallyKeep observes the incoming deposit on the next
+  observation cycle as a ledger entry of kind `deposit`. The
+  pinned deposit address is captured once on the Account (user
+  pastes it from the provider's funding page); no provider-side
+  credential scope is required on the TallyKeep side for
+  deposits.
 - **Reconciles** withdrawals across two surfaces. When the
   provider reports a withdrawal in its history, TallyKeep
   expects a corresponding on-chain incoming transaction at the
@@ -131,13 +175,20 @@ during the Account-wizard design pass; the rationale lives in the
 ADR.
 
 - **Read-only credential (mandatory).** Captured at the Add
-  Account wizard. Carries only the provider's balance-query
-  permission (`Query funds` on Kraken). Used by TallyKeep for:
-  balance polling, withdrawal-history reconciliation, read-only
-  display of non-BTC balances. **Cannot move funds.** If this
-  credential ever leaks, the blast radius is information
-  disclosure of balance and history at the provider — nothing
-  is moved.
+  Account wizard. Carries the provider's full observation-
+  permission set — for Kraken (v1), this is `Query funds` **and**
+  `Query ledger entries` (both read-only flags on Kraken; neither
+  grants fund-movement capability). The exact accepted set is
+  declared per-provider on each `CustodialProviderAdapter` at
+  registration time; the wizard reads it for helper-banner copy
+  and for overage rejection (per ADR-0012). Used by TallyKeep
+  for: balance observation, activity-feed observation (ledger
+  entries — deposits, withdrawals, trades, fees, transfers, all
+  unified), withdrawal-history reconciliation, read-only display
+  of non-BTC balances. **Cannot move funds** under any
+  composition of the locked permissions. If this credential ever
+  leaks, the blast radius is information disclosure of balance
+  and history at the provider — nothing is moved.
 
 - **Withdrawal credential (optional, post-onboarding).**
   Configured separately from the Account detail page's Withdraw
@@ -206,16 +257,18 @@ wizard` section of `UI/mobile.md`.
    provider dropdown (v1 list: Kraken only). Per-provider helper
    banner with the exact steps to create a read-only API key on
    the provider side, the key-naming convention (`TallyKeep
-   Read`), the single permission to enable (`Query funds` on
-   Kraken), and which permissions to leave off. Sub-banner
-   warning that the provider's create-key dialog shows the
-   private key once. API Key + Private Key inputs (Private Key
-   uses a password field with a reveal toggle, no Copy
-   affordance — per the privacy-first-reveal memory). Continue
-   validates the credentials against the provider; rejects
-   overage (any permission beyond the expected single scope).
-   Error variant surfaces the specific overage detail and a
-   tap-to-clear-both coding rule.
+   Read`), the observation-permission set to enable (`Query funds`
+   **and** `Query ledger entries` on Kraken, per ADR-0012), and
+   which permissions to leave off. Sub-banner warning that the
+   provider's create-key dialog shows the private key once. API
+   Key + Private Key inputs (Private Key uses a password field
+   with a reveal toggle, no Copy affordance — per the
+   privacy-first-reveal memory). Continue validates the
+   credentials against the provider; rejects overage (any
+   permission beyond the declared observation set) and rejects
+   underage (any of the required observation permissions
+   missing). Error variant surfaces the specific overage /
+   underage detail and a tap-to-clear-both coding rule.
 
 2. **Step 2 — Parseback.** Recap card showing provider name,
    permission qualifier ("Read-only — this key cannot move
@@ -239,98 +292,165 @@ wizard` section of `UI/mobile.md`.
 
 Specific API request/response shapes live in `api/openapi.yaml`.
 
-## Balance polling
+## Observation cycles
 
 - Default cadence: every 10 minutes.
 - Configurable: 1–60 minutes via
   `runtime_configuration.custodial_polling.interval_seconds`.
 - On demand: refresh endpoint (path in `api/openapi.yaml`).
 
-The poller fetches BTC balance, other-asset balances (read-only
-display; never actionable), recent withdrawal history, and
-recent deposit history. Updates the provider row's
-`last_known_balance_sats`, `last_polled_at`, `last_error`. Emits
-`treasury.custodial.balance_changed` on delta.
+Each cycle fetches BTC balance, other-asset balances (read-only
+display only — never actionable on the provider's side), and new
+ledger entries since the last cycle's cursor (deposits, withdrawals,
+trades, fees, transfers, all unified). Updates the provider row's
+`last_known_balance_sats`, `last_updated_at`, `last_error`. Persists
+ledger entries in `custodial_ledger_entry`. Emits
+`treasury.custodial.balance_changed` on balance delta and
+`treasury.custodial.ledger_entry_added` per new ledger row.
 
-Polling failures (rate-limit hits, network errors, auth errors)
-are logged and surfaced via `system.custodial.auth_failed`. After
-N consecutive auth errors (default 5), the provider is marked
-`is_active=FALSE` and the user is alerted via SSE.
+Cycle failures (rate-limit hits, network errors, auth errors) are
+logged and surfaced via `system.custodial.auth_failed` and
+`treasury.custodial.connection_state_changed`. After N consecutive
+auth errors (default 5), the provider is marked `is_active=FALSE`
+and the user is alerted via SSE.
 
-## Outflow — "Withdraw to whitelist"
+## Flows — Withdraw and Deposit
 
-Account is the only Holding type whose outflow is **not** a PSBT.
-It uses the provider's withdraw API and the destination is the
-pre-whitelisted address — typically a Strongbox or Vault address.
-Outflow requires the withdrawal credential to be configured (see
-"Credentials — 2-key model" above); Accounts in the
-`withdraw_credential_id = null` state cannot withdraw via
-TallyKeep regardless of the read-only credential's capabilities.
+The Account holding type carries two native BTC flows, each tied to
+a different mechanism on the provider side.
 
-The user does **not** choose a destination at withdraw time.
-This is by design: the whitelist is the load-bearing defense
-against the withdrawal credential being compromised (per the
-threat model, S4). The destination is bound when the withdrawal
-credential is registered, in the withdrawal sub-flow.
+### Outflow — Withdraw to whitelist (Account → TK Holding)
 
-A SweepPolicy (see `concerns/sweep_policies.md`) is the
-recommended way to drive Account outflows automatically — fire
-on schedule or threshold, withdraw the available balance minus
+Outflow uses the provider's withdraw API (not a PSBT) and routes to
+a **pre-whitelisted destination address** — typically a Strongbox
+or Vault address belonging to the user. Outflow requires the
+withdrawal credential to be configured (see "Credentials — 2-key
+model" above); Accounts with `withdraw_credential_id = null` cannot
+withdraw via TallyKeep regardless of the observation credential.
+
+The user does **not** choose a destination at withdraw time. The
+whitelist is the load-bearing defense against the withdrawal
+credential being compromised (per the threat model, S4). The
+destination is bound when the withdrawal credential is registered.
+
+Outflow SweepPolicies (`source = this Account`,
+`destination = a TK Holding`) drive automated outflows on schedule
+or threshold — fire, withdraw the available balance minus
 `minimum_balance_sats`, route to the whitelisted address. Policies
-on Accounts without a withdrawal credential run in
-watch-and-advise mode.
+on Accounts without a withdrawal credential run in watch-and-advise
+mode (the trigger fires, the user is notified, no API call is made).
 
-Manual "Sweep now" is available as a button on the Account
-detail page (active when `withdraw_credential_id` is non-null;
-greyed out otherwise with a tap-prompt routing to the
-withdrawal sub-flow).
+Manual Withdraw is available as a button on the Account detail
+page. It's a one-off outflow execution to the whitelisted address,
+mechanically equivalent to a SweepPolicy firing once.
 
-Order placement, partial withdrawal to multiple addresses, and
-non-BTC withdrawals are explicitly **out of scope**.
+### Inflow — Deposit to pinned address (TK Holding → Account)
+
+Inflow is a regular Bitcoin transaction composed and signed on the
+**source-Holding side** (Strongbox / Vault / Purse PSBT machinery —
+no Account-side credential needed for the signing). The destination
+is the Account's **pinned deposit address**, captured once on the
+Account (the user pastes it from the provider's funding page) and
+stored in `Account.deposit_address`. TallyKeep does not fetch the
+deposit address via the provider's API — that would require an
+elevated credential scope, and the user-pasted pinned pattern keeps
+the observation credential narrow.
+
+TallyKeep observes the incoming deposit on the next observation
+cycle as a ledger entry of kind `deposit`. The reconciliation loop
+links the TK-attested on-chain broadcast to the provider-reported
+deposit ledger entry.
+
+Inflow SweepPolicies (`source = a TK Holding`,
+`destination = this Account`) drive automated inflows on schedule
+or threshold — fire, compose a PSBT on the source side, sign,
+broadcast. Used for scheduled decumulation: send BTC to the
+provider before manually selling on the provider's site.
+
+Manual Deposit is available as a button on the Account detail page.
+It opens a Send flow from a user-picked source TK Holding to the
+Account's pinned deposit address, mechanically equivalent to an
+inflow SweepPolicy firing once.
+
+### What is explicitly out of scope on Account flows
+
+- **Order placement at the provider.** TallyKeep does not route
+  buy/sell orders; the user trades on the provider's site directly.
+  Captured for much-later consideration in `future_iterations.md`
+  ("Order placement on custodial providers"); pursuing it would
+  require a separate regulatory evaluation because the natural use
+  case crosses the fiat-operations boundary which is locked out.
+- **Fiat operations.** TallyKeep never initiates, holds, or
+  transfers fiat. Fiat balances are read-only display only. The
+  fiat side of any sell happens on the provider's site, outside
+  TallyKeep.
+- **Partial withdrawals to multiple addresses.** Outflow always
+  goes to the single whitelisted address.
+- **Non-BTC withdrawals or deposits.** Both flows operate on BTC
+  only.
 
 ## What the user sees (target UX)
 
 The Account detail page shows:
 
-- Provider name, last poll time, connection status (green /
-  amber / red).
-- Current BTC balance (and read-only breakdown of other assets
-  if present — see `pre-implementation.md`
-  `multi-asset-aggregation` for the open question of whether
-  these surface on the Home).
-- Active SweepPolicy summaries ("Auto-sweep weekly every Friday
-  at 03:00 to Strongbox").
-- "Sweep now" button.
-- Recent sweep history with status badges.
-- Prominent warning if provider-side whitelist is unverified.
+- Provider name, connection status (green / amber / red), freshness
+  indicator ("Updated N minutes ago" — refreshed by observation
+  cycles and incoming SSE events; no manual refresh button).
+- Current BTC balance (and read-only breakdown of other assets if
+  present — see `pre-implementation.md` `multi-asset-aggregation`
+  for the open question of whether these surface on the Home).
+- **Withdraw** action — one-off outflow to the whitelisted address.
+  Greyed (with a tap-prompt routing to the withdrawal-credential
+  configuration sub-flow) when `withdraw_credential_id = null`.
+- **Deposit** action — one-off inflow from a picked TK Holding to
+  the pinned deposit address. Greyed (with a tap-prompt routing to
+  the pin-a-deposit-address sub-flow) when `deposit_address = null`.
+- Active SweepPolicy summaries, both directions: outflow ("Auto-
+  sweep weekly every Friday at 03:00 to Strongbox") and inflow
+  ("Deposit 0.01 BTC monthly from Purse").
+- Recent activity from the observation ledger (deposits, withdrawals,
+  trades, fees, transfers).
+- Prominent warning if the provider-side whitelist is unverified or
+  if the pinned deposit address has never been used.
 
-Specific layout and component naming lives in `UI/README.md`
-and `UI/mobile.md`.
+Specific layout and component naming lives in `UI/README.md` and
+`UI/mobile.md`.
 
 ## Regulatory posture (locked)
 
 These lines are firm:
 
-- TallyKeep does NOT route buy/sell orders → no broker role.
-- TallyKeep does NOT custody fiat or crypto → no custodian role.
-- TallyKeep does NOT pool user funds → no money-transmitter role.
-- TallyKeep does NOT match buyers and sellers → no exchange
-  role.
+- TallyKeep does NOT initiate, hold, or transfer fiat. Fiat
+  balances at the provider are read-only display only.
+- TallyKeep does NOT route buy/sell orders at the provider. The
+  user places trades on the provider's site directly.
+- TallyKeep does NOT custody fiat or crypto on the user's behalf
+  in a pooled account.
+- TallyKeep does NOT match buyers and sellers.
 
 The user's relationship with each CustodialProvider is direct;
-TallyKeep is a client to the provider's API, on the user's
-behalf, from the user's own machine, with the user's own
-credentials. This is the architectural shape that keeps order
-placement (and the regulatory escalation it triggers) out of
-scope.
+TallyKeep is a client to the provider's API, on the user's behalf,
+from the user's own machine, with the user's own credentials. This
+is the architectural shape that keeps order routing, exchange
+operation, and money-transmitter activities out of scope.
 
-## Deferred
+BTC flows in both directions (Withdraw and Deposit) are within
+scope — both are direct API or PSBT operations the user authorizes
+on their own behalf, neither involves TallyKeep custody of funds
+nor fiat operations.
+
+## UX design surface still to land
+
+The Account flows are native canonical features (above). Their UX
+design passes are iteration-scoped:
 
 | Item | Tracked in |
 |---|---|
-| Account withdrawal-key sub-flow (post-onboarding flow to configure the withdrawal credential + destination whitelist) | `future_iterations.md` "Account withdrawal-key sub-flow" |
+| Withdrawal credential configuration UX (capture the withdraw credential + pre-whitelisted destination picker; activates the Withdraw button on Account detail) | `future_iterations.md` "Account withdrawal-key UX" |
+| Deposit-address capture UX (paste the provider's BTC deposit address; activates the Deposit button on Account detail) | `future_iterations.md` "Account deposit-address UX" |
+| Bi-directional SweepPolicy creation UX (source / destination picker, schedule and threshold rules across both directions) | `future_iterations.md` "SweepPolicy creation UX" |
 | Additional providers — Bitstamp (cut from v1), Lemon, Buenbit, Belo, Coinbase Advanced, etc. | `future_iterations.md` "Additional CustodialProvider adapters" |
-| Order placement on custodial providers | `future_iterations.md` "Order placement on custodial providers" — needs fresh regulatory eval |
+| Order placement on custodial providers | `future_iterations.md` "Order placement on custodial providers" — requires fresh regulatory evaluation because it crosses the fiat boundary |
 | Custom adapter for non-ccxt venues (Swissquote) | `future_iterations.md` "Custom adapter for non-ccxt venues" |
 | Whether to surface non-BTC balances at the consolidated view | `pre-implementation.md` `multi-asset-aggregation` |
 | P2P swap routes (RoboSats) as a separate adapter | `future_iterations.md` "P2P swap routes" |

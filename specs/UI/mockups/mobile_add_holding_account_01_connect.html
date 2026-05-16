@@ -2,8 +2,13 @@
   Title: Mobile — Add Account · step 1 (connect — provider pick + credentials, collapsed)
   Status: validated  (Rémy greenlight 2026-05-16 closing the
                       Account-wizard design pass; 2-key model,
-                      Kraken-only at v1, withdrawal sub-flow deferred)
-  Date last touched: 2026-05-16
+                      Kraken-only at v1, withdrawal sub-flow deferred.
+                      Observation-scope amendment per ADR-0012:
+                      helper-banner copy updated in place 2026-05-17
+                      to instruct enabling Query funds AND Query
+                      ledger entries — the activity-feed observation
+                      set; structural shape unchanged.)
+  Date last touched: 2026-05-17
   Replaces: the earlier 2-file pair
     mobile_add_holding_account_01_provider.html and
     mobile_add_holding_account_02_credentials.html — both retired.
@@ -26,8 +31,9 @@
       1. Provider dropdown (searchable; v1 list = Kraken only)
       2. Per-provider helper banner (info palette, compressed —
          the one-action message: "create a read-only key on
-         {provider}, name it TallyKeep Read, enable only Query
-         funds, leave everything else off")
+         {provider}, name it TallyKeep Read, enable only the
+         observation permissions — for Kraken, Query funds AND
+         Query ledger entries; leave everything else off")
       3. "Shown once" warning (amber band, load-bearing — Kraken
          won't show the Private Key again, TK can't retrieve it)
       4. API Key field (plain)
@@ -45,11 +51,11 @@
     in their heads.
   - Helper banner compressed (compared to the 2-step draft):
     just the one-action ("create a read-only key, named TK Read,
-    only Query funds enabled"). The detailed leave-off list got
-    dropped because (a) it bloats the banner and (b) the backend
-    rejects any overage at Continue with a clear error, which
-    forces the user back to fix on the provider side anyway —
-    that's the natural feedback loop.
+    only Query funds and Query ledger entries enabled"). The
+    detailed leave-off list got dropped because (a) it bloats the
+    banner and (b) the backend rejects any overage at Continue
+    with a clear error, which forces the user back to fix on the
+    provider side anyway — that's the natural feedback loop.
   - No withdrawal-deferred footer on this step. Per Rémy review:
     withdrawal was over-leaked across all 4 prior drafts. The single
     subtle mention now lives on Step 2 (parseback) as a one-line foot.
@@ -344,7 +350,7 @@
 <div class="mockup-meta">
   <strong>Mobile — Add Account · 1 of 3 · Connect (provider + credentials)</strong> ·
   <span class="status-validated">validated</span> ·
-  2026-05-16 · 360×800
+  2026-05-17 · 360×800
 </div>
 
 <div class="phone-frame">
@@ -398,7 +404,8 @@
           <p class="hint-body">
             <strong>Settings → Connection and API → Create an API key.</strong>
             Name it <code>TallyKeep Read</code> and tick
-            <strong>only</strong> <code>Query funds</code>.
+            <strong>only</strong> <code>Query funds</code> and
+            <code>Query ledger entries</code>.
           </p>
         </div>
       </div>

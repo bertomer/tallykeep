@@ -100,3 +100,16 @@ bd4pcvVPyOem3l5k9+NV3/nEH2b2QHyVuddJCxpW5WiZ9iBcQRLmkgi0
 
 "Clé privée" Kraken Withdrawal only:
 qRiDRMEYytD/oXc0vFUpQ70k7s/HEucnAM0geZNSTip8Ly0Z0CmSumA6KS+/6wKSt6GdS0lkvqo2u3pBsPMVEQ==
+
+"Clé API" kraken read + withdraw
+sCJ0VYkFnyhX84u+XHGrn/UKvtDiGj2oE8NriWKBYiCoEENCjNrUm5Iw
+
+"Clé privée" Kraken read + withdraw
+SBuDW24+DFgDfltgUbHyuaA1x3XcsdEDwgC7nVeoikPRdurbUNcevp8fZ2shTcUNLS3c3ZgB07l2d8X8K2PBCw==
+
+
+"Clé API" Kraken read + mess
+7aPHT6EZfecvfeeb1OfZS2bJpttJZhmn7OJtHeFlNhIH4l/hchmTQ/mB
+
+"Clé privée" Kraken read + mess
+h64Dr93ocC7y8s1PJsjq/htpDQNXlwqYy9tjGMERURLpH+gV2W8Gpqx9XZqd7UiG+1/SkutcqV8zSe285yOG1w==

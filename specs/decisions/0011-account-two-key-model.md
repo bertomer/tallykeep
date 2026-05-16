@@ -1,7 +1,10 @@
 # ADR-0011 — Account credentials use the 2-key model
 
 - **Date:** 2026-05
-- **Status:** Accepted
+- **Status:** Accepted; permission-list section superseded by ADR-0012
+  (read-only credential expanded from `Query funds` only to
+  `Query funds` + `Query ledger entries`; the 2-key model and the
+  wizard's read-only-only scope are unchanged)
 - **Decided by:** Rémy
 - **Authored by:** Claude, during the Account-wizard design pass
   (session 2026-05-16)

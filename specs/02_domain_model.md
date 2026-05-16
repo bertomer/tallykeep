@@ -328,14 +328,14 @@ class ProviderKind(Enum):
 @dataclass
 class ProviderPermissions:
     can_read: bool                      # always True
-    can_trade: bool                     # locked invariant: must be False (no order placement)
-    can_withdraw: bool
+    can_trade: bool                     # locked False — TallyKeep does not route orders
+    can_withdraw: bool                  # True when the withdrawal credential is configured
 ```
 
 Rules:
-- The app refuses to register a CustodialProvider whose API credential has trade permissions enabled. The check is done against the provider's API at registration time. This is locked by the "no order placement" principle (see `holdings/01_account.md` §"Regulatory posture (locked)").
-- `whitelist_address` must be derivable from a Descriptor whose Holding is **not** an Account (you cannot whitelist to another custodial Account; that would defeat the point).
-- The validator strongly recommends the whitelist destination be an offline-signed Holding (Strongbox or Vault); see SweepPolicy section for the sweep-destination rule.
+- The app refuses to register a CustodialProvider whose API credential carries trade or order-placement permissions. The check runs against the provider's API at registration time. TallyKeep does not route buy/sell orders — the user trades on the provider's site directly (see `holdings/01_account.md` §"Regulatory posture (locked)" and §"What is explicitly out of scope on Account flows").
+- `whitelist_address` is the outflow destination bound to the Account's withdrawal credential. It must be derivable from a Descriptor whose Holding is a self-custody Holding (Purse / Strongbox / Vault). Cross-Account whitelisting (Account → another Account) is out of current scope; the natural destination for an outflow is the user's self-custody.
+- The SweepPolicy validator strongly recommends the whitelist destination be an offline-signed Holding (Strongbox or Vault); see SweepPolicy section for the sweep-destination rule.
 
 ### LedgerEntry
 
@@ -571,7 +571,7 @@ The policy validator runs at policy creation and modification, computes warnings
 
 Validator rules (warn, do not block):
 - If destination Holding is a Purse (keys on host or connected device), warn `DESTINATION_KEYS_ON_HOST` — sweep into something an attacker on the same host could drain.
-- If destination Holding is an Account, warn `DESTINATION_IS_CUSTODIAL` — moving from one custodian to another defeats minimum-exposure.
+- If destination Holding is an Account (inflow sweep, source = TK Holding, destination = a custodial Account), surface the policy summary so the user is clear they are sending self-custody BTC to a third-party venue. Inflow sweeps are a legitimate decumulation pattern (scheduled BTC deposits before manual selling on the provider's site); the validator does not warn but the policy summary names the direction explicitly.
 - If source and destination have the same `signing_model`, warn `SAME_SECURITY_TIER` — this is unusual and may indicate the user did not understand the model.
 - If `maximum_per_period_sats` is None, warn `NO_MAXIMUM_CAP_SET` for any policy moving more than a small amount.
 - For Account sources, if the CustodialProvider's `whitelist_address` could not be programmatically verified on the provider side, warn `UNVERIFIED_WHITELIST_ON_PROVIDER`.
@@ -717,8 +717,8 @@ Job (standalone, linked to whatever triggered it via parameters)
 3. A LedgerEntry with `direction=INTERNAL` must link to at least two user-owned Holdings.
 4. A SweepPolicy's source and destination must both be active Holdings.
 5. A SweepPolicy's safety warnings must all be acknowledged before the policy can be enabled.
-6. A CustodialProvider cannot be registered with `permissions.can_trade=True` (locked: no order placement).
-7. The whitelist address of a CustodialProvider must be owned by a non-Account Holding.
+6. A CustodialProvider cannot be registered with `permissions.can_trade=True` (locked: TallyKeep does not route orders at the provider).
+7. The whitelist address of a CustodialProvider's withdrawal credential must be owned by a self-custody Holding (Purse / Strongbox / Vault). Cross-Account whitelisting is out of current scope.
 8. No domain entity exposes a private key, seed, or signing material in any field. The type system forbids it.
 9. PaymentRequest from a Holding whose `signing_model == NOT_APPLICABLE` is rejected at construction.
 10. A Purse's `purse_mode` is mutable only along the `WATCH_ONLY → ON_DEVICE_USER_IMPORTED` axis, gated by the in-place upgrade flow defined in `pre-implementation.md` `purse-upgrade-path` (the user pastes the seed of the wallet whose descriptor was already imported; the same Purse becomes spendable from the device that holds the seed). The seed *source* itself is invariant — `ON_DEVICE_TK_GENERATED` and `ON_DEVICE_USER_IMPORTED` never convert into each other. Any other transition requires creating a new Purse and moving funds; the original is archived. The upgrade flow is target state; implementation lands when `purse-upgrade-path` arbitration closes.

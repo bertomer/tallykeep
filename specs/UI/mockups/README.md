@@ -148,13 +148,90 @@ share), Safari mobile.
 at-a-glance review — useful for spotting drift across screens
 (colors, type, spacing, navigation conventions).
 
-When adding or removing a mockup, update the `mockups` array
-near the top of `index.html`. The iteration-done sanity sweep
-(`PROCESS.md §Iteration-done sanity sweep`) verifies the array
-matches the files present.
-
 Open `index.html` in any browser; click any card to open the
 full-size mockup in a new tab.
+
+### Adding or removing a mockup
+
+Edit the `mockups` array near the top of `index.html`. Every
+entry has four fields:
+
+```js
+{ file:   'mobile_<flow>_<state>.html',
+  title:  'Human-readable card title (matches the mockup header)',
+  status: 'draft' | 'review' | 'validated',
+  group:  '<one of the ids in GROUPS above>' }
+```
+
+The iteration-done sanity sweep (`PROCESS.md §Iteration-done
+sanity sweep`) verifies the array matches the files present on
+disk. The `group` field is enforced softly: an unknown id still
+renders the card but logs a `console.warn` and the card stops
+showing under a section pill — so check the browser console
+after editing.
+
+### Section pills (groups)
+
+The gallery has two filter rows: **Section** (which flow) and
+**Status** (draft/review/validated). The Section row is driven
+by the `GROUPS` array near the top of the script:
+
+```js
+const GROUPS = [
+  { id: 'onboarding',  label: 'Onboarding' },
+  { id: 'unlock',      label: 'Unlock' },
+  { id: 'home',        label: 'Home' },
+  { id: 'add-holding', label: 'Add holding' },
+  { id: 'account',     label: 'Account wizard' },
+  { id: 'purse',       label: 'Purse wizard' },
+  { id: 'strongbox',   label: 'Strongbox wizard' },
+  { id: 'vault',       label: 'Vault wizard' },
+];
+```
+
+Rules:
+
+- **Order is user-lifecycle**, not spec-drafting order or
+  custody-tier order. A pill row is a picker; the
+  Holdings-picker discipline applies (Account first as the most
+  common starting point for target-market users, then Purse,
+  Strongbox, Vault).
+- **No ad-hoc groups in entries.** If a new flow doesn't fit an
+  existing group, add a new entry to `GROUPS` at its lifecycle
+  position, then reference the new id from your mockup entries.
+- **Empty groups are hidden.** The Section row only renders
+  pills for groups that have at least one mockup, so adding a
+  group ahead of its mockups is harmless.
+
+### Preview frame sizing
+
+The contact sheet renders each mockup at exactly the body's
+natural content area — `392 × 896` — so every card shows the
+full phone-screen including the bottom nav and any primary CTA
+above it, with no spare slate background bleeding above or
+below the phone-frame.
+
+That `392 × 896` is derived from `_shared/shell.css`:
+
+```
+body padding:  var(--space-7) (48) top/bottom
+               var(--space-4) (16) sides
+phone-frame:   var(--mobile-viewport-width)  = 360
+               var(--mobile-viewport-height) = 800   (border-box)
+=> body content area = (16+360+16) × (48+800+48) = 392 × 896
+```
+
+If any of those tokens change, or `body { padding }` in
+`shell.css` changes, update the `IFRAME_W` / `IFRAME_H`
+constants in `index.html` and the `.preview { aspect-ratio }`
+in lockstep — otherwise cards will show clipped chrome again.
+
+Per-mockup content that lives **outside** the `.phone-frame`
+(banners, debug helpers, mockup-meta overlays) is the one thing
+that can break this contract: if it pushes the body taller than
+896px, the bottom of the phone-frame gets cropped in the
+gallery. Keep dev-only chrome inside fixed-position elements or
+inside the phone-frame.
 
 ## Pointers
 
