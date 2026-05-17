@@ -16,6 +16,7 @@ from sqlalchemy.orm import Session
 
 from tallykeep.adapters.adapter_registry import UnsupportedAdapterError, build_adapter
 from tallykeep.adapters.custodial_provider_adapter import (
+    CustodialLedgerEntry,
     ProviderAuthError,
     ProviderError,
 )
@@ -64,9 +65,9 @@ class TradePermissionsDetected(TreasuryServiceError):
 
 
 class OveragePermissionsDetected(TradePermissionsDetected):
-    """Read-only credential has permissions beyond Query funds (ADR-0011).
+    """Read-only credential has permissions beyond the observation set (ADR-0012).
 
-    Carries the verbatim Kraken permission names for the wizard's danger band.
+    Carries the verbatim provider permission names for the wizard's danger band.
     """
 
     def __init__(self, extra_permissions: list[str]) -> None:
@@ -76,8 +77,22 @@ class OveragePermissionsDetected(TradePermissionsDetected):
         self.extra_permissions = extra_permissions
 
 
-class NoReadPermissionError(TreasuryServiceError):
-    """Key is valid but lacks Query Funds (read) scope."""
+class CredentialPermissionMismatch(TreasuryServiceError):
+    """Key's permissions don't match the adapter's observation_permission_set (ADR-0012).
+
+    Carries both overage and underage lists (either can be empty, but at least one is
+    non-empty). The API layer maps this to HTTP 409 with code "permission_mismatch".
+    """
+
+    def __init__(self, overage: list[str], underage: list[str]) -> None:
+        parts = []
+        if overage:
+            parts.append(f"overage: {', '.join(overage)}")
+        if underage:
+            parts.append(f"underage: {', '.join(underage)}")
+        super().__init__(f"Credential permission mismatch — {'; '.join(parts)}")
+        self.overage = overage
+        self.underage = underage
 
 
 class ProviderConnectionError(TreasuryServiceError):
@@ -181,17 +196,18 @@ def validate_account_credentials(
     api_key: str,
     api_secret: str,
     api_passphrase: str | None = None,
-) -> tuple[int, dict[str, str]]:
+) -> tuple[int, dict[str, str], list[CustodialLedgerEntry], int]:
     """Validate API credentials against the provider without any DB writes.
 
     Steps:
     1. Validate adapter_id.
     2. Build adapter with provided credentials.
-    3. get_permissions() — reject with OveragePermissionsDetected if overage.
+    3. get_permissions() — reject with CredentialPermissionMismatch if overage/underage.
     4. Fetch initial BTC balance + other-asset balances.
+    5. Fetch recent ledger entries (non-fatal — preview only).
 
-    Returns (btc_balance_sats, other_balances).
-    Raises TreasuryServiceError, OveragePermissionsDetected, ProviderConnectionError.
+    Returns (btc_balance_sats, other_balances, recent_entries_newest_first, total_count).
+    Raises TreasuryServiceError, CredentialPermissionMismatch, ProviderConnectionError.
     """
     try:
         adapter = build_adapter(
@@ -203,17 +219,12 @@ def validate_account_credentials(
     try:
         perms = adapter.get_permissions()
     except ProviderAuthError as exc:
-        if "permission denied" in str(exc).lower():
-            raise NoReadPermissionError(
-                "This key has no Query Funds (read) access. "
-                "TallyKeep needs a key with only 'Query funds' ticked on Kraken Pro."
-            ) from exc
         raise TreasuryServiceError(f"Provider authentication failed: {exc}") from exc
     except ProviderError as exc:
         raise ProviderConnectionError(f"Could not reach provider: {exc}") from exc
 
-    if perms.detected_extra_permissions:
-        raise OveragePermissionsDetected(perms.detected_extra_permissions)
+    if perms.overage or perms.underage:
+        raise CredentialPermissionMismatch(perms.overage, perms.underage)
 
     try:
         btc_balance_sats = adapter.get_balance()
@@ -222,7 +233,16 @@ def validate_account_credentials(
         btc_balance_sats = 0
         other_balances = {}
 
-    return btc_balance_sats, other_balances
+    recent_entries: list[CustodialLedgerEntry] = []
+    ledger_total = 0
+    try:
+        all_entries, _ = adapter.fetch_ledger_since(None)
+        ledger_total = len(all_entries)
+        recent_entries = list(reversed(all_entries[-3:]))
+    except Exception:
+        pass
+
+    return btc_balance_sats, other_balances, recent_entries, ledger_total
 
 
 def create_account_holding(
@@ -250,7 +270,7 @@ def create_account_holding(
 
     Returns (holding, provider, btc_balance_sats, other_balances).
     """
-    btc_balance_sats, other_balances = validate_account_credentials(
+    btc_balance_sats, other_balances, _, _ = validate_account_credentials(
         adapter_id=adapter_id,
         api_key=api_key,
         api_secret=api_secret,
@@ -329,6 +349,9 @@ def create_account_holding(
         last_polled_at=now,
         last_error=None,
         last_known_balance_sats=btc_balance_sats,
+        connection_status="healthy",
+        consecutive_error_count=0,
+        ledger_cursor_at=None,
         created_at=now,
         updated_at=now,
     )
@@ -808,6 +831,7 @@ __all__ = [
     "TreasuryServiceError",
     "TradePermissionsDetected",
     "OveragePermissionsDetected",
+    "CredentialPermissionMismatch",
     "ProviderNotFound",
     "PolicyNotFound",
     "ExecutionNotFound",

@@ -6,6 +6,7 @@ the repositories.
 """
 
 from tallykeep.models.base import Base
+from tallykeep.models.custodial_ledger_entry import CustodialLedgerEntryRow
 from tallykeep.models.custodial_provider import CustodialProviderRow
 from tallykeep.models.descriptor import AddressRow, DescriptorRow, UTXORow
 from tallykeep.models.holding import HoldingRow, HoldingTypeChangeLogRow
@@ -38,6 +39,7 @@ __all__ = [
     "DescriptorRow",
     "AddressRow",
     "UTXORow",
+    "CustodialLedgerEntryRow",
     "CustodialProviderRow",
     "OnChainTransactionRow",
     "LedgerEntryRow",

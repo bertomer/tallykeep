@@ -20,6 +20,7 @@ from datetime import UTC, datetime
 import ccxt
 
 from tallykeep.adapters.custodial_provider_adapter import (
+    CustodialLedgerEntry,
     CustodialProviderAdapter,
     Deposit,
     ProviderAuthError,
@@ -56,6 +57,7 @@ class KrakenAdapter(CustodialProviderAdapter):
     display_name = "Kraken"
     supports_withdrawal_keys = True
     whitelist_read_api = True  # Kraken exposes privatePostWithdrawAddresses
+    observation_permission_set = frozenset({"Query funds", "Query ledger entries"})
 
     def __init__(self, api_key: str, api_secret: str, api_passphrase: str | None = None) -> None:
         self._exchange: ccxt.kraken = ccxt.kraken(
@@ -80,17 +82,26 @@ class KrakenAdapter(CustodialProviderAdapter):
             raise ProviderAuthError(f"Invalid credentials format: {exc}") from exc
 
     @staticmethod
-    def _is_read_scope(name: str) -> bool:
-        """True for the Query Funds scope (the only one we accept)."""
-        n = name.lower().replace("-", "").replace(" ", "").replace("_", "")
+    def _normalise(name: str) -> str:
+        return name.lower().replace("-", "").replace(" ", "").replace("_", "").replace(":", "")
+
+    @staticmethod
+    def _is_query_funds_scope(name: str) -> bool:
+        n = KrakenAdapter._normalise(name)
         return n in {"queryfunds", "funds", "querybalance"}
 
-    def _parse_permissions_from_key_info(self, response: dict) -> list[str]:
-        """Return raw Kraken permission strings from a GetApiKeyInfo response.
+    @staticmethod
+    def _is_query_ledger_scope(name: str) -> bool:
+        n = KrakenAdapter._normalise(name)
+        return n in {"queryledger", "queryledgerentries", "ledger", "data", "querydata"}
 
-        Returns ALL permissions except Query Funds verbatim — no label mapping.
-        This ensures the danger band shows every permission the key has, even
-        ones we don't recognise, and avoids collapsing many permissions to one.
+    def _parse_permissions_from_key_info(
+        self, response: dict
+    ) -> tuple[list[str], list[str]]:
+        """Parse a GetApiKeyInfo response into (overage, underage) permission lists.
+
+        Overage: permissions the key has that are NOT in the observation set.
+        Underage: observation-set permissions the key does NOT have.
 
         Handles three formats Kraken may return:
           Format A: list         ["query-funds", "create-orders", "cancel-orders"]
@@ -117,20 +128,41 @@ class KrakenAdapter(CustodialProviderAdapter):
                 return any(_flag(v) for v in obj.values())
             return False
 
-        extra: list[str] = []
+        has_query_funds = False
+        has_query_ledger = False
+        overage: list[str] = []
 
         if isinstance(raw_perms, list):
-            extra = [str(p) for p in raw_perms if not self._is_read_scope(str(p))]
+            for p in raw_perms:
+                name = str(p)
+                if self._is_query_funds_scope(name):
+                    has_query_funds = True
+                elif self._is_query_ledger_scope(name):
+                    has_query_ledger = True
+                else:
+                    overage.append(name)
 
         elif isinstance(raw_perms, dict):
             for key, val in raw_perms.items():
-                if not self._is_read_scope(key) and _flag(val):
-                    extra.append(key)
+                if not _flag(val):
+                    continue
+                if self._is_query_funds_scope(key):
+                    has_query_funds = True
+                elif self._is_query_ledger_scope(key):
+                    has_query_ledger = True
+                else:
+                    overage.append(key)
 
         else:
             raise ValueError(f"Unrecognised permissions format: {type(raw_perms)}")
 
-        return extra
+        underage: list[str] = []
+        if not has_query_funds:
+            underage.append("Query funds")
+        if not has_query_ledger:
+            underage.append("Query ledger entries")
+
+        return overage, underage
 
     def _probe(self, fn, permission_name: str, extra: list[str]) -> None:
         """Fail-closed permission probe: success → present, AuthenticationError
@@ -154,40 +186,58 @@ class KrakenAdapter(CustodialProviderAdapter):
             ) from exc
 
     def get_permissions(self) -> ProviderPermissions:
-        """Detect Kraken API key permissions (2-key model, ADR-0011).
+        """Detect Kraken API key permissions (ADR-0011, ADR-0012).
 
-        Primary path: GetApiKeyInfo — direct query, no side effects.
-        Fallback (unrecognised response schema): read-only endpoint probing.
+        Returns overage (extra permissions beyond observation set) and underage
+        (observation-set permissions the key is missing). Both lists can be
+        non-empty simultaneously.
+
+        Primary path: GetApiKeyInfo — direct, no side effects.
+        Fallback (unrecognised response schema): endpoint probing.
         Fails closed throughout: ambiguous results raise ProviderError → 502.
         """
-        # Confirm read access first (Query Funds — minimum required).
-        self._call(self._exchange.fetch_balance)
-
         # Primary: ask Kraken directly what this key can do.
         try:
             response = self._exchange.privatePostGetApiKeyInfo({})
-            extra = self._parse_permissions_from_key_info(response)
-            logger.debug("GetApiKeyInfo detected extra permissions: %r", extra)
-        except (ccxt.AuthenticationError, ccxt.NetworkError, ccxt.ExchangeError) as exc:
+            overage, underage = self._parse_permissions_from_key_info(response)
+            logger.debug(
+                "GetApiKeyInfo: overage=%r underage=%r", overage, underage
+            )
+        except ccxt.AuthenticationError as exc:
+            raise ProviderAuthError(str(exc)) from exc
+        except (ccxt.NetworkError, ccxt.ExchangeError) as exc:
             raise ProviderError(f"Could not retrieve API key permissions: {exc}") from exc
         except ValueError:
             # Unrecognised response schema — fall back to endpoint probing.
             logger.warning("GetApiKeyInfo returned unrecognised schema; falling back to probes")
-            extra = []
-            self._probe(self._exchange.privatePostWithdrawStatus, "Withdraw funds", extra)
-            self._probe(self._exchange.privatePostOpenOrders, "Trade", extra)
-            self._probe(self._exchange.privatePostTradeBalance, "Margin", extra)
+            present: list[str] = []
+            self._probe(self._exchange.fetch_balance, "Query funds", present)
+            self._probe(
+                lambda: self._exchange.fetch_ledger("BTC", limit=1),
+                "Query ledger entries",
+                present,
+            )
+            underage = [
+                p for p in ("Query funds", "Query ledger entries") if p not in present
+            ]
+
+            overage_candidates: list[str] = []
+            self._probe(self._exchange.privatePostWithdrawStatus, "Withdraw funds", overage_candidates)
+            self._probe(self._exchange.privatePostOpenOrders, "Trade", overage_candidates)
+            self._probe(self._exchange.privatePostTradeBalance, "Margin", overage_candidates)
             self._probe(
                 lambda: self._exchange.privatePostEarnStrategies({"limit": 1}),
                 "Earn / Staking",
-                extra,
+                overage_candidates,
             )
+            overage = overage_candidates
 
         return ProviderPermissions(
-            can_read=True,
+            can_read="Query funds" not in underage,
             can_trade=False,
             can_withdraw=False,
-            detected_extra_permissions=extra,
+            overage=overage,
+            underage=underage,
         )
 
     def get_balance(self) -> int:
@@ -259,3 +309,53 @@ class KrakenAdapter(CustodialProviderAdapter):
             return WhitelistVerification(is_whitelisted=False)
         except (ccxt.AuthenticationError, ccxt.ExchangeError) as exc:
             return WhitelistVerification(is_whitelisted=False, error=str(exc))
+
+    _CCXT_KIND_MAP: dict[str, str] = {
+        "trade": "trade",
+        "deposit": "deposit",
+        "withdrawal": "withdrawal",
+        "fee": "fee",
+        "transfer": "transfer",
+        "staking": "staking",
+        "earn": "staking",
+        "margin": "trade",
+        "rollover": "fee",
+    }
+
+    def fetch_ledger_since(
+        self, since: datetime | None
+    ) -> tuple[list[CustodialLedgerEntry], datetime | None]:
+        """Fetch Kraken unified ledger entries via ccxt's fetch_ledger."""
+        since_ms = int(since.timestamp() * 1000) if since is not None else None
+        try:
+            raw = self._call(
+                self._exchange.fetch_ledger, None, since_ms, 200
+            ) or []
+        except ProviderError:
+            logger.warning("KrakenAdapter.fetch_ledger_since: fetch failed; returning empty")
+            return [], since
+
+        entries: list[CustodialLedgerEntry] = []
+        newest_ts: datetime | None = None
+
+        for item in raw:
+            ts = _ts_to_dt(item.get("timestamp"), since or datetime(2020, 1, 1, tzinfo=UTC))
+            raw_kind = (item.get("type") or "").lower()
+            kind = self._CCXT_KIND_MAP.get(raw_kind, raw_kind or "transfer")
+            amount = float(item.get("amount") or 0.0)
+            entries.append(
+                CustodialLedgerEntry(
+                    provider_entry_id=str(item.get("id") or ""),
+                    kind=kind,
+                    asset=str(item.get("currency") or ""),
+                    amount=amount,
+                    status=str(item.get("status") or "success"),
+                    timestamp=ts,
+                    raw=dict(item),
+                )
+            )
+            if newest_ts is None or ts > newest_ts:
+                newest_ts = ts
+
+        entries.sort(key=lambda e: e.timestamp)
+        return entries, newest_ts

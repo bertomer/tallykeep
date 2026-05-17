@@ -1,8 +1,12 @@
 <!--
-  Title: Mobile — Add Account · step 2 · Parse-back (recap + auto-name)
+  Title: Mobile — Add Account · step 2 · Parse-back (recap + auto-name + activity preview)
   Status: validated  (Rémy greenlight 2026-05-16 closing the
-                      Account-wizard design pass)
-  Date last touched: 2026-05-16
+                      Account-wizard design pass; activity-preview
+                      section added 2026-05-17 per Rémy follow-up —
+                      structural-content addition, status remains
+                      validated per UI/mockups/README.md cosmetic-
+                      refinement rule; no locked-principle change.)
+  Date last touched: 2026-05-17
   Replaces: own earlier draft at filename …_03_parseback.html. Step
             renumbered after Step 1 (Provider) + Step 2 (Credentials)
             collapsed into the single Step 1 (Connect).
@@ -47,6 +51,44 @@
          entirely if zero other assets. Multi-asset display open
          per pre-implementation `multi-asset-aggregation`; the
          Account detail page will render these explicitly.
+  - **Recent activity preview (added 2026-05-17).** A small card
+    below the parse-card showing the last 3 ledger entries from
+    the user's Kraken account. Three reasons:
+      1. Verification — "yes, this is my account" is most concrete
+         when the user can recognize a recent event (Tuesday's
+         trade, last week's deposit).
+      2. Tangible payoff for the `Query ledger entries` permission
+         the user just enabled — they granted it, they immediately
+         see what it unlocked.
+      3. Previews the Account detail page's Operations tab — the
+         user knows where the full feed lives going forward.
+    Each entry: native-asset descriptor ("Deposit · BTC",
+    "Trade · BTC/EUR", "Withdraw · BTC", etc.) and relative time
+    ("2h ago", "yesterday", "5d ago"). **No amounts** — they
+    don't add verification value (the user knows their account)
+    and showing balances/trade sizes on a pre-save wizard surface
+    feels heavier than it needs to. The Operations tab is where
+    amounts live.
+    **No kind-icons yet** (Rémy 2026-05-17): Kraken's ledger
+    surfaces more entry kinds than the obvious three (deposit /
+    trade / withdraw) — there are fees, transfers, stake events,
+    rebates, internal adjustments, possibly more we haven't
+    mapped yet. Committing to a per-kind icon set on the wizard
+    surface before iteration B's Operations tab has done the
+    full ledger-kind enumeration would lock in a vocabulary we
+    might have to redraw. Defer the icon design until iteration B
+    surfaces every kind Kraken returns; revisit then. For now the
+    text descriptor alone carries the row.
+    Below the three entries: a forward-reference line
+    "+ N more on your Account page" pointing at the Operations tab.
+    Empty-ledger state (brand-new Kraken account or no activity in
+    90 days): the section renders with a single muted line
+    "No activity yet — your entries will surface here as they
+    happen on Kraken." Honest about the state, doesn't break the
+    visual structure. Mockup renders the populated case.
+    Backend lift: validate endpoint extends its response with
+    `recent_ledger_entries: [...]` (last 3 entries via ccxt
+    `fetchLedger`, same round-trip as balance fetch).
   - NO withdrawal mention on this step. Step 2 is for "did we
     read this right?" confirmation; surfacing the deferred-
     withdrawal forward-reference here dilutes that focus. The
@@ -222,6 +264,68 @@
     font-weight: var(--font-weight-semibold);
   }
 
+  /* ---------- Activity preview ---------- */
+  .activity-preview {
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    padding: var(--space-3) var(--space-4);
+    margin-bottom: var(--space-3);
+  }
+  .activity-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    margin-bottom: var(--space-2);
+  }
+  .activity-label {
+    font-size: var(--font-size-xs);
+    color: var(--color-text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    font-weight: var(--font-weight-semibold);
+  }
+  .activity-meta {
+    font-size: var(--font-size-xs);
+    color: var(--color-text-muted);
+    font-weight: var(--font-weight-normal);
+  }
+  .activity-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+  .activity-entry {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: var(--space-3);
+    padding: var(--space-2) 0;
+    min-width: 0;
+  }
+  .activity-entry + .activity-entry {
+    border-top: 1px solid var(--color-border);
+  }
+  .activity-title {
+    font-size: var(--font-size-sm);
+    color: var(--color-text);
+    font-weight: var(--font-weight-medium);
+  }
+  .activity-time {
+    font-size: var(--font-size-xs);
+    color: var(--color-text-muted);
+    font-weight: var(--font-weight-normal);
+    flex-shrink: 0;
+  }
+  .activity-overflow {
+    margin: var(--space-2) 0 0;
+    padding-top: var(--space-2);
+    border-top: 1px solid var(--color-border);
+    font-size: var(--font-size-xs);
+    color: var(--color-text-muted);
+    text-align: center;
+  }
+
 
   /* ---------- Wizard footer ---------- */
   .wizard-footer {
@@ -250,7 +354,7 @@
 <div class="mockup-meta">
   <strong>Mobile — Add Account · 2 of 3 · Parse-back</strong> ·
   <span class="status-validated">validated</span> ·
-  2026-05-16 · 360×800
+  2026-05-17 · 360×800
 </div>
 
 <div class="phone-frame">
@@ -309,6 +413,28 @@
             <span class="qualifier">Read-only summary · not actionable from TallyKeep</span>
           </span>
         </div>
+      </div>
+
+      <div class="activity-preview" aria-label="Recent activity from Kraken ledger">
+        <div class="activity-head">
+          <span class="activity-label">Recent activity</span>
+          <span class="activity-meta">From your ledger</span>
+        </div>
+        <ul class="activity-list">
+          <li class="activity-entry">
+            <span class="activity-title">Deposit · BTC</span>
+            <span class="activity-time">2h ago</span>
+          </li>
+          <li class="activity-entry">
+            <span class="activity-title">Trade · BTC/EUR</span>
+            <span class="activity-time">yesterday</span>
+          </li>
+          <li class="activity-entry">
+            <span class="activity-title">Withdraw · BTC</span>
+            <span class="activity-time">5d ago</span>
+          </li>
+        </ul>
+        <p class="activity-overflow">+ 14 more on your Account page</p>
       </div>
 
     </div>

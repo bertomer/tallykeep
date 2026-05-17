@@ -25,16 +25,12 @@ class ProviderPermissions:
     can_read: bool
     can_trade: bool
     can_withdraw: bool
-    # Verbatim names of detected over-permissions (e.g. "Withdraw funds", "Trade").
-    # Populated by adapters during get_permissions(); used by the service to build
-    # the hard-reject error message for the wizard's danger band.
-    detected_extra_permissions: list[str] = field(default_factory=list)
-
-    def __post_init__(self) -> None:
-        if not self.can_read:
-            raise ValueError("ProviderPermissions.can_read must be True")
-        if self.can_trade:
-            raise ValueError("ProviderPermissions.can_trade must be False (ADR-0011)")
+    # Verbatim names of permissions beyond the adapter's observation_permission_set
+    # (e.g. "Withdraw funds", "Trade"). Empty if the key is exactly scoped.
+    overage: list[str] = field(default_factory=list)
+    # Verbatim names from the adapter's observation_permission_set that the key
+    # does not carry (e.g. "Query ledger entries"). Empty if fully scoped.
+    underage: list[str] = field(default_factory=list)
 
 
 @dataclass
@@ -56,6 +52,10 @@ class CustodialProvider:
     last_polled_at: datetime | None
     last_error: str | None
     last_known_balance_sats: int | None
+    # Connection health state machine (ADR-0012 / iteration A).
+    connection_status: str  # healthy | degraded | unreachable | auth_failed
+    consecutive_error_count: int
+    ledger_cursor_at: datetime | None
     created_at: datetime
     updated_at: datetime
 

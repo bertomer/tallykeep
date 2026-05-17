@@ -163,8 +163,9 @@ Per `concerns/sweep_policies.md`:
 | Strongbox as source | Not auto. Reduces to a **scheduled reminder** that prepares a PSBT awaiting the user's external signature on the hardware wallet. Resumes the standard send flow at step 3. |
 
 Strongbox-source sweeps land post-shipping. Pre-shipping,
-Account → Strongbox sweeps (minimum-exposure trading) are the
-primary use case.
+Account → Strongbox outflow sweeps are the primary use case —
+the minimum-exposure trading pattern: BTC bought at the venue is
+swept into Strongbox (self-custody) as fast as policy allows.
 
 ## Type-specific safeguards
 
@@ -186,3 +187,4 @@ primary use case.
 | Strongbox → anywhere sweeps (with scheduled-reminder UX) | `future_iterations.md` "Holding-to-Holding sweeps beyond Account-originated" |
 | Strongbox-frequent-usage warning in security-health | `pre-implementation.md` `seed-backup-disclosure` (full security-health system) |
 | Multisig descriptor support (would extend Strongbox into Vault territory) | `future_iterations.md` "Multisig descriptor support" |
+ support (would extend Strongbox into Vault territory) | `future_iterations.md` "Multisig descriptor support" |

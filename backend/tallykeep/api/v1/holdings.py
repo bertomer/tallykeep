@@ -32,11 +32,16 @@ from tallykeep.schemas.holding import (
     StrongboxCreate,
     VaultCreate,
 )
-from tallykeep.schemas.treasury import AccountCreateOut, AccountValidateIn, AccountValidateOut
+from tallykeep.schemas.treasury import (
+    AccountCreateOut,
+    AccountValidateIn,
+    AccountValidateOut,
+    LedgerEntryPreview,
+)
 from tallykeep.services import holding_service, treasury_service
 from tallykeep.services.holding_service import HoldingServiceError
 from tallykeep.services.treasury_service import (
-    NoReadPermissionError,
+    CredentialPermissionMismatch,
     OveragePermissionsDetected,
     ProviderConnectionError,
     TreasuryServiceError,
@@ -203,39 +208,41 @@ async def validate_account_holding_credentials(
     Step 2 "Looks right" calls POST /holdings/account to commit.
     """
     try:
-        btc_balance_sats, other_balances = validate_account_credentials(
+        btc_balance_sats, other_balances, recent_entries, ledger_total = validate_account_credentials(
             adapter_id=body.adapter_id,
             api_key=body.api_key,
             api_secret=body.api_secret,
             api_passphrase=body.api_passphrase,
         )
-    except OveragePermissionsDetected as exc:
+    except CredentialPermissionMismatch as exc:
         raise HTTPException(
             status_code=409,
             detail={
-                "code": "overage_permissions",
-                "extra_permissions": exc.extra_permissions,
-                "message": str(exc),
+                "code": "permission_mismatch",
+                "overage": exc.overage,
+                "underage": exc.underage,
             },
         ) from exc
-    except TradePermissionsDetected as exc:
+    except (OveragePermissionsDetected, TradePermissionsDetected) as exc:
+        # Kept for safety — should not be reached after the CredentialPermissionMismatch path.
         raise HTTPException(status_code=409, detail=str(exc)) from exc
-    except NoReadPermissionError as exc:
-        raise HTTPException(
-            status_code=422,
-            detail={"code": "no_read_permission", "message": str(exc)},
-        ) from exc
     except ProviderConnectionError as exc:
         raise HTTPException(status_code=502, detail=str(exc)) from exc
     except TreasuryServiceError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
 
     sorted_assets = sorted(other_balances.keys())
+    previews = [
+        LedgerEntryPreview(kind=e.kind, asset=e.asset, timestamp=e.timestamp)
+        for e in recent_entries
+    ]
     return AccountValidateOut(
         adapter_id=body.adapter_id,
         btc_balance_sats=btc_balance_sats,
         other_asset_tickers=sorted_assets[:3],
         other_asset_total_count=len(sorted_assets),
+        recent_ledger_entries=previews,
+        ledger_total_count=ledger_total,
     )
 
 
@@ -266,17 +273,17 @@ async def create_account_holding(
             )
         )
         session.commit()
-    except OveragePermissionsDetected as exc:
+    except CredentialPermissionMismatch as exc:
         session.rollback()
         raise HTTPException(
             status_code=409,
             detail={
-                "code": "overage_permissions",
-                "extra_permissions": exc.extra_permissions,
-                "message": str(exc),
+                "code": "permission_mismatch",
+                "overage": exc.overage,
+                "underage": exc.underage,
             },
         ) from exc
-    except TradePermissionsDetected as exc:
+    except (OveragePermissionsDetected, TradePermissionsDetected) as exc:
         session.rollback()
         raise HTTPException(status_code=409, detail=str(exc)) from exc
     except ProviderConnectionError as exc:

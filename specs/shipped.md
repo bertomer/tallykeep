@@ -14,6 +14,49 @@ commit.
 
 ---
 
+## 2026-05-17 — Account observation scope amendment + ledger polling
+
+ADR-0012 landed end-to-end: the Account credential now requires both Kraken
+observation permissions (`Query funds` + `Query ledger entries`), the backend
+has the ledger-polling infrastructure, and the wizard Step 2 shows the last 3
+ledger entries as an activity preview.
+
+**Backend:** `CustodialProviderAdapter.observation_permission_set` ABC attribute
+declared; Kraken adapter declares `{"Query funds", "Query ledger entries"}`.
+Validation endpoint rejects on both **overage** and **underage** via unified
+`CredentialPermissionMismatch` exception (HTTP 409, `permission_mismatch` code,
+`overage: list[str]` + `underage: list[str]` always present). `CustodialPoller`
+fully rewritten: ledger-polling via `fetch_ledger_since()` integrated into each
+observation cycle; new `custodial_ledger_entry` table (migration `b2c3d4e5f6a7`)
+persists entries keyed on `(provider_id, provider_entry_id)`; connection state
+machine (`healthy → degraded → unreachable → auth_failed`) with three SSE
+topics: `treasury.custodial.cycle_completed` (Option B atomic batch),
+`treasury.custodial.ledger_entry_added` (per-entry granular),
+`treasury.custodial.connection_state_changed` (on transitions). `ChainListener`
+gains `system.chain.connection_state_changed` (bitcoind RPC/ZMQ health
+transitions). `CustodialProvider` domain dataclass extended with
+`connection_status`, `consecutive_error_count`, `ledger_cursor_at`. Validation
+endpoint extended: calls `fetch_ledger_since(None)` (non-fatal) and returns
+`recent_ledger_entries: list[LedgerEntryPreview]` + `ledger_total_count: int`
+for the Step 2 activity preview.
+
+**Frontend:** Step 1 helper banner updated to instruct ticking `Query funds` +
+`Query ledger entries`. Overage danger band corrective copy updated; underage
+danger band added ("This API key is missing required permissions"); legacy
+`no_read_permission` 422 branch removed. Step 2 parseback gains an activity
+preview card (last 3 entries newest-first, `Kind · asset` + relative time,
+overflow line "+ N more on your Account page", empty state).
+
+**Tests:** unit tests updated for new `ProviderPermissions` shape
+(`overage`/`underage`); `_make_provider()` extended; new tests for
+underage-only and combined overage+underage cases. Smoke test section 15.13
+updated with documented OK response shape.
+
+Canonical docs touched at closeout: `api/openapi.yaml` (5328 lines,
+`LedgerEntryPreview` schema + `AccountValidateOut` extensions).
+
+---
+
 ## 2026-05-16 — Add Holding · Account wizard
 
 3-step wizard at `/holding/new/account` lets a user connect a Kraken

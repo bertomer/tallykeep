@@ -41,6 +41,12 @@ class AccountValidateIn(BaseModel):
     api_passphrase: str | None = None
 
 
+class LedgerEntryPreview(BaseModel):
+    kind: str
+    asset: str
+    timestamp: datetime
+
+
 class AccountValidateOut(BaseModel):
     """Response for POST /holdings/account/validate — balance preview, no holding created."""
 
@@ -48,6 +54,8 @@ class AccountValidateOut(BaseModel):
     btc_balance_sats: int
     other_asset_tickers: list[str]
     other_asset_total_count: int
+    recent_ledger_entries: list[LedgerEntryPreview] = []
+    ledger_total_count: int = 0
 
 
 class CustodialProviderInput(BaseModel):

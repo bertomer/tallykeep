@@ -72,6 +72,17 @@ class CustodialProviderRow(Base):
     )
     last_error: Mapped[str | None] = mapped_column(Text, nullable=True)
     last_known_balance_sats: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+    # Connection health state machine (ADR-0012 / iteration A).
+    # healthy | degraded | unreachable | auth_failed
+    connection_status: Mapped[str] = mapped_column(
+        String(20), nullable=False, server_default=text("'healthy'")
+    )
+    consecutive_error_count: Mapped[int] = mapped_column(
+        nullable=False, server_default=text("0")
+    )
+    ledger_cursor_at: Mapped[datetime | None] = mapped_column(
+        TIMESTAMP(timezone=True), nullable=True
+    )
     created_at: Mapped[datetime] = mapped_column(
         TIMESTAMP(timezone=True), nullable=False, server_default=text("NOW()")
     )

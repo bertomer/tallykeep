@@ -60,6 +60,29 @@
     grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
     gap: var(--space-5);
   }
+  .section-heading {
+    position: sticky;
+    top: 0;
+    z-index: 5;
+    margin: var(--space-6) 0 var(--space-3);
+    padding: var(--space-3) 0 var(--space-2);
+    background: var(--color-bg);
+    border-bottom: 1px solid var(--color-border);
+    display: flex;
+    align-items: baseline;
+    gap: var(--space-2);
+    font-size: var(--font-size-lg);
+    font-weight: var(--font-weight-semibold);
+    color: var(--color-text);
+  }
+  .section-heading:first-child {
+    margin-top: 0;
+  }
+  .section-heading .section-count {
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-weight-normal);
+    color: var(--color-text-muted);
+  }
   .card {
     background: var(--color-surface);
     border: 1px solid var(--color-border);
@@ -175,7 +198,7 @@
   <button class="filter-btn" data-status="validated">Validated</button>
 </div>
 
-<div id="grid" class="grid"></div>
+<div id="sections"></div>
 
 <script>
   // Section pills — ordered by user lifecycle, not by spec drafting
@@ -308,7 +331,7 @@
   const IFRAME_W = 392;
   const IFRAME_H = 896;
 
-  const grid = document.getElementById('grid');
+  const sectionsEl = document.getElementById('sections');
   const groupFiltersEl = document.getElementById('group-filters');
   let currentStatus = 'all';
   let currentGroup = 'all';
@@ -349,9 +372,28 @@
     }
   });
 
+  function makeCard(m) {
+    const card = document.createElement('a');
+    card.href = m.file;
+    card.target = '_blank';
+    card.className = 'card';
+    card.innerHTML = `
+      <div class="card-header">
+        <div class="card-title">${m.title}</div>
+        <div class="card-meta">
+          <span class="badge badge-${m.status}">${m.status}</span>
+          <span class="filename">${m.file}</span>
+        </div>
+      </div>
+      <div class="preview">
+        <iframe src="${m.file}" loading="lazy"></iframe>
+      </div>`;
+    return card;
+  }
+
   function render() {
     if (mockups.length === 0) {
-      grid.outerHTML = `
+      sectionsEl.innerHTML = `
         <div class="empty">
           No mockups yet. Add files to <code>UI/mockups/</code> and
           list them in the <code>mockups</code> array near the top of
@@ -360,38 +402,68 @@
       return;
     }
 
-    grid.innerHTML = '';
-    const filtered = mockups.filter(m =>
-      (currentStatus === 'all' || m.status === currentStatus) &&
-      (currentGroup  === 'all' || m.group  === currentGroup)
-    );
+    sectionsEl.innerHTML = '';
 
-    if (filtered.length === 0) {
-      grid.innerHTML = `
-        <div class="empty" style="grid-column: 1 / -1;">
-          No mockups match the current filters.
-        </div>`;
-      return;
+    const matchesFilters = m =>
+      (currentStatus === 'all' || m.status === currentStatus) &&
+      (currentGroup  === 'all' || m.group  === currentGroup);
+
+    // Walk GROUPS in lifecycle order so section headers stay ordered
+    // regardless of the source-array order of entries.
+    let anyShown = false;
+    for (const g of GROUPS) {
+      if (currentGroup !== 'all' && currentGroup !== g.id) continue;
+      const items = mockups.filter(m => m.group === g.id && matchesFilters(m));
+      if (items.length === 0) continue;
+
+      const heading = document.createElement('h2');
+      heading.className = 'section-heading';
+      heading.innerHTML = `
+        <span>${g.label}</span>
+        <span class="section-count">${items.length}</span>`;
+      sectionsEl.appendChild(heading);
+
+      const grid = document.createElement('div');
+      grid.className = 'grid';
+      for (const m of items) {
+        const card = makeCard(m);
+        grid.appendChild(card);
+        previewRO.observe(card.querySelector('.preview'));
+      }
+      sectionsEl.appendChild(grid);
+      anyShown = true;
     }
 
-    for (const m of filtered) {
-      const card = document.createElement('a');
-      card.href = m.file;
-      card.target = '_blank';
-      card.className = 'card';
-      card.innerHTML = `
-        <div class="card-header">
-          <div class="card-title">${m.title}</div>
-          <div class="card-meta">
-            <span class="badge badge-${m.status}">${m.status}</span>
-            <span class="filename">${m.file}</span>
-          </div>
-        </div>
-        <div class="preview">
-          <iframe src="${m.file}" loading="lazy"></iframe>
+    // Defensive: any mockup pointing at an unknown group id ends up
+    // here so it stays visible (rather than silently disappearing).
+    if (currentGroup === 'all') {
+      const knownIds = new Set(GROUPS.map(g => g.id));
+      const orphans = mockups.filter(m =>
+        !knownIds.has(m.group) && matchesFilters(m));
+      if (orphans.length > 0) {
+        const heading = document.createElement('h2');
+        heading.className = 'section-heading';
+        heading.innerHTML = `
+          <span>Ungrouped</span>
+          <span class="section-count">${orphans.length}</span>`;
+        sectionsEl.appendChild(heading);
+        const grid = document.createElement('div');
+        grid.className = 'grid';
+        for (const m of orphans) {
+          const card = makeCard(m);
+          grid.appendChild(card);
+          previewRO.observe(card.querySelector('.preview'));
+        }
+        sectionsEl.appendChild(grid);
+        anyShown = true;
+      }
+    }
+
+    if (!anyShown) {
+      sectionsEl.innerHTML = `
+        <div class="empty">
+          No mockups match the current filters.
         </div>`;
-      grid.appendChild(card);
-      previewRO.observe(card.querySelector('.preview'));
     }
   }
 

@@ -753,8 +753,35 @@ $krakenCap = $providerCaps | Where-Object { $_.slug -eq "kraken" }
 Show "kraken supports_withdrawal_keys" $krakenCap.supports_withdrawal_keys
 Show "kraken whitelist_read_api"       $krakenCap.whitelist_read_api
 
-# 15.13 Account validate — bad credentials must return 422 (no DB write)
-Section "15.13 holdings/account/validate (bad creds → 422)"
+# 15.13 Account validate — error cases (ADR-0012: permission_mismatch 409 + auth-fail 422)
+#
+# Error shape (observation-scope amendment):
+#   409 { "detail": { "code": "permission_mismatch",
+#                     "overage": [...],   # extra permissions beyond observation set
+#                     "underage": [...] } # missing required observation permissions
+#         }
+# Observation set for Kraken: { "Query funds", "Query ledger entries" }
+#
+# OK response shape (200) — also includes ledger preview (added 2026-05-17):
+#   { "adapter_id": "kraken",
+#     "btc_balance_sats": <int>,
+#     "other_asset_tickers": [...],
+#     "other_asset_total_count": <int>,
+#     "recent_ledger_entries": [            # up to 3, newest-first; [] if none or fetch failed
+#       { "kind": "deposit", "asset": "BTC", "timestamp": "<ISO8601>" }, ...
+#     ],
+#     "ledger_total_count": <int>           # total entries in the fetch batch; used for overflow line
+#   }
+#
+# Manual test cases (require real Kraken API keys):
+#   OK case:       key with ONLY {Query funds, Query ledger entries} → 200
+#   Overage case:  key with {Query funds, Query ledger entries, Withdraw funds} → 409
+#                  response: { code: "permission_mismatch", overage: ["Withdraw funds"], underage: [] }
+#   Underage case: key with {Query funds} only → 409
+#                  response: { code: "permission_mismatch", overage: [], underage: ["Query ledger entries"] }
+#
+# Auth-fail case (automatable with fake creds): → 422
+Section "15.13 holdings/account/validate (auth-fail → 422; overage/underage → 409 with permission_mismatch)"
 $validateBody = @{
     adapter_id = "kraken"
     api_key    = "smoke-test-invalid-key"
@@ -766,7 +793,7 @@ try {
     Show "validate bad creds" "(unexpected 2xx!)"
 } catch {
     $sc = $_.Exception.Response.StatusCode.value__
-    Show "validate bad creds → 422" ($sc -eq 422)
+    Show "validate auth-fail → 422" ($sc -eq 422)
 }
 
 

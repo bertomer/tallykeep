@@ -813,13 +813,18 @@ mockup because mockups are static-only per
 
 ## Add Holding
 
-The scaffolding iteration (`next_iteration.md`) ships the
-picker entry surface plus a type-parameterized "coming soon"
-stub for every tile tap. Per-wizard surfaces (Purse / Strongbox
-/ Vault descriptor wizards, Account provider-key wizard) ship
-in subsequent iterations as each design pass validates the
-relevant mockups — entries will appear in this section as those
-iterations close, each with its own gauntlet pass.
+The picker entry surface plus all four per-type wizards have
+shipped. Tile taps route to the live wizard for each Holding
+type — Account, Purse, Strongbox, Vault — documented in their
+own §Add Holding — *type* sections below. The scaffolding
+iteration originally shipped a type-parameterized coming-soon
+stub as the routing target for every tile; each wizard
+iteration since (Purse → Strongbox → Vault → Account) replaced
+the corresponding `/holding/new/<type>` route with its real
+wizard surface. The stub mockup itself is preserved as the
+canonical visual template for future coming-soon stubs (see
+`future_iterations.md` "Deposit Send-to-Account flow") and is
+no longer reached from this picker.
 
 ### Screens
 
@@ -835,73 +840,64 @@ iterations close, each with its own gauntlet pass.
   animation; scrim at `--color-overlay`. *Status: validated
   (Rémy greenlight 2026-05-13).*
 
-- `mobile_add_holding_coming_soon.html` — one-screen stub
-  parameterized by Holding type, used in this iteration by all
-  four tile taps. (Account because the Add Account wizard ships
-  in its own follow-up iteration with ccxt provider integration;
-  Purse / Strongbox / Vault because their descriptor wizards
-  ship in subsequent iterations each.) App bar with back
-  chevron + screen title ("Add a Purse" / "Add a Strongbox" /
-  etc.), centred body with a 96 px Holding icon (same per-type
+- `mobile_add_holding_coming_soon.html` — **pattern reference,
+  no longer reached from the Add Holding picker.** Originally
+  shipped as the type-parameterized routing target for all four
+  tile taps during the scaffolding iteration, replaced by each
+  per-type wizard as they shipped (Purse → Strongbox → Vault →
+  Account). Kept on disk as the canonical visual template for
+  future coming-soon stubs (cf. `future_iterations.md` "Deposit
+  Send-to-Account flow"). Anatomy: app bar with back chevron +
+  screen title ("Add a Purse" / "Add a Strongbox" / etc.),
+  centred body with a 96 px Holding icon (same per-type
   bordered framing as the picker row, sized up), heading
   *"Coming in an upcoming iteration"*, paragraph copy
   acknowledging API workaround for dev-phase users, "Return to
   Home" secondary CTA. Bottom nav unchanged. *Status: validated
-  (Rémy greenlight 2026-05-13).*
+  (Rémy greenlight 2026-05-13); role demoted to template
+  2026-05-17 as the last wizard shipped.*
 
-As each wizard iteration ships, its tile starts routing to the
-real wizard instead of the coming-soon stub. Promotion order
-locked in `future_iterations.md`: **Purse first** (canonical
-descriptor wizard, also carries the shared wizard shell into
-the codebase since it's the first consumer), then Strongbox
-(copy + framing variant on Purse), then Vault (multisig-only
-+ framing pre-card), then Account (different surface — ccxt
-provider integration, no descriptor parser).
+Promotion order followed `future_iterations.md`: **Purse first**
+(canonical descriptor wizard, also carried the shared wizard
+shell into the codebase since it was the first consumer), then
+Strongbox (copy + framing variant on Purse), then Vault
+(multisig-only + framing pre-card), then Account (different
+surface — ccxt provider integration, no descriptor parser).
 
 ### Reconcilability gauntlet answers
 
+Gauntlet answers below cover the picker surface only. Per-wizard
+gauntlet answers — descriptor handling (Purse / Strongbox /
+Vault), API credentials (Account), and Capacitor capability
+gates — live with each wizard's section below. The coming-soon
+stub's gauntlet was answered for the scaffolding iteration and
+is preserved in `shipped.md`; the screen is no longer a live
+surface so no current gauntlet attaches.
+
 1. **Trust boundary.** Phone (UI only). The picker is local
    sheet state — no backend call when opening or dismissing.
-   The coming-soon stub is a UI dead-end — no backend
-   interaction. The backend interaction (descriptor validation,
-   per-type Holding creation) lives in the per-wizard
-   iterations that ship later; for this scaffolding iteration
-   the stub is the honest "nothing happens yet" gate. The
-   backend endpoints DO ship in this iteration (so the
-   populated home can render against Swagger-seeded fixture
-   data), they're just not yet reachable from inside the app.
+   Tile taps route into the per-type wizard, which carries its
+   own trust-boundary answer.
 
-2. **Keys and secrets.** None on these surfaces. No descriptor
-   input, no API keys, no passphrases. Per-wizard gauntlet
-   answers — touching descriptors (Purse / Strongbox / Vault)
-   and API credentials (Account) — land with each wizard's
-   iteration.
+2. **Keys and secrets.** None on the picker surface. No
+   descriptor input, no API keys, no passphrases.
 
 3. **Self-hosted vs hosted.** Identical surface. The picker
-   and stub render identically regardless of the connection
-   target. The Holding-create backend endpoints behave
-   identically on both deployment models per
-   `01_architecture.md`.
+   renders identically regardless of the connection target.
 
-4. **Confirmation honesty.** Picker doesn't promise anything
-   — it presents the four type choices. Stub is explicit
-   ("Coming in an upcoming iteration") plus an API-workaround
-   disclosure for technical users ("Backend support is in
-   place — Holdings can be added via the API for now"). No
-   "added!" state shown before anything is added.
+4. **Confirmation honesty.** Picker doesn't promise anything —
+   it presents the four type choices. No "added!" state shown
+   before anything is added.
 
-5. **Browser-only fallback.** Per ADR-0007. Both surfaces are
+5. **Browser-only fallback.** Per ADR-0007. The picker is
    fully browser-compatible. No Capacitor-only capability is
-   exercised on the picker or stub — no QR scan, no biometric,
-   no secure-storage write. The deferred wizard capability
-   checks (managed-Purse on Capacitor-with-secure-storage,
-   QR-scan via camera) land with their respective wizard
-   iterations alongside honest browser gates.
+   exercised here — no QR scan, no biometric, no secure-storage
+   write. Capability gates land with the wizards that need them.
 
 6. **Open-source and reproducibility.** No closed-source
    dependency. Inline SVG icons from `brand/identity/`,
    token-driven styling (no raw hex in component CSS), no
-   third-party JS libraries on these surfaces.
+   third-party JS libraries on the picker surface.
 
 ### Notes
 
@@ -964,25 +960,27 @@ brass). The icon itself carries its own internal colours from
 glance even before the user reads the name. The coming-soon
 stub uses the same border convention at 96 px scale.
 
-**Coming-soon stub treatment — visible-with-stub for all four
-tiles in this iteration.** All four tile taps route to the
-same parameterized stub (icon + name change per type). Earlier
-plan had a unique Account-only stub with the other three tiles
+**Coming-soon stub treatment — historical, all four tiles
+routed to one parameterized stub during the scaffolding
+iteration.** All four tile taps once routed to the same
+parameterized stub (icon + name change per type). Earlier plan
+had a unique Account-only stub with the other three tiles
 leading to their wizards directly. Once the iteration was
 split (wizards to their own follow-on iterations), the stub
-treatment generalised to all four — keeps the picker visibly
-honest about what's coming across the board, avoids the "why
-is Account special?" question, and the parameterized stub is
-one mockup instead of three placeholders.
+treatment generalised to all four — kept the picker visibly
+honest about what was coming across the board, avoided the
+"why is Account special?" question, and the parameterized stub
+was one mockup instead of three placeholders. Resolved as each
+wizard shipped and took over its `/holding/new/<type>` route.
 
-**Backend ships before per-type frontend wizards.** The
+**Backend shipped before per-type frontend wizards.** The
 descriptor-validate endpoint and the three Holding-create
-endpoints (purse / strongbox / vault) ship in this scaffolding
-iteration alongside the picker + stub frontend. Without the
-wizards, Holdings can be created via Swagger UI for testing
-the populated home rendering. This decouples backend
-correctness testing from wizard UX work, and means each
-wizard's coding session focuses purely on the per-type UI
+endpoints (purse / strongbox / vault) shipped in the
+scaffolding iteration alongside the picker + stub frontend.
+Without the wizards yet, Holdings were created via Swagger UI
+for testing the populated-home rendering. This decoupled
+backend correctness testing from wizard UX work, and meant
+each wizard's coding session focused purely on the per-type UI
 rather than re-discovering backend shapes.
 
 ---

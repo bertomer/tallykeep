@@ -72,6 +72,7 @@ class ChainListener:
         # times set the natural cadence.
         self._fee_rate_cache: tuple[float, float] | None = None
         self._fee_rate_ttl_seconds = 60.0
+        self._chain_status: str = "healthy"
 
     # --- lifecycle ----------------------------------------------------------
 
@@ -111,6 +112,7 @@ class ChainListener:
                     )
         except Exception:  # noqa: BLE001
             logger.exception("ChainListener: read loop exited unexpectedly")
+            self._transition_chain_status("unreachable")
 
     def _handle(self, notification: ChainNotification) -> None:
         if notification.kind == "hashtx":
@@ -139,7 +141,9 @@ class ChainListener:
             if exc.code == -5:
                 logger.debug("ChainListener: tx %s no longer available", txid)
                 return
+            self._transition_chain_status("degraded")
             raise
+        self._transition_chain_status("healthy")
 
         # If bitcoind already reports a block hash on this tx, prefer the
         # height it reports (handles the race where hashtx fires after
@@ -195,7 +199,9 @@ class ChainListener:
             block = self._node._call("getblock", [block_hash, 1])
         except NodeRpcError:
             logger.exception("ChainListener: getblock failed for %s", block_hash)
+            self._transition_chain_status("degraded")
             return
+        self._transition_chain_status("healthy")
 
         height = int(block.get("height", 0))
         self._bus.publish(
@@ -527,6 +533,19 @@ class ChainListener:
 
         row = session.get(DescriptorRow, descriptor_id)
         return row.holding_id if row is not None else None
+
+    # --- connection state ---------------------------------------------------
+
+    def _transition_chain_status(self, new_status: str) -> None:
+        if self._chain_status == new_status:
+            return
+        old = self._chain_status
+        self._chain_status = new_status
+        self._bus.publish(
+            "system.chain.connection_state_changed",
+            {"old_status": old, "new_status": new_status},
+        )
+        logger.info("ChainListener: connection state %s → %s", old, new_status)
 
     # --- session helper -----------------------------------------------------
 

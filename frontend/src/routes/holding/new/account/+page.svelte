@@ -19,8 +19,8 @@
     No further API calls on Step 3.
 
   Tap-to-clear rule (ADR-0011 / mockup header comment):
-    On focus of either credential input AFTER an overage rejection,
-    clear BOTH fields AND dismiss the danger band in one motion.
+    On focus of either credential input AFTER an overage OR underage rejection,
+    clear BOTH fields AND dismiss all danger bands in one motion.
     Fires on focus event, not on edit. Paste button does NOT trigger it.
 -->
 <script lang="ts">
@@ -36,12 +36,20 @@
 
   type Step = 'connect' | 'parseback' | 'success';
 
+  interface LedgerEntryPreview {
+    kind: string;
+    asset: string;
+    timestamp: string;
+  }
+
   // From POST /holdings/account/validate — no holding created yet.
   interface ValidateResult {
     adapter_id: string;
     btc_balance_sats: number;
     other_asset_tickers: string[];
     other_asset_total_count: number;
+    recent_ledger_entries: LedgerEntryPreview[];
+    ledger_total_count: number;
   }
 
   // From POST /holdings/account — holding committed to DB.
@@ -77,7 +85,8 @@
   let apiKey = $state('');
   let privateKey = $state('');
   let privateKeyRevealed = $state(false);
-  let overageError = $state<{ extraPermissions: string[] } | null>(null);
+  let overageError = $state<{ permissions: string[] } | null>(null);
+  let underageError = $state<{ permissions: string[] } | null>(null);
   let connectGenError = $state<string | null>(null);
 
   // Step 2 — parseback
@@ -114,15 +123,31 @@
     return rest > 0 ? `${base}, + ${rest} more` : base;
   }
 
+  function formatRelativeTime(isoTs: string): string {
+    const diffMs = Date.now() - new Date(isoTs).getTime();
+    const diffMins = Math.floor(diffMs / 60_000);
+    if (diffMins < 60) return `${Math.max(1, diffMins)}m ago`;
+    const diffHrs = Math.floor(diffMs / 3_600_000);
+    if (diffHrs < 24) return `${diffHrs}h ago`;
+    const diffDays = Math.floor(diffMs / 86_400_000);
+    if (diffDays === 1) return 'yesterday';
+    return `${diffDays}d ago`;
+  }
+
+  function formatEntryTitle(kind: string, asset: string): string {
+    return `${kind.charAt(0).toUpperCase()}${kind.slice(1)} · ${asset}`;
+  }
+
   // -------------------------------------------------------------------------
   // Tap-to-clear (ADR-0011 / mockup rule)
   // -------------------------------------------------------------------------
 
   function handleCredentialFocus() {
-    if (overageError !== null || connectGenError !== null) {
+    if (overageError !== null || underageError !== null || connectGenError !== null) {
       apiKey = '';
       privateKey = '';
       overageError = null;
+      underageError = null;
       connectGenError = null;
     }
   }
@@ -170,15 +195,14 @@
         await auth.clearCredential(); goto('/'); return;
       }
 
-      if (res.status === 409 && data?.detail?.code === 'overage_permissions') {
-        overageError = { extraPermissions: data.detail.extra_permissions ?? [] };
+      if (res.status === 409 && data?.detail?.code === 'permission_mismatch') {
+        const overage: string[] = data.detail.overage ?? [];
+        const underage: string[] = data.detail.underage ?? [];
+        if (overage.length > 0) overageError = { permissions: overage };
+        if (underage.length > 0) underageError = { permissions: underage };
         return;
       }
 
-      if (res.status === 422 && data?.detail?.code === 'no_read_permission') {
-        connectGenError = "These keys don't hold read permission. Replace these keys on Kraken Pro with ones that have ONLY Query funds ticked. Then paste the new pair here.";
-        return;
-      }
       if (res.status === 422) {
         connectGenError = 'Kraken rejected these credentials. Double-check your API Key and Private Key.';
         return;
@@ -337,7 +361,8 @@
         <p class="hint-body">
           <strong>Settings → Connection and API → Create an API key.</strong>
           Name it <code>TallyKeep Read</code> and tick
-          <strong>only</strong> <code>Query funds</code>.
+          <strong>only</strong> <code>Query funds</code> and
+          <code>Query ledger entries</code>.
         </p>
       </div>
     </div>
@@ -367,11 +392,11 @@
           <input
             id="api-key-input"
             class="key-input"
-            class:has-error={overageError !== null}
+            class:has-error={overageError !== null || underageError !== null}
             type="text"
             placeholder="bd4pcvVPyOem3l5k9+NV3…"
             aria-label="API Key"
-            aria-invalid={overageError !== null ? true : undefined}
+            aria-invalid={overageError !== null || underageError !== null ? true : undefined}
             bind:value={apiKey}
             onfocus={handleCredentialFocus}
             onclick={handleCredentialFocus}
@@ -399,11 +424,11 @@
           <input
             id="private-key-input"
             class="key-input"
-            class:has-error={overageError !== null}
+            class:has-error={overageError !== null || underageError !== null}
             type={privateKeyRevealed ? 'text' : 'password'}
             placeholder="qRiDRMEYytD/oXc0vFUpQ70k7s…"
             aria-label="Private Key"
-            aria-invalid={overageError !== null ? true : undefined}
+            aria-invalid={overageError !== null || underageError !== null ? true : undefined}
             bind:value={privateKey}
             onfocus={handleCredentialFocus}
             onclick={handleCredentialFocus}
@@ -455,13 +480,42 @@
             This one also has:
           </p>
           <ul class="danger-list">
-            {#each overageError.extraPermissions as perm (perm)}
+            {#each overageError.permissions as perm (perm)}
               <li><code>{perm}</code></li>
             {/each}
           </ul>
           <p class="danger-body mt2">
             Replace these keys on Kraken Pro with ones that have
-            <strong>ONLY</strong> <code>Query funds</code> ticked.
+            <strong>ONLY</strong> <code>Query funds</code> and
+            <code>Query ledger entries</code> ticked.
+            Then paste the new pair here.
+          </p>
+        </div>
+      </div>
+    {/if}
+
+    <!-- Danger band — underage error -->
+    {#if underageError !== null}
+      <div class="danger-band" role="alert">
+        <svg class="danger-icon" viewBox="0 0 24 24" aria-hidden="true">
+          <circle cx="12" cy="12" r="10"/>
+          <line x1="12" y1="8" x2="12" y2="13"/>
+          <line x1="12" y1="16" x2="12.01" y2="16"/>
+        </svg>
+        <div>
+          <p class="danger-title">This API key is missing required permissions</p>
+          <p class="danger-body">
+            This key needs the following permissions to observe your account:
+          </p>
+          <ul class="danger-list">
+            {#each underageError.permissions as perm (perm)}
+              <li><code>{perm}</code></li>
+            {/each}
+          </ul>
+          <p class="danger-body mt2">
+            Replace these keys on Kraken Pro with ones that have
+            <strong>ONLY</strong> <code>Query funds</code> and
+            <code>Query ledger entries</code> ticked.
             Then paste the new pair here.
           </p>
         </div>
@@ -565,6 +619,31 @@
           <span class="parse-qualifier">Read-only summary · not actionable from TallyKeep</span>
         </span>
       </div>
+      {/if}
+    </div>
+    {/if}
+
+    <!-- Activity preview card -->
+    {#if validateResult}
+    <div class="activity-preview" aria-label="Recent activity from Kraken ledger">
+      <div class="activity-head">
+        <span class="activity-label">Recent activity</span>
+        <span class="activity-meta">From your ledger</span>
+      </div>
+      {#if validateResult.recent_ledger_entries.length === 0}
+        <p class="activity-empty">No activity yet — your entries will surface here as they happen on Kraken.</p>
+      {:else}
+        <ul class="activity-list">
+          {#each validateResult.recent_ledger_entries as entry (entry.timestamp + entry.kind + entry.asset)}
+          <li class="activity-entry">
+            <span class="activity-title">{formatEntryTitle(entry.kind, entry.asset)}</span>
+            <span class="activity-time">{formatRelativeTime(entry.timestamp)}</span>
+          </li>
+          {/each}
+        </ul>
+        {#if validateResult.ledger_total_count > 3}
+        <p class="activity-overflow">+ {validateResult.ledger_total_count - 3} more on your Account page</p>
+        {/if}
       {/if}
     </div>
     {/if}
@@ -972,6 +1051,72 @@
     color: var(--color-danger-text-on-soft, #dc2626);
     margin: var(--space-3) 0 0;
     text-align: center;
+  }
+
+  /* ---- activity preview card ---- */
+  .activity-preview {
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    padding: var(--space-3) var(--space-4);
+    margin-bottom: var(--space-3);
+  }
+  .activity-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    margin-bottom: var(--space-2);
+  }
+  .activity-label {
+    font-size: var(--font-size-xs);
+    color: var(--color-text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    font-weight: var(--font-weight-semibold);
+  }
+  .activity-meta {
+    font-size: var(--font-size-xs);
+    color: var(--color-text-muted);
+    font-weight: var(--font-weight-normal);
+  }
+  .activity-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+  .activity-entry {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: var(--space-3);
+    padding: var(--space-2) 0;
+    min-width: 0;
+  }
+  .activity-entry + .activity-entry { border-top: 1px solid var(--color-border); }
+  .activity-title {
+    font-size: var(--font-size-sm);
+    color: var(--color-text);
+    font-weight: var(--font-weight-medium);
+  }
+  .activity-time {
+    font-size: var(--font-size-xs);
+    color: var(--color-text-muted);
+    font-weight: var(--font-weight-normal);
+    flex-shrink: 0;
+  }
+  .activity-overflow {
+    margin: var(--space-2) 0 0;
+    padding-top: var(--space-2);
+    border-top: 1px solid var(--color-border);
+    font-size: var(--font-size-xs);
+    color: var(--color-text-muted);
+    text-align: center;
+  }
+  .activity-empty {
+    font-size: var(--font-size-sm);
+    color: var(--color-text-muted);
+    margin: 0;
+    line-height: var(--line-height-default);
   }
 
   /* ---- success step ---- */

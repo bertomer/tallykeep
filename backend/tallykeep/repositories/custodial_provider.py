@@ -35,6 +35,9 @@ def _row_to_domain(row: CustodialProviderRow) -> CustodialProvider:
         last_polled_at=row.last_polled_at,
         last_error=row.last_error,
         last_known_balance_sats=row.last_known_balance_sats,
+        connection_status=row.connection_status,
+        consecutive_error_count=row.consecutive_error_count,
+        ledger_cursor_at=row.ledger_cursor_at,
         created_at=row.created_at,
         updated_at=row.updated_at,
     )
@@ -160,3 +163,47 @@ def set_active(
     row.is_active = is_active
     row.updated_at = datetime.now(UTC)
     return _row_to_domain(row)
+
+
+def update_connection_status(
+    session: Session,
+    provider_id: UUID,
+    *,
+    status: str,
+    consecutive_error_count: int,
+    polled_at: datetime,
+    error: str | None = None,
+) -> tuple[str, str] | None:
+    """Update connection_status and consecutive_error_count.
+
+    Returns (old_status, new_status) so the caller can detect a transition and
+    emit a SSE event, or None if the provider row doesn't exist.
+    """
+    row = session.get(CustodialProviderRow, provider_id)
+    if row is None:
+        return None
+    old_status = row.connection_status
+    row.connection_status = status
+    row.consecutive_error_count = consecutive_error_count
+    row.last_polled_at = polled_at
+    if error is not None:
+        row.last_error = error
+    row.updated_at = datetime.now(UTC)
+    return old_status, status
+
+
+def update_ledger_cursor(
+    session: Session,
+    provider_id: UUID,
+    *,
+    cursor_at: datetime,
+) -> None:
+    row = session.get(CustodialProviderRow, provider_id)
+    if row is not None:
+        row.ledger_cursor_at = cursor_at
+        row.updated_at = datetime.now(UTC)
+
+
+def get_ledger_cursor(session: Session, provider_id: UUID) -> datetime | None:
+    row = session.get(CustodialProviderRow, provider_id)
+    return row.ledger_cursor_at if row is not None else None

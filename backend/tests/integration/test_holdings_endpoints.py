@@ -377,10 +377,11 @@ def _account_body(
     }
 
 
-def _clean_perms(extra: list[str] | None = None) -> MagicMock:
+def _clean_perms(overage: list[str] | None = None, underage: list[str] | None = None) -> MagicMock:
     return MagicMock(
         can_read=True, can_trade=False, can_withdraw=False,
-        detected_extra_permissions=extra or [],
+        overage=overage or [],
+        underage=underage or [],
     )
 
 
@@ -443,7 +444,7 @@ class TestCreateAccount:
     ) -> None:
         client, _ = app_with_db
         mock_adapter = MagicMock()
-        mock_adapter.get_permissions.return_value = _clean_perms(["Withdraw funds"])
+        mock_adapter.get_permissions.return_value = _clean_perms(overage=["Withdraw funds"])
 
         with patch(
             "tallykeep.services.treasury_service.build_adapter",
@@ -453,15 +454,15 @@ class TestCreateAccount:
 
         assert response.status_code == 409
         data = response.json()["detail"]
-        assert data["code"] == "overage_permissions"
-        assert "Withdraw funds" in data["extra_permissions"]
+        assert data["code"] == "permission_mismatch"
+        assert "Withdraw funds" in data["overage"]
 
     def test_create_account_overage_trade_and_margin_returns_409(
         self, app_with_db
     ) -> None:
         client, _ = app_with_db
         mock_adapter = MagicMock()
-        mock_adapter.get_permissions.return_value = _clean_perms(["Trade", "Margin"])
+        mock_adapter.get_permissions.return_value = _clean_perms(overage=["Trade", "Margin"])
 
         with patch(
             "tallykeep.services.treasury_service.build_adapter",
@@ -471,8 +472,8 @@ class TestCreateAccount:
 
         assert response.status_code == 409
         data = response.json()["detail"]
-        assert data["code"] == "overage_permissions"
-        assert set(data["extra_permissions"]) == {"Trade", "Margin"}
+        assert data["code"] == "permission_mismatch"
+        assert set(data["overage"]) == {"Trade", "Margin"}
 
 
 def _validate_body(
@@ -528,7 +529,7 @@ class TestValidateAccountCredentials:
     def test_validate_overage_withdraw_funds_returns_409(self, app_with_db) -> None:
         client, _ = app_with_db
         mock_adapter = MagicMock()
-        mock_adapter.get_permissions.return_value = _clean_perms(["Withdraw funds"])
+        mock_adapter.get_permissions.return_value = _clean_perms(overage=["Withdraw funds"])
 
         with patch(
             "tallykeep.services.treasury_service.build_adapter",
@@ -540,15 +541,15 @@ class TestValidateAccountCredentials:
 
         assert response.status_code == 409
         data = response.json()["detail"]
-        assert data["code"] == "overage_permissions"
-        assert "Withdraw funds" in data["extra_permissions"]
+        assert data["code"] == "permission_mismatch"
+        assert "Withdraw funds" in data["overage"]
 
     def test_validate_overage_trade_and_margin_returns_409(
         self, app_with_db
     ) -> None:
         client, _ = app_with_db
         mock_adapter = MagicMock()
-        mock_adapter.get_permissions.return_value = _clean_perms(["Trade", "Margin"])
+        mock_adapter.get_permissions.return_value = _clean_perms(overage=["Trade", "Margin"])
 
         with patch(
             "tallykeep.services.treasury_service.build_adapter",
@@ -560,8 +561,8 @@ class TestValidateAccountCredentials:
 
         assert response.status_code == 409
         data = response.json()["detail"]
-        assert data["code"] == "overage_permissions"
-        assert set(data["extra_permissions"]) == {"Trade", "Margin"}
+        assert data["code"] == "permission_mismatch"
+        assert set(data["overage"]) == {"Trade", "Margin"}
 
     def test_validate_does_not_create_holding(self, app_with_db) -> None:
         client, _ = app_with_db

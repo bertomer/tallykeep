@@ -8,23 +8,35 @@ authority.
 
 ## Why this primitive matters
 
-The primitive powers three product patterns natively, all in
+SweepPolicies are the mechanism that enforces the **minimum-
+exposure trading** principle (per `holdings/01_account.md` —
+custodial providers are pass-through liquidity, not storage):
+BTC sits at a venue only as long as a trade window requires,
+the user controls when value enters and leaves. The primitive
+also serves as the general inter-Holding rebalancing tool.
+Three product patterns share the same primitive, all in
 dev-phase scope at the architectural level:
 
-- **Outflow** (Account → TK Holding) — sweeping BTC off a
-  custodial provider into a self-custody Holding. The bread-and-
-  butter accumulation pattern. Fires the provider's withdraw API
-  via the Account's withdrawal credential.
-- **Inflow** (TK Holding → Account) — sending BTC to a custodial
-  provider from a self-custody Holding. The bread-and-butter
-  decumulation pattern — schedule BTC deposits to the provider
-  ahead of selling on the provider's site. Composes a PSBT on
-  the source-Holding side, broadcasts to the Account's pinned
-  deposit address.
+- **Outflow** (Account → TK Holding) — sweep BTC off a custodial
+  provider into a self-custody Holding as fast as policy allows.
+  The bread-and-butter accumulation pattern: fiat → BTC at the
+  venue (user trades on the provider's site) → BTC at self-
+  custody (SweepPolicy fires). Minimum-exposure trading in the
+  buy direction. Uses the provider's withdraw API via the
+  Account's withdrawal credential.
+- **Inflow** (TK Holding → Account) — push BTC from a self-
+  custody Holding to a custodial provider only when the user is
+  about to sell. The bread-and-butter decumulation pattern: BTC
+  at self-custody → BTC at the venue (SweepPolicy fires) → fiat
+  off the venue (user trades on the provider's site, fiat exit
+  on the provider's surface). Minimum-exposure trading in the
+  sell direction. Composes a PSBT on the source-Holding side,
+  broadcasts to the Account's pinned deposit address.
 - **Inter-Holding rebalancing** (TK Holding → TK Holding) — e.g.
   Strongbox → Purse ("top up the spending stack"), Purse →
   Strongbox ("daily spending bounded"), Strongbox → Vault
-  ("promote to long-term"). PSBT-driven on both sides.
+  ("promote to long-term"). PSBT-driven on both sides. Not
+  custodian-related; same primitive, different goal.
 
 The directionality is unconstrained at the type level. Whether a
 specific direction makes sense is the user's call; the validator
@@ -111,8 +123,8 @@ acknowledges.
 the validator carried three additional warnings —
 `destination_is_custodial`, `destination_keys_on_host`,
 `same_security_tier` — that opinionated which destination shapes
-"defeat minimum-exposure." Those warnings have been removed
-from the current rule-set because:
+were "wrong" without a clear use-case basis. Those warnings have
+been removed from the current rule-set because:
 
 - *Decumulation is a legitimate flow* (saved → custodial to
   sell, or to pay a bill that needs fiat off-ramp). Flagging
@@ -241,9 +253,9 @@ sweeps are architecturally supported but UX-deferred (per
   feature flag (default `true`); users can change it per policy
   thereafter.
 
-## Account → Strongbox/Vault sweep mechanics (the common path)
+## Account → Strongbox/Vault sweep mechanics (the common outflow path)
 
-The bread-and-butter use case for pre-shipping:
+The bread-and-butter outflow use case for pre-shipping:
 
 ```
 Account (Kraken) ──▶ SweepPolicy ──▶ Strongbox (cold reserve)

@@ -29,43 +29,54 @@ neither carries permissions beyond the one TK capability it serves
 > framing carried through the spec since `00_README.md` to keep
 > custodial Holdings honest about their custody model.
 
-## Product principle: BTC flow control between TK and the venue
+## Product principle: minimum-exposure trading via pass-through liquidity
 
-An Account is the bridge between TallyKeep's self-custody zone and
-a custodial provider's BTC liquidity. TallyKeep's job is **BTC
-flow control in both directions** between the user's other Holdings
-and the venue:
+The CustodialProvider is **pass-through liquidity, not storage**.
+The user's BTC should sit at the venue only as long as the trade
+window requires — minutes-to-hours, not days-to-months. The user's
+fiat likewise transits the venue rather than accumulating there
+indefinitely. This is the **minimum-exposure trading** pattern:
+the user controls when value enters and leaves the venue, the
+venue holds value only during active use.
 
-- **Outflow** (Account → TK Holding) — sweeping BTC off the
-  provider into self-custody, typically after the user bought
-  BTC on the provider's site. Driven by SweepPolicies with
+TallyKeep enforces the pattern by controlling BTC flow in both
+directions on the user's terms:
+
+- **Outflow** (Account → TK Holding) — sweep BTC off the provider
+  as fast as policy allows, typically right after the user buys
+  BTC on the provider's site. Accumulation pattern: fiat → BTC at
+  the venue → BTC at self-custody. Driven by SweepPolicies with
   source = Account or by manual Withdraw on the Account detail
   page.
-- **Inflow** (TK Holding → Account) — sending BTC to the provider
-  from a self-custody Holding, typically because the user is
-  about to sell on the provider's site to exit to fiat. Driven by
-  SweepPolicies with destination = Account or by manual Deposit
-  on the Account detail page.
+- **Inflow** (TK Holding → Account) — push BTC to the provider
+  only when the user is about to sell, scheduled or threshold-
+  triggered. Decumulation pattern: BTC at self-custody → BTC at
+  the venue → fiat off the venue (user's wallet, not TallyKeep's
+  surface). Driven by SweepPolicies with destination = Account or
+  by manual Deposit on the Account detail page.
 
-Both directions are native Account capabilities. Both operate on
-BTC only.
+Both directions are native Account capabilities. The pattern is
+the same in both: BTC arrives at the venue only when needed for
+an imminent trade, leaves immediately after. Without minimum-
+exposure enforcement, the venue accumulates the user's BTC and
+the FTX-class threat surface grows; with it, the user keeps
+exposure to a bounded window.
 
-**Locked principle: BTC only, no fiat operations.** TallyKeep never
-initiates, holds, or transfers fiat. Fiat balances at the provider
-are read-only display surface (consolidation rows, fiat-denominated
-thresholds in SweepPolicies). The fiat side of any sell trade
-happens on the provider's site, by the user, outside TallyKeep —
-TallyKeep observes the BTC balance change between two cycles.
+**Locked principle: BTC only, no fiat operations.** TallyKeep
+never initiates, holds, or transfers fiat. Fiat balances at the
+provider are read-only display surface (consolidation rows,
+fiat-denominated thresholds in SweepPolicies). The fiat side of
+any trade happens on the provider's site, by the user, outside
+TallyKeep — TallyKeep observes the resulting BTC balance change
+between two cycles and ledger entries via the provider's API.
 
-**Out of current scope: order placement at the provider.** TallyKeep
-does not route buy/sell orders on the user's behalf. The natural
-use case for order routing crosses the fiat boundary (BTC ↔ fiat
-trades), which is locked out. Order placement is therefore captured
-for much-later consideration in `future_iterations.md` ("Order
-placement on custodial providers"), gated on a separate regulatory
-evaluation if pursued. This is a scope cut, not a principle — the
-Account credential model and adapter shape do not preclude future
-order-placement work if regulatory ground is cleared.
+**Out of current scope: order placement at the provider.**
+TallyKeep does not route buy/sell orders — the user trades on the
+provider's site. The natural use case for order routing crosses
+the fiat-operations boundary which is locked out, so pursuing it
+would require a separate regulatory evaluation. Captured in
+`future_iterations.md` for much-later consideration; this is a
+current scope cut, not a foundational principle.
 
 ## What an Account does
 

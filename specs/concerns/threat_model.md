@@ -132,7 +132,7 @@ The provider lies about balances, seizes funds, or collapses (the FTX scenario).
 
 **Impact:** whatever was on the provider at the time of failure is lost. Sweep policies minimize the exposure window.
 
-**Mitigation:** minimum-exposure trading doctrine. Sweeps run frequently. `minimum_balance_sats` defaults to 0. Threshold triggers fire as soon as a buy lands.
+**Mitigation:** minimum-exposure trading doctrine. Outflow SweepPolicies (Account → TK Holding) move BTC off the provider frequently, reducing the exposure window. `minimum_balance_sats` defaults to 0. Threshold triggers fire as soon as a buy lands on the provider. Inflow SweepPolicies (TK Holding → Account) push BTC to the provider only at trade time, not for storage. Users with active sweep policies on tight thresholds have minutes-to-hours of exposure rather than days.
 
 ### S6 — Malicious descriptor as input
 

@@ -1204,10 +1204,12 @@ record.
 
 - **Captured:** 2026-05 (custodial-and-sweeps review)
 - **Motivation:** Per `concerns/sweep_policies.md`, SweepPolicy is generalized:
-  any Holding to any Holding with a safety validator. Pre-shipping
-  surfaces Account-originated sweeps (minimum-exposure trading
-  pattern). Other Holding-to-Holding sweeps are architecturally
-  supported but their UX hasn't been designed.
+  any Holding to any Holding, in any direction, with a safety
+  validator. Pre-shipping surfaces Account-originated outflow sweeps
+  (Account → TK Holding — the minimum-exposure-trading accumulation
+  pattern). Other directions — TK-Holding-source sweeps (inflow
+  TK → Account for decumulation, plus inter-Holding rebalancing) —
+  are architecturally supported but their UX hasn't been designed.
 - **Sketch:** Surface sweep-policy creation for non-Account sources:
     - **TallyKeep-managed Purse → Strongbox/Vault** — auto-sweep
       with biometric prompt or background signing on the Capacitor
@@ -1410,9 +1412,9 @@ record.
   address manually from kraken.com, paste it into a Send flow
   from a separate Holding, and remember to use it. The product
   narrative reads cleaner with TK as the **outflow / inflow
-  controller** between TK Holdings and the custodial venue:
-  pass-through liquidity in both directions, BTC never sitting at
-  the venue longer than the user's trading window.
+  controller** enforcing minimum-exposure trading in both
+  directions: pass-through liquidity, not storage — BTC sits at
+  the venue only for the trade window the user actually needs.
 - **Sketch:** Reached from the Account detail page's **Deposit**
   action button. Likely 3 steps:
   1. **Source picker.** List the user's other TK Holdings
@@ -1477,6 +1479,88 @@ record.
   "Deposit address" section likewise — capture the field but
   forward-reference the sub-flow that consumes it. Honest
   absence-of-affordance for the actual deposit action.
+
+### Custodial ledger mirroring posture and TK-initiated event linkage
+
+- **Captured:** 2026-05-17 (Account-detail-page brainstorm follow-up
+  after Step 2's activity-preview surfaced the underlying question).
+- **Motivation:** Iteration A landed a `custodial_ledger_entry`
+  table that mirrors Kraken's ledger feed on disk. Two open
+  questions flow from that choice:
+  1. **Mirror vs. cache.** Mirroring creates a second source of
+     truth (Kraken's ledger is canonical; TK's table is a copy).
+     If Kraken edits, cancels, or reorgs an entry, TK needs
+     reconciliation logic. There are kinds Kraken returns that we
+     haven't modeled (margin events, staking rewards, sub-account
+     transfers, internal adjustments, fees of various flavours);
+     mirroring forces us to either store raw JSONB pass-through
+     or invest in schema for every kind we might encounter. The
+     alternative is a refreshable *cache* — short-TTL, no
+     source-of-truth claim, query Kraken on Operations-tab access
+     — which trades reconciliation work for active-connection
+     dependency.
+  2. **Linkage to TK domain for TK-initiated events.** When a
+     SweepPolicy fires an outflow, Kraken returns a `withdraw`
+     ledger entry whose semantics on the TK side are richer than
+     "Kraken withdrew funds": it corresponds to a specific
+     `sweep_execution` row, and the BTC lands on-chain at a TK
+     Holding's whitelisted address (producing a chain-side
+     `LedgerEntry`). The custodial ledger entry should ideally
+     link to both — three-way reconciliation: Kraken ledger ↔
+     `sweep_execution` ↔ TK chain-side `LedgerEntry`. The
+     equivalent linkage for inflow (TK Holding → Kraken Account
+     via PSBT) ties a Kraken `deposit` entry back to the
+     source-Holding's chain-side outgoing tx. For events NOT
+     initiated by TK (manual buys on the provider's site,
+     external deposits, provider-side fees), the entry stays
+     pure observation with no TK linkage. This branch has not
+     been designed.
+- **Sketch:**
+    - Settle the mirror-vs-cache posture explicitly. If mirror:
+      `custodial_ledger_entry` stays canonical, with a JSONB
+      `raw_payload` column for kinds TK doesn't model; recon
+      rules defined for provider-side edits. If cache: TTL +
+      refresh policy; Operations tab requires an active provider
+      connection.
+    - Add nullable foreign keys on `custodial_ledger_entry` for
+      TK-side linkage: `linked_sweep_execution_id`,
+      `linked_holding_id` (the TK Holding involved as source or
+      destination), `linked_chain_ledger_entry_id` (the chain-side
+      `LedgerEntry` that resulted from the on-chain leg of the
+      flow).
+    - Reconciler subscriber: on each new custodial ledger entry
+      of kind `deposit` or `withdraw`, attempt to match against
+      pending `sweep_execution` rows (by amount + timestamp
+      window + provider). On match, populate the link fields. On
+      no-match, the entry is "pure observation" (external user
+      action).
+    - UI surface (iteration B's Operations tab): rows
+      corresponding to TK-initiated events render with a
+      clickable link to the originating sweep / destination
+      Holding; rows for external events render display-only.
+      Visual distinction surfaces "TK did this" vs. "the user
+      did this on the provider's site" without judging either.
+- **Touches:** `holdings/01_account.md` §"Observation cycles" and
+  §"Flows" (sharpen the mirror contract), `02_domain_model.md`
+  (new FK fields on `custodial_ledger_entry`),
+  `03_data_model.md` (schema), `concerns/sweep_policies.md`
+  §Reconciliation (extend beyond the chain-side matching to
+  include the custodial-side matching), `concerns/threat_model.md`
+  (provider-ledger trust posture — do we trust Kraken's ledger
+  as authoritative, or audit deltas?), iteration B (Operations
+  tab display of linked vs. unlinked entries).
+- **Status:** sketched (the question is real and the linkage
+  branch has shape; the mirror-vs-cache posture needs an
+  arbitration session before the rest sharpens).
+- **Milestone:** TBD — pre-shipping if iteration B's Operations
+  tab needs the linkage to ship a useful surface (likely);
+  could partially defer the mirror-posture reconciliation rules
+  for unknown kinds to post-shipping if v1 accepts a raw
+  pass-through display.
+- **Notes:** Pairs with `pre-implementation.md`
+  `multi-asset-aggregation` (the non-BTC display question) —
+  both touch the shape and enrichment surface of the entries TK
+  observes from the provider. Worth bundling the arbitration.
 
 ### Custom adapter for non-ccxt venues (Swissquote and similar)
 
@@ -2201,3 +2285,87 @@ record.
 - **Milestone:** post-shipping
 - **Notes:** Source claim from May 2026 sparring notes; re-verify
   before any commit.
+on, prior iteration). [Note: entry truncated by prior session; preserved as-is.]
+intains certain non-obvious behaviors that, surfaced as gentle UI hints, can teach users how the system works. [entry truncated by prior session — restore from git if needed.]
+
+### Custodial ledger mirroring posture and TK-initiated event linkage
+
+- **Captured:** 2026-05-17 (Account-detail-page brainstorm follow-up
+  after Step 2's activity-preview surfaced the underlying question).
+- **Motivation:** Iteration A landed a `custodial_ledger_entry` table
+  that mirrors Kraken's ledger feed on disk. Two open questions
+  flow from that choice:
+  1. **Mirror vs. cache.** Mirroring creates a second source of
+     truth (Kraken's ledger is canonical; TK's table is a copy).
+     If Kraken edits, cancels, or reorgs an entry, TK needs
+     reconciliation logic. There are kinds Kraken returns that we
+     haven't modeled (margin events, staking rewards, sub-account
+     transfers, internal adjustments, fees of various flavours);
+     mirroring forces us to either store raw JSONB pass-through
+     or invest in schema for every kind we might encounter. The
+     alternative is a refreshable *cache* — short-TTL, no
+     source-of-truth claim, query Kraken on Operations-tab access
+     — which trades reconciliation work for active-connection
+     dependency.
+  2. **Linkage to TK domain for TK-initiated events.** When a
+     SweepPolicy fires an outflow, Kraken returns a `withdraw`
+     ledger entry whose semantics on the TK side are richer than
+     "Kraken withdrew funds": it corresponds to a specific
+     `sweep_execution` row, and the BTC lands on-chain at a TK
+     Holding's whitelisted address (producing a chain-side
+     `LedgerEntry`). The custodial ledger entry should ideally
+     link to both — three-way reconciliation: Kraken ledger ↔
+     `sweep_execution` ↔ TK chain-side `LedgerEntry`. The
+     equivalent linkage for inflow (TK Holding → Kraken Account
+     via PSBT) ties a Kraken `deposit` entry back to the
+     source-Holding's chain-side outgoing tx. For events NOT
+     initiated by TK (manual buys on the provider's site,
+     external deposits, provider-side fees), the entry stays
+     pure observation with no TK linkage. This branch has not
+     been designed.
+- **Sketch:**
+    - Settle the mirror-vs-cache posture explicitly. If mirror:
+      `custodial_ledger_entry` stays canonical, with a JSONB
+      `raw_payload` column for kinds TK doesn't model; recon
+      rules defined for provider-side edits. If cache: TTL +
+      refresh policy; Operations tab requires an active provider
+      connection.
+    - Add nullable foreign keys on `custodial_ledger_entry` for
+      TK-side linkage: `linked_sweep_execution_id`,
+      `linked_holding_id` (the TK Holding involved as source or
+      destination), `linked_chain_ledger_entry_id` (the chain-side
+      `LedgerEntry` that resulted from the on-chain leg of the
+      flow).
+    - Reconciler subscriber: on each new custodial ledger entry
+      of kind `deposit` or `withdraw`, attempt to match against
+      pending `sweep_execution` rows (by amount + timestamp
+      window + provider). On match, populate the link fields. On
+      no-match, the entry is "pure observation" (external user
+      action).
+    - UI surface (iteration B's Operations tab): rows
+      corresponding to TK-initiated events render with a
+      clickable link to the originating sweep / destination
+      Holding; rows for external events render display-only.
+      Visual distinction surfaces "TK did this" vs. "the user
+      did this on the provider's site" without judging either.
+- **Touches:** `holdings/01_account.md` §"Observation cycles" and
+  §"Flows" (sharpen the mirror contract), `02_domain_model.md`
+  (new FK fields on `custodial_ledger_entry`),
+  `03_data_model.md` (schema), `concerns/sweep_policies.md`
+  §Reconciliation (extend beyond the chain-side matching to
+  include the custodial-side matching), `concerns/threat_model.md`
+  (provider-ledger trust posture — do we trust Kraken's ledger
+  as authoritative, or audit deltas?), iteration B (Operations
+  tab display of linked vs. unlinked entries).
+- **Status:** sketched (the question is real and the linkage
+  branch has shape; the mirror-vs-cache posture needs an
+  arbitration session before the rest sharpens).
+- **Milestone:** TBD — pre-shipping if iteration B's Operations
+  tab needs the linkage to ship a useful surface (likely);
+  could partially defer the mirror-posture reconciliation rules
+  for unknown kinds to post-shipping if v1 accepts a raw
+  pass-through display.
+- **Notes:** Pairs with `pre-implementation.md`
+  `multi-asset-aggregation` (the non-BTC display question) —
+  both touch the shape and enrichment surface of the entries TK
+  observes from the provider. Worth bundling the arbitration.

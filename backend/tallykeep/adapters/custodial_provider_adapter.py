@@ -55,6 +55,19 @@ class WhitelistVerification:
     error: str | None = None            # reason if is_whitelisted=False and provider was contacted
 
 
+@dataclass
+class CustodialLedgerEntry:
+    """One entry from the provider's unified ledger feed."""
+
+    provider_entry_id: str
+    kind: str          # "deposit" | "withdrawal" | "trade" | "fee" | "transfer" | "staking"
+    asset: str         # e.g. "BTC"
+    amount: float      # signed (negative = debit)
+    status: str        # "pending" | "success" | "failed"
+    timestamp: datetime
+    raw: dict          # full provider payload for forward-compatibility
+
+
 # --- Exceptions -----------------------------------------------------------------
 
 
@@ -98,6 +111,10 @@ class CustodialProviderAdapter(ABC):
     supports_withdrawal_keys: bool = False
     #: Provider exposes a programmatic address-whitelist read API.
     whitelist_read_api: bool = False
+    #: Verbatim provider permission names that compose the "observe" TK capability
+    #: (ADR-0012). The validate endpoint rejects any key missing one of these
+    #: (underage) or carrying anything beyond them (overage).
+    observation_permission_set: frozenset[str] = frozenset()
 
     # --- Abstract interface -------------------------------------------------------
 
@@ -151,8 +168,23 @@ class CustodialProviderAdapter(ABC):
         """
         ...
 
+    @abstractmethod
+    def fetch_ledger_since(
+        self, since: datetime | None
+    ) -> tuple[list[CustodialLedgerEntry], datetime | None]:
+        """Fetch unified ledger entries (deposits, withdrawals, trades, fees, etc.)
+        newer than `since`. Returns (entries, newest_timestamp_or_None).
+
+        If `since` is None, fetches the most recent batch only. Entries are
+        ordered oldest-first. Returns an empty list if there are no new entries.
+        Does not raise on missing permission — the caller (ledger poller) handles
+        that by logging and skipping the provider.
+        """
+        ...
+
 
 __all__ = [
+    "CustodialLedgerEntry",
     "CustodialProviderAdapter",
     "Deposit",
     "ProviderAuthError",

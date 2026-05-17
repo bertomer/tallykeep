@@ -358,14 +358,6 @@ class TestUTXOInvariants:
 
 
 class TestCustodialProvider:
-    def test_can_trade_must_be_false(self) -> None:
-        with pytest.raises(ValueError, match="can_trade must be False"):
-            ProviderPermissions(can_read=True, can_trade=True, can_withdraw=False)
-
-    def test_can_read_must_be_true(self) -> None:
-        with pytest.raises(ValueError, match="can_read must be True"):
-            ProviderPermissions(can_read=False, can_trade=False, can_withdraw=False)
-
     def test_credential_reference_cannot_look_like_a_value(self) -> None:
         with pytest.raises(ValueError, match="lookup strings"):
             CustodialProvider(
@@ -387,6 +379,9 @@ class TestCustodialProvider:
                 last_polled_at=None,
                 last_error=None,
                 last_known_balance_sats=None,
+                connection_status="healthy",
+                consecutive_error_count=0,
+                ledger_cursor_at=None,
                 created_at=NOW,
                 updated_at=NOW,
             )

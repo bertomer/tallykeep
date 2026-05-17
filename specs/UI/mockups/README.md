@@ -173,8 +173,10 @@ after editing.
 ### Section pills (groups)
 
 The gallery has two filter rows: **Section** (which flow) and
-**Status** (draft/review/validated). The Section row is driven
-by the `GROUPS` array near the top of the script:
+**Status** (draft/review/validated). Cards are also visually
+grouped under a sticky section heading per group when scrolling,
+so the structure is visible without filtering. The Section row
+is driven by the `GROUPS` array near the top of the script:
 
 ```js
 const GROUPS = [
@@ -195,7 +197,11 @@ Rules:
   custody-tier order. A pill row is a picker; the
   Holdings-picker discipline applies (Account first as the most
   common starting point for target-market users, then Purse,
-  Strongbox, Vault).
+  Strongbox, Vault). Section headers in the gallery render in
+  this same `GROUPS` order regardless of the order entries
+  appear in the `mockups` array, so re-ordering the array has
+  no visual effect — re-order `GROUPS` if you want to change
+  what users see.
 - **No ad-hoc groups in entries.** If a new flow doesn't fit an
   existing group, add a new entry to `GROUPS` at its lifecycle
   position, then reference the new id from your mockup entries.
@@ -239,3 +245,4 @@ inside the phone-frame.
   from `UI/mobile.md`) → `PROCESS.md §Iteration cycle`
 - Routing table for ADR-vs-edit decisions → `PROCESS.md §When
   things change`
+es the files present on disk.

@@ -2964,6 +2964,16 @@ components:
         other_asset_total_count:
           type: integer
           title: Other Asset Total Count
+        recent_ledger_entries:
+          items:
+            $ref: '#/components/schemas/LedgerEntryPreview'
+          type: array
+          title: Recent Ledger Entries
+          default: []
+        ledger_total_count:
+          type: integer
+          title: Ledger Total Count
+          default: 0
       type: object
       required:
       - adapter_id
@@ -4201,6 +4211,24 @@ components:
           title: Note
       type: object
       title: LedgerEntryPatch
+    LedgerEntryPreview:
+      properties:
+        kind:
+          type: string
+          title: Kind
+        asset:
+          type: string
+          title: Asset
+        timestamp:
+          type: string
+          format: date-time
+          title: Timestamp
+      type: object
+      required:
+      - kind
+      - asset
+      - timestamp
+      title: LedgerEntryPreview
     Network:
       type: string
       enum:
@@ -5403,4 +5431,3 @@ components:
       - address
       - is_whitelisted
       title: WhitelistVerificationOut
-

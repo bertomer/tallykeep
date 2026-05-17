@@ -26,6 +26,7 @@ from tallykeep.services.treasury_service import (
     TreasuryServiceError,
     TradePermissionsDetected,
     OveragePermissionsDetected,
+    CredentialPermissionMismatch,
     _compute_safety_warnings,
 )
 
@@ -104,6 +105,9 @@ def _make_provider(whitelist_verified: bool = True) -> CustodialProvider:
         last_polled_at=None,
         last_error=None,
         last_known_balance_sats=None,
+        connection_status="healthy",
+        consecutive_error_count=0,
+        ledger_cursor_at=None,
         created_at=_NOW,
         updated_at=_NOW,
     )
@@ -297,23 +301,6 @@ def _read_only_store():
     return store
 
 
-def test_create_account_holding_rejects_trade_permissions(monkeypatch) -> None:  # type: ignore[no-untyped-def]
-    """create_account_holding raises TradePermissionsDetected when the adapter
-    reports can_trade=True via detected_extra_permissions."""
-    from tallykeep.services.treasury_service import create_account_holding
-
-    store = _read_only_store()
-    mock_adapter = MagicMock()
-    mock_adapter.get_permissions.return_value = MagicMock(
-        can_read=True, can_trade=True, can_withdraw=False,
-        detected_extra_permissions=["Trade"],
-    )
-
-    with patch("tallykeep.services.treasury_service.build_adapter", return_value=mock_adapter):
-        with pytest.raises(TradePermissionsDetected):
-            create_account_holding(**_account_creation_args(store))
-
-
 def test_create_account_holding_rejects_unknown_adapter() -> None:
     """Unsupported adapter_id raises TreasuryServiceError, not a bare ValueError."""
     from tallykeep.services.treasury_service import create_account_holding
@@ -323,14 +310,14 @@ def test_create_account_holding_rejects_unknown_adapter() -> None:
 
 
 def test_create_account_holding_ok_returns_balance_tuple() -> None:
-    """Read-only key with no extra permissions succeeds and returns balance data."""
+    """Exactly-scoped key (no overage, no underage) succeeds and returns balance data."""
     from tallykeep.services.treasury_service import create_account_holding
 
     store = _read_only_store()
     mock_adapter = MagicMock()
     mock_adapter.get_permissions.return_value = MagicMock(
         can_read=True, can_trade=False, can_withdraw=False,
-        detected_extra_permissions=[],
+        overage=[], underage=[],
     )
     mock_adapter.get_balance.return_value = 1_500_000
     mock_adapter.get_other_balances.return_value = {"ETH": "1.5", "SOL": "10.0"}
@@ -350,36 +337,76 @@ def test_create_account_holding_ok_returns_balance_tuple() -> None:
 
 
 def test_create_account_holding_overage_withdraw_funds() -> None:
-    """Key with 'Withdraw funds' is rejected with OveragePermissionsDetected."""
+    """Key with 'Withdraw funds' is rejected with CredentialPermissionMismatch."""
     from tallykeep.services.treasury_service import create_account_holding
 
     store = _read_only_store()
     mock_adapter = MagicMock()
     mock_adapter.get_permissions.return_value = MagicMock(
         can_read=True, can_trade=False, can_withdraw=True,
-        detected_extra_permissions=["Withdraw funds"],
+        overage=["Withdraw funds"], underage=[],
     )
 
     with patch("tallykeep.services.treasury_service.build_adapter", return_value=mock_adapter):
-        with pytest.raises(OveragePermissionsDetected) as exc_info:
+        with pytest.raises(CredentialPermissionMismatch) as exc_info:
             create_account_holding(**_account_creation_args(store))
 
-    assert exc_info.value.extra_permissions == ["Withdraw funds"]
+    assert exc_info.value.overage == ["Withdraw funds"]
+    assert exc_info.value.underage == []
 
 
 def test_create_account_holding_overage_multiple_permissions() -> None:
-    """Key with Trade + Margin is rejected; all detected names are reported."""
+    """Key with Trade + Margin overage is rejected; all names are reported."""
     from tallykeep.services.treasury_service import create_account_holding
 
     store = _read_only_store()
     mock_adapter = MagicMock()
     mock_adapter.get_permissions.return_value = MagicMock(
         can_read=True, can_trade=True, can_withdraw=False,
-        detected_extra_permissions=["Trade", "Margin"],
+        overage=["Trade", "Margin"], underage=[],
     )
 
     with patch("tallykeep.services.treasury_service.build_adapter", return_value=mock_adapter):
-        with pytest.raises(OveragePermissionsDetected) as exc_info:
+        with pytest.raises(CredentialPermissionMismatch) as exc_info:
             create_account_holding(**_account_creation_args(store))
 
-    assert set(exc_info.value.extra_permissions) == {"Trade", "Margin"}
+    assert set(exc_info.value.overage) == {"Trade", "Margin"}
+    assert exc_info.value.underage == []
+
+
+def test_create_account_holding_underage_missing_ledger() -> None:
+    """Key missing 'Query ledger entries' is rejected with CredentialPermissionMismatch."""
+    from tallykeep.services.treasury_service import create_account_holding
+
+    store = _read_only_store()
+    mock_adapter = MagicMock()
+    mock_adapter.get_permissions.return_value = MagicMock(
+        can_read=True, can_trade=False, can_withdraw=False,
+        overage=[], underage=["Query ledger entries"],
+    )
+
+    with patch("tallykeep.services.treasury_service.build_adapter", return_value=mock_adapter):
+        with pytest.raises(CredentialPermissionMismatch) as exc_info:
+            create_account_holding(**_account_creation_args(store))
+
+    assert exc_info.value.underage == ["Query ledger entries"]
+    assert exc_info.value.overage == []
+
+
+def test_create_account_holding_overage_and_underage() -> None:
+    """Key with both extra and missing permissions reports both lists."""
+    from tallykeep.services.treasury_service import create_account_holding
+
+    store = _read_only_store()
+    mock_adapter = MagicMock()
+    mock_adapter.get_permissions.return_value = MagicMock(
+        can_read=True, can_trade=True, can_withdraw=False,
+        overage=["Trade"], underage=["Query ledger entries"],
+    )
+
+    with patch("tallykeep.services.treasury_service.build_adapter", return_value=mock_adapter):
+        with pytest.raises(CredentialPermissionMismatch) as exc_info:
+            create_account_holding(**_account_creation_args(store))
+
+    assert exc_info.value.overage == ["Trade"]
+    assert exc_info.value.underage == ["Query ledger entries"]

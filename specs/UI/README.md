@@ -397,18 +397,23 @@ external action.** Practically:
 - **External-watch-only Purse → anywhere** — not possible (no keys
   held by any TallyKeep client).
 
-**Dev-phase scope:** Account-originated sweeps only (the
-minimum-exposure-trading use case). Other Holding-to-Holding sweeps
-are architecturally supported but their UX is design-deferred to a
-future iteration — see `future_iterations.md` "Holding-to-Holding
-sweeps beyond Account-originated".
+**Dev-phase scope:** Account-originated outflow sweeps (the
+minimum-exposure-trading accumulation pattern: Account → TK
+Holding) are the primary surface. TK-Holding-originated sweeps
+(inflow Account-bound for decumulation, plus inter-Holding
+rebalancing) are architecturally supported but their UX is
+design-deferred to a future iteration — see
+`future_iterations.md` "Holding-to-Holding sweeps beyond
+Account-originated".
 
 Visible only when the user has at least one Account or has set up
-another sweep. **Order placement** (buying / selling Bitcoin through
-the connected provider) is explicitly out of scope through the
-personal-use phase — current scope is read + withdraw + auto-sweep
-only. Adding order placement triggers a regulatory / KYC conversation
-captured in `future_iterations.md` ("Order placement on custodial
+another sweep. **Order placement** (buying / selling Bitcoin
+through the connected provider) is explicitly out of scope
+through the personal-use phase — current scope is observation +
+Withdraw + Deposit + bi-directional SweepPolicies. Adding order
+placement crosses the fiat-operations boundary which is locked
+out, and would require a separate regulatory evaluation. Captured
+in `future_iterations.md` ("Order placement on custodial
 providers").
 
 ### Settings

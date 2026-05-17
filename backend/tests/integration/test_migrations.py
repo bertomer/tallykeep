@@ -23,6 +23,7 @@ EXPECTED_TABLES = {
     "address",
     "broadcast_attempt",
     "crypto_parameters",
+    "custodial_ledger_entry",
     "custodial_provider",
     "descriptor",
     "event_emission_log",
