@@ -20,7 +20,7 @@ should first locate which surface is responsible.
 | **Backend** | FastAPI app, Postgres, Redis, worker process. Docker Compose stack on the user's host (or hosted-tier infrastructure when that ships). | Observe the chain via bitcoind. Construct PSBTs. Persist Holdings, Descriptors, LedgerEntries. Call custodial-provider APIs. Emit and consume domain events. Encrypt and decrypt third-party credentials with the user's passphrase. | **Hold spending keys.** Sign anything. Create user accounts on TallyKeep infrastructure. |
 | **Capacitor client** | The mobile app (Capacitor wrap of the SvelteKit PWA), distributed via app store / sideload. | Hold spending keys for Purses with `purse_mode = ON_DEVICE_TK_GENERATED` or `ON_DEVICE_USER_IMPORTED`, in OS Keychain/Keystore, biometric-gated. Sign with the on-device key via NativeBridge. Read camera (QR). Subscribe to push notifications. | Transmit spending keys to the backend. Sign for Holdings whose keys live elsewhere (a Strongbox's hardware wallet, a `WATCH_ONLY` Purse's source wallet). |
 | **Browser PWA client** | The SvelteKit PWA in any browser (desktop Chrome / Safari / Firefox, mobile browsers, or installed-as-PWA). Same SvelteKit code as the Capacitor client; the `NativeBridge` interface stubs out. | Observe Holdings. Render flows. Compose PSBTs server-side and download the file. | Hold spending keys (no OS-grade secure storage primitive). Sign with on-device keys. Operations requiring keys gate honestly with "install the app / sign externally". |
-| **bitcoind** | Bitcoin Core node, pruned or full, running on the user's host (or shared in the hosted tier — see `future_iterations.md`). | Serve chain data via JSON-RPC. Push live events via ZeroMQ. Hold the source-of-truth view of the chain. | Sign anything. The backend never sends keys to bitcoind for signing. |
+| **bitcoind** | Bitcoin Core node, pruned or full, running on the user's host (or shared in the hosted tier — see `backlog/hosted-tier-infrastructure.md`). | Serve chain data via JSON-RPC. Push live events via ZeroMQ. Hold the source-of-truth view of the chain. | Sign anything. The backend never sends keys to bitcoind for signing. |
 | **Custodial provider** | Third-party exchange / broker API (Kraken, Bitstamp; future Lemon, Buenbit, Belo, Coinbase Advanced, Swissquote). | Hold custody of the user's BTC (and stablecoin) balances at the provider. Accept withdrawals to whitelisted addresses. | Anything TallyKeep is responsible for. TallyKeep owns the API credentials encrypted at rest; the provider owns the funds. |
 | **Hardware wallet** | The user's external signing device (Coldcard, Trezor, Ledger, Jade, BitBox, airgapped laptop). | Hold the spending key for Strongbox or Vault Holdings. Sign PSBTs offered to it by file / USB / QR. | Reach TallyKeep directly. The user is the bridge — they export a PSBT, walk it to the hardware wallet, walk the signed PSBT back. |
 
@@ -31,11 +31,11 @@ security boundary is the OS user account. The authentication
 layer (passphrase + biometric on Capacitor) is a private-ship
 requirement (per ADR-0003); the public-ship event hardens it
 further. Remote access for self-hosters is documented in
-`future_iterations.md` "Remote access for self-hosters" and is
-opt-in.
+`backlog/remote-access-for-self-hosters.md` and is opt-in.
 
 **Hosted-tier surface:** when the hosted tier ships (per
-`future_iterations.md`), the backend moves from "user's host" to
+`backlog/hosted-tier-infrastructure.md`), the backend moves from
+"user's host" to
 "TallyKeep infrastructure" but the trust zones do **not** change:
 the backend still never holds spending keys. The Capacitor
 client's key-holding model is identical between self-hosted and
@@ -259,8 +259,8 @@ in `api/openapi.yaml`.
 - All services bind to `127.0.0.1`.
 - No TLS — everything is on localhost. Adding TLS later (with
   WireGuard / Tailscale for remote access — see
-  `future_iterations.md`) is a configuration change, not an
-  architectural one.
+  `backlog/remote-access-for-self-hosters.md`) is a configuration
+  change, not an architectural one.
 - No authentication layer on the API in the dev phase. Security
   boundary is the OS user account. The auth layer (passphrase +
   biometric on Capacitor) is a private-ship requirement (per

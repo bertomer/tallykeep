@@ -35,8 +35,9 @@ Supported descriptor types: `pkh(...)`, `sh(wpkh(...))`,
 Holding (which has multisig metadata fields), the current build
 accepts only single-key descriptors. The Vault metadata is stored
 for future use; the analyzer surfaces the discrepancy honestly.
-Captured in `future_iterations.md` as "Multisig descriptor
-support." See `holdings/04_vault.md` for the per-Vault treatment.
+Captured for future sharpening in `backlog/add-holding-vault-wizard.md`
+(onboarding) and `backlog/vault-send-for-all-shapes.md` (spending). See
+`holdings/04_vault.md` for the per-Vault treatment.
 
 ## Gap limit
 
@@ -102,8 +103,8 @@ When a transaction has some inputs from user-controlled Holdings
 and some from external sources (likely a CoinJoin or PayJoin),
 the LedgerEntry retains net-effect direction (so balances stay
 correct) but gains a tag distinguishing it from a "real"
-outgoing payment. See `future_iterations.md` "Mixed-input
-transaction flagging".
+outgoing payment. See
+`backlog/mixed-input-transaction-flagging.md`.
 
 ### Suggested category (non-binding)
 
@@ -131,7 +132,7 @@ and sets `categorized_at`. API surface lives in
 
 Push-driven categorization prompts (event-driven popups when the
 bitcoin node detects new on-chain activity) are captured in
-`future_iterations.md` "Push-driven categorization workflow".
+`backlog/push-driven-categorization-workflow.md`.
 
 ## UTXO hygiene flags
 
@@ -200,7 +201,7 @@ can dismiss per-item, and dismissals persist.
 
 The Blueprint analysis UI surface that aggregates these
 recommendations is deferred to post-shipping (per
-`future_iterations.md` "Blueprint analysis"). The backend logic
+`backlog/blueprint-analysis.md`). The backend logic
 ships pre-shipping so the data accumulates.
 
 ## Declared vs observable security analysis
@@ -287,7 +288,7 @@ Sums confirmed balances across non-archived Holdings. Account
 balances use `last_known_balance_sats` with an "as of {timestamp}"
 indicator. Breaks down by holding_type and purpose. Optional
 fiat conversion gated by `display.fiat_conversion.enabled` (see
-`future_iterations.md` "Fiat display"). UI contract: the global
+`backlog/fiat-display.md`). UI contract: the global
 view always shows the per-Holding breakdown alongside the total.
 No silent consolidation. API surface in `api/openapi.yaml`.
 
@@ -296,4 +297,4 @@ No silent consolidation. API surface in `api/openapi.yaml`.
 Fiat conversion is gated behind the
 `display.fiat_conversion.enabled` flag and deferred to a future
 iteration. Rate source: the first connected CustodialProvider's
-ticker. See "Fiat display" in `future_iterations.md`.
+ticker. See `backlog/fiat-display.md`.

@@ -51,8 +51,8 @@ makes sure they know what they're doing.
   biometric prompt + native sign + broadcast.
 - **Strongbox / Vault source** — reduces to a scheduled reminder
   (no auto-execution; the user signs externally). Architecturally
-  present, UI surface deferred per `future_iterations.md`
-  "Holding-to-Holding sweeps beyond Account-originated".
+  present, UI surface deferred per
+  `backlog/holding-to-holding-sweeps-beyond-account-originated.md`.
 
 The Treasury layer is the primary user of the primitive for
 Account-touching flows (outflow and inflow); the same primitive
@@ -264,8 +264,9 @@ sweep_execution ─┬─ custodial_ledger_entry (linked_sweep_execution_id)
 ```
 
 The Operations tab on the Account detail page can surface this
-linkage visually in a later iteration (per `future_iterations.md`);
-v1 keeps entries text-only and the linkage stays in the data layer.
+linkage visually in a later iteration (a deferred follow-up
+captured for future sharpening in `backlog/`); v1 keeps entries
+text-only and the linkage stays in the data layer.
 
 ### 6. Failure paths
 

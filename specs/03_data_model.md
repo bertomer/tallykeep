@@ -245,7 +245,8 @@ Notes:
   file's convention). The Account-detail iteration's hard-delete of
   this table on Account removal is a deliberate divergence handled
   by the service-layer deletion logic, not by FK cascade. The
-  Holding-deletion iteration in `future_iterations.md` will revisit.
+  deferred Holding-deletion iteration (captured for future
+  sharpening in `backlog/`) will revisit.
 
 ### `onchain_transaction`
 
@@ -439,7 +440,7 @@ CREATE INDEX idx_sweep_execution_pending ON sweep_execution(status) WHERE status
 
 ### `broadcast_attempt`
 
-Audit trail for transaction broadcasts. Distinct from `payment_request` because a single payment may have multiple broadcast attempts (initial fail, retry, RBF in a future iteration — see `future_iterations.md` "Replace-By-Fee (RBF) support").
+Audit trail for transaction broadcasts. Distinct from `payment_request` because a single payment may have multiple broadcast attempts (initial fail, retry, RBF in a future iteration — see `backlog/replace-by-fee-rbf-support.md`).
 
 ```sql
 CREATE TABLE broadcast_attempt (

@@ -75,8 +75,9 @@ TallyKeep does not route buy/sell orders — the user trades on the
 provider's site. The natural use case for order routing crosses
 the fiat-operations boundary which is locked out, so pursuing it
 would require a separate regulatory evaluation. Captured in
-`future_iterations.md` for much-later consideration; this is a
-current scope cut, not a foundational principle.
+`backlog/order-placement-on-custodial-providers.md` for
+much-later consideration; this is a current scope cut, not a
+foundational principle.
 
 ## What an Account does
 
@@ -139,15 +140,15 @@ current scope cut, not a foundational principle.
 ## Supported providers (target state)
 
 Pre-shipping ships **Kraken** as the v1 provider. Bitstamp and
-broader coverage are deferred to the "Additional CustodialProvider
-adapters" iteration in `future_iterations.md` — the v1 scope cut
+broader coverage are deferred to
+`backlog/additional-custodialprovider-adapters.md` — the v1 scope cut
 shipped with the Account-wizard iteration (per ADR-0011).
 
 | Provider | Adapter id | Withdrawal keys | Whitelist read API | Tier |
 |---|---|---|---|---|
 | Kraken | `kraken` | Yes | Yes (WithdrawAddresses) | v1 |
 | Bitstamp | `bitstamp` | Yes | No (web UI only) | post-v1 |
-| Lemon / Buenbit / Belo / Coinbase / Swissquote | (per `future_iterations.md`) | Per-adapter | Per-adapter | post-shipping |
+| Lemon / Buenbit / Belo / Coinbase / Swissquote | (per `backlog/additional-custodialprovider-adapters.md`) | Per-adapter | Per-adapter | post-shipping |
 
 Adding a provider is a localized change against the
 `CustodialProviderAdapter` ABC (the treasury-layer ACL described
@@ -204,7 +205,7 @@ ADR.
 - **Withdrawal credential (optional, post-onboarding).**
   Configured separately from the Account detail page's Withdraw
   affordance — its own design pass, captured in
-  `future_iterations.md` "Account withdrawal-key sub-flow".
+  `backlog/account-withdrawal-key-sub-flow.md`.
   Carries only the provider's withdraw permission (`Withdraw
   funds` on Kraken, plus the provider's balance-query scope
   where required by the withdraw endpoints — Kraken needs both;
@@ -401,9 +402,9 @@ that don't match a pending `sweep_execution` stay pure observation
 Operations tab renders all entries identically — text-only
 descriptor, relative time, single-unit BTC amount with sign-based
 color. The visual TK-vs-external distinction is deferred (see
-`future_iterations.md` and the Account-detail iteration's scope-out
-list); the linkage data exists from day one and the next UI
-iteration lights it up without a migration.
+`backlog/` and the Account-detail iteration's scope-out list);
+the linkage data exists from day one and the next UI iteration
+lights it up without a migration.
 
 ## Flows — Withdraw and Deposit
 

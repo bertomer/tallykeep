@@ -10,7 +10,7 @@ Each has a recommendation. Rémy decides, dates, and the item
 
 - Foundational decisions land as ADRs in `decisions/`.
 - Implementation work moves to `next_iteration.md` (if active) or
-  `future_iterations.md` (if deferred).
+  a new file in `backlog/` (if deferred; per ADR-0014).
 - The relevant canonical doc is edited to reflect the decision.
 
 There is no "Decided" section in this file. Closed items leave;
@@ -68,8 +68,8 @@ will be either over-specified or wrong.
   more legitimate than the other.
 - A potential third pattern: *static address reuse for recurring
   payments* (rent recipient, family, etc.) — a banking-IBAN
-  analogue. Touches `future_iterations.md` "Receive in static /
-  merchant mode" and "Contact book / saved counterparties".
+  analogue. Touches `backlog/receive-in-static-merchant-mode.md`
+  and `backlog/contact-book-saved-counterparties.md`.
   Worth thinking about whether sweep-policy destinations should
   be addresses-not-Holdings for those flows.
 
@@ -81,8 +81,7 @@ will be either over-specified or wrong.
 ### `purse-upgrade-path`
 
 **Status:** open (structural question only; design work
-captured in `future_iterations.md` "Purse upgrade path
-(watch-only → on-device-imported)")
+captured in `backlog/purse-upgrade-path-watch-only-on-device-imported.md`)
 
 **Item:** When upgrading a `WATCH_ONLY` Purse to spendable by
 importing the source wallet's seed, is `purse_mode` mutable in
@@ -111,9 +110,8 @@ or amendment recording the relaxation.
 
 The downstream design work (upgrade-flow UX, disclosure copy,
 double-spend UX timing, Capacitor gate posture) lives in
-`future_iterations.md` "Purse upgrade path (watch-only →
-on-device-imported)" and sharpens once this arbitration
-closes.
+`backlog/purse-upgrade-path-watch-only-on-device-imported.md`
+and sharpens once this arbitration closes.
 
 **Decision:** ___ (pending session)
 **Decided on:** ___
@@ -170,8 +168,8 @@ admits the responsibility is ongoing, not a one-time confirmation.
 - Wording of the warning at seed-generation time.
 
 The security-health system is also captured in
-`future_iterations.md` as a feature item, since several items
-contribute to it.
+`backlog/security-health-system.md` as a feature item, since
+several items contribute to it.
 
 **Decision:** ___ (pending session)
 **Decided on:** ___

@@ -160,7 +160,7 @@ An adversary publishes a malicious fork that looks identical and tricks the user
 
 **Impact:** potentially everything.
 
-**Mitigation:** out of scope through the personal-use phase. Documented in the README. The public-ship event includes signed releases + reproducible builds (per ADR-0003 ship-gate bundle) and signed releases for self-hosters (see `future_iterations.md` "Signed releases for self-hosters").
+**Mitigation:** out of scope through the personal-use phase. Documented in the README. The public-ship event includes signed releases + reproducible builds (per ADR-0003 ship-gate bundle) and signed releases for self-hosters (see `backlog/signed-releases-for-self-hosters.md`).
 
 ### S9 — Subscriber outage causing missed events
 
@@ -200,7 +200,7 @@ User reuses a weak passphrase, or it is keylogged.
 | Persist-first-emit-second for critical events | Enforced |
 | Audit tables (sweep_execution, broadcast_attempt, event_emission_log) | Enforced |
 | Signed releases | Public-ship event (per ADR-0003 ship-gate bundle); not in dev or personal-use phase |
-| TLS | Not needed currently (localhost). Required when remote access is added — see `future_iterations.md` "Remote access for self-hosters". |
+| TLS | Not needed currently (localhost). Required when remote access is added — see `backlog/remote-access-for-self-hosters.md`. |
 | Backup guidance in documentation | Yes |
 
 ## Things explicitly NOT defended
@@ -330,10 +330,10 @@ dev-phase posture is **not** the public-ship posture.
 
 ## Posture for deferred work
 
-Each item below is captured in `future_iterations.md`; this section
-sketches the threat-model delta each one introduces, so the iteration
-that picks it up has a starting point for its own threat-model
-addendum.
+Each item below is captured as a backlog entry in `backlog/`; this
+section sketches the threat-model delta each one introduces, so
+the iteration that picks it up has a starting point for its own
+threat-model addendum.
 
 - **Remote access for self-hosters** — when remote access is added (recommended via WireGuard or Tailscale), API-layer auth becomes required: token-based, not passwords. TLS is required for any traffic beyond localhost, even over an encrypted tunnel.
 - **Order placement on custodial providers** — when order placement is added, a new threat class appears (loss via malicious orders). Dry-run mode and per-order confirmation become required defaults; auto-execution behind extra gates.

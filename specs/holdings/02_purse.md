@@ -176,7 +176,7 @@ Native send via `NativeBridge`:
 4. Broadcast.
 5. Confirmed — depth shown verbatim. Settlement-rails framing
    with confirmation probability when that feature ships (per
-   `future_iterations.md`).
+   `backlog/settlement-rails-payment-status-with-confirmation-probability.md`).
 
 The PSBT-construction mechanics (BDK coin selection, fee
 resolution, network validation) live in `concerns/outflow.md`;
@@ -190,7 +190,7 @@ No PSBT export, no pretend-to-sign.
 
 Pairing-based PSBT roundtrip between TallyKeep instances ("send
 a PSBT from desktop to my paired phone for signing") is captured
-for later in `future_iterations.md`.
+for later in `backlog/psbt-by-qr-roundtrip-on-mobile.md`.
 
 ## Receive flow
 
@@ -202,7 +202,7 @@ derivation is a public operation:
   (`bitcoin:address?amount=X&label=Y`) for sender-wallet
   pre-fill.
 - Fresh-per-payment by default; reuse is captured for later
-  (`future_iterations.md` "Receive in static / merchant mode").
+  (`backlog/receive-in-static-merchant-mode.md`).
 
 For `WATCH_ONLY` Purses, the source wallet observes
 the chain too; both apps stay in sync because the descriptor is
@@ -224,8 +224,7 @@ Per `concerns/sweep_policies.md`:
 | Same Purse, on any other client | Not auto-sweep. Scheduled reminder fires only on the device that holds the seed. |
 
 Auto-sweep from Purse is post-shipping in current scope (see
-`future_iterations.md` "Holding-to-Holding sweeps beyond
-Account-originated").
+`backlog/holding-to-holding-sweeps-beyond-account-originated.md`).
 
 ## Type-specific safeguards
 
@@ -242,10 +241,10 @@ both modes where TallyKeep holds the seed.
 
 | Item | Tracked in |
 |---|---|
-| Pairing-based PSBT roundtrip between TallyKeep instances | `future_iterations.md` |
-| Auto-sweep from an on-device Purse (and the broader Holding-to-Holding sweep UX) | `future_iterations.md` "Holding-to-Holding sweeps beyond Account-originated" |
+| Pairing-based PSBT roundtrip between TallyKeep instances | `backlog/psbt-by-qr-roundtrip-on-mobile.md` |
+| Auto-sweep from an on-device Purse (and the broader Holding-to-Holding sweep UX) | `backlog/holding-to-holding-sweeps-beyond-account-originated.md` |
 | `ON_DEVICE_USER_IMPORTED` upgrade flow details | `pre-implementation.md` `purse-upgrade-path` |
 | Seed-backup disclosure full system | `pre-implementation.md` `seed-backup-disclosure` |
-| Lightning support per Purse | `concerns/lightning_placeholder.md` + `future_iterations.md` "Lightning support" |
-| Receive in static / merchant mode | `future_iterations.md` |
-| Possible Purse / Strongbox vocabulary collapse (observation mode) | `future_iterations.md` "Possible Purse / Strongbox collapse" |
+| Lightning support per Purse | `concerns/lightning_placeholder.md` + `backlog/lightning-support.md` |
+| Receive in static / merchant mode | `backlog/receive-in-static-merchant-mode.md` |
+| Possible Purse / Strongbox vocabulary collapse (observation mode) | `backlog/possible-purse-strongbox-collapse.md` |

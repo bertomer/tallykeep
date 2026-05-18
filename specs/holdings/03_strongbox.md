@@ -82,7 +82,7 @@ Five steps. TallyKeep choreographs; the hardware wallet signs.
    - **Single QR code** — for PSBTs under ~1000 bytes, gated by
      `banking.psbt_qr.enabled`.
    - **Multi-frame QR (BBQr / UR2)** — deferred to
-     `future_iterations.md` "PSBT-by-QR roundtrip on mobile".
+     `backlog/psbt-by-qr-roundtrip-on-mobile.md`.
 
    The user signs **outside** TallyKeep — on the hardware wallet
    device's screen. The user is prompted to **verify the
@@ -103,8 +103,8 @@ Five steps. TallyKeep choreographs; the hardware wallet signs.
 The user can cancel at steps 1–3 (status `DRAFT`,
 `AWAITING_SIGNATURE`, `AWAITING_BROADCAST`). Cancellation after
 broadcast is impossible on-chain; replacement is via RBF
-(`future_iterations.md` "Replace-By-Fee (RBF) support") when
-that iteration ships.
+(`backlog/replace-by-fee-rbf-support.md`) when that iteration
+ships.
 
 ## Receive flow
 
@@ -182,9 +182,8 @@ swept into Strongbox (self-custody) as fast as policy allows.
 
 | Item | Tracked in |
 |---|---|
-| Multi-frame QR PSBT roundtrip | `future_iterations.md` "PSBT-by-QR roundtrip on mobile" |
-| Replace-By-Fee (RBF) | `future_iterations.md` "Replace-By-Fee (RBF) support" |
-| Strongbox → anywhere sweeps (with scheduled-reminder UX) | `future_iterations.md` "Holding-to-Holding sweeps beyond Account-originated" |
+| Multi-frame QR PSBT roundtrip | `backlog/psbt-by-qr-roundtrip-on-mobile.md` |
+| Replace-By-Fee (RBF) | `backlog/replace-by-fee-rbf-support.md` |
+| Strongbox → anywhere sweeps (with scheduled-reminder UX) | `backlog/holding-to-holding-sweeps-beyond-account-originated.md` |
 | Strongbox-frequent-usage warning in security-health | `pre-implementation.md` `seed-backup-disclosure` (full security-health system) |
-| Multisig descriptor support (would extend Strongbox into Vault territory) | `future_iterations.md` "Multisig descriptor support" |
- support (would extend Strongbox into Vault territory) | `future_iterations.md` "Multisig descriptor support" |
+| Multisig descriptor support (would extend Strongbox into Vault territory) | `backlog/add-holding-vault-wizard.md` + `backlog/vault-send-for-all-shapes.md` |

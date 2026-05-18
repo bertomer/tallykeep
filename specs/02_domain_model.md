@@ -15,7 +15,7 @@ The user-facing words are chosen deliberately. They are used consistently throug
 - **Strongbox** — a Holding backed by a wallet whose private keys are on an offline or hardware signing device. User holds the keys; signing requires the external device.
 - **Vault** — a Holding backed by a wallet under additional structural protection (multisig, timelocks, geographic separation, inheritance setup). User holds the keys; access requires ceremony. Multisig descriptors are deferred; pre-shipping accepts single-key descriptors with the analyzer surfacing the gap.
 - **Descriptor** — the technical primitive (BIP 380) that defines how a wallet derives its addresses. A Holding of type Purse, Strongbox, or Vault references one or more Descriptors. Account does not have a Descriptor.
-- **CustodialProvider** — the technical primitive that defines a connection to a third-party custodian that holds keys on the user's behalf (Kraken, Bitstamp, Swissquote). An Account references exactly one CustodialProvider. **P2P acquisition venues** (RoboSats, Bisq, future similar) are *not* CustodialProviders — keys stay with the user — and are tracked separately when their iteration lands; see `future_iterations.md`.
+- **CustodialProvider** — the technical primitive that defines a connection to a third-party custodian that holds keys on the user's behalf (Kraken, Bitstamp, Swissquote). An Account references exactly one CustodialProvider. **P2P acquisition venues** (RoboSats, Bisq, future similar) are *not* CustodialProviders — keys stay with the user — and are tracked separately when their iteration lands; see `backlog/p2p-swap-routes-robosats-and-similar.md`.
 - **LedgerEntry** — a recorded movement of value affecting one or more Holdings. May be backed by an OnChainTransaction, a Lightning payment (when that iteration ships), or a CustodialProvider event (deposit, withdrawal).
 - **OnChainTransaction** — a Bitcoin blockchain transaction record, identified by txid.
 - **PaymentRequest** — a user-initiated outgoing payment, in lifecycle from draft to confirmed.
@@ -425,9 +425,10 @@ Rules:
 - The current Account-removal cascade (per the Account-detail page
   iteration) hard-deletes `custodial_ledger_entry` rows along with
   the Holding. This is a deliberate divergence from the file's
-  default ON DELETE RESTRICT convention; the Holding-deletion
-  iteration in `future_iterations.md` will revisit and likely shift
-  to null-the-back-pointer semantics.
+  default ON DELETE RESTRICT convention; a deferred
+  Holding-deletion iteration (captured for future sharpening in
+  `backlog/`) will revisit and likely shift to
+  null-the-back-pointer semantics.
 
 ### LedgerEntry
 

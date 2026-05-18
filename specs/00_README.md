@@ -48,14 +48,14 @@ private-ship event → personal-use phase → public-ship event → public
 phase). The "v1 / v1.5 / v2 / v3" framing the spec used originally
 is dropped in favor of those events. The active iteration's scope
 lives in `next_iteration.md`; the deferred backlog with milestone
-tags lives in `future_iterations.md`.
+tags lives in `backlog/` (one file per entry, per ADR-0014).
 
 ### Dev-phase target scope
 
 What the dev phase aims to converge on. This is target state
 per `PROCESS.md §1` — not a checklist of what's live today.
 Already shipped lives in `shipped.md`; deferred items live in
-`future_iterations.md` with a milestone tag; questions
+`backlog/` (one file per entry) with a milestone tag; questions
 blocking work live in `pre-implementation.md`.
 
 - Watch-only Holdings (Account, Purse, Strongbox, Vault) with descriptor-based wallets
@@ -64,7 +64,7 @@ blocking work live in `pre-implementation.md`.
 - Custodial provider integration (Kraken, Bitstamp) via the ccxt library — observation (balance + ledger entries, both read-only at the provider, per ADR-0012) plus withdrawal-to-whitelist plus deposit-to-pinned-address. **No order placement at the provider** — the user trades on the provider's site directly. Both BTC flows (Withdraw and Deposit) are in dev-phase scope because SweepPolicies need both directions.
 - Generalized sweep policies between any two Holdings, with a safety validator that warns but does not block
 - Live blockchain scanning and user-driven transaction categorization
-- UTXO hygiene flags computed in the backend (address reuse, dust, change larger than payment, suspected consolidation) — UI surface deferred per `future_iterations.md`
+- UTXO hygiene flags computed in the backend (address reuse, dust, change larger than payment, suspected consolidation) — UI surface deferred per `backlog/`
 - Declared-vs-observable security analysis
 - Onboarding-question-driven feature-flag defaults (no named user identities — see `concerns/feature_flags.md`)
 - Security-health system surfacing persistent warnings (seed-backup not yet acknowledged, declared-vs-observable discrepancies, hosted-tier privacy boundary, principles acknowledgement). Full specification pending arbitration `seed-backup-disclosure` in `pre-implementation.md`; minimum-viable surface in dev-phase scope so warnings accumulate before the private-ship event needs them.
@@ -74,8 +74,9 @@ blocking work live in `pre-implementation.md`.
 
 ### Deferred
 
-See `future_iterations.md` for the full backlog with `pre-shipping` /
-`post-shipping` / TBD milestone tags. Major deferred items include:
+See `backlog/` (and its `README.md`) for the full backlog with
+`pre-shipping` / `post-shipping` / TBD milestone tags. Major
+deferred items include:
 
 - Lightning support (CoreLightning, LND, Phoenix) behind the `LightningProvider` interface
 - Capacitor mobile wrapper + native plugins (private-ship enabler)

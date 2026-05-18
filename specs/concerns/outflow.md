@@ -119,7 +119,7 @@ Per-Holding-type detail in `holdings/<type>.md`.
   `banking.psbt_qr.enabled`.
 - **Base64 string** — for clipboard transfer.
 - **Multi-frame QR (BBQr / UR2)** — deferred per
-  `future_iterations.md` "PSBT-by-QR roundtrip on mobile".
+  `backlog/psbt-by-qr-roundtrip-on-mobile.md`.
 
 ### Step 4: Submit the signed PSBT
 
@@ -174,7 +174,7 @@ Allowed while `status` is in `{DRAFT, AWAITING_SIGNATURE,
 AWAITING_BROADCAST}`. Sets status to `CANCELLED`. Cancellation
 after broadcast is not possible on-chain; Replace-By-Fee handles
 that case once the RBF iteration ships (see
-`future_iterations.md`).
+`backlog/replace-by-fee-rbf-support.md`).
 
 ## Fee user experience (honest abstraction)
 
@@ -211,8 +211,9 @@ transaction's inclusion in a block."*
 ## Settlement-rails framing (target — pending)
 
 The "settled" state is statistical, not binary. The settlement-
-rails pattern (per `future_iterations.md` "Settlement-rails
-payment status with confirmation probability") surfaces:
+rails pattern (per
+`backlog/settlement-rails-payment-status-with-confirmation-probability.md`)
+surfaces:
 
 1. Instruction composed (PSBT created, not signed)
 2. Instruction signed (PSBT signed, not broadcast)
@@ -268,7 +269,7 @@ Invoices; the gap-limit mechanism advances to the next address.
 
 ### Receive in static / merchant mode (deferred)
 
-Per `future_iterations.md` "Receive in static / merchant mode":
+Per `backlog/receive-in-static-merchant-mode.md`:
 a per-Holding toggle for tip jars / donation addresses / static
 merchant flows. The Blueprint analyzer continues to flag the
 reuse honestly when that feature ships.
@@ -333,9 +334,9 @@ the interface contract.
 
 | Item | Tracked in |
 |---|---|
-| Settlement-rails framing with confirmation probability | `future_iterations.md` "Settlement-rails payment status…" |
-| Multi-frame QR PSBT roundtrip (BBQr / UR2) | `future_iterations.md` "PSBT-by-QR roundtrip on mobile" |
-| Replace-By-Fee (RBF) bumping a stuck transaction | `future_iterations.md` "Replace-By-Fee (RBF) support" |
+| Settlement-rails framing with confirmation probability | `backlog/settlement-rails-payment-status-with-confirmation-probability.md` |
+| Multi-frame QR PSBT roundtrip (BBQr / UR2) | `backlog/psbt-by-qr-roundtrip-on-mobile.md` |
+| Replace-By-Fee (RBF) bumping a stuck transaction | `backlog/replace-by-fee-rbf-support.md` |
 | BIP21 with Lightning fallback (sending side) | `concerns/lightning_placeholder.md` |
-| CoinJoin / PayJoin initiation | `future_iterations.md` "CoinJoin / PayJoin" |
-| Coin-selection algorithm review session | `future_iterations.md` "Coin selection algorithm review session" |
+| CoinJoin / PayJoin initiation | `backlog/coinjoin-payjoin.md` |
+| Coin-selection algorithm review session | `backlog/coin-selection-algorithm-review-session.md` |

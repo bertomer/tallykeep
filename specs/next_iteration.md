@@ -9,8 +9,9 @@ When this iteration completes:
   removed from this file.
 - Canonical specs already reflect the target (no extra "merge"
   work).
-- One item from `future_iterations.md` is promoted, sharpened,
-  and becomes the new active iteration here.
+- One file from `backlog/` is promoted, sharpened, and becomes
+  the new active iteration here; on promotion, the backlog file
+  is deleted (per ADR-0014).
 
 If you're a coding agent reading this: this file is your scope.
 Other docs in `specs/` are reference; this file is the
@@ -108,6 +109,6 @@ No active coding iteration.
 
 The rough sequence ("Onboarding → Add Holding → Holding detail
 → Send + Receive → …") for Rémy's mental model lives in
-`future_iterations.md §Iteration roadmap`, not here.
+`backlog/README.md` (Iteration roadmap section), not here.
 `next_iteration.md` carries the active block only; everything
 else is reference.

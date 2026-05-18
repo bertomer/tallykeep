@@ -96,7 +96,7 @@ been a permanent declared-vs-observable mismatch by design (not
 a transient one), which would noise out the discrepancy system.
 Usage-based feedback (observed spend frequency vs declared
 purpose) is the right honest variant of that idea and is
-captured in `future_iterations.md`.
+captured in `backlog/usage-based-feedback-for-long-term-vaults.md`.
 
 ## Add-Holding flow (v1 — both shapes)
 
@@ -182,8 +182,7 @@ Rejected shapes (with explicit error states):
   multiple spending paths with different keys / timelocks) —
   inline error: "unsupported descriptor form, contact us if you
   need this." Multi-path designs are captured in
-  `future_iterations.md` "Multi-path Vault descriptors (hot +
-  recovery)".
+  `backlog/multi-path-vault-descriptors-hot-path-recovery-path.md`.
 
 The miniscript language is rich; the v1 accept set is
 deliberately narrow but covers all five shape variants of
@@ -322,8 +321,9 @@ Vault-source sweeps land post-shipping alongside Vault Send.
   suggesting an on-chain timelock or migration to Strongbox. The
   honest declared-vs-observable formulation (`purpose=long_term`
   declared, observed N spends/year). Captured in
-  `future_iterations.md`; lives in the broader security-health
-  system pending `seed-backup-disclosure` arbitration.
+  `backlog/usage-based-feedback-for-long-term-vaults.md`; lives
+  in the broader security-health system pending
+  `seed-backup-disclosure` arbitration.
 
 Multisig parameters cannot diverge from the descriptor —
 they're parsed, not declared. Same for any present timelock
@@ -333,10 +333,10 @@ they're parsed, not declared. Same for any present timelock
 
 | Item | Tracked in |
 |---|---|
-| Multisig descriptor support + Vault Send (single-sig + timelock and multisig flows together) | `future_iterations.md` "Multisig descriptor support + Vault Send" |
-| Strongbox → Vault promotion (single-Holding type-relabel when adding multisig to the descriptor) | `future_iterations.md` "Multisig descriptor support + Vault Send" |
-| Multi-path Vault descriptors (hot path + recovery path) | `future_iterations.md` "Multi-path Vault descriptors (hot + recovery)" |
-| Usage-based feedback for long-term Vaults | `future_iterations.md` (security-health system) |
-| Vault → anywhere sweeps | `future_iterations.md` "Holding-to-Holding sweeps beyond Account-originated" |
+| Multisig descriptor support + Vault Send (single-sig + timelock and multisig flows together) | `backlog/vault-send-for-all-shapes.md` |
+| Strongbox → Vault promotion (single-Holding type-relabel when adding multisig to the descriptor) | `backlog/vault-send-for-all-shapes.md` |
+| Multi-path Vault descriptors (hot path + recovery path) | `backlog/multi-path-vault-descriptors-hot-path-recovery-path.md` |
+| Usage-based feedback for long-term Vaults | `backlog/usage-based-feedback-for-long-term-vaults.md` |
+| Vault → anywhere sweeps | `backlog/holding-to-holding-sweeps-beyond-account-originated.md` |
 | Inheritance / recovery-path UX surface | post-shipping (touched indirectly via `seed-backup-disclosure` system) |
-| Investment layer with structured yield (DLC / LSP-mediated) — a sibling product, not a generalization of Vault | `future_iterations.md` "Investment layer with structured yield" |
+| Investment layer with structured yield (DLC / LSP-mediated) — a sibling product, not a generalization of Vault | `backlog/investment-layer-with-structured-yield-the-v5-sketch.md` |

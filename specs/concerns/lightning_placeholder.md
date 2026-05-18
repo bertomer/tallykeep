@@ -5,7 +5,7 @@ that the deferred Lightning iteration slots in without disrupting the
 rest of the app. No concrete Lightning code is implemented yet.
 
 The Lightning iteration itself (sketch, milestone, open questions) is
-captured in `future_iterations.md` under "Lightning support". The
+captured in `backlog/lightning-support.md`. The
 sequencing decision (private-shipping vs post-shipping) is Rémy's
 call when sharpening that iteration.
 

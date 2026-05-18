@@ -42,9 +42,9 @@ flags are positive (`enable_X` or `X.enabled`); no negations.
 
 | Flag key | Description |
 |---|---|
-| `analysis.blueprint.shown` | Show Blueprint tab and recommendations (deferred — see `future_iterations.md`) |
+| `analysis.blueprint.shown` | Show Blueprint tab and recommendations (deferred — see `backlog/blueprint-analysis.md`) |
 | `analysis.security_discrepancies.shown` | Show declared-vs-observable discrepancy warnings |
-| `analysis.advanced_clustering.shown` | Clustering graph (deferred — see `future_iterations.md`) |
+| `analysis.advanced_clustering.shown` | Clustering graph (deferred — see `backlog/blueprint-analysis.md`) |
 
 ### Banking — outgoing
 
@@ -54,7 +54,7 @@ flags are positive (`enable_X` or `X.enabled`); no negations.
 | `banking.psbt_qr.enabled` | Offer PSBT export via QR code |
 | `banking.psbt_file.enabled` | Offer PSBT export via file download (always on) |
 | `banking.address_derivation_view` | Show derivation path in receive view |
-| `banking.rbf.enabled` | Replace-By-Fee toggle (deferred — see `future_iterations.md`) |
+| `banking.rbf.enabled` | Replace-By-Fee toggle (deferred — see `backlog/replace-by-fee-rbf-support.md`) |
 | `banking.vault_outgoing_warns` | Vault guardrail: warn before outgoing from Vault Holding |
 | `banking.coin_selection_per_payment_override` | Allow choosing coin-selection algorithm per payment |
 
@@ -72,7 +72,7 @@ flags are positive (`enable_X` or `X.enabled`); no negations.
 | Flag key | Description |
 |---|---|
 | `notifications.in_app` | Show in-app notifications |
-| `display.fiat_conversion.enabled` | Show fiat-converted amounts (deferred — see `future_iterations.md`) |
+| `display.fiat_conversion.enabled` | Show fiat-converted amounts (deferred — see `backlog/fiat-display.md`) |
 
 ### Advanced
 
@@ -127,15 +127,15 @@ DEFAULT_FLAG_VALUES: dict[str, bool] = {
     "utxo.coin_control.enabled":                False,
     "utxo.hygiene_flags.shown":                 False,
     # Analysis
-    "analysis.blueprint.shown":                 False,    # deferred per future_iterations.md
+    "analysis.blueprint.shown":                 False,    # deferred per backlog/blueprint-analysis.md
     "analysis.security_discrepancies.shown":    True,
-    "analysis.advanced_clustering.shown":       False,    # deferred per future_iterations.md
+    "analysis.advanced_clustering.shown":       False,    # deferred per backlog/blueprint-analysis.md
     # Banking
     "banking.custom_fee_rate.enabled":          False,
     "banking.psbt_qr.enabled":                  True,
     "banking.psbt_file.enabled":                True,
     "banking.address_derivation_view":          False,
-    "banking.rbf.enabled":                      False,    # deferred per future_iterations.md
+    "banking.rbf.enabled":                      False,    # deferred per backlog/replace-by-fee-rbf-support.md
     "banking.vault_outgoing_warns":             True,
     "banking.coin_selection_per_payment_override": False,
     # Treasury
@@ -146,7 +146,7 @@ DEFAULT_FLAG_VALUES: dict[str, bool] = {
     # Notifications
     "notifications.in_app":                     True,
     # Display
-    "display.fiat_conversion.enabled":          False,    # deferred per future_iterations.md
+    "display.fiat_conversion.enabled":          False,    # deferred per backlog/fiat-display.md
     # Advanced
     "advanced.show_raw_tx":                     False,
     "advanced.show_descriptors":                False,
