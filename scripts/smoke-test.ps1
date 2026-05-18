@@ -797,6 +797,39 @@ try {
 }
 
 
+# --- 15.14. Custodial provider refresh migrated to 202 + job_id ---------------
+#
+# The refresh endpoint now enqueues a one_shot_custodial_poll RQ job and returns
+# 202 Accepted instead of blocking. This section confirms the contract with a
+# non-existent provider UUID (404) and documents the 202 shape for reference.
+# Green-path test (real Kraken credentials) is performed manually via hand test 4.
+
+Section "15.14 custodial-providers refresh — 404 for unknown, 202 contract documented"
+
+# 404 for unknown provider
+try {
+    Invoke-RestMethod -Method Post `
+        -Uri "$BaseUrl/api/v1/custodial-providers/00000000-0000-0000-0000-000000000002/refresh" `
+        -Headers $Headers | Out-Null
+    Show "unknown provider refresh" "(unexpected 200!)"
+} catch {
+    $sc = $_.Exception.Response.StatusCode.value__
+    Show "unknown provider 404" ($sc -eq 404)
+}
+
+# 15.15 Internal poll-cycle — 404 for unknown provider (verifies route is registered)
+Section "15.15 internal poll-cycle — 404 for unknown provider (route registered)"
+try {
+    Invoke-RestMethod -Method Post `
+        -Uri "$BaseUrl/api/v1/internal/custodial/00000000-0000-0000-0000-000000000003/poll-cycle" `
+        -Headers $Headers | Out-Null
+    Show "unknown provider cycle" "(unexpected 200!)"
+} catch {
+    $sc = $_.Exception.Response.StatusCode.value__
+    Show "unknown provider cycle 404" ($sc -eq 404)
+}
+
+
 # --- 16. Jobs endpoints (M8.1) -----------------------------------------------
 
 Section "16. Jobs endpoints"

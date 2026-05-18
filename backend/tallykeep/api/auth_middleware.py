@@ -38,6 +38,7 @@ AUTH_EXEMPT_PREFIXES = (
     "/api/v1/server/info",
     "/api/v1/pairing",
     "/api/v1/auth/passphrase-validate",
+    "/api/v1/internal",  # loopback-only; worker has no device credential
     "/openapi.json",
     "/docs",
 )

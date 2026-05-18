@@ -554,6 +554,14 @@ paths:
           type: string
           format: uuid
           title: Holding Id
+      - name: before
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Before
       responses:
         '200':
           description: Successful Response
@@ -593,6 +601,36 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HoldingResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+    delete:
+      tags:
+      - holdings
+      summary: Delete Holding
+      description: 'Hard-delete an Account Holding and its CustodialProvider (cascade
+        + secret cleanup).
+
+
+        Only Account holdings can be deleted this way; other types use the archive
+        flow.
+
+        Returns 404 if the holding doesn''t exist, 422 if it''s not an Account.'
+      operationId: delete_holding_api_v1_holdings__holding_id__delete
+      parameters:
+      - name: holding_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Holding Id
+      responses:
+        '204':
+          description: Successful Response
         '422':
           description: Validation Error
           content:
@@ -1141,12 +1179,14 @@ paths:
           format: uuid
           title: Provider Id
       responses:
-        '200':
+        '202':
           description: Successful Response
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/CustodialProviderOut'
+                $ref: '#/components/schemas/RefreshOut'
+        '404':
+          description: Provider not found
         '422':
           description: Validation Error
           content:
@@ -2802,6 +2842,37 @@ paths:
           content:
             application/json:
               schema: {}
+  /api/v1/internal/custodial/{provider_id}/poll-cycle:
+    post:
+      tags:
+      - internal
+      summary: Poll Cycle
+      operationId: poll_cycle_api_v1_internal_custodial__provider_id__poll_cycle_post
+      parameters:
+      - name: provider_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Provider Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PollCycleOut'
+        '423':
+          description: Secret store is locked
+        '404':
+          description: Provider not found or archived
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
   /api/v1/events/stream:
     get:
       tags:
@@ -2900,6 +2971,12 @@ components:
         other_asset_total_count:
           type: integer
           title: Other Asset Total Count
+        kickoff_job_id:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          title: Kickoff Job Id
       type: object
       required:
       - holding_id
@@ -2913,6 +2990,79 @@ components:
       title: AccountCreateOut
       description: Response for POST /holdings/account — includes the wizard's initial
         poll data.
+    AccountDetailOut:
+      properties:
+        provider_id:
+          type: string
+          format: uuid
+          title: Provider Id
+        provider_kind:
+          type: string
+          title: Provider Kind
+        adapter_id:
+          type: string
+          title: Adapter Id
+        display_name:
+          type: string
+          title: Display Name
+        connection_status:
+          type: string
+          title: Connection Status
+        last_polled_at:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: Last Polled At
+        last_error:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Last Error
+        last_known_balance_sats:
+          anyOf:
+          - type: integer
+          - type: 'null'
+          title: Last Known Balance Sats
+        non_btc_balances:
+          additionalProperties:
+            type: string
+          type: object
+          title: Non Btc Balances
+        polling_interval_seconds:
+          type: integer
+          title: Polling Interval Seconds
+        observation_key_last_four:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Observation Key Last Four
+        ledger_entries:
+          items:
+            $ref: '#/components/schemas/CustodialLedgerEntryOut'
+          type: array
+          title: Ledger Entries
+        ledger_has_more:
+          type: boolean
+          title: Ledger Has More
+      type: object
+      required:
+      - provider_id
+      - provider_kind
+      - adapter_id
+      - display_name
+      - connection_status
+      - last_polled_at
+      - last_error
+      - last_known_balance_sats
+      - non_btc_balances
+      - polling_interval_seconds
+      - observation_key_last_four
+      - ledger_entries
+      - ledger_has_more
+      title: AccountDetailOut
+      description: Extended sub-object returned on GET /holdings/{id} for Account-type
+        holdings.
     AccountValidateIn:
       properties:
         adapter_id:
@@ -3295,6 +3445,41 @@ components:
       required:
       - message
       title: ConfirmationRequiredResponse
+    CustodialLedgerEntryOut:
+      properties:
+        id:
+          type: string
+          format: uuid
+          title: Id
+        provider_entry_id:
+          type: string
+          title: Provider Entry Id
+        kind:
+          type: string
+          title: Kind
+        asset:
+          type: string
+          title: Asset
+        amount_sats:
+          type: integer
+          title: Amount Sats
+        status:
+          type: string
+          title: Status
+        timestamp:
+          type: string
+          format: date-time
+          title: Timestamp
+      type: object
+      required:
+      - id
+      - provider_entry_id
+      - kind
+      - asset
+      - amount_sats
+      - status
+      - timestamp
+      title: CustodialLedgerEntryOut
     CustodialPollingConfiguration:
       properties:
         interval_seconds:
@@ -3849,6 +4034,10 @@ components:
           - type: string
           - type: 'null'
           title: Recovery Setup Notes
+        account_detail:
+          anyOf:
+          - $ref: '#/components/schemas/AccountDetailOut'
+          - type: 'null'
       type: object
       required:
       - id
@@ -3930,6 +4119,11 @@ components:
             minimum: 0.0
           - type: 'null'
           title: Display Order
+        polling_interval_seconds:
+          anyOf:
+          - type: integer
+          - type: 'null'
+          title: Polling Interval Seconds
       additionalProperties: false
       type: object
       title: HoldingUpdate
@@ -4219,6 +4413,9 @@ components:
         asset:
           type: string
           title: Asset
+        amount_sats:
+          type: integer
+          title: Amount Sats
         timestamp:
           type: string
           format: date-time
@@ -4227,6 +4424,7 @@ components:
       required:
       - kind
       - asset
+      - amount_sats
       - timestamp
       title: LedgerEntryPreview
     Network:
@@ -4510,6 +4708,32 @@ components:
       - broadcast_txid
       - resulting_ledger_entry_id
       title: PaymentRequestOut
+    PollCycleOut:
+      properties:
+        rows_added:
+          type: integer
+          title: Rows Added
+        rows_updated:
+          type: integer
+          title: Rows Updated
+        rows_unchanged:
+          type: integer
+          title: Rows Unchanged
+        last_polled_at:
+          type: string
+          format: date-time
+          title: Last Polled At
+        connection_status:
+          type: string
+          title: Connection Status
+      type: object
+      required:
+      - rows_added
+      - rows_updated
+      - rows_unchanged
+      - last_polled_at
+      - connection_status
+      title: PollCycleOut
     ProviderKind:
       type: string
       enum:
@@ -4601,6 +4825,16 @@ components:
       - job_id
       - holding_count
       title: RecomputeOut
+    RefreshOut:
+      properties:
+        job_id:
+          type: string
+          format: uuid
+          title: Job Id
+      type: object
+      required:
+      - job_id
+      title: RefreshOut
     RescanResponse:
       properties:
         descriptor_id:

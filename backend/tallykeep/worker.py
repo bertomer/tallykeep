@@ -3,9 +3,16 @@
 Spec module 01: a single Python codebase with two entry points (backend, worker).
 The worker runs three kinds of components: listeners, schedulers, subscribers.
 
-M2 wires the EventBus and the AuditReconciler scheduler. Listeners and the
-domain-specific subscribers (CustodialPoller, SweepEngine, CategorizerSuggester,
-ChainListener, LiveUpdateBridge) land with their owning milestones (M5+).
+Components and their lock-state behavior:
+  - ChainListener          — always on; lock-independent.
+  - AuditReconciler        — always on; lock-independent.
+  - CategorizerSuggester   — always on; lock-independent.
+  - SweepEngine            — always on; lock-independent.
+  - CustodialReconciler    — always on; lock-independent.
+  - SelfCustodyPoller      — always on; lock-independent.
+  - CustodialPollScheduler — always on; emits poll_tick, no lock check.
+  - CustodialPoller        — always on; dispatches HTTP to backend; drops 423 silently.
+  - RQ worker thread       — executes one_shot_custodial_poll jobs from the queue.
 """
 
 from __future__ import annotations
@@ -13,6 +20,7 @@ from __future__ import annotations
 import logging
 import signal
 import sys
+import threading
 import time
 from datetime import timedelta
 from types import FrameType
@@ -23,8 +31,10 @@ from tallykeep.infrastructure.database import get_session_factory
 from tallykeep.infrastructure.event_bus import EventBus, RedisEventBus
 from tallykeep.infrastructure.event_emission import AuditReconciler
 from tallykeep.workers.listeners.chain_listener import ChainListener
+from tallykeep.workers.schedulers.custodial_poll_scheduler import CustodialPollScheduler
 from tallykeep.workers.schedulers.self_custody_poller import SelfCustodyPoller
 from tallykeep.workers.subscribers.categorizer_suggester import CategorizerSuggester
+from tallykeep.workers.subscribers.custodial_poller import CustodialPoller
 from tallykeep.workers.subscribers.custodial_reconciler import CustodialReconciler
 from tallykeep.workers.subscribers.sweep_engine import SweepEngine
 
@@ -45,6 +55,41 @@ def _handle_signal(signum: int, frame: FrameType | None) -> None:
     _running = False
 
 
+def _start_rq_worker_thread(redis_url: str) -> threading.Thread | None:
+    """Start a SimpleWorker thread that consumes the tallykeep RQ queue."""
+    try:
+        import redis as redis_lib
+        from rq import Queue as RQQueue, SimpleWorker
+
+        class _NoDeathPenalty:
+            # SIGALRM-based timeout enforcer; not usable outside the main thread.
+            def __init__(self, *args: object, **kwargs: object) -> None: pass
+            def __enter__(self) -> "_NoDeathPenalty": return self
+            def __exit__(self, *args: object) -> None: pass
+
+        class _DaemonSimpleWorker(SimpleWorker):
+            death_penalty_class = _NoDeathPenalty  # type: ignore[assignment]
+
+            def _install_signal_handlers(self) -> None:
+                pass
+
+        rq_redis = redis_lib.Redis.from_url(redis_url, decode_responses=False)
+        rq_queue = RQQueue(name="tallykeep", connection=rq_redis)
+
+        def _worker_loop() -> None:
+            worker = _DaemonSimpleWorker([rq_queue], connection=rq_redis)
+            # burst=False: run forever, processing jobs as they arrive.
+            worker.work(burst=False, with_scheduler=False)
+
+        thread = threading.Thread(target=_worker_loop, name="RQWorker", daemon=True)
+        thread.start()
+        logger.info("worker: RQWorker thread started (queue=tallykeep)")
+        return thread
+    except Exception:  # noqa: BLE001
+        logger.exception("worker: failed to start RQWorker thread")
+        return None
+
+
 def main() -> int:
     signal.signal(signal.SIGTERM, _handle_signal)
     signal.signal(signal.SIGINT, _handle_signal)
@@ -58,11 +103,12 @@ def main() -> int:
     sweep_engine: SweepEngine | None = None
     custodial_reconciler: CustodialReconciler | None = None
     self_custody_poller: SelfCustodyPoller | None = None
+    custodial_scheduler: CustodialPollScheduler | None = None
+    custodial_poller: CustodialPoller | None = None
     node: NodeAdapter | None = None
     reconciler_interval_seconds = 30  # how often to scan for unacked events
 
-    # Best-effort start. Workers tolerate degraded environments — the audit
-    # reconciler simply runs no-ops when its dependencies are missing.
+    # Best-effort start. Workers tolerate degraded environments.
     if settings.redis_url:
         try:
             bus = RedisEventBus(settings.redis_url)
@@ -73,9 +119,6 @@ def main() -> int:
     if bus is not None and settings.database_url:
         try:
             session_factory = get_session_factory()
-            # Conservative grace period in production: events older than 5 min
-            # without acknowledgement are considered lost. Tunable later via
-            # runtime_configuration.
             reconciler = AuditReconciler(
                 bus=bus,
                 session_factory=session_factory,
@@ -115,6 +158,34 @@ def main() -> int:
         except Exception:  # noqa: BLE001
             logger.exception("worker: failed to start CustodialReconciler")
             custodial_reconciler = None
+
+    if bus is not None and settings.database_url:
+        try:
+            custodial_scheduler = CustodialPollScheduler(
+                session_factory=get_session_factory(),
+                bus=bus,
+            )
+            custodial_scheduler.start()
+            logger.info("worker: CustodialPollScheduler started")
+        except Exception:  # noqa: BLE001
+            logger.exception("worker: failed to start CustodialPollScheduler")
+            custodial_scheduler = None
+
+    if bus is not None and settings.database_url and settings.backend_url:
+        try:
+            custodial_poller = CustodialPoller(
+                bus=bus,
+                session_factory=get_session_factory(),
+                backend_url=settings.backend_url,
+            )
+            custodial_poller.start()
+            logger.info(
+                "worker: CustodialPoller started (orchestrator, backend=%s)",
+                settings.backend_url,
+            )
+        except Exception:  # noqa: BLE001
+            logger.exception("worker: failed to start CustodialPoller")
+            custodial_poller = None
 
     if (
         bus is not None
@@ -159,10 +230,15 @@ def main() -> int:
             logger.exception("worker: failed to start ChainListener")
             chain_listener = None
 
+    # RQ worker thread — executes one_shot_custodial_poll jobs from the queue.
+    if settings.redis_url:
+        _start_rq_worker_thread(settings.redis_url)
+
     last_reconcile = 0.0
     logger.info(
         "worker: started (bus=%s, reconciler=%s, chain_listener=%s, categorizer=%s, "
-        "sweep_engine=%s, custodial_reconciler=%s, self_custody_poller=%s)",
+        "sweep_engine=%s, custodial_reconciler=%s, self_custody_poller=%s, "
+        "custodial_scheduler=%s, custodial_poller=%s)",
         "redis" if bus else "none",
         "on" if reconciler else "off",
         "on" if chain_listener else "off",
@@ -170,6 +246,8 @@ def main() -> int:
         "on" if sweep_engine else "off",
         "on" if custodial_reconciler else "off",
         "on" if self_custody_poller else "off",
+        "on" if custodial_scheduler else "off",
+        "on" if custodial_poller else "off",
     )
 
     while _running:
@@ -183,6 +261,18 @@ def main() -> int:
                 logger.exception("worker: AuditReconciler failed")
             last_reconcile = now
         time.sleep(1)
+
+    if custodial_poller is not None:
+        try:
+            custodial_poller.stop()
+        except Exception:  # noqa: BLE001
+            pass
+
+    if custodial_scheduler is not None:
+        try:
+            custodial_scheduler.stop()
+        except Exception:  # noqa: BLE001
+            pass
 
     if categorizer is not None:
         try:

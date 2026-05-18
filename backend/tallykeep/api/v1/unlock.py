@@ -3,18 +3,21 @@
 POST /api/v1/unlock                — verify passphrase, unlock the secret store.
 POST /api/v1/unlock/initialize     — first-run setup; both initializes and unlocks.
 
-On successful unlock, an immediate poll is dispatched for every active custodial
-provider via the backend's CustodialPollHandler — no interval guard, no event bus.
+On successful unlock, emits system.unlocked (topic-only) on the event bus.
+The worker's CustodialPoller subscribes to this event and triggers a catch-up
+burst of poll-cycle calls to the backend. No passphrase or derived material
+in the event payload. (ADR-0016)
 """
 
 from __future__ import annotations
 
 import logging
+from datetime import UTC, datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
 
-from tallykeep.api.dependencies import get_secret_store
+from tallykeep.api.dependencies import get_event_bus, get_secret_store
 from tallykeep.infrastructure.secrets import (
     AlreadyInitializedError,
     NotInitializedError,
@@ -41,13 +44,17 @@ class InitializeResponse(BaseModel):
     unlocked: bool
 
 
-def _trigger_immediate_polls(request: Request) -> None:
-    handler = getattr(request.app.state, "custodial_poll_handler", None)
-    if handler is not None:
+def _emit_system_unlocked(request: Request) -> None:
+    bus = getattr(request.app.state, "event_bus", None)
+    if bus is not None:
         try:
-            handler.poll_all_immediately()
+            bus.publish(
+                "system.unlocked",
+                {"topic": "system.unlocked", "timestamp": datetime.now(UTC).isoformat()},
+            )
+            logger.info("unlock: emitted system.unlocked (topic-only)")
         except Exception:
-            logger.warning("unlock: could not trigger immediate polls", exc_info=True)
+            logger.warning("unlock: could not emit system.unlocked", exc_info=True)
 
 
 @router.post(
@@ -70,7 +77,7 @@ async def post_unlock(
     except WrongPassphraseError as exc:
         raise HTTPException(status_code=401, detail="Bad passphrase") from exc
 
-    _trigger_immediate_polls(request)
+    _emit_system_unlocked(request)
     return UnlockResponse(unlocked=True)
 
 
@@ -91,5 +98,5 @@ async def post_unlock_initialize(
     except AlreadyInitializedError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
 
-    _trigger_immediate_polls(request)
+    _emit_system_unlocked(request)
     return InitializeResponse(initialized=True, unlocked=True)

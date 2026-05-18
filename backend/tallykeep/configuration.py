@@ -40,6 +40,10 @@ class Settings(BaseSettings):
     # bitcoin.conf lines users add to enable it.
     bitcoind_zmq_endpoint: str = Field(default="")
 
+    # Internal loopback URL the worker uses to reach the backend.
+    # In the Docker Compose stack the backend service is reachable as `backend:8000`.
+    backend_url: str = Field(default="http://backend:8000")
+
 
 @lru_cache(maxsize=1)
 def get_settings() -> Settings:

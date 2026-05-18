@@ -138,6 +138,7 @@ services:
       TALLYKEEP_REDIS_URL: redis://redis:6379/0
       TALLYKEEP_BITCOIND_RPC_URL: http://tallykeep:tallykeep_dev@bitcoind:18443
       TALLYKEEP_BITCOIND_ZMQ_ENDPOINT: tcp://bitcoind:28332
+      TALLYKEEP_BACKEND_URL: http://backend:8000
     volumes:
       # Note: source is mounted read-write so dev tools (alembic revision) can write
       # back generated files. Containers do not modify source as a runtime side-effect.

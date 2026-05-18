@@ -17,9 +17,10 @@ from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from sqlalchemy.orm import Session
 
 from tallykeep.adapters.descriptor_adapter import DescriptorAdapter
-from tallykeep.api.dependencies import get_db_session, get_secret_store
+from tallykeep.api.dependencies import get_db_session, get_job_queue, get_secret_store
 from tallykeep.domain.enums import HoldingType, Purpose
 from tallykeep.domain.holding import Holding, SecurityClaim
+from tallykeep.infrastructure.job_queue import JobQueue
 from tallykeep.infrastructure.secrets import SecretStore
 from tallykeep.repositories.descriptor import DescriptorAlreadyExists
 from tallykeep.schemas.holding import (
@@ -263,7 +264,10 @@ async def create_account_holding(
     body: AccountCreate,
     session: Session = Depends(get_db_session),
     secret_store: SecretStore = Depends(get_secret_store),
+    job_queue: JobQueue = Depends(get_job_queue),
 ) -> AccountCreateOut:
+    from tallykeep.jobs.custodial_jobs import one_shot_custodial_poll
+
     cp = body.custodial_provider
     try:
         holding, provider, btc_balance_sats, other_balances = (
@@ -285,15 +289,6 @@ async def create_account_holding(
             )
         )
         session.commit()
-        # Entries were already persisted during create_account_holding, but dispatch
-        # an extra poll so the handler updates last_polled_at and picks up any entries
-        # that arrived in the seconds between validate and create.
-        handler = getattr(request.app.state, "custodial_poll_handler", None)
-        if handler is not None:
-            try:
-                handler.poll_provider_immediately(provider.id)
-            except Exception:
-                pass
     except CredentialPermissionMismatch as exc:
         session.rollback()
         raise HTTPException(
@@ -319,6 +314,19 @@ async def create_account_holding(
     top_three = sorted_assets[:3]
     total_count = len(sorted_assets)
 
+    # Enqueue a one-shot poll so last_polled_at is set and any entries that
+    # arrived between validate and create are picked up by the worker.
+    kickoff_job_id = None
+    try:
+        kickoff_job_id = job_queue.enqueue(
+            one_shot_custodial_poll,
+            provider.id,
+            job_type="custodial_poll",
+            label=f"post-create poll for provider {provider.id}",
+        )
+    except Exception:  # noqa: BLE001 — enqueue failure must not block account creation
+        pass
+
     return AccountCreateOut(
         holding_id=holding.id,
         provider_id=provider.id,
@@ -328,6 +336,7 @@ async def create_account_holding(
         btc_balance_sats=btc_balance_sats,
         other_asset_tickers=top_three,
         other_asset_total_count=total_count,
+        kickoff_job_id=kickoff_job_id,
     )
 
 

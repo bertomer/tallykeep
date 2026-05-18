@@ -122,6 +122,8 @@ class AccountCreateOut(BaseModel):
     # Top-3 non-BTC assets by alphabetical order + total count.
     other_asset_tickers: list[str]
     other_asset_total_count: int
+    # Job ID for the one-shot poll dispatched immediately after creation.
+    kickoff_job_id: UUID | None = None
 
 
 # --- CustodialProvider CRUD ----------------------------------------------------

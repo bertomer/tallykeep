@@ -4,11 +4,13 @@ from __future__ import annotations
 
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Response
+from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from tallykeep.adapters.adapter_registry import SUPPORTED_ADAPTER_IDS, list_provider_capabilities
-from tallykeep.api.dependencies import get_db_session, get_secret_store
+from tallykeep.api.dependencies import get_db_session, get_job_queue, get_secret_store
+from tallykeep.infrastructure.job_queue import JobQueue
 from tallykeep.infrastructure.secrets import SecretStore
 from tallykeep.schemas.treasury import (
     BalanceOut,
@@ -22,6 +24,10 @@ from tallykeep.services.treasury_service import (
     ProviderNotFound,
     TreasuryServiceError,
 )
+
+
+class RefreshOut(BaseModel):
+    job_id: UUID
 
 
 router = APIRouter(tags=["custodial-providers"])
@@ -105,24 +111,35 @@ async def patch_provider(
     return _provider_to_out(provider)
 
 
-@router.post("/custodial-providers/{provider_id}/refresh", response_model=CustodialProviderOut)
+@router.post(
+    "/custodial-providers/{provider_id}/refresh",
+    response_model=RefreshOut,
+    status_code=202,
+    responses={404: {"description": "Provider not found"}},
+)
 async def refresh_provider(
     provider_id: UUID,
     session: Session = Depends(get_db_session),
-    secret_store: SecretStore = Depends(get_secret_store),
-) -> CustodialProviderOut:
-    try:
-        provider = treasury_service.refresh_provider_balance(
-            session, provider_id, secret_store=secret_store
-        )
-        session.commit()
-    except ProviderNotFound as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
-    except ProviderConnectionError as exc:
-        raise HTTPException(status_code=502, detail=str(exc)) from exc
-    except TreasuryServiceError as exc:
-        raise HTTPException(status_code=422, detail=str(exc)) from exc
-    return _provider_to_out(provider)
+    job_queue: JobQueue = Depends(get_job_queue),
+) -> Response:
+    from tallykeep.jobs.custodial_jobs import one_shot_custodial_poll
+    from tallykeep.repositories import custodial_provider as cp_repo
+
+    provider = cp_repo.get(session, provider_id)
+    if provider is None or not provider.is_active:
+        raise HTTPException(status_code=404, detail="Provider not found or archived")
+
+    job_id = job_queue.enqueue(
+        one_shot_custodial_poll,
+        provider_id,
+        job_type="custodial_poll",
+        label=f"manual refresh for provider {provider_id}",
+    )
+    return Response(
+        content=RefreshOut(job_id=job_id).model_dump_json(),
+        status_code=202,
+        media_type="application/json",
+    )
 
 
 @router.get("/custodial-providers/{provider_id}/balance", response_model=BalanceOut)

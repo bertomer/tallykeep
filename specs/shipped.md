@@ -14,6 +14,50 @@ commit.
 
 ---
 
+## 2026-05-19 — Lock-aware worker + backend-only custodial ACL (ADR-0015 / ADR-0016)
+
+`CustodialPollHandler` retired from the backend entirely — its scheduler thread,
+`poll_all_immediately()`, and `poll_provider_immediately()` callsites removed.
+The backend now runs no custodial timer threads.
+
+New internal endpoint `POST /api/v1/internal/custodial/{provider_id}/poll-cycle`
+(loopback-only, auth-exempt, 423 via existing LockMiddleware) carries the full
+cycle logic: decrypt credential from in-memory store, ccxt call, upsert to
+`custodial_ledger_entry`, emit `treasury.custodial.*` events, return a small
+summary. Worker holds no credentials and imports no ccxt.
+
+Backend startup now emits `system.locked` on the bus (`{topic, timestamp}` only).
+`POST /api/v1/unlock` on success emits `system.unlocked` (same shape, no
+passphrase or derived material in payload).
+
+Worker gains `CustodialPollScheduler` (per-provider heartbeat timer, configurable
+60–3600 s, default 600 s, no lock-state check) and `CustodialPoller`
+(orchestrator: subscribes to `poll_tick` / `system.unlocked` / `system.locked`,
+dispatches HTTP to the internal endpoint, drops 423 silently, runs catch-up burst
+on unlock via `ThreadPoolExecutor`). Both boot cleanly with the backend locked.
+Worker also runs an RQ `SimpleWorker` daemon thread consuming the `tallykeep`
+queue (signal-handler and SIGALRM death-penalty overridden for daemon-thread
+compatibility).
+
+Post-Account-creation poll and manual refresh both migrated to
+`one_shot_custodial_poll(provider_id)` RQ jobs. `AccountCreateOut` gains
+`kickoff_job_id`. Manual refresh endpoint now returns `202 Accepted + {job_id}`.
+
+`backlog/worker-restart-locked-state-handshake.md` deleted — moot under the
+new design: `CustodialPoller` defaults to enabled on boot, so a mid-session
+worker restart reactivates dispatch immediately without waiting for a fresh
+`system.unlocked` event.
+
+Integration tests added: worker boot lifecycle assertions, catch-up burst
+dispatches N calls per active provider, regression guard that `system.*`
+payloads never carry forbidden keys.
+
+Canonical docs touched: `api/openapi.yaml` (5559 lines; new internal endpoint,
+updated `AccountCreateOut`, 202 on refresh). `specs/decisions/0016-custodial-acl-backend-only.md`
+authored as part of spec sharpening prior to this iteration.
+
+---
+
 ## 2026-05-18 — Account detail page + custodial polling architecture
 
 Five Account detail page screens shipped: Operations (populated + empty state),

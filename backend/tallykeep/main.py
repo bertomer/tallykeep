@@ -28,6 +28,7 @@ from tallykeep.api.v1 import (
     feature_flags as feature_flags_routes,
     health,
     holdings as holdings_routes,
+    internal_custodial as internal_custodial_routes,
     jobs as jobs_routes,
     ledger_entries as ledger_entries_routes,
     lightning as lightning_routes,
@@ -46,7 +47,6 @@ from tallykeep.infrastructure.secrets import (
     EncryptedDatabaseSecretStore,
     SecretStore,
 )
-from tallykeep.workers.subscribers.custodial_poll_handler import CustodialPollHandler
 
 
 # Wire application logger early so tallykeep.* INFO output reaches stdout
@@ -71,6 +71,8 @@ async def _lifespan(app: FastAPI):
     the app is created and before the first request — the override survives
     because we only seed defaults here when nothing has been set.
     """
+    from datetime import UTC, datetime
+
     settings = get_settings()
 
     if not hasattr(app.state, "session_factory"):
@@ -123,21 +125,19 @@ async def _lifespan(app: FastAPI):
         else:
             app.state.node_adapter = None
 
-    if not hasattr(app.state, "custodial_poll_handler"):
-        bus = getattr(app.state, "event_bus", None)
-        sf = getattr(app.state, "session_factory", None)
-        store = getattr(app.state, "secret_store", None)
-        if bus is not None and sf is not None and store is not None:
-            handler = CustodialPollHandler(
-                session_factory=sf,
-                secret_store=store,
-                bus=bus,
+    # Emit system.locked once at startup so the worker's CustodialPoller knows
+    # the backend has restarted and credentials are not yet available.
+    # Payload is topic-only — no secrets, no passphrase. (ADR-0016)
+    bus = getattr(app.state, "event_bus", None)
+    if bus is not None:
+        try:
+            bus.publish(
+                "system.locked",
+                {"topic": "system.locked", "timestamp": datetime.now(UTC).isoformat()},
             )
-            handler.start()
-            app.state.custodial_poll_handler = handler
-            logger.info("CustodialPollHandler started")
-        else:
-            app.state.custodial_poll_handler = None
+            logger.info("backend: emitted system.locked (topic-only) at startup")
+        except Exception:  # noqa: BLE001 — best-effort; lock middleware covers requests
+            logger.warning("backend: could not emit system.locked at startup", exc_info=True)
 
     yield
 
@@ -171,13 +171,6 @@ async def _lifespan(app: FastAPI):
         except Exception:  # pragma: no cover — best-effort cleanup
             pass
 
-    poll_handler = getattr(app.state, "custodial_poll_handler", None)
-    if poll_handler is not None:
-        try:
-            poll_handler.stop()
-        except Exception:  # pragma: no cover — best-effort cleanup
-            pass
-
 
 def create_app() -> FastAPI:
     app = FastAPI(
@@ -195,7 +188,7 @@ def create_app() -> FastAPI:
     app.add_middleware(AuthMiddleware)
     app.add_middleware(LockMiddleware)
 
-    # Implemented in M0–M3.1
+    # Implemented in M0-M3.1
     app.include_router(health.router, prefix="/api/v1")
     app.include_router(unlock.router, prefix="/api/v1")
     app.include_router(server_info_routes.router, prefix="/api/v1")
@@ -205,10 +198,7 @@ def create_app() -> FastAPI:
     app.include_router(feature_flags_routes.router, prefix="/api/v1")
     app.include_router(configuration_routes.router, prefix="/api/v1")
 
-    # M3.2 — every other spec-module-04 route registered as a 501 stub. The
-    # OpenAPI spec covers the full surface so the frontend can generate its
-    # typed client today; each stub raises with a milestone-tagged Problem
-    # Details body so the user knows when to expect the real handler.
+    # M3.2+ routes
     app.include_router(holdings_routes.router, prefix="/api/v1")
     app.include_router(descriptors_routes.router, prefix="/api/v1")
     app.include_router(custodial_providers_routes.router, prefix="/api/v1")
@@ -222,8 +212,10 @@ def create_app() -> FastAPI:
     app.include_router(export_routes.router, prefix="/api/v1")
     app.include_router(lightning_routes.router, prefix="/api/v1")
 
-    # SSE event stream — implemented as a working scaffold in M3.3, refined in
-    # M9 with the full LiveUpdateBridge.
+    # Internal — loopback-only by convention (process-level token hardening deferred).
+    app.include_router(internal_custodial_routes.router, prefix="/api/v1")
+
+    # SSE event stream
     app.include_router(events_stream_routes.router, prefix="/api/v1")
 
     return app
