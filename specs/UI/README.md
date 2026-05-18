@@ -117,7 +117,8 @@ gauntlet (PROCESS.md §3) enforces this at design time. The
 optimistic UI states — never "sent" before broadcast acknowledgement,
 never "confirmed" before chain inclusion, confirmation depth shown
 verbatim. Settlement-rails framing with confirmation probability is
-in `future_iterations.md` as a strong differentiator candidate.
+in `backlog/settlement-rails-payment-status-with-confirmation-probability.md`
+as a strong differentiator candidate.
 
 ---
 
@@ -191,7 +192,8 @@ Recent activity and categorization live in the Activity tab
 home / consolidated landing page. The home is for at-a-glance
 "where is my money" and primary actions; the Activity tab is for
 review and categorization work. The push-driven categorization
-prompt is captured for later in `future_iterations.md`.
+prompt is captured for later in
+`backlog/push-driven-categorization-workflow.md`.
 
 ### Add Holding
 
@@ -269,13 +271,15 @@ the underlying mechanic differs. Per type:
     3. Sign — biometric prompt + signing in-app
     4. Broadcast
     5. Confirmed (depth shown verbatim; confirmation probability
-       when implemented per `future_iterations.md`)
+       when implemented per
+       `backlog/settlement-rails-payment-status-with-confirmation-probability.md`)
   - *On any other client* (different phone, browser PWA on
     desktop or mobile) — Send shows a clear gate: "This wallet's
     keys are on another device. To spend, open TallyKeep on the
     device that holds them." No PSBT export, no pretend-to-sign.
     Pairing-based PSBT roundtrip between TallyKeep instances is
-    captured for later in `future_iterations.md`.
+    captured for later in
+    `backlog/psbt-by-qr-roundtrip-on-mobile.md`.
 
 - **Strongbox** — Five-step PSBT flow with the user's hardware
   wallet at step 3:
@@ -348,7 +352,8 @@ share — designed in the Receive iteration.
 
 Receive uses fresh-per-payment addresses by default. Reuse is
 technically possible but flagged by the Blueprint analyzer for
-privacy reasons (deferred post-ship per `future_iterations.md`).
+privacy reasons (deferred post-ship per
+`backlog/receive-in-static-merchant-mode.md`).
 The persistent identifier of the wallet is the descriptor / xpub,
 which stays internal — only fresh-derived addresses are shared
 externally.
@@ -363,7 +368,7 @@ Cross-Holding activity feed. On mobile: a dedicated Activity tab
 carries this. Categorization is possible from the per-Holding
 detail page and from the Activity tab. Push-driven categorization
 prompts and timed in-app popups are captured in
-`future_iterations.md` for a later iteration.
+`backlog/push-driven-categorization-workflow.md`.
 
 ### Custodial accounts and sweep policies
 
@@ -403,8 +408,7 @@ Holding) are the primary surface. TK-Holding-originated sweeps
 (inflow Account-bound for decumulation, plus inter-Holding
 rebalancing) are architecturally supported but their UX is
 design-deferred to a future iteration — see
-`future_iterations.md` "Holding-to-Holding sweeps beyond
-Account-originated".
+`backlog/holding-to-holding-sweeps-beyond-account-originated.md`.
 
 Visible only when the user has at least one Account or has set up
 another sweep. **Order placement** (buying / selling Bitcoin
@@ -413,8 +417,7 @@ through the personal-use phase — current scope is observation +
 Withdraw + Deposit + bi-directional SweepPolicies. Adding order
 placement crosses the fiat-operations boundary which is locked
 out, and would require a separate regulatory evaluation. Captured
-in `future_iterations.md` ("Order placement on custodial
-providers").
+in `backlog/order-placement-on-custodial-providers.md`.
 
 ### Settings
 
@@ -434,8 +437,9 @@ Rémy 2026-05:
   dust UTXOs, round-number outputs, suspected consolidation) plus
   later UTXO clustering graph. Backend logic per `concerns/observation.md` is
   implemented; UI surface deferred. Captured in
-  `future_iterations.md` as a public-product differentiator candidate
-  to ship as a feature update post-launch.
+  `backlog/blueprint-analysis.md` as a public-product
+  differentiator candidate to ship as a feature update
+  post-launch.
 
 ---
 
@@ -448,6 +452,6 @@ Rémy 2026-05:
 - Brand identity, copy voice — see `brand/README.md` (mark,
   wordmark, palette locked; voice/about draft; finalized at
   the public-ship event per ADR-0003).
-- Future iterations and parked ideas — see `future_iterations.md`.
+- Future iterations and parked ideas — see `backlog/`.
 - The threat-model implications of mobile and the Capacitor build
   — see `concerns/threat_model.md` §Mobile addendum.

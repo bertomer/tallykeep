@@ -297,7 +297,7 @@ automatically reduce sweeps to **scheduled reminders**:
 This is the "scheduled reminder" pattern. Pre-shipping ships
 Account-source sweeps with full automation; non-Account-source
 sweeps are architecturally supported but UX-deferred (per
-`future_iterations.md`).
+`backlog/holding-to-holding-sweeps-beyond-account-originated.md`).
 
 ## Daily caps and safety controls
 
@@ -384,9 +384,9 @@ pinned by the user.
 
 UX for non-Account-source sweeps (the source-side composition,
 review, sign, broadcast surface) is deferred (per
-`future_iterations.md` "Holding-to-Holding sweeps beyond
-Account-originated", which now covers both inter-Holding
-rebalancing and TK → Account inflow). The architectural
+`backlog/holding-to-holding-sweeps-beyond-account-originated.md`,
+which now covers both inter-Holding rebalancing and TK → Account
+inflow). The architectural
 primitive ships pre-shipping; the UI surface for these flows
 follows once Send / Receive iterations land.
 
@@ -414,5 +414,5 @@ and the iteration that ships the sweep-creation UI.
 
 | Item | Tracked in |
 |---|---|
-| UX for Holding-to-Holding sweeps (non-Account source) | `future_iterations.md` "Holding-to-Holding sweeps beyond Account-originated" |
-| DCA (recurring scheduled purchases) — depends on order placement | `future_iterations.md` "DCA primitive" |
+| UX for Holding-to-Holding sweeps (non-Account source) | `backlog/holding-to-holding-sweeps-beyond-account-originated.md` |
+| DCA (recurring scheduled purchases) — depends on order placement | `backlog/dca-primitive.md` |

@@ -311,6 +311,36 @@ Specific API request/response shapes live in `api/openapi.yaml`.
   `runtime_configuration.custodial_polling.interval_seconds`.
 - On demand: refresh endpoint (path in `api/openapi.yaml`).
 
+**Lock-aware lifecycle and catch-up (ADR-0015).** The
+`CustodialPoller` is secret-gated: it cannot run while the
+backend is locked because Account credentials are encrypted at
+rest. The worker's `CustodialPollScheduler` emits ticks
+unconditionally; the poller silently ignores them while paused.
+On `system.unlocked`, the poller transitions to active and runs
+one **immediate catch-up cycle per active Account, in parallel**
+(asyncio gather over the active set). The catch-up cycle is the
+same code path as a heartbeat-driven cycle: it paginates the
+provider's ledger against the persisted cursor from
+`last_polled_at` and upserts new or mutated rows against
+`(custodial_provider_id, provider_entry_id)`. Practical catch-up
+time per Account: hundreds of milliseconds in the common case
+(no missed entries); single-digit seconds after a multi-day
+lock; tens of seconds after a long lock with heavy venue
+activity.
+
+During the catch-up window, `connection_state` reads `degraded`;
+the Account detail page's "Updated N minutes ago" indicator
+lags until the cycle completes. No modal, no blocking
+full-screen state — the existing connection-state dot + freshness
+stamp carry the UX honestly. On cycle completion,
+`connection_state` returns to `healthy` and the freshness stamp
+catches up.
+
+The chain side has no equivalent catch-up: `ChainListener` runs
+always (descriptors are plaintext), so the on-chain ledger is
+current at unlock time regardless of how long the backend was
+locked.
+
 Each cycle fetches BTC balance, other-asset balances (read-only
 display only — never actionable on the provider's side), and new
 or updated ledger entries since the last cycle's cursor (deposits,
@@ -468,8 +498,8 @@ inflow SweepPolicy firing once.
 
 - **Order placement at the provider.** TallyKeep does not route
   buy/sell orders; the user trades on the provider's site directly.
-  Captured for much-later consideration in `future_iterations.md`
-  ("Order placement on custodial providers"); pursuing it would
+  Captured for much-later consideration in
+  `backlog/order-placement-on-custodial-providers.md`; pursuing it would
   require a separate regulatory evaluation because the natural use
   case crosses the fiat-operations boundary which is locked out.
 - **Fiat operations.** TallyKeep never initiates, holds, or
@@ -538,11 +568,11 @@ design passes are iteration-scoped:
 
 | Item | Tracked in |
 |---|---|
-| Withdrawal credential configuration UX (capture the withdraw credential + pre-whitelisted destination picker; activates the Withdraw button on Account detail) | `future_iterations.md` "Account withdrawal-key UX" |
-| Deposit-address capture UX (paste the provider's BTC deposit address; activates the Deposit button on Account detail) | `future_iterations.md` "Account deposit-address UX" |
-| Bi-directional SweepPolicy creation UX (source / destination picker, schedule and threshold rules across both directions) | `future_iterations.md` "SweepPolicy creation UX" |
-| Additional providers — Bitstamp (cut from v1), Lemon, Buenbit, Belo, Coinbase Advanced, etc. | `future_iterations.md` "Additional CustodialProvider adapters" |
-| Order placement on custodial providers | `future_iterations.md` "Order placement on custodial providers" — requires fresh regulatory evaluation because it crosses the fiat boundary |
-| Custom adapter for non-ccxt venues (Swissquote) | `future_iterations.md` "Custom adapter for non-ccxt venues" |
+| Withdrawal credential configuration UX (capture the withdraw credential + pre-whitelisted destination picker; activates the Withdraw button on Account detail) | `backlog/account-withdrawal-key-sub-flow.md` |
+| Deposit-address capture UX (paste the provider's BTC deposit address; activates the Deposit button on Account detail) | `backlog/deposit-send-to-account-flow.md` |
+| Bi-directional SweepPolicy creation UX (source / destination picker, schedule and threshold rules across both directions) | a deferred SweepPolicy-creation UX iteration (captured for future sharpening in `backlog/`) |
+| Additional providers — Bitstamp (cut from v1), Lemon, Buenbit, Belo, Coinbase Advanced, etc. | `backlog/additional-custodialprovider-adapters.md` |
+| Order placement on custodial providers | `backlog/order-placement-on-custodial-providers.md` — requires fresh regulatory evaluation because it crosses the fiat boundary |
+| Custom adapter for non-ccxt venues (Swissquote) | `backlog/custom-adapter-for-non-ccxt-venues-swissquote-and-similar.md` |
 | Whether to surface non-BTC balances at the consolidated view | `pre-implementation.md` `multi-asset-aggregation` |
-| P2P swap routes (RoboSats) as a separate adapter | `future_iterations.md` "P2P swap routes" |
+| P2P swap routes (RoboSats) as a separate adapter | `backlog/p2p-swap-routes-robosats-and-similar.md` |

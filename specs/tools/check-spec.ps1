@@ -203,7 +203,8 @@ $allowDecisionsOnlyList = @(
     # planned-then-rejected proposals
     'UI/backend_deltas\.md',                 # ADR-0001 §4 proposal, retired per ADR-0002
     'backend_deltas\.md',
-    'backlog\.md'                            # ADR-0002 alternative, not adopted
+    'backlog\.md',                           # ADR-0002 alternative, not adopted
+    'future_iterations\.md'                  # flat backlog file, retired per ADR-0014 in favor of backlog/
 ) -join '|'
 $allowDecisionsOnlyRegex = "^(?:specs/)?($allowDecisionsOnlyList)`$"
 

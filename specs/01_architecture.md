@@ -112,8 +112,12 @@ The backend deployment is a Docker Compose stack:
   the sole client.
 - **backend** — FastAPI application. HTTP API + Server-Sent
   Events. Talks to bitcoind (RPC), Postgres, Redis (events + job
-  queue), and ccxt-wrapped custodial-provider APIs. Does not run
-  scheduled tasks itself.
+  queue), and ccxt-wrapped custodial-provider APIs. **Runs no
+  schedulers, no poll loops, and no background timer threads** —
+  all periodic work belongs to the worker (per ADR-0015). The
+  backend may dispatch one-shot RQ jobs to the worker for
+  immediate work (post-Account-creation poll, manual "Refresh
+  now"), but does not execute that work in-process.
 - **worker** — same Python codebase, separate entry point. Runs
   three component kinds: listeners (consume external feeds →
   events), schedulers (emit events on a timer), subscribers
@@ -228,6 +232,56 @@ The worker process runs three component kinds:
 Specific component file names and exact responsibilities live in
 the codebase; the spec promises only that the three kinds exist
 and that adding a new component fits one of them.
+
+### Lock-aware lifecycle (ADR-0015)
+
+The worker process starts at stack boot and runs continuously,
+**independent of the backend's locked / unlocked state**.
+Components split into two readiness classes based on whether they
+need a decrypted secret to do their job:
+
+**Always-on components** (need no decrypted secret):
+
+- `ChainListener` — bitcoind ZMQ → `chain.*` events. Descriptors
+  are plaintext on disk (per `03_data_model.md`); the listener
+  observes the chain regardless of lock state.
+- `CategorizerSuggester`, `LiveUpdateBridge`, `AuditReconciler` —
+  operate on already-persisted data or on the bus itself.
+
+**Secret-gated components** (require decrypted credentials):
+
+- `CustodialPoller` — calls custodial-provider APIs using
+  decrypted credentials.
+- `SweepEngine` outflow path — fires the provider's withdraw API
+  using the withdrawal credential.
+- Future Lightning components consuming encrypted macaroons.
+
+Two events under the `system.*` namespace drive the gating:
+
+- `system.locked` — emitted at backend startup before any unlock,
+  and (future) on explicit re-lock. Secret-gated subscribers
+  transition to a paused state; subsequent scheduler ticks are
+  silently ignored.
+- `system.unlocked` — emitted by `POST /api/v1/unlock` on
+  successful passphrase validation. Secret-gated subscribers
+  transition to active state and run one **immediate catch-up
+  cycle** before resuming the normal heartbeat-driven schedule.
+  The catch-up cycle is the same code path as a regular cycle,
+  paginated against the persisted cursor from `last_polled_at` —
+  not a special code path.
+
+Schedulers (the `*Scheduler` heartbeat emitters) do not consult
+lock state. They emit ticks unconditionally; the readiness gate
+lives at the subscriber. A paused subscriber does not
+meaningfully lose ticks — when it resumes, the immediate
+catch-up cycle subsumes whatever ticks it missed.
+
+The unlock endpoint emits `system.unlocked` on the bus and
+returns; it does **not** call any poller in-process. Likewise,
+post-Account-creation immediate polls and manual "Refresh now"
+requests dispatch as one-shot RQ jobs to the worker — the
+endpoint returns 202 with a `job_id`, the cycle runs in the
+worker, events arrive on SSE.
 
 ## Request shape
 

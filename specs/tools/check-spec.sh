@@ -117,7 +117,7 @@ allow_anywhere='^(\.\.\._v([0-9]+|N)_lock\.html|\.\.\._fiat_(off|on)\.html|color
 # Tier 2: retired filenames - acceptable only inside decisions/ where
 # ADRs preserve them as historical record. Same name in a current
 # canonical doc is drift.
-allow_decisions_only='^(specs/)?(09_profiles_and_flags\.md|09_feature_flags\.md|11_ux_flows\.md|12_roadmap\.md|13_open_questions\.md|14_context_handoff\.md|04_api_surface\.md|05_savings_layer\.md|06_banking_layer\.md|07_trading_layer\.md|08_lightning_placeholder\.md|10_threat_model\.md|design_decisions\.md|mobile_form_factor_decision\.md|spec_amendments\.md|handoff\.md|mobile_v1\.md|UI/design_decisions\.md|UI/handoff\.md|UI/mobile_form_factor_decision\.md|UI/drafts/spec_amendments\.md|drafts/spec_amendments\.md|UI/backend_deltas\.md|backend_deltas\.md|backlog\.md)$'
+allow_decisions_only='^(specs/)?(09_profiles_and_flags\.md|09_feature_flags\.md|11_ux_flows\.md|12_roadmap\.md|13_open_questions\.md|14_context_handoff\.md|04_api_surface\.md|05_savings_layer\.md|06_banking_layer\.md|07_trading_layer\.md|08_lightning_placeholder\.md|10_threat_model\.md|design_decisions\.md|mobile_form_factor_decision\.md|spec_amendments\.md|handoff\.md|mobile_v1\.md|UI/design_decisions\.md|UI/handoff\.md|UI/mobile_form_factor_decision\.md|UI/drafts/spec_amendments\.md|drafts/spec_amendments\.md|UI/backend_deltas\.md|backend_deltas\.md|backlog\.md|future_iterations\.md)$'
 while IFS= read -r f; do
   in_decisions=0
   case "$f" in

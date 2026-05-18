@@ -3,7 +3,7 @@
 - **Captured:** 2026-05 (ADR-0003 — Project phases and shipping
   milestones)
 - **Motivation:** This entry IS the public-ship event in
-  `future_iterations.md` form. Once Rémy is satisfied with the
+  backlog-entry form. Once Rémy is satisfied with the
   product (after iterating on his own phone post-private-ship), the
   ship-gate is the dedicated session bundle that finalizes
   everything before going public. Reaching it is Rémy's explicit

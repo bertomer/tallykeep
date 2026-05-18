@@ -33,7 +33,7 @@ specs/
 ├── pre-implementation.md ... items needing dedicated arbitration session
 ├── next_iteration.md ....... template + active iteration block + rough roadmap
 ├── shipped.md .............. condensed changelog of iterations that closed out
-├── backlog/ ................ one captured idea per file (per ADR-0014; replaces flat `future_iterations.md`)
+├── backlog/ ................ one captured idea per file (per ADR-0014)
 ├── api/
 │   └── openapi.yaml ... frozen backend contract (generated)
 ├── brand/

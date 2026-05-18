@@ -270,8 +270,8 @@ the QR, and the same-LAN constraint per `01_architecture.md`
 add ceremonial cost (mutual-auth handshake, ephemeral key
 generation, replay protection) for a threat largely mitigated by
 the deployment posture. Worth revisiting if remote pairing (post
-`Remote access for self-hosters` in `future_iterations.md`) lands
-and the same-LAN constraint goes away.
+`backlog/remote-access-for-self-hosters.md`) lands and the
+same-LAN constraint goes away.
 
 **Open part — full session needed:**
 
@@ -461,8 +461,8 @@ merge migrated as follows:
 | `native-secp256k1-signing` | [ADR-0003](decisions/0003-personal-use-phase.md) §"What relaxes during the personal-use phase" | Captured by the phase model |
 | `brand-tokens-placeholder` | `brand/README.md` and brand v1 lock docs | Brand v1 is now locked; the placeholder phase is over |
 | `mobile-spec-authoring-path` | `PROCESS.md §6` working agreement, `UI/mobile.md` status section | Process choice |
-| `psbt-by-qr-mobile` | `future_iterations.md` "PSBT-by-QR roundtrip on mobile" | Deferred; no foundational decision |
-| `categorization-queue-mobile` | `UI/README.md` Activity section, `future_iterations.md` "Push-driven categorization workflow" | Decided + deferred parts each found their canonical home |
+| `psbt-by-qr-mobile` | `backlog/psbt-by-qr-roundtrip-on-mobile.md` | Deferred; no foundational decision |
+| `categorization-queue-mobile` | `UI/README.md` Activity section, `backlog/push-driven-categorization-workflow.md` | Decided + deferred parts each found their canonical home |
 
 Slugs are preserved by the receiving ADR's "Migrated from" header
 so existing back-references in canonical docs still resolve.

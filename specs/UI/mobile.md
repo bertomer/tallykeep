@@ -100,8 +100,8 @@ When an iteration ships, its corresponding section appears below.
   Wordmark-icony at 280 px is the brand surface; intended to land
   as the dynamic-mark surface (tap to regenerate matching grain
   on both halves of the embedded Y) when the SvelteKit build
-  ships — see `future_iterations.md` "Dynamic brand mark on
-  first-touch surfaces". *Status: validated (Rémy greenlight 2026-05-10).*
+  ships — see `backlog/dynamic-brand-mark-on-first-touch-surfaces.md`.
+  *Status: validated (Rémy greenlight 2026-05-10).*
 - `mobile_onboarding_02_paired.html` — second screen (initial
   state). Combines pair-success confirmation + biometric setup.
   Header carries the same wordmark-icony (static after Screen 1).
@@ -152,7 +152,8 @@ self-hosted onboarding flow above (Connect → Paired →
 biometric / passphrase / no-biometric variants → Home) is
 distinct from the hosted-tier flow, which adds at least one
 new screen and modifies others. Captured for sharpening when
-the hosted-tier iteration promotes from `future_iterations.md`:
+the hosted-tier iteration promotes from
+`backlog/hosted-tier-infrastructure.md`:
 
 - *Hosted-tier signup* (likely happens in a web browser, outside
   the app — TBD). Generates a `crisp-river-7842`-style
@@ -178,8 +179,8 @@ the hosted-tier iteration promotes from `future_iterations.md`:
   Phone forwards passphrase to hosted backend for validation.
 
 The hosted-tier flow is post-public-ship per
-`future_iterations.md` "Hosted tier infrastructure", so it is
-not drafted for the current iteration. The
+`backlog/hosted-tier-infrastructure.md`, so it is not drafted
+for the current iteration. The
 `traveling-user-recovery` arbitration is resolved by ADR-0008
 (two-layer unlock model). The `pairing-handshake-crypto` crypto
 specifics remain open in `pre-implementation.md` but do not
@@ -221,8 +222,8 @@ block Screen 02 design.
    passphrase transits the paired connection — TLS in
    production deployments, plaintext-on-localhost in dev (per
    `01_architecture.md` §"Network security posture"; remote
-   access adds TLS per `future_iterations.md` "Remote access
-   for self-hosters").
+   access adds TLS per
+   `backlog/remote-access-for-self-hosters.md`).
 2. **Keys and secrets.** Device credential lives in Keychain
    biometric-protected. Server passphrase is typed transiently
    for fallback validation; never stored on the phone, never
@@ -418,7 +419,8 @@ to the right of `sats` — think `sats²` notation but with `↻`
 as the exponent. The `↻` is the tap-affordance for cycling
 sats / BTC. The "what's behind" gesture is the right metaphor
 — same family as the "Tap to see under the hood" UI spine
-pattern captured in `future_iterations.md`. The Unicode
+pattern captured in
+`backlog/tap-to-see-under-the-hood-ui-spine-pattern.md`. The Unicode
 character keeps the rendering simple (no SVG mimicry, single
 glyph) and lighter than the rotate-style SVG variants. On
 cycle, the amount re-formats (e.g. `0` sats → `0.00000000`
@@ -576,7 +578,7 @@ icon-border), not on the icon's body fill.
    hosted-tier). Disclosed honestly in the principles card; the
    hosted-tier-specific privacy boundary is acknowledged via the
    security-health system once that path is functional (see
-   `future_iterations.md` "Hosted tier infrastructure").
+   `backlog/hosted-tier-infrastructure.md`).
 4. **Confirmation honesty.** The screen has no positive end state
    to fake. The QR scan initiates pairing; the post-pair
    confirmation screen (next iteration) shows pairing-completed
@@ -596,8 +598,9 @@ icon-border), not on the icon's body fill.
    Capacitor community plugin — license to verify before adoption.
    The "How TallyKeep works" card asserts open-source as a
    principle the user can verify; this is bound to the ship-gate
-   reproducible-build pipeline in `future_iterations.md` to make
-   the assertion provable.
+   reproducible-build pipeline in
+   `backlog/ship-gate-meta-iteration-the-public-ship-event.md`
+   to make the assertion provable.
 
 ### Notes
 
@@ -633,8 +636,8 @@ fallback.** Sharpened across the onboarding sessions
   acknowledging.
 
 The Security health zone is its own iteration (per
-`future_iterations.md` "Security-health system", milestone
-pre-shipping). For the current Onboarding iteration's empty
+`backlog/security-health-system.md`, milestone pre-shipping). For
+the current Onboarding iteration's empty
 Home, the zone does not yet appear — meaning a skip during
 personal-use phase leaves the principles unacknowledged with
 no re-surface (acceptable since Rémy is the only user during
@@ -779,9 +782,9 @@ the default; the Connect screen and Paired screen render the
 server's identifier (server_label if set, falling back to
 endpoint URL or hosted-tier connection-ID) primarily for sanity
 ("did I scan the right QR?"). Multi-server-per-client is captured
-as a post-public-ship future iteration (`future_iterations.md`
-"Multi-server per single client") and is not blocking for
-private-ship or public-ship.
+as a post-public-ship future iteration (per
+`backlog/multi-server-per-single-client.md`) and is not blocking
+for private-ship or public-ship.
 
 **Brand strip continuity across onboarding.** Same wordmark-icony
 at 280px on every onboarding screen. Visual continuity = "we're
@@ -804,9 +807,9 @@ brand argues. Bringing it into Connect requires a brand v1 → v2
 lock-doc bump (per `brand/README.md` §Status-driven discipline —
 pre-public-ship lock-doc edits allowed without an ADR) updating §5
 to extend the sanction.
-Captured for sharpening in `future_iterations.md` as
-"Dynamic brand mark on first-touch surfaces"; not landed in this
-mockup because mockups are static-only per
+Captured for sharpening in
+`backlog/dynamic-brand-mark-on-first-touch-surfaces.md`; not
+landed in this mockup because mockups are static-only per
 `UI/mockups/README.md`.
 
 ---
@@ -823,8 +826,8 @@ iteration since (Purse → Strongbox → Vault → Account) replaced
 the corresponding `/holding/new/<type>` route with its real
 wizard surface. The stub mockup itself is preserved as the
 canonical visual template for future coming-soon stubs (see
-`future_iterations.md` "Deposit Send-to-Account flow") and is
-no longer reached from this picker.
+`backlog/deposit-send-to-account-flow.md`) and is no longer
+reached from this picker.
 
 ### Screens
 
@@ -846,8 +849,9 @@ no longer reached from this picker.
   tile taps during the scaffolding iteration, replaced by each
   per-type wizard as they shipped (Purse → Strongbox → Vault →
   Account). Kept on disk as the canonical visual template for
-  future coming-soon stubs (cf. `future_iterations.md` "Deposit
-  Send-to-Account flow"). Anatomy: app bar with back chevron +
+  future coming-soon stubs (cf.
+  `backlog/deposit-send-to-account-flow.md`). Anatomy: app bar
+  with back chevron +
   screen title ("Add a Purse" / "Add a Strongbox" / etc.),
   centred body with a 96 px Holding icon (same per-type
   bordered framing as the picker row, sized up), heading
@@ -857,7 +861,8 @@ no longer reached from this picker.
   (Rémy greenlight 2026-05-13); role demoted to template
   2026-05-17 as the last wizard shipped.*
 
-Promotion order followed `future_iterations.md`: **Purse first**
+Promotion order followed the iteration roadmap (now in
+`backlog/README.md`): **Purse first**
 (canonical descriptor wizard, also carried the shared wizard
 shell into the codebase since it was the first consumer), then
 Strongbox (copy + framing variant on Purse), then Vault
@@ -987,8 +992,8 @@ rather than re-discovering backend shapes.
 
 ## Add Holding — Purse wizard
 
-Promoted from `future_iterations.md` as the first per-type
-wizard (canonical descriptor-wizard pattern carrying the shared
+Promoted from the backlog as the first per-type wizard
+(canonical descriptor-wizard pattern carrying the shared
 wizard shell into the codebase; Strongbox and Vault wizards
 derive). Design pass closed 2026-05-13; lands after the Add
 Holding scaffolding iteration closes.
@@ -1469,8 +1474,8 @@ across the wizard for future per-type sibling reuse:
   via the tinted Derivation row. Where the warning persists
   post-Holding-create and how the user later resolves it is a
   design question carried by the security-health iteration in
-  `future_iterations.md` — flagged there as needing rework
-  before the user-facing surface lands, since "Security health"
+  `backlog/security-health-system.md` — flagged there as needing
+  rework before the user-facing surface lands, since "Security health"
   as a product-design concept users encounter directly is not
   yet committed (Rémy 2026-05-14).
 
@@ -1511,8 +1516,8 @@ variants in this iteration:
   user proceeds; the security-health item gets created server-
   side on Holding-create so the same warning surfaces on Home
   under the security-health heading with a "Fix this" affordance
-  (remediation sub-flow specified in `future_iterations.md`
-  Security-health entry).
+  (remediation sub-flow specified in
+  `backlog/security-health-system.md`).
 
 Both variants share the same shape. The screen lands with the
 **auto-name preview at the top**, directly under the heading:
@@ -1779,8 +1784,8 @@ that the banner was inconsistent with the Purse / Strongbox
 wizards (which don't carry such banners) and that a
 product-wide "tap anything for detail" pattern is the right
 place for that kind of help. The banner was removed; the future
-pattern is captured in `future_iterations.md` as
-"Tap-anything-for-detail help affordance." **No third-party
+pattern is captured in
+`backlog/tap-anything-for-detail-help-affordance.md`. **No third-party
 product names in user copy** — the descriptor's source software
 (Liana, Bitcoin Core, Sparrow, Specter, hardware-wallet
 exports, etc.) varies, isn't TallyKeep's to endorse, and
@@ -2007,7 +2012,7 @@ ADR-0011's 2-key model: this wizard captures **only the
 read-only credential**. The withdrawal credential is configured
 separately post-onboarding via the Account detail page's
 Withdraw affordance, in its own design pass (captured in
-`future_iterations.md` "Account withdrawal-key sub-flow").
+`backlog/account-withdrawal-key-sub-flow.md`).
 
 ### Vocabulary lock
 
@@ -2261,10 +2266,10 @@ flags live in the adapter registration; frontend reads them
 via the treasury providers endpoint.
 
 **Bitstamp deferred at v1, not architecturally cut.** The v1
-provider dropdown lists only Kraken. Bitstamp moves to the
-"Additional CustodialProvider adapters" iteration in
-`future_iterations.md` — same iteration that covers Lemon,
-Buenbit, Belo, Coinbase, Swissquote. Backend adapter is
+provider dropdown lists only Kraken. Bitstamp moves to
+`backlog/additional-custodialprovider-adapters.md` — the same
+iteration that covers Lemon, Buenbit, Belo, Coinbase,
+Swissquote. Backend adapter is
 unchanged at the contract level; the dropdown filter is the
 scope-tightening surface.
 
@@ -2391,10 +2396,10 @@ above each card:
   iteration).
 - **Withdrawal key** — "Not configured" + short explanation
   + **Set up** CTA. Routes to the withdrawal sub-flow per
-  `future_iterations.md` "Account withdrawal-key UX".
+  `backlog/account-withdrawal-key-sub-flow.md`.
 - **Deposit address** — "Not configured" + short explanation
   + **Set up** CTA. Routes to the deposit-flow address-capture
-  per `future_iterations.md` "Deposit Send-to-Account flow".
+  per `backlog/deposit-send-to-account-flow.md`.
 - **Auto-sweep rules** — "None" + explanation + **Add rule**
   CTA. Routes to SweepPolicy creation (its own iteration).
 - **Polling** — current cadence (default 10 min) + **Change**
@@ -2536,9 +2541,10 @@ the full wild set risks lock-in. Sign-based amount colour does
 the visual lift for now.
 
 **TK-initiated vs external activity distinction deferred.** Per
-`future_iterations.md` "Custodial ledger mirroring posture and
-TK-initiated event linkage". v1 renders all entries identically;
-the visual distinction lands when that arbitration closes.
+ADR-0013 (custodial ledger mirroring posture and TK-initiated
+event linkage). v1 renders all entries identically; the visual
+distinction lands when that arbitration's UI follow-up is
+sharpened.
 
 **Deferred CTAs route to coming-soon stubs.** Withdraw, Deposit,
 Auto-sweep "Add rule", Observation key "Replace", Withdrawal key

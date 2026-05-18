@@ -13,10 +13,9 @@ session, not done in-pot.
 not work. Do not implement from here. Your scope is
 `../next_iteration.md`'s active iteration block.
 
-Structure decided in ADR-0014 (replacing the prior flat
-`future_iterations.md`); the per-file form sidesteps the §4.8
-Cowork-file-tool stale-buffer pattern that long-file Edits kept
-triggering.
+Structure decided in ADR-0014; the per-file form sidesteps the
+§4.8 Cowork-file-tool stale-buffer pattern that long-file Edits
+on the prior flat backlog kept triggering.
 
 ---
 
