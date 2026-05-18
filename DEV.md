@@ -113,3 +113,9 @@ SBuDW24+DFgDfltgUbHyuaA1x3XcsdEDwgC7nVeoikPRdurbUNcevp8fZ2shTcUNLS3c3ZgB07l2d8X8
 
 "Clé privée" Kraken read + mess
 h64Dr93ocC7y8s1PJsjq/htpDQNXlwqYy9tjGMERURLpH+gV2W8Gpqx9XZqd7UiG+1/SkutcqV8zSe285yOG1w==
+
+"Clé API" Kraken read funds + ledger
+5eUCoi4OJUFH9228MiRAm9BGGlVbGen0S/994PdEjWpgcY/AozWL5WV7
+
+"Clé privée" Kraken read + mess
+4oJYS7dqGbPU4TMVbi3nWaOOgrTNLgBuw4ZjwP2Nr+MzYj6Obc4usuSPbpy8rkUJf8MAm8IYfSXb6jmVFDrygA==

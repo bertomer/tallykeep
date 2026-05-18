@@ -33,7 +33,7 @@ specs/
 ├── pre-implementation.md ... items needing dedicated arbitration session
 ├── next_iteration.md ....... template + active iteration block + rough roadmap
 ├── shipped.md .............. condensed changelog of iterations that closed out
-├── future_iterations.md .... pot of ideas captured for later
+├── backlog/ ................ one captured idea per file (per ADR-0014; replaces flat `future_iterations.md`)
 ├── api/
 │   └── openapi.yaml ... frozen backend contract (generated)
 ├── brand/
@@ -77,7 +77,7 @@ lives in the two subfolders.
   Edited in lockstep with every brainstorm decision. Never
   describes process.
 - **Path-to-target** (`next_iteration.md`, `shipped.md`,
-  `future_iterations.md`, `pre-implementation.md`) — what's
+  `backlog/`, `pre-implementation.md`) — what's
   being worked, what shipped, what's open, what's deferred.
   Never describes the canonical product.
 - **Rules and decisions** (this file, `decisions/`,
@@ -98,7 +98,7 @@ should never need to read `archive/` to do its job.
 which is the frozen API contract per ADR-0004). The bridge
 between them is `shipped.md` (a brief human-readable note when
 something lands) and the **"deferred" marker** in canonical
-docs, which forward-references either `future_iterations.md`
+docs, which forward-references either a `backlog/` file
 (parked idea) or `pre-implementation.md` (blocked on
 arbitration).
 
@@ -126,7 +126,7 @@ the routing explicit.
   `pre-implementation.md`, or drift the §4.6 sweep surfaced.
 - *Output:* edits to canonical docs (`00`–`04`, `holdings/`,
   `concerns/`, `UI/`, `brand/`), entries in `next_iteration.md`
-  / `pre-implementation.md` / `future_iterations.md`, ADRs in
+  / `pre-implementation.md` / new files in `backlog/`, ADRs in
   `decisions/`, mockup files when the iteration includes them.
   **Never code.**
 - *Gate:* Rémy reads the spec edits and confirms ("yes, that's
@@ -409,8 +409,9 @@ about scope, read the README first.
 
 The coding agent works one iteration at a time. The active
 iteration's sharpened scope lives in `next_iteration.md`.
-Future iterations live in `future_iterations.md` as rough
-captured ideas, awaiting promotion. Shipped iterations are
+Future iterations live as individual files in `backlog/`
+(per ADR-0014), each a rough captured idea awaiting
+promotion. Shipped iterations are
 condensed into `shipped.md` at closeout.
 
 **Stages of a coding iteration:**
@@ -475,8 +476,10 @@ condensed into `shipped.md` at closeout.
    By the time the coding agent reaches closeout, every mockup
    it touched is already `validated`.
 
-6. **Promote.** One item from `future_iterations.md` is
-   sharpened into the new active-iteration block. Picking the
+6. **Promote.** One file from `backlog/` is sharpened into the
+   new active-iteration block; on promotion, the backlog file is
+   deleted (`rm`) — git history retains it, `shipped.md` will be
+   the durable trail at closeout (per ADR-0014). Picking the
    next item is **collaborative** — the agent does not pick
    alone. If Rémy isn't in the conversation, the agent stops
    here and reports "iteration closed; no successor sharpened
@@ -491,8 +494,8 @@ bypassing OpenAPI regeneration because "I didn't change much."
 
 When a brainstorm session produces a decision: edit the
 canonical doc **and** `next_iteration.md` in lockstep, every
-time. New ideas not in the active scope go to
-`future_iterations.md`. No parallel notes. Foundational
+time. New ideas not in the active scope go to new files in
+`backlog/` via `Write` (per ADR-0014). No parallel notes. Foundational
 decisions get an ADR (per §7); non-foundational decisions ride
 in the canonical-doc edit alone.
 
@@ -614,7 +617,7 @@ the file:
 
 - Foundational decisions land as ADRs in `decisions/`.
 - Implementation work moves to `next_iteration.md` (if active)
-  or `future_iterations.md` (if deferred).
+  or a new file in `backlog/` (if deferred).
 - The relevant canonical doc is edited to reflect the
   decision.
 
@@ -622,7 +625,7 @@ There is no "Decided" section in this file (per §4.6 check 5).
 
 If an agent encounters a question whose answer is not in the
 spec, the answer goes into `pre-implementation.md` (if it
-needs Rémy's arbitration) or `future_iterations.md` (if it's
+needs Rémy's arbitration) or a new file in `backlog/` (if it's
 a capturable idea for later) — not into the agent's head.
 
 
@@ -639,8 +642,8 @@ mtime check (#8) catches the rest.
 **Rule.** For edits to existing canonical markdown docs longer
 than ~200 lines (`holdings/*.md`, `concerns/*.md`,
 `UI/mobile.md`, `UI/README.md`, `PROCESS.md`,
-`next_iteration.md`, `future_iterations.md`), prefer bash
-heredoc over the Edit / Write tools when the change exceeds a
+`next_iteration.md`), prefer bash heredoc over the Edit /
+Write tools when the change exceeds a
 couple of lines:
 
 ```bash
@@ -747,7 +750,9 @@ When starting a new session:
    contract bullet) and the routing table in §7.
 6. Read `pre-implementation.md` — Open items only; that's
    what's blocked on Rémy's arbitration.
-7. `future_iterations.md` is reference only; do not work it.
+7. `backlog/` is reference only; do not work it. Each file is
+   one captured idea (per ADR-0014); the folder's `README.md`
+   carries the conventions and the iteration roadmap.
 8. **Trust `api/openapi.yaml` as the contract — do not
    regenerate it at boot.** Regeneration is a closeout-stage
    action that runs against the live backend of the iteration
@@ -834,7 +839,7 @@ that's an ADR moment.
 |---|---|
 | Bug or wording fix in canonical spec | Edit the module directly |
 | Decision sharpened during brainstorm | Edit canonical doc + edit `next_iteration.md` in lockstep + ADR if foundational |
-| Idea captured but flagged "later" | Entry in `future_iterations.md` |
+| Idea captured but flagged "later" | New file in `backlog/<slug>.md` via `Write` (per ADR-0014) |
 | Decision overriding an earlier one | New ADR (Status: Supersedes NNNN), edit canonical doc |
 | Decision affecting custody, regulatory, or open-source posture | New ADR + explicit user sign-off, edit canonical doc |
 | UI screen design (new screen or new draft) | Mockup file + section in `UI/mobile.md` (or `UI/desktop.md`) |
@@ -843,7 +848,7 @@ that's an ADR moment.
 | Backend or domain change required by an active iteration | Item in `next_iteration.md` |
 | Iteration closeout | Condensed entry appended to `shipped.md`; active block in `next_iteration.md` cleared |
 | Question requiring dedicated arbitration | Entry in `pre-implementation.md` |
-| Question deferable to a later iteration | Entry in `future_iterations.md` |
+| Question deferable to a later iteration | New file in `backlog/<slug>.md` via `Write` (per ADR-0014) |
 | New brand artifact (pre-public-ship) | New `tallykeep_<artifact>_v1_lock.html` in `brand/` + extracted SVG in `brand/identity/` + tokens lockstep if values changed |
 | Material revision to a locked brand artifact (pre-public-ship) | New `..._v<N+1>_lock.html` (don't edit a published lock doc) + regenerated SVG in `brand/identity/` + tokens lockstep |
 | Cosmetic / typo fix in a lock doc | Edit in place — bump nothing |

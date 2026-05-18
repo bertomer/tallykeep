@@ -312,18 +312,98 @@ Specific API request/response shapes live in `api/openapi.yaml`.
 
 Each cycle fetches BTC balance, other-asset balances (read-only
 display only — never actionable on the provider's side), and new
-ledger entries since the last cycle's cursor (deposits, withdrawals,
-trades, fees, transfers, all unified). Updates the provider row's
-`last_known_balance_sats`, `last_updated_at`, `last_error`. Persists
-ledger entries in `custodial_ledger_entry`. Emits
-`treasury.custodial.balance_changed` on balance delta and
-`treasury.custodial.ledger_entry_added` per new ledger row.
+or updated ledger entries since the last cycle's cursor (deposits,
+withdrawals, trades, fees, transfers, all unified). Updates the
+provider row's `last_known_balance_sats`, `last_updated_at`,
+`last_error`. Persists ledger entries in `custodial_ledger_entry`
+under the mirror posture (per ADR-0013).
+
+**Mirror posture (per ADR-0013).** `custodial_ledger_entry` is the
+canonical on-disk record of what TallyKeep has observed at the
+provider's ledger endpoint — not a short-TTL cache. The Operations
+tab on the Account detail page reads from this table, so it renders
+honestly even when the provider is unreachable, the user has revoked
+the API key, or the polling cycle is paused. The trade-off is
+reconciliation discipline: provider-side mutations are tracked and
+unknown kinds are pass-through-preserved rather than dropped. See
+ADR-0013 for the full reasoning.
+
+**Per-cycle persistence contract.**
+
+- **Upsert by `(custodial_provider_id, provider_entry_id)`.** Each
+  observed row carries the provider's stable row id (Kraken's `id`
+  field on a ledger entry). New refids insert; existing refids
+  update in place when fields changed (status transitions like
+  `pending → success → cancelled`, fee corrections); missing refids
+  from a paginated past are not deleted (providers don't delete
+  historical entries — missing means out of the polled window).
+- **Kind normalization is adapter-owned.**
+  `CustodialProviderAdapter.normalize_ledger_entry(raw)` returns the
+  TK kind (`trade`, `deposit`, `withdrawal`, `transfer`, `fee`,
+  `other`) from a per-provider mapping table. Anything not in the
+  explicit map normalizes to `other`. The full provider record
+  always goes into `raw_payload` (JSONB), so unknown kinds remain
+  fully readable even when the TK enum doesn't represent them
+  structurally.
+- **Multi-row events stay coherent.** Kraken trades return one
+  ledger row per asset leg, paired by `refid`. For v1 (BTC-only
+  display), the adapter emits the BTC leg only and stashes the
+  fiat leg inside `raw_payload`. Non-BTC-only events drop at
+  normalization time. If `multi-asset-aggregation` (per
+  `pre-implementation.md`) decides the other way later, the
+  adapter stops dropping; pass-through means no provider-side
+  re-poll is required.
+
+**Per-cycle SSE.** The poller emits four event topics, all under the
+`treasury.custodial.*` namespace:
+
+- `treasury.custodial.balance_changed` — fires on a balance delta
+  between the previous cycle and the current one (typical cause:
+  the user made a manual buy on the provider's site, or a deposit
+  cleared, or an external withdrawal landed).
+- `treasury.custodial.ledger_entry_added` — per new ledger row
+  (refid not previously seen at this provider). Carries the full
+  normalized entry payload.
+- `treasury.custodial.ledger_entry_updated` — per existing ledger
+  row that mutated in the latest cycle (status transitioned, fee
+  corrected, etc.). Carries the post-update entry payload plus a
+  delta hint (`changed_fields: list[str]`). Frontends that do not
+  subscribe degrade silently — the row is stale until the next
+  page load.
+- `treasury.custodial.connection_state_changed` — connection-state
+  transitions (`healthy → degraded → unreachable → auth_failed`).
 
 Cycle failures (rate-limit hits, network errors, auth errors) are
-logged and surfaced via `system.custodial.auth_failed` and
-`treasury.custodial.connection_state_changed`. After N consecutive
-auth errors (default 5), the provider is marked `is_active=FALSE`
-and the user is alerted via SSE.
+logged and surfaced via `system.custodial.auth_failed` and the
+connection-state event above. After N consecutive auth errors
+(default 5), the provider is marked `is_active=FALSE` and the user
+is alerted via SSE.
+
+**TK-initiated event linkage.** Some custodial ledger entries
+correspond to TK-initiated flows — a SweepPolicy that fired an
+outflow produces a `withdrawal` entry at the provider; an inflow
+sweep that broadcast a PSBT produces a `deposit` entry at the
+provider once it confirms. These entries carry richer semantics
+than "the user did something on the provider's site," and TK
+records that richness via three nullable FKs on
+`custodial_ledger_entry`: `linked_sweep_execution_id`,
+`linked_counterparty_holding_id` (the TK Holding on the *other*
+side of the flow — source for a withdrawal, destination's source
+for a deposit), and `linked_chain_ledger_entry_id` (the chain-side
+`LedgerEntry` produced by the on-chain leg). A reconciler
+subscriber populates the FKs on each new `kind=deposit`/`withdrawal`
+entry; matching criteria and the reconciler's persist-first flow
+live in `concerns/sweep_policies.md §5. Reconciliation`. Entries
+that don't match a pending `sweep_execution` stay pure observation
+("the user did this on the provider's site") — no judgment.
+
+**What the page surfaces in v1.** The Account-detail page's
+Operations tab renders all entries identically — text-only
+descriptor, relative time, single-unit BTC amount with sign-based
+color. The visual TK-vs-external distinction is deferred (see
+`future_iterations.md` and the Account-detail iteration's scope-out
+list); the linkage data exists from day one and the next UI
+iteration lights it up without a migration.
 
 ## Flows — Withdraw and Deposit
 

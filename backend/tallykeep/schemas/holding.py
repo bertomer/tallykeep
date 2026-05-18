@@ -17,7 +17,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-from tallykeep.schemas.treasury import CustodialProviderInput
+from tallykeep.schemas.treasury import AccountDetailOut, CustodialProviderInput
 from tallykeep.domain.enums import (
     AddressType,
     CustodyModel,
@@ -132,6 +132,9 @@ class AccountCreate(_HoldingCreateBase):
 # --- inputs: management ------------------------------------------------------
 
 
+VALID_POLLING_INTERVALS: frozenset[int] = frozenset({60, 300, 600, 1800, 3600})
+
+
 class HoldingUpdate(BaseModel):
     model_config = _StrictBase
 
@@ -141,6 +144,8 @@ class HoldingUpdate(BaseModel):
     declared_security: SecurityClaimInput | None = None
     display_color: str | None = Field(default=None, pattern=r"^#[0-9A-Fa-f]{6}$")
     display_order: int | None = Field(default=None, ge=0)
+    # Account-specific: updates the CustodialProvider polling cadence.
+    polling_interval_seconds: int | None = None
 
 
 class ChangeTypeRequest(BaseModel):
@@ -197,6 +202,9 @@ class HoldingResponse(BaseModel):
     timelock_kind: str | None = None
     timelock_value: int | None = None
     recovery_setup_notes: str | None = None
+
+    # Account — populated only when holding_type == ACCOUNT
+    account_detail: AccountDetailOut | None = None
 
 
 class DescriptorResponse(BaseModel):

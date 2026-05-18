@@ -1,0 +1,627 @@
+<!--
+  Title: Mobile — Account detail · Settings tab (default state)
+  Status: validated  (Rémy greenlight 2026-05-17 closing the Account-detail-page design pass — iteration B mockup set: populated Operations, empty Operations, Settings, Remove confirm, connection-error toast)
+  Date last touched: 2026-05-17
+  Replaces: nothing on disk; sibling to
+            mobile_account_detail_operations_populated.html.
+
+  Design notes:
+  - Same chrome as the populated/empty Operations mockups (app
+    bar, status card, hero, action row, tab strip, bottom nav).
+    The page-header chrome is consistent across tabs — the user
+    is on the same Account regardless of which tab they're
+    viewing. Below the tab strip, the content area swaps to
+    Settings.
+  - **Settings active tab.** Tab strip's verdigris underline now
+    sits under "Settings" (not Operations). Same component, same
+    sticky behaviour.
+  - **Section pattern.** Each settings topic is a card with:
+      - uppercase section label above the card (iOS-style),
+      - primary value or state on the first line,
+      - secondary description / meta on the second line,
+      - right-aligned CTA chip when an action exists.
+    Sections are vertically stacked with consistent spacing.
+  - **Sections in user-relevant order** (top to bottom):
+      1. **Provider** — display name + connection-establishment
+         date. Pure info, no CTA.
+      2. **Observation key** — last-4 chars of the API key (rest
+         masked) + configured date + "Replace key" CTA. Replace
+         routes to a coming-soon stub in v1 (per iteration B's
+         scope — see `future_iterations.md` for the eventual
+         credential-rotation iteration).
+      3. **Withdrawal key** — "Not configured" + short
+         explanation + "Set up" CTA. Routes to the withdrawal
+         sub-flow (per `future_iterations.md` "Account
+         withdrawal-key UX"). Once configured, this section
+         shows the last-4 chars of the withdraw key + a
+         Replace/Revoke CTA (out of scope for this mockup).
+      4. **Deposit address** — "Not configured" + short
+         explanation + "Set up" CTA. Routes to the deposit-
+         address-capture surface (per `future_iterations.md`
+         "Deposit Send-to-Account flow"). Once configured, this
+         section shows the address (truncated middle) + Replace
+         affordance (out of scope for this mockup).
+      5. **Auto-sweep rules** — "None" + explanation + "Add
+         rule" CTA. Routes to the SweepPolicy creation surface
+         (its own iteration). Once rules exist, this section
+         renders a small per-rule list (one summary line per
+         rule, e.g. "Outflow weekly Friday 03:00 → Strongbox" /
+         "Inflow 0.01 BTC monthly ← Purse") with edit / delete
+         per-row.
+      6. **Polling** — current cadence (default 10 min) + Change
+         CTA. Routes to a simple picker (1, 5, 10, 30, 60 min
+         per the spec). This one is real in v1 — no coming-soon
+         stub. The picker is small enough to live in this
+         iteration's scope; flag if the coding agent disagrees.
+      7. **Danger zone** — Rename + Forget, visually grouped as
+         the last section. Sober at rest (no red banner); the
+         destructive action's CTA is what carries the red. "Forget"
+         rather than "Remove" or "Delete" because TK never custodies
+         user funds and never destroys anything outside its own
+         observation surface — the verb describes what TK actually
+         does. Cross-type vocabulary lock across all Holding types.
+  - **Whitelist destination — section deferred until withdrawal
+    key is configured.** Honest absence-of-affordance: there's
+    no whitelist to display until the user sets up the
+    withdrawal credential. Once withdrawal key is in place, a
+    new "Withdrawal whitelist" section appears between Deposit
+    address and Auto-sweep rules. Out of scope for this mockup
+    (which is the fresh-account default state).
+  - **Danger zone visual treatment.** Pattern: GitHub /
+    Vercel-style sober card; section label colored in danger
+    text, destructive CTA in danger color, rest stays sober.
+    No red banner, no scary chrome. The visual weight comes
+    from the action button's color, not from the section
+    background.
+  - **Rename action.** Tap "Rename" opens an inline text input
+    (replaces the value line) or a small sheet — coding-agent
+    call, both work. Current implementation isn't visualised
+    here; only the at-rest state.
+  - **Forget action.** Tap "Forget" opens the two-button
+    bottom-sheet confirm modal (see
+    `mobile_account_detail_remove_confirm.html`).
+  - **Sticky tab strip.** Same as the Operations tab — the tab
+    strip pins to the top of the scroll area when the user
+    scrolls past the hero / action row. Allows the user to
+    switch back to Operations without scrolling all the way up.
+  - **Pull-down-to-refresh on Settings tab — same behaviour as
+    Operations.** Refresh hits the Account observation, which
+    re-fetches the credential status, polling cadence, sweep
+    rules. The Settings tab's content is mostly local state but
+    the per-row "is configured?" booleans depend on backend.
+
+  Sample data:
+  - Provider: Kraken
+  - Connection: healthy
+  - Updated: 2 min ago
+  - Balance: 4 231 055 sats
+  - Observation key configured May 16, 2026, last 4 chars "AbCd"
+  - Withdrawal key, deposit address, sweep rules: all not
+    configured (fresh account state, v1 scope)
+-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>TallyKeep — Mobile — Account detail · Settings</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="_shared/tokens.css">
+<link rel="stylesheet" href="_shared/shell.css">
+<style>
+  .phone-screen { background: var(--color-bg); }
+
+  /* ---------- App bar ---------- */
+  .app-bar {
+    height: var(--mobile-app-bar);
+    flex-shrink: 0;
+    display: grid;
+    grid-template-columns: 44px 1fr 44px;
+    align-items: center;
+    padding: 0 var(--space-2);
+    background: var(--color-surface);
+    border-bottom: 1px solid var(--color-border);
+  }
+  .app-bar .back-btn {
+    width: 36px; height: 36px;
+    display: inline-flex; align-items: center; justify-content: center;
+    background: transparent; border: 0;
+    border-radius: var(--radius-md);
+    color: var(--color-text);
+    cursor: pointer;
+    justify-self: start;
+    margin-left: var(--space-2);
+  }
+  .app-bar .back-btn:hover { background: var(--color-bg); }
+  .app-bar .back-btn svg {
+    width: 22px; height: 22px;
+    stroke: currentColor; fill: none;
+    stroke-width: 2; stroke-linecap: round; stroke-linejoin: round;
+  }
+  .app-bar-title {
+    text-align: center;
+    font-size: var(--font-size-base);
+    font-weight: var(--font-weight-semibold);
+    color: var(--color-text);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  /* ---------- Scroll area ---------- */
+  .scroll-area {
+    flex: 1;
+    overflow-y: auto;
+    padding-bottom: var(--space-5);
+  }
+
+  /* ---------- Status card ---------- */
+  .status-card {
+    margin: var(--space-3) var(--space-4) 0;
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-left: 4px solid var(--color-holding-account);
+    border-radius: var(--radius-md);
+    padding: var(--space-3) var(--space-4);
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    cursor: pointer;
+    text-align: left;
+    width: calc(100% - var(--space-4) * 2);
+    font-family: inherit;
+  }
+  .status-card:hover { background: var(--color-surface-raised); }
+  .status-provider {
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-weight-semibold);
+    color: var(--color-text);
+  }
+  .status-line {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-2);
+    font-size: var(--font-size-xs);
+    color: var(--color-text-muted);
+    line-height: 1.4;
+  }
+  .status-sep { color: var(--color-text-dim); }
+  .status-dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    display: inline-block;
+    flex-shrink: 0;
+  }
+  .status-dot--healthy { background: var(--color-success); }
+  .status-state { color: var(--color-text); font-weight: var(--font-weight-medium); }
+
+  /* ---------- Hero ---------- */
+  .detail-hero {
+    padding: var(--space-5) var(--space-4) var(--space-3);
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+  }
+  .hero-amount-line { display: flex; align-items: baseline; gap: var(--space-2); }
+  .hero-amount {
+    font-family: var(--font-sans);
+    font-size: 36px;
+    font-weight: var(--font-weight-semibold);
+    color: var(--color-text);
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+  }
+  .hero-unit-label {
+    font-size: var(--font-size-md);
+    color: var(--color-text-muted);
+    font-weight: var(--font-weight-medium);
+    line-height: 1;
+  }
+  .unit-toggle {
+    background: transparent; border: 0;
+    padding: 0 0 0 2px; margin: 0;
+    font-size: 0.7em; vertical-align: super; line-height: 1;
+    color: var(--color-text-muted);
+    cursor: pointer; font-family: inherit;
+  }
+  .hero-other-assets {
+    font-size: var(--font-size-xs);
+    color: var(--color-text-dim);
+    margin-top: var(--space-1);
+  }
+  .hero-other-assets .other-label { color: var(--color-text-muted); margin-right: var(--space-1); }
+
+  /* ---------- Action row ---------- */
+  .action-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--space-3);
+    padding: var(--space-2) var(--space-4) var(--space-4);
+  }
+  .action-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-2);
+    padding: var(--space-3) var(--space-4);
+    background: var(--color-primary-soft);
+    border: 0;
+    border-radius: var(--radius-md);
+    font-family: inherit;
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-weight-semibold);
+    color: var(--color-primary-strong);
+    cursor: pointer;
+  }
+  .action-btn:hover { background: #c9e3d9; }
+  .action-btn svg {
+    width: 18px; height: 18px;
+    stroke: currentColor; fill: none;
+    stroke-width: 2; stroke-linecap: round; stroke-linejoin: round;
+  }
+
+  /* ---------- Tab strip ---------- */
+  .tab-strip {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    background: var(--color-bg);
+    border-top: 1px solid var(--color-border);
+    border-bottom: 1px solid var(--color-border);
+  }
+  .tab {
+    padding: var(--space-3) 0;
+    background: transparent;
+    border: 0;
+    font-family: inherit;
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-weight-medium);
+    color: var(--color-text-muted);
+    cursor: pointer;
+    position: relative;
+  }
+  .tab:hover { color: var(--color-text); }
+  .tab--active {
+    color: var(--color-text);
+    font-weight: var(--font-weight-semibold);
+  }
+  .tab--active::after {
+    content: '';
+    position: absolute;
+    left: 12%;
+    right: 12%;
+    bottom: -1px;
+    height: 2px;
+    background: var(--color-primary);
+    border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+  }
+
+  /* ---------- Settings sections ---------- */
+  .settings-label {
+    margin: var(--space-4) var(--space-5) var(--space-2);
+    font-size: var(--font-size-xs);
+    color: var(--color-text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    font-weight: var(--font-weight-semibold);
+  }
+  .settings-label--danger { color: var(--color-danger); }
+
+  .settings-card {
+    margin: 0 var(--space-4);
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    padding: var(--space-3) var(--space-4);
+  }
+  .settings-card + .settings-label { margin-top: var(--space-5); }
+
+  .settings-row {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    align-items: center;
+    gap: var(--space-3);
+    padding: var(--space-2) 0;
+  }
+  .settings-row + .settings-row { border-top: 1px solid var(--color-border); }
+
+  .settings-body { min-width: 0; }
+  .settings-value {
+    font-size: var(--font-size-sm);
+    color: var(--color-text);
+    font-weight: var(--font-weight-medium);
+  }
+  .settings-value--not-configured {
+    color: var(--color-text-muted);
+    font-style: italic;
+  }
+  .settings-value--mono {
+    font-family: var(--font-mono);
+    letter-spacing: 0.04em;
+  }
+  .settings-meta {
+    font-size: var(--font-size-xs);
+    color: var(--color-text-dim);
+    margin-top: 2px;
+    line-height: var(--line-height-default);
+  }
+
+  .settings-cta {
+    background: transparent;
+    border: 1px solid var(--color-border-strong);
+    border-radius: var(--radius-pill);
+    padding: var(--space-1) var(--space-3);
+    font-family: inherit;
+    font-size: var(--font-size-xs);
+    font-weight: var(--font-weight-semibold);
+    color: var(--color-text);
+    cursor: pointer;
+    flex-shrink: 0;
+    white-space: nowrap;
+  }
+  .settings-cta:hover { background: var(--color-bg); }
+  .settings-cta--danger {
+    color: var(--color-danger);
+    border-color: var(--color-danger-border);
+  }
+  .settings-cta--danger:hover {
+    background: var(--color-danger-soft);
+  }
+
+  /* ---------- Bottom nav ---------- */
+  .bottom-nav {
+    height: var(--mobile-bottom-nav);
+    flex-shrink: 0;
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    background: var(--color-surface);
+    border-top: 1px solid var(--color-border);
+  }
+  .nav-item {
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    gap: 2px;
+    padding: var(--space-2) 0;
+    font-size: 10px;
+    color: var(--color-text-dim);
+    background: transparent; border: 0; cursor: pointer;
+  }
+  .nav-item .nav-ico {
+    width: 22px; height: 22px;
+    stroke: currentColor; fill: none;
+    stroke-width: 2; stroke-linecap: round; stroke-linejoin: round;
+  }
+  .nav-item.active {
+    color: var(--color-primary-strong);
+    font-weight: var(--font-weight-semibold);
+    position: relative;
+  }
+  .nav-item.active::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 20%;
+    right: 20%;
+    height: 2px;
+    background: var(--color-primary);
+    border-radius: 0 0 var(--radius-sm) var(--radius-sm);
+  }
+  .nav-item.enabled-inactive { color: var(--color-text-muted); }
+  .nav-item.disabled { color: var(--color-text-dim); opacity: 0.4; cursor: not-allowed; }
+</style>
+</head>
+<body>
+
+<div class="mockup-meta">
+  <strong>Mobile — Account detail · Settings (default state)</strong> ·
+  <span class="status-validated">validated</span> ·
+  2026-05-17 · 360×800
+</div>
+
+<div class="phone-frame">
+  <div class="phone-screen">
+
+    <div class="app-bar">
+      <button class="back-btn" aria-label="Back to Holdings">
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <polyline points="15 6 9 12 15 18"/>
+        </svg>
+      </button>
+      <div class="app-bar-title">Kraken account</div>
+      <div></div>
+    </div>
+
+    <div class="scroll-area">
+
+      <button class="status-card" type="button" aria-label="Account connection status — tap to refresh">
+        <span class="status-provider">Kraken</span>
+        <span class="status-line">
+          <span class="status-dot status-dot--healthy" aria-hidden="true"></span>
+          <span class="status-state">Connected</span>
+          <span class="status-sep">·</span>
+          <span>Updated 2 min ago</span>
+        </span>
+      </button>
+
+      <div class="detail-hero">
+        <div class="hero-amount-line">
+          <span class="hero-amount">4 231 055</span>
+          <span class="hero-unit-label">sats<button class="unit-toggle" aria-label="Cycle unit: sats / BTC">↻</button></span>
+        </div>
+        <div class="hero-other-assets">
+          <span class="other-label">Other assets:</span>
+          USDT, ETH, ADA · + 9 more
+        </div>
+      </div>
+
+      <div class="action-row">
+        <button class="action-btn" type="button" aria-label="Deposit BTC to this Account">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <rect x="4" y="12" width="16" height="9" rx="1.5"/>
+            <line x1="12" y1="3" x2="12" y2="15"/>
+            <polyline points="8 11 12 15 16 11"/>
+          </svg>
+          Deposit
+        </button>
+        <button class="action-btn" type="button" aria-label="Withdraw BTC from this Account">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <rect x="4" y="12" width="16" height="9" rx="1.5"/>
+            <line x1="12" y1="15" x2="12" y2="3"/>
+            <polyline points="8 7 12 3 16 7"/>
+          </svg>
+          Withdraw
+        </button>
+      </div>
+
+      <div class="tab-strip" role="tablist">
+        <button class="tab" role="tab" aria-selected="false">Operations</button>
+        <button class="tab tab--active" role="tab" aria-selected="true">Settings</button>
+      </div>
+
+      <!-- Provider -->
+      <div class="settings-label">Provider</div>
+      <div class="settings-card">
+        <div class="settings-row">
+          <div class="settings-body">
+            <div class="settings-value">Kraken</div>
+            <div class="settings-meta">Connected via API since May 16, 2026</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Observation key -->
+      <div class="settings-label">Observation key</div>
+      <div class="settings-card">
+        <div class="settings-row">
+          <div class="settings-body">
+            <div class="settings-value settings-value--mono">•••• AbCd</div>
+            <div class="settings-meta">Configured May 16, 2026</div>
+          </div>
+          <button class="settings-cta" type="button">Replace</button>
+        </div>
+      </div>
+
+      <!-- Withdrawal key -->
+      <div class="settings-label">Withdrawal key</div>
+      <div class="settings-card">
+        <div class="settings-row">
+          <div class="settings-body">
+            <div class="settings-value settings-value--not-configured">Not configured</div>
+            <div class="settings-meta">Required to send BTC out of this Account to your other Holdings.</div>
+          </div>
+          <button class="settings-cta" type="button">Set up</button>
+        </div>
+      </div>
+
+      <!-- Deposit address -->
+      <div class="settings-label">Deposit address</div>
+      <div class="settings-card">
+        <div class="settings-row">
+          <div class="settings-body">
+            <div class="settings-value settings-value--not-configured">Not configured</div>
+            <div class="settings-meta">Required to send BTC into this Account from your other Holdings.</div>
+          </div>
+          <button class="settings-cta" type="button">Set up</button>
+        </div>
+      </div>
+
+      <!-- Auto-sweep rules -->
+      <div class="settings-label">Auto-sweep rules</div>
+      <div class="settings-card">
+        <div class="settings-row">
+          <div class="settings-body">
+            <div class="settings-value settings-value--not-configured">None</div>
+            <div class="settings-meta">Move BTC in or out automatically on a schedule or threshold.</div>
+          </div>
+          <button class="settings-cta" type="button">Add rule</button>
+        </div>
+      </div>
+
+      <!-- Polling -->
+      <div class="settings-label">Polling</div>
+      <div class="settings-card">
+        <div class="settings-row">
+          <div class="settings-body">
+            <div class="settings-value">Every 10 minutes</div>
+            <div class="settings-meta">How often TallyKeep observes balance and ledger changes at Kraken.</div>
+          </div>
+          <button class="settings-cta" type="button">Change</button>
+        </div>
+      </div>
+
+      <!-- Danger zone -->
+      <div class="settings-label settings-label--danger">Danger zone</div>
+      <div class="settings-card">
+        <div class="settings-row">
+          <div class="settings-body">
+            <div class="settings-value">Rename this Account</div>
+            <div class="settings-meta">Change how this Account appears across TallyKeep.</div>
+          </div>
+          <button class="settings-cta" type="button">Rename</button>
+        </div>
+        <div class="settings-row">
+          <div class="settings-body">
+            <div class="settings-value">Forget this Account</div>
+            <div class="settings-meta">TallyKeep forgets the credentials and stops observing. Your Kraken account itself is unaffected.</div>
+          </div>
+          <button class="settings-cta settings-cta--danger" type="button">Forget</button>
+        </div>
+      </div>
+
+    </div>
+
+    <div class="bottom-nav">
+      <button class="nav-item active">
+        <svg class="nav-ico" viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M 3 11 L 12 4 L 21 11"/>
+          <polyline points="5 10 5 20 19 20 19 10"/>
+        </svg>
+        Home
+      </button>
+      <button class="nav-item enabled-inactive">
+        <svg class="nav-ico" viewBox="0 0 24 24" aria-hidden="true">
+          <polyline points="4 12 9 17 20 6"/>
+        </svg>
+        Activity
+      </button>
+      <button class="nav-item enabled-inactive">
+        <svg class="nav-ico" viewBox="0 0 24 24" aria-hidden="true">
+          <circle cx="12" cy="12" r="3"/>
+          <path d="M 12 2 L 12 6 M 12 18 L 12 22 M 4 12 L 8 12 M 16 12 L 20 12 M 6.34 6.34 L 8.46 8.46 M 15.54 15.54 L 17.66 17.66 M 6.34 17.66 L 8.46 15.54 M 15.54 8.46 L 17.66 6.34"/>
+        </svg>
+        Settings
+      </button>
+      <button class="nav-item disabled">
+        <svg class="nav-ico" viewBox="0 0 24 24" aria-hidden="true">
+          <circle cx="12" cy="12" r="9"/>
+          <line x1="12" y1="8" x2="12" y2="12"/>
+          <line x1="12" y1="16" x2="12.01" y2="16"/>
+        </svg>
+        Help
+      </button>
+    </div>
+
+  </div>
+</div>
+
+</body>
+</html>
+bled">
+        <svg class="nav-ico" viewBox="0 0 24 24" aria-hidden="true">
+          <circle cx="12" cy="12" r="9"/>
+          <line x1="12" y1="8" x2="12" y2="12"/>
+          <line x1="12" y1="16" x2="12.01" y2="16"/>
+        </svg>
+        Help
+      </button>
+    </div>
+
+  </div>
+</div>
+
+</body>
+</html>

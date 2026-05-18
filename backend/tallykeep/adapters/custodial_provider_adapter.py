@@ -57,12 +57,18 @@ class WhitelistVerification:
 
 @dataclass
 class CustodialLedgerEntry:
-    """One entry from the provider's unified ledger feed."""
+    """One entry from the provider's unified ledger feed.
+
+    provider_entry_id is the provider's stable row identifier — the upsert anchor
+    per ADR-0013. kind is already normalised to the TK CustodialLedgerKind enum
+    values by the adapter before this object is constructed.
+    """
 
     provider_entry_id: str
-    kind: str          # "deposit" | "withdrawal" | "trade" | "fee" | "transfer" | "staking"
+    kind: str          # normalised: "trade"|"deposit"|"withdrawal"|"transfer"|"fee"|"other"
     asset: str         # e.g. "BTC"
     amount: float      # signed (negative = debit)
+    fee: float | None  # fee amount if the provider reports it separately; else None
     status: str        # "pending" | "success" | "failed"
     timestamp: datetime
     raw: dict          # full provider payload for forward-compatibility

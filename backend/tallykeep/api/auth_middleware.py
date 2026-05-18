@@ -111,12 +111,14 @@ class AuthMiddleware(BaseHTTPMiddleware):
             return await call_next(request)
 
         auth_header = request.headers.get("Authorization", "")
-        if not auth_header.startswith("Bearer "):
-            return _unauthorized("Missing or malformed Authorization header")
-
-        credential = auth_header[len("Bearer "):]
+        if auth_header.startswith("Bearer "):
+            credential = auth_header[len("Bearer "):]
+        else:
+            # Fallback for EventSource clients (browser EventSource cannot set
+            # custom headers, so the frontend passes the token as ?token=).
+            credential = request.query_params.get("token", "")
         if not credential:
-            return _unauthorized("Empty credential")
+            return _unauthorized("Missing or malformed Authorization header")
 
         cache = _get_credential_cache(request)
         device_id = _cache_lookup(cache, credential)

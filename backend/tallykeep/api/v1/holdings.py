@@ -13,7 +13,7 @@ from __future__ import annotations
 
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Response
+from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from sqlalchemy.orm import Session
 
 from tallykeep.adapters.descriptor_adapter import DescriptorAdapter
@@ -34,14 +34,17 @@ from tallykeep.schemas.holding import (
 )
 from tallykeep.schemas.treasury import (
     AccountCreateOut,
+    AccountDetailOut,
     AccountValidateIn,
     AccountValidateOut,
+    CustodialLedgerEntryOut,
     LedgerEntryPreview,
 )
 from tallykeep.services import holding_service, treasury_service
 from tallykeep.services.holding_service import HoldingServiceError
 from tallykeep.services.treasury_service import (
     CredentialPermissionMismatch,
+    InvalidPollingInterval,
     OveragePermissionsDetected,
     ProviderConnectionError,
     TreasuryServiceError,
@@ -232,9 +235,17 @@ async def validate_account_holding_credentials(
         raise HTTPException(status_code=422, detail=str(exc)) from exc
 
     sorted_assets = sorted(other_balances.keys())
+    _SATS = 100_000_000
+    # recent_entries is now ALL entries; take newest 3 for the wizard preview.
+    preview_entries = list(reversed(recent_entries[-3:])) if recent_entries else []
     previews = [
-        LedgerEntryPreview(kind=e.kind, asset=e.asset, timestamp=e.timestamp)
-        for e in recent_entries
+        LedgerEntryPreview(
+            kind=e.kind,
+            asset=e.asset,
+            amount_sats=int(round(e.amount * _SATS)),
+            timestamp=e.timestamp,
+        )
+        for e in preview_entries
     ]
     return AccountValidateOut(
         adapter_id=body.adapter_id,
@@ -248,6 +259,7 @@ async def validate_account_holding_credentials(
 
 @router.post("/holdings/account", response_model=AccountCreateOut, status_code=201)
 async def create_account_holding(
+    request: Request,
     body: AccountCreate,
     session: Session = Depends(get_db_session),
     secret_store: SecretStore = Depends(get_secret_store),
@@ -273,6 +285,15 @@ async def create_account_holding(
             )
         )
         session.commit()
+        # Entries were already persisted during create_account_holding, but dispatch
+        # an extra poll so the handler updates last_polled_at and picks up any entries
+        # that arrived in the seconds between validate and create.
+        handler = getattr(request.app.state, "custodial_poll_handler", None)
+        if handler is not None:
+            try:
+                handler.poll_provider_immediately(provider.id)
+            except Exception:
+                pass
     except CredentialPermissionMismatch as exc:
         session.rollback()
         raise HTTPException(
@@ -515,12 +536,68 @@ async def holding_summary(
 
 @router.get("/holdings/{holding_id}", response_model=HoldingResponse)
 async def get_holding(
-    holding_id: UUID, session: Session = Depends(get_db_session)
+    holding_id: UUID,
+    before: str | None = None,
+    session: Session = Depends(get_db_session),
 ) -> HoldingResponse:
+    from datetime import datetime
+    from tallykeep.repositories import custodial_provider as cp_repo
+    from tallykeep.repositories import custodial_ledger_entry as cle_repo
+
     holding = holding_service.get_holding(session, holding_id)
     if holding is None:
         raise HTTPException(status_code=404, detail="Holding not found")
-    return _to_response(holding)
+
+    response = _to_response(holding)
+
+    if holding.holding_type == HoldingType.ACCOUNT and holding.custodial_provider_id:
+        provider = cp_repo.get(session, holding.custodial_provider_id)
+        if provider is not None:
+            before_ts: datetime | None = None
+            if before is not None:
+                try:
+                    before_ts = datetime.fromisoformat(before)
+                except ValueError:
+                    raise HTTPException(status_code=422, detail="Invalid `before` timestamp")
+
+            limit = 51
+            rows = cle_repo.list_paginated(
+                session,
+                provider.id,
+                limit=limit,
+                before_timestamp=before_ts,
+            )
+            has_more = len(rows) == limit
+            entries = rows[:50]
+
+            response.account_detail = AccountDetailOut(
+                provider_id=provider.id,
+                provider_kind=provider.provider_kind.value,
+                adapter_id=provider.adapter_id,
+                display_name=provider.display_name,
+                connection_status=provider.connection_status,
+                last_polled_at=provider.last_polled_at,
+                last_error=provider.last_error,
+                last_known_balance_sats=provider.last_known_balance_sats,
+                non_btc_balances=provider.non_btc_balances,
+                polling_interval_seconds=provider.polling_interval_seconds,
+                observation_key_last_four=provider.observation_key_last_four,
+                ledger_entries=[
+                    CustodialLedgerEntryOut(
+                        id=e.id,
+                        provider_entry_id=e.provider_entry_id,
+                        kind=e.kind,
+                        asset=e.asset,
+                        amount_sats=e.amount_sats,
+                        status=e.status,
+                        timestamp=e.timestamp,
+                    )
+                    for e in entries
+                ],
+                ledger_has_more=has_more,
+            )
+
+    return response
 
 
 @router.patch("/holdings/{holding_id}", response_model=HoldingResponse)
@@ -528,6 +605,7 @@ async def patch_holding(
     holding_id: UUID,
     body: HoldingUpdate,
     session: Session = Depends(get_db_session),
+    secret_store: SecretStore = Depends(get_secret_store),
 ) -> HoldingResponse:
     if body.model_dump(exclude_unset=True) == {}:
         raise HTTPException(status_code=422, detail="empty update")
@@ -548,13 +626,58 @@ async def patch_holding(
             display_color=body.display_color,
             display_order=body.display_order,
         )
+        if holding is None:
+            raise HTTPException(status_code=404, detail="Holding not found")
+
+        if body.polling_interval_seconds is not None:
+            if holding.holding_type != HoldingType.ACCOUNT:
+                raise HTTPException(
+                    status_code=422,
+                    detail="polling_interval_seconds is only valid for Account holdings",
+                )
+            treasury_service.update_polling_interval(
+                session,
+                holding_id,
+                interval_seconds=body.polling_interval_seconds,
+            )
+
         session.commit()
+    except HTTPException:
+        session.rollback()
+        raise
+    except InvalidPollingInterval as exc:
+        session.rollback()
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
     except ValueError as exc:
         session.rollback()
         raise HTTPException(status_code=422, detail=str(exc)) from exc
-    if holding is None:
-        raise HTTPException(status_code=404, detail="Holding not found")
+
     return _to_response(holding)
+
+
+@router.delete("/holdings/{holding_id}", status_code=204)
+async def delete_holding(
+    holding_id: UUID,
+    session: Session = Depends(get_db_session),
+    secret_store: SecretStore = Depends(get_secret_store),
+) -> Response:
+    """Hard-delete an Account Holding and its CustodialProvider (cascade + secret cleanup).
+
+    Only Account holdings can be deleted this way; other types use the archive flow.
+    Returns 404 if the holding doesn't exist, 422 if it's not an Account.
+    """
+    try:
+        treasury_service.delete_account_holding(
+            session, holding_id, secret_store=secret_store
+        )
+        session.commit()
+    except TreasuryServiceError as exc:
+        session.rollback()
+        detail = str(exc)
+        if "not found" in detail.lower():
+            raise HTTPException(status_code=404, detail=detail) from exc
+        raise HTTPException(status_code=422, detail=detail) from exc
+    return Response(status_code=204)
 
 
 @router.post("/holdings/{holding_id}/archive", status_code=204)

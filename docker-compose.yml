@@ -149,6 +149,10 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+      # Wait for the backend to pass its healthcheck: by then alembic upgrade
+      # head has completed and all tables exist.
+      backend:
+        condition: service_healthy
     command: ["python", "-m", "tallykeep.worker"]
     restart: unless-stopped
 

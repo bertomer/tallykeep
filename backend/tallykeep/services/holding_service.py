@@ -465,8 +465,20 @@ def update_holding(
     )
     if row is None:
         return None
+    from sqlalchemy import select as _sa_select
+    from tallykeep.models.custodial_provider import CustodialProviderRow
+
     descriptor_ids = descriptor_repo.descriptor_ids_for_holding(session, row.id)
-    return holding_repo.to_domain(row, descriptor_ids=descriptor_ids)
+    custodial_provider_id: UUID | None = session.execute(
+        _sa_select(CustodialProviderRow.id).where(
+            CustodialProviderRow.holding_id == row.id
+        )
+    ).scalar_one_or_none()
+    return holding_repo.to_domain(
+        row,
+        descriptor_ids=descriptor_ids,
+        custodial_provider_id=custodial_provider_id,
+    )
 
 
 def archive_holding(session: Session, holding_id: UUID) -> bool:

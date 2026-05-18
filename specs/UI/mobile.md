@@ -2276,3 +2276,316 @@ metadata pre-paste. The provider dropdown at the top of Step 1
 is the only "which thing am I connecting" affordance the wizard
 needs.
 
+---
+
+## Account detail
+
+The per-Holding detail page for an Account. Reached from the
+Home Holdings row tap. This is where the user goes to see
+their custodial-provider balance, recent activity at the
+provider, and to configure the Account (keys, sweep rules,
+polling, removal). Design pass closed 2026-05-17 (Rémy
+greenlight on all five validated mockups); ships under
+ADR-0011 (2-key credential model) + ADR-0012 (observation
+scope expansion).
+
+The page anchors around three commitments:
+
+1. **SSE-driven realtime.** No manual refresh button anywhere.
+   Balance + ledger updates land via SSE (per iteration A's
+   consistency rule); the user trusts the page to be live.
+2. **Banking-grade ergonomics.** Two-tab layout (Operations |
+   Settings) matches Revolut / N26 / Boursorama. Single-unit
+   hero (sats default, ↻ toggle cycles the whole page —
+   same component and state-key as the home-page hero).
+3. **Honest absence-of-affordance for deferred flows.** Withdraw,
+   Deposit, Auto-sweep "Add rule", and the Settings tab's
+   key-setup / address-setup / key-replace CTAs all render as
+   real action buttons but route to coming-soon placeholders
+   until their dependent flows ship. The mockup specifies the
+   target; the implementation gates the routing.
+
+### Vocabulary lock
+
+- **"Operations"** — the activity-feed tab. Locked across
+  spec, code, and user-facing UI.
+- **"Settings"** — the configure-this-Account tab. Distinct
+  from the app-wide Settings nav item; this one is per-Account.
+- **"Updated N min ago"** — the freshness indicator copy.
+  Locked. *Never* "Last polled X ago" anywhere user-facing.
+- **"Connected" / "Connection lost"** — the connection-state
+  copy in the status card. Maps to backend's
+  `treasury.custodial.connection_state_changed` SSE states.
+- **"Card-with-arrow"** — the action-button icon metaphor for
+  Deposit (arrow going into the card) and Withdraw (arrow
+  going out of the card). The Account is the card; arrow
+  direction shows the flow relative to it. Sidesteps the
+  up-vs-down ambiguity.
+- **"Cannot reach Kraken"** — the toast title for transient
+  connection issues. Provider-specific; coding agent
+  substitutes the actual provider name.
+- **"Danger zone"** — Settings tab's bottom section housing
+  Rename + Remove. GitHub / Vercel convention.
+
+### Page chrome (consistent across tabs)
+
+Stacked top-to-bottom:
+
+- **App bar** — back chevron returns to Home; account name
+  centered (e.g. "Kraken account"); right slot reserved for
+  future per-page actions, empty in v1.
+- **Status card** — limestone left-stripe (Account-type anchor,
+  same accent as the Holdings row on Home); provider name on
+  the first line; connection-state dot + state copy + middot
+  separator + freshness on the second. The whole card is
+  tap-to-refresh (force-poll).
+- **Hero** — BTC balance in the user's active unit (sats
+  default), large tabular-nums; ↻ toggle next to the unit label
+  cycles the whole page sats ↔ BTC. Non-BTC cap-and-overflow
+  row below ("Other assets: USDT, ETH, ADA · + 9 more"),
+  hidden entirely when zero non-BTC balances.
+- **Action row** — Deposit + Withdraw, light-CTA weight
+  (`primary-soft` background, `primary-strong` text/icon),
+  card-with-arrow icons.
+- **Tab strip** — Operations | Settings, swipeable +
+  segmented-control, sticky on scroll. Active-tab underline =
+  brand verdigris.
+- **Bottom nav** — Home tab active (the user is in the
+  home-section of the app).
+
+### Operations tab
+
+The activity feed of recent ledger entries from the provider's
+unified ledger (per ADR-0012's observation scope). Each entry:
+
+- Text-only descriptor ("Deposit · BTC", "Trade · BTC/EUR",
+  "Withdraw · BTC", "Fee · BTC", …). **No kind-icons**:
+  Kraken's ledger surfaces more kinds than we've enumerated
+  (fees, transfers, stake events, rebates, adjustments,
+  others); committing to a per-kind icon vocabulary before
+  the wild data is in lock-in we might have to redraw. Defer
+  the icon vocabulary; text alone carries the row.
+- Relative time ("2h ago", "yesterday", "5d ago"). Switches
+  to absolute date past ~7 days ("May 10").
+- Single-unit amount in the active unit, right-aligned,
+  sign-based color (positive `success-text-on-soft`, negative
+  `danger-text-on-soft`, neutral default text).
+- Pull-to-refresh on the whole scroll area triggers a
+  force-poll. Standard mobile gesture; no chrome at rest.
+
+**Empty state** (fresh accounts or no activity in observation
+window): sober text-only panel. Title "No activity yet", sub
+"Your deposits, withdrawals, and trades will surface here as
+they happen on Kraken." No illustration.
+
+### Settings tab
+
+Per-section configuration cards, iOS-style uppercase labels
+above each card:
+
+- **Provider** — display name + connection-established date.
+  Pure info, no CTA.
+- **Observation key** — last-4 chars (mono, masked) +
+  configured date + **Replace** CTA. Replace routes to a
+  coming-soon stub in v1 (key-replace lands in its own small
+  iteration).
+- **Withdrawal key** — "Not configured" + short explanation
+  + **Set up** CTA. Routes to the withdrawal sub-flow per
+  `future_iterations.md` "Account withdrawal-key UX".
+- **Deposit address** — "Not configured" + short explanation
+  + **Set up** CTA. Routes to the deposit-flow address-capture
+  per `future_iterations.md` "Deposit Send-to-Account flow".
+- **Auto-sweep rules** — "None" + explanation + **Add rule**
+  CTA. Routes to SweepPolicy creation (its own iteration).
+- **Polling** — current cadence (default 10 min) + **Change**
+  CTA. Real in v1: picker for 1 / 5 / 10 / 30 / 60 min.
+- **Danger zone** — last section, label in `danger` text
+  colour. Two rows: Rename (neutral CTA) + Forget (`danger`-
+  coloured CTA). Forget opens the two-button bottom-sheet
+  confirm modal. The verb is "Forget" rather than "Remove" or
+  "Delete" — TK never custodies user funds and never destroys
+  anything outside its own observation surface; "Forget"
+  describes what TK actually does. Locked across all Holding
+  types (see Cross-type vocabulary lock below).
+
+**Whitelist destination** section is conditional — appears
+between Deposit address and Auto-sweep rules once the
+withdrawal key is configured. Hidden in v1's fresh-account
+state (honest absence-of-affordance).
+
+### Behaviors
+
+**Unit toggle (sats ↔ BTC).** The ↻ next to the hero unit
+label cycles the whole page's amount displays (hero + activity
+entries). State is shared with the home-page hero — same
+preference key, same component. No per-page divergence.
+
+**Pull-to-refresh.** Standard iOS/Android overscroll gesture
+at scroll position 0 triggers a force-poll. When mid-list, the
+gesture scrolls back to top without triggering refresh. No
+conflict with normal scrolling.
+
+**Tap-to-refresh on the status card.** Tapping anywhere on the
+status card triggers a force-poll. Complementary path for users
+who don't know the pull gesture. On press: dot briefly becomes
+a spinner; on response: dot returns + freshness resets to
+"Updated just now".
+
+**SSE-driven live updates.** `treasury.custodial.ledger_entry_added`
+inserts new entries at the top of the activity feed and updates
+the displayed balance atomically (per iteration A's consistency
+rule — Option A or B from the iteration A scope; the page
+consumes whichever the coding agent picked).
+`treasury.custodial.connection_state_changed` drives the status
+card's dot colour and triggers the connection-error toast on
+transitions to unreachable.
+
+**Connection-error toast.** On transition to unreachable, a
+red-soft toast slides down from below the app bar with title
+"Cannot reach Kraken" + dismiss × + "Try again now" CTA.
+Auto-dismisses after ~5 seconds. Re-appears on each failed
+retry. The page content itself renders normally — only the
+status card's red dot is persistent. The toast is the
+transient action prompt; the dot is the at-rest state.
+
+### Screens
+
+- **Operations tab — populated.** `mobile_account_detail_operations_populated.html`.
+  Default state with non-zero balance, 6+ activity entries.
+  The visual anchor mockup for the iteration; chrome and
+  conventions defined here propagate to all four variants.
+- **Operations tab — empty.** `mobile_account_detail_operations_empty.html`.
+  Fresh-account state: balance zero, no non-BTC row, sober
+  text-only empty-state panel in the activity area.
+- **Settings tab — default state.** `mobile_account_detail_settings.html`.
+  All sections at their fresh-account defaults; six set-up
+  CTAs route to coming-soon stubs (per the deferred-flows
+  list above); Polling Change CTA is real; Danger zone at
+  the bottom.
+- **Remove-confirm modal.** `mobile_account_detail_remove_confirm.html`.
+  Bottom-sheet reached from the Settings tab's Danger-zone
+  Remove. Dimmed Settings-tab silhouette behind. Two-tone red
+  two-button confirm: light-red Cancel (left), `danger`-filled
+  Remove (right). No type-to-confirm — the action is
+  reversible (re-add via the Add Account wizard).
+- **Connection-error toast variant.** `mobile_account_detail_connection_error.html`.
+  Operations tab with a red dot in the status card +
+  slide-in toast at the top + cached activity entries
+  rendered normally. The toast pattern (not a banner)
+  signals transience without painting the page broken.
+
+### Reconcilability gauntlet (per PROCESS.md §3)
+
+1. *Trust boundary.* Page sits on the phone (UI); reads from
+   the backend (cached Account row + ledger entries). Backend
+   talks to the provider (Kraken) over the ccxt adapter. Keys
+   never leave the backend; the page never touches credentials
+   directly.
+2. *Keys and secrets.* Observation credential lives encrypted
+   on TallyKeep (ADR-0011 + ADR-0012). Withdrawal credential,
+   when configured (future iteration), lives the same way. The
+   Settings tab shows only the last-4 chars of the observation
+   key for identification; never the full credential. Replace
+   re-captures the key in a future iteration.
+3. *Self-hosted vs hosted.* Identical from the page's POV.
+   Both backends serve the same SSE topics and REST endpoints;
+   the connection-state dot reflects whichever backend the user
+   is connected to. Hosted-tier privacy notice (per onboarding
+   hosted-welcome) covers the visibility disclosure.
+4. *Confirmation honesty.* Freshness indicator is honest about
+   staleness ("Updated N min ago" updates live, resets on each
+   new event). Balance is the last-known polled value with the
+   staleness signal carried by the freshness indicator and the
+   connection dot. The connection-error toast surfaces transient
+   drops; cached entries stay visible without false confidence
+   that the data is live.
+5. *Browser-only fallback.* Fully functional in the browser
+   build. No Capacitor-only capability exercised. SSE works in
+   the browser; pull-to-refresh is browser-native; the toast
+   and bottom-sheet patterns are CSS+JS only.
+6. *Open-source and reproducibility.* SSE topics consumed
+   (`treasury.custodial.*`, `system.chain.*`) are all defined
+   by the open-source backend (FastAPI + ccxt). Frontend
+   subscribes via standard `EventSource`. No closed-source
+   dependency on the Account-detail path.
+
+### Notes
+
+**Two-tab structure locks across Holding types.** "Operations" and
+"Settings" are the two tabs for all per-Holding detail pages.
+Purse / Strongbox / Vault detail pages (future iterations)
+inherit this shape — same chrome, same tabs, different content
+per type. The card-with-arrow Deposit / Withdraw icons are
+Account-specific; chain-based Holdings have different action sets
+(Receive / Send) and may use different icon metaphors.
+
+**Connection-status dot semantics per Holding type:**
+
+- Account: backend's connection to the provider API
+  (`treasury.custodial.connection_state_changed`).
+- Chain-based Holdings (Purse / Strongbox / Vault): backend's
+  connection to bitcoind (`system.chain.connection_state_changed`).
+
+Same UI affordance, per-Holding-type meaning. Locked.
+
+**Activity feed kind-icons deferred.** Per the 2026-05-17 Step 2
+follow-up, text-only descriptors carry the activity rows. Kraken's
+unified ledger surfaces more kinds than enumerated; committing
+to per-kind icons before iteration B's Operations tab has seen
+the full wild set risks lock-in. Sign-based amount colour does
+the visual lift for now.
+
+**TK-initiated vs external activity distinction deferred.** Per
+`future_iterations.md` "Custodial ledger mirroring posture and
+TK-initiated event linkage". v1 renders all entries identically;
+the visual distinction lands when that arbitration closes.
+
+**Deferred CTAs route to coming-soon stubs.** Withdraw, Deposit,
+Auto-sweep "Add rule", Observation key "Replace", Withdrawal key
+"Set up", Deposit address "Set up" — all six route to a
+parameterized coming-soon screen mirroring
+`mobile_add_holding_coming_soon.html`. Mockup specifies the
+target; implementation gates the routing.
+
+**No type-to-confirm on Forget.** Dropped after the 2026-05-17
+review. The action is genuinely reversible for Account (re-add
+via the Add Account wizard); the friction wasn't earning its
+keep. Two-tone red confirm (light-red Cancel + red Forget)
+carries the are-you-sure.
+
+**"Forget" cross-type vocabulary lock.** The destructive Settings-
+tab action is **"Forget"** across all Holding types — not
+"Remove" or "Delete". Reasoning: TK never custodies user funds
+and never destroys anything outside its own observation
+surface. For most Holding types, Forget literally just means
+"TK loses memory of this Holding". Per type:
+
+- **Account** — TK forgets the API credentials and stops
+  polling. Provider-side account, balance, and history are
+  untouched.
+- **Strongbox** — TK forgets the descriptor and stops chain-
+  scanning these addresses. Hardware-wallet keys + on-chain
+  UTXOs persist.
+- **Vault** — TK forgets the multisig descriptor + cosigner
+  annotations + any sweep rules. Cosigner keys + on-chain
+  funds persist.
+- **Watch-only Purse** — TK forgets the descriptor. Funds on
+  the external wallet persist.
+- **TK-managed Purse (`ON_DEVICE_TK_GENERATED` /
+  `ON_DEVICE_USER_IMPORTED`)** — **the load-bearing exception.**
+  TK forgets the descriptor AND destroys the on-device seed via
+  NativeBridge. If the user hasn't backed up the recovery
+  phrase, the funds become permanently inaccessible. The
+  Purse-detail Forget modal body MUST carry an explicit
+  warning: "If you haven't backed up the recovery phrase,
+  you'll lose access to these funds permanently." This is the
+  only Holding-type case where Forget has material on-chain
+  consequences; the warning is non-negotiable, and the modal
+  body for this case may also include a "Have you backed up?"
+  acknowledgement-style checkbox (final UX call deferred to
+  the Purse-detail iteration).
+
+The "Forget" vocabulary is locked across iteration B (Account
+detail) and inherited by the future Purse / Strongbox / Vault
+detail iterations.
+

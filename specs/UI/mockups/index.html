@@ -205,14 +205,15 @@
   // order. Adding a new group? Add it here in lifecycle position, then
   // reference its id from each new mockup entry's `group` field.
   const GROUPS = [
-    { id: 'onboarding',  label: 'Onboarding' },
-    { id: 'unlock',      label: 'Unlock' },
-    { id: 'home',        label: 'Home' },
-    { id: 'add-holding', label: 'Add holding' },
-    { id: 'account',     label: 'Account wizard' },
-    { id: 'purse',       label: 'Purse wizard' },
-    { id: 'strongbox',   label: 'Strongbox wizard' },
-    { id: 'vault',       label: 'Vault wizard' },
+    { id: 'onboarding',     label: 'Onboarding' },
+    { id: 'unlock',         label: 'Unlock' },
+    { id: 'home',           label: 'Home' },
+    { id: 'add-holding',    label: 'Add holding' },
+    { id: 'account',        label: 'Account wizard' },
+    { id: 'account-detail', label: 'Account detail' },
+    { id: 'purse',          label: 'Purse wizard' },
+    { id: 'strongbox',      label: 'Strongbox wizard' },
+    { id: 'vault',          label: 'Vault wizard' },
   ];
 
   // Mockup index — update when adding or removing files.
@@ -319,11 +320,26 @@
       title: 'Add Account · 1 of 3 — Connect (key has too many permissions)',
       status: 'validated', group: 'account' },
     { file: 'mobile_add_holding_account_02_parseback.html',
-      title: 'Add Account · 2 of 3 — Parse-back (provider + permission + multi-asset)',
+      title: 'Add Account · 2 of 3 — Parse-back (provider + permission + multi-asset + recent activity)',
       status: 'validated', group: 'account' },
     { file: 'mobile_add_holding_account_03_success.html',
       title: 'Add Account · 3 of 3 — Success (balance + capability-gated auto-sweep CTA)',
       status: 'validated', group: 'account' },
+    { file: 'mobile_account_detail_operations_populated.html',
+      title: 'Account detail — Operations tab (populated)',
+      status: 'validated', group: 'account-detail' },
+    { file: 'mobile_account_detail_operations_empty.html',
+      title: 'Account detail — Operations tab (empty / fresh account)',
+      status: 'validated', group: 'account-detail' },
+    { file: 'mobile_account_detail_settings.html',
+      title: 'Account detail — Settings tab (default state)',
+      status: 'validated', group: 'account-detail' },
+    { file: 'mobile_account_detail_remove_confirm.html',
+      title: 'Account detail — Remove (type-to-confirm modal)',
+      status: 'validated', group: 'account-detail' },
+    { file: 'mobile_account_detail_connection_error.html',
+      title: 'Account detail — Operations tab (connection error)',
+      status: 'validated', group: 'account-detail' },
   ];
 
   // Body content area for each mockup (see CSS comment above .preview).
@@ -364,7 +380,6 @@
     for (const e of entries) {
       const iframe = e.target.querySelector('iframe');
       if (iframe) {
-        // Force iframe natural size + scale (defensive — also set in CSS).
         iframe.style.width  = IFRAME_W + 'px';
         iframe.style.height = IFRAME_H + 'px';
         iframe.style.transform = `scale(${e.contentRect.width / IFRAME_W})`;
@@ -408,8 +423,6 @@
       (currentStatus === 'all' || m.status === currentStatus) &&
       (currentGroup  === 'all' || m.group  === currentGroup);
 
-    // Walk GROUPS in lifecycle order so section headers stay ordered
-    // regardless of the source-array order of entries.
     let anyShown = false;
     for (const g of GROUPS) {
       if (currentGroup !== 'all' && currentGroup !== g.id) continue;
@@ -434,8 +447,6 @@
       anyShown = true;
     }
 
-    // Defensive: any mockup pointing at an unknown group id ends up
-    // here so it stays visible (rather than silently disappearing).
     if (currentGroup === 'all') {
       const knownIds = new Set(GROUPS.map(g => g.id));
       const orphans = mockups.filter(m =>

@@ -238,6 +238,19 @@ def archive(session: Session, holding_id: UUID) -> bool:
     return True
 
 
+def delete_row(session: Session, holding_id: UUID) -> bool:
+    """Hard-delete a Holding row. Returns True if a row was deleted.
+
+    Only used for Account holdings removed via the Account-detail Remove flow.
+    All other subtypes use soft-delete (archive).
+    """
+    row = session.get(HoldingRow, holding_id)
+    if row is None:
+        return False
+    session.delete(row)
+    return True
+
+
 def change_type(
     session: Session,
     holding_id: UUID,
@@ -286,6 +299,7 @@ def to_domain(
 __all__ = [
     "archive",
     "change_type",
+    "delete_row",
     "get",
     "insert",
     "list_holdings",

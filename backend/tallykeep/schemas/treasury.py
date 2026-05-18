@@ -44,6 +44,7 @@ class AccountValidateIn(BaseModel):
 class LedgerEntryPreview(BaseModel):
     kind: str
     asset: str
+    amount_sats: int
     timestamp: datetime
 
 
@@ -74,6 +75,34 @@ class CustodialProviderInput(BaseModel):
     api_key: str = Field(..., min_length=1)
     api_secret: str = Field(..., min_length=1)
     api_passphrase: str | None = None
+
+
+class CustodialLedgerEntryOut(BaseModel):
+    id: UUID
+    provider_entry_id: str
+    kind: str
+    asset: str
+    amount_sats: int
+    status: str
+    timestamp: datetime
+
+
+class AccountDetailOut(BaseModel):
+    """Extended sub-object returned on GET /holdings/{id} for Account-type holdings."""
+
+    provider_id: UUID
+    provider_kind: str
+    adapter_id: str
+    display_name: str
+    connection_status: str
+    last_polled_at: datetime | None
+    last_error: str | None
+    last_known_balance_sats: int | None
+    non_btc_balances: dict[str, str]
+    polling_interval_seconds: int
+    observation_key_last_four: str | None
+    ledger_entries: list[CustodialLedgerEntryOut]
+    ledger_has_more: bool
 
 
 class OtherAssetEntry(BaseModel):

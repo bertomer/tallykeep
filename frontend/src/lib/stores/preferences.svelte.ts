@@ -14,14 +14,18 @@
 
 import { preferenceStorage } from '$lib/native-bridge';
 
+type Unit = 'sats' | 'btc';
+
 const PREF_KEYS = {
   principlesPending: 'principles_pending',
+  unit: 'display_unit',
 } as const;
 
 function createPreferences() {
   let principlesAcknowledged = $state(false);
   let biometricEnabled = $state(false);
   let loaded = $state(false);
+  let unit = $state<Unit>('sats');
 
   /**
    * Load preferences.
@@ -45,6 +49,8 @@ function createPreferences() {
 
     const pending = await preferenceStorage.get(PREF_KEYS.principlesPending);
     principlesAcknowledged = pending === 'true';
+    const savedUnit = await preferenceStorage.get(PREF_KEYS.unit);
+    if (savedUnit === 'btc') unit = 'btc';
     loaded = true;
   }
 
@@ -83,14 +89,26 @@ function createPreferences() {
     biometricEnabled = value;
   }
 
+  async function setUnit(value: Unit): Promise<void> {
+    unit = value;
+    await preferenceStorage.set(PREF_KEYS.unit, value);
+  }
+
+  function cycleUnit(): void {
+    setUnit(unit === 'sats' ? 'btc' : 'sats');
+  }
+
   return {
     get principlesAcknowledged() { return principlesAcknowledged; },
     get biometricEnabled() { return biometricEnabled; },
     get loaded() { return loaded; },
+    get unit() { return unit; },
     load,
     acknowledgePrinciples,
     syncToBackend,
     setBiometricEnabled,
+    setUnit,
+    cycleUnit,
   };
 }
 

@@ -56,6 +56,9 @@ class CustodialProvider:
     connection_status: str  # healthy | degraded | unreachable | auth_failed
     consecutive_error_count: int
     ledger_cursor_at: datetime | None
+    polling_interval_seconds: int  # one of {60, 300, 600, 1800, 3600}; default 600
+    observation_key_last_four: str | None  # last 4 chars of read-only API key
+    non_btc_balances: dict[str, str]  # {ticker: amount_str}; updated each poll
     created_at: datetime
     updated_at: datetime
 

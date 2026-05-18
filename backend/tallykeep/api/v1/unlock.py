@@ -3,13 +3,15 @@
 POST /api/v1/unlock                — verify passphrase, unlock the secret store.
 POST /api/v1/unlock/initialize     — first-run setup; both initializes and unlocks.
 
-The lock state and crypto parameters are owned by the SecretStore. These endpoints
-are the only API surface that can transition between locked / unlocked.
+On successful unlock, an immediate poll is dispatched for every active custodial
+provider via the backend's CustodialPollHandler — no interval guard, no event bus.
 """
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException
+import logging
+
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
 
 from tallykeep.api.dependencies import get_secret_store
@@ -20,6 +22,8 @@ from tallykeep.infrastructure.secrets import (
     WrongPassphraseError,
 )
 
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["unlock"])
 
@@ -37,6 +41,15 @@ class InitializeResponse(BaseModel):
     unlocked: bool
 
 
+def _trigger_immediate_polls(request: Request) -> None:
+    handler = getattr(request.app.state, "custodial_poll_handler", None)
+    if handler is not None:
+        try:
+            handler.poll_all_immediately()
+        except Exception:
+            logger.warning("unlock: could not trigger immediate polls", exc_info=True)
+
+
 @router.post(
     "/unlock",
     response_model=UnlockResponse,
@@ -46,17 +59,18 @@ class InitializeResponse(BaseModel):
     },
 )
 async def post_unlock(
+    request: Request,
     body: UnlockRequest,
     store: SecretStore = Depends(get_secret_store),
 ) -> UnlockResponse:
     try:
         store.unlock(body.passphrase)
     except NotInitializedError as exc:
-        # Spec module 04: "503: crypto parameters not initialized (first-run)"
         raise HTTPException(status_code=503, detail=str(exc)) from exc
     except WrongPassphraseError as exc:
-        # Spec module 04: "401: bad passphrase"
         raise HTTPException(status_code=401, detail="Bad passphrase") from exc
+
+    _trigger_immediate_polls(request)
     return UnlockResponse(unlocked=True)
 
 
@@ -68,12 +82,14 @@ async def post_unlock(
     },
 )
 async def post_unlock_initialize(
+    request: Request,
     body: UnlockRequest,
     store: SecretStore = Depends(get_secret_store),
 ) -> InitializeResponse:
     try:
         store.initialize(body.passphrase)
     except AlreadyInitializedError as exc:
-        # Spec module 04: "409: already initialized"
         raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+    _trigger_immediate_polls(request)
     return InitializeResponse(initialized=True, unlocked=True)

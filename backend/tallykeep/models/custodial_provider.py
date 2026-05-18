@@ -9,11 +9,13 @@ from sqlalchemy import (
     BigInteger,
     CheckConstraint,
     ForeignKey,
+    Integer,
     String,
     Text,
     UniqueConstraint,
     text,
 )
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.sql.sqltypes import TIMESTAMP
 
@@ -82,6 +84,15 @@ class CustodialProviderRow(Base):
     )
     ledger_cursor_at: Mapped[datetime | None] = mapped_column(
         TIMESTAMP(timezone=True), nullable=True
+    )
+    polling_interval_seconds: Mapped[int] = mapped_column(
+        Integer, nullable=False, server_default=text("600")
+    )
+    observation_key_last_four: Mapped[str | None] = mapped_column(
+        String(4), nullable=True
+    )
+    non_btc_balances: Mapped[dict] = mapped_column(
+        JSONB, nullable=False, server_default=text("'{}'::jsonb")
     )
     created_at: Mapped[datetime] = mapped_column(
         TIMESTAMP(timezone=True), nullable=False, server_default=text("NOW()")

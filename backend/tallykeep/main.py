@@ -46,7 +46,19 @@ from tallykeep.infrastructure.secrets import (
     EncryptedDatabaseSecretStore,
     SecretStore,
 )
+from tallykeep.workers.subscribers.custodial_poll_handler import CustodialPollHandler
 
+
+# Wire application logger early so tallykeep.* INFO output reaches stdout
+# regardless of which log handler uvicorn or the test runner installs.
+_app_log = logging.getLogger("tallykeep")
+if not _app_log.handlers:
+    _h = logging.StreamHandler()
+    _h.setFormatter(logging.Formatter("%(asctime)s %(levelname)-5s [%(name)s] %(message)s"))
+    _h.setLevel(logging.INFO)
+    _app_log.setLevel(logging.INFO)
+    _app_log.addHandler(_h)
+    _app_log.propagate = False
 
 logger = logging.getLogger(__name__)
 
@@ -111,6 +123,22 @@ async def _lifespan(app: FastAPI):
         else:
             app.state.node_adapter = None
 
+    if not hasattr(app.state, "custodial_poll_handler"):
+        bus = getattr(app.state, "event_bus", None)
+        sf = getattr(app.state, "session_factory", None)
+        store = getattr(app.state, "secret_store", None)
+        if bus is not None and sf is not None and store is not None:
+            handler = CustodialPollHandler(
+                session_factory=sf,
+                secret_store=store,
+                bus=bus,
+            )
+            handler.start()
+            app.state.custodial_poll_handler = handler
+            logger.info("CustodialPollHandler started")
+        else:
+            app.state.custodial_poll_handler = None
+
     yield
 
     # Discard in-memory key on shutdown so a fast restart doesn't leak it via
@@ -140,6 +168,13 @@ async def _lifespan(app: FastAPI):
     if jq is not None:
         try:
             jq.close()
+        except Exception:  # pragma: no cover — best-effort cleanup
+            pass
+
+    poll_handler = getattr(app.state, "custodial_poll_handler", None)
+    if poll_handler is not None:
+        try:
+            poll_handler.stop()
         except Exception:  # pragma: no cover — best-effort cleanup
             pass
 

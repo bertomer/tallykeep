@@ -38,6 +38,9 @@ def _row_to_domain(row: CustodialProviderRow) -> CustodialProvider:
         connection_status=row.connection_status,
         consecutive_error_count=row.consecutive_error_count,
         ledger_cursor_at=row.ledger_cursor_at,
+        polling_interval_seconds=row.polling_interval_seconds,
+        observation_key_last_four=row.observation_key_last_four,
+        non_btc_balances=dict(row.non_btc_balances) if row.non_btc_balances else {},
         created_at=row.created_at,
         updated_at=row.updated_at,
     )
@@ -88,6 +91,9 @@ def create(session: Session, provider: CustodialProvider) -> None:
         last_polled_at=provider.last_polled_at,
         last_error=provider.last_error,
         last_known_balance_sats=provider.last_known_balance_sats,
+        polling_interval_seconds=provider.polling_interval_seconds,
+        observation_key_last_four=provider.observation_key_last_four,
+        non_btc_balances=provider.non_btc_balances,
     )
     session.add(row)
 
@@ -207,3 +213,54 @@ def update_ledger_cursor(
 def get_ledger_cursor(session: Session, provider_id: UUID) -> datetime | None:
     row = session.get(CustodialProviderRow, provider_id)
     return row.ledger_cursor_at if row is not None else None
+
+
+def update_non_btc_balances(
+    session: Session,
+    provider_id: UUID,
+    *,
+    balances: dict[str, str],
+) -> None:
+    row = session.get(CustodialProviderRow, provider_id)
+    if row is not None:
+        row.non_btc_balances = balances
+        row.updated_at = datetime.now(UTC)
+
+
+def update_polling_interval(
+    session: Session,
+    provider_id: UUID,
+    *,
+    interval_seconds: int,
+) -> CustodialProvider | None:
+    row = session.get(CustodialProviderRow, provider_id)
+    if row is None:
+        return None
+    row.polling_interval_seconds = interval_seconds
+    row.updated_at = datetime.now(UTC)
+    return _row_to_domain(row)
+
+
+def update_observation_key_last_four(
+    session: Session,
+    provider_id: UUID,
+    *,
+    last_four: str | None,
+) -> None:
+    row = session.get(CustodialProviderRow, provider_id)
+    if row is not None:
+        row.observation_key_last_four = last_four
+        row.updated_at = datetime.now(UTC)
+
+
+def delete_by_holding_id(session: Session, holding_id: UUID) -> bool:
+    """Delete the custodial_provider row for a holding. Returns True if a row was deleted."""
+    row = session.execute(
+        select(CustodialProviderRow).where(
+            CustodialProviderRow.holding_id == holding_id
+        )
+    ).scalar_one_or_none()
+    if row is None:
+        return False
+    session.delete(row)
+    return True

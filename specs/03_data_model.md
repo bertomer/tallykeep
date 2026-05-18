@@ -181,6 +181,72 @@ CREATE TABLE custodial_provider (
 CREATE INDEX idx_custodial_active ON custodial_provider(is_active);
 ```
 
+### `custodial_ledger_entry`
+
+The on-disk mirror of the provider's ledger feed per ADR-0013. One
+row per provider-side event TallyKeep has observed at any connected
+Account. Upsert key is `(custodial_provider_id, provider_entry_id)` —
+new entries insert, existing entries update in place when the
+provider mutates them.
+
+```sql
+CREATE TABLE custodial_ledger_entry (
+    id UUID PRIMARY KEY,
+    holding_id UUID NOT NULL REFERENCES holding(id),                      -- the Account this entry belongs to
+    custodial_provider_id UUID NOT NULL REFERENCES custodial_provider(id),
+    provider_entry_id VARCHAR(200) NOT NULL,                              -- provider's stable row id; upsert anchor
+    kind VARCHAR(20) NOT NULL CHECK (kind IN ('trade','deposit','withdrawal','transfer','fee','other')),
+    amount_sats BIGINT NOT NULL,                                          -- signed: positive = into Account, negative = out
+    fee_sats BIGINT,                                                      -- when provider reports it
+    timestamp TIMESTAMPTZ NOT NULL,                                       -- provider's event time
+    raw_payload JSONB NOT NULL,                                           -- full provider record, pass-through
+
+    -- TK-initiated event linkage — all nullable. Populated by the
+    -- reconciler subscriber (concerns/sweep_policies.md §5). Pure
+    -- observation when all three stay null.
+    linked_sweep_execution_id UUID REFERENCES sweep_execution(id),
+    linked_counterparty_holding_id UUID REFERENCES holding(id),           -- the TK Holding on the OTHER side of the flow
+    linked_chain_ledger_entry_id UUID REFERENCES ledger_entry(id),
+    reconciled_at TIMESTAMPTZ,                                            -- null = reconciler has not yet attempted matching
+
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE UNIQUE INDEX uq_custodial_ledger_entry_provider_entry
+  ON custodial_ledger_entry(custodial_provider_id, provider_entry_id);
+CREATE INDEX idx_custodial_ledger_entry_holding_time
+  ON custodial_ledger_entry(holding_id, timestamp DESC);
+CREATE INDEX idx_custodial_ledger_entry_unreconciled
+  ON custodial_ledger_entry(holding_id, timestamp)
+  WHERE reconciled_at IS NULL AND kind IN ('deposit','withdrawal');
+CREATE INDEX idx_custodial_ledger_entry_sweep_link
+  ON custodial_ledger_entry(linked_sweep_execution_id)
+  WHERE linked_sweep_execution_id IS NOT NULL;
+```
+
+Notes:
+
+- `kind` values come from `CustodialProviderAdapter.normalize_ledger_entry`,
+  not the provider's raw kind string. The adapter carries the
+  per-provider mapping table; unknown kinds fall through to `other`.
+  The provider's raw kind is always preserved in `raw_payload`.
+- For v1, only BTC entries materialize. Kraken's two-row trade
+  events (one per asset leg, paired by `refid`) emit one row in this
+  table (the BTC leg) with the fiat leg captured inside `raw_payload`.
+  Non-BTC-only events drop at normalization. If `multi-asset-aggregation`
+  (per `pre-implementation.md`) decides the other way later, this
+  table gains an `asset_code` column and the adapter stops dropping;
+  the JSONB pass-through means no provider-side backfill is needed.
+- `linked_counterparty_holding_id` is the TK Holding on the *other*
+  side of a TK-initiated flow, not the Account this entry already
+  belongs to (which is `holding_id`).
+- All three linkage FKs default to ON DELETE RESTRICT (per the
+  file's convention). The Account-detail iteration's hard-delete of
+  this table on Account removal is a deliberate divergence handled
+  by the service-layer deletion logic, not by FK cascade. The
+  Holding-deletion iteration in `future_iterations.md` will revisit.
+
 ### `onchain_transaction`
 
 The blockchain record. Stored once per txid, regardless of how many of our Holdings it touches.

@@ -111,6 +111,13 @@ class WrongExecutionStatus(TreasuryServiceError):
     pass
 
 
+class InvalidPollingInterval(TreasuryServiceError):
+    pass
+
+
+VALID_POLLING_INTERVALS = frozenset({60, 300, 600, 1800, 3600})
+
+
 # --- Safety validator -----------------------------------------------------------
 
 
@@ -233,16 +240,13 @@ def validate_account_credentials(
         btc_balance_sats = 0
         other_balances = {}
 
-    recent_entries: list[CustodialLedgerEntry] = []
-    ledger_total = 0
+    all_entries: list[CustodialLedgerEntry] = []
     try:
         all_entries, _ = adapter.fetch_ledger_since(None)
-        ledger_total = len(all_entries)
-        recent_entries = list(reversed(all_entries[-3:]))
     except Exception:
         pass
 
-    return btc_balance_sats, other_balances, recent_entries, ledger_total
+    return btc_balance_sats, other_balances, all_entries, len(all_entries)
 
 
 def create_account_holding(
@@ -270,7 +274,12 @@ def create_account_holding(
 
     Returns (holding, provider, btc_balance_sats, other_balances).
     """
-    btc_balance_sats, other_balances, _, _ = validate_account_credentials(
+    from tallykeep.models.custodial_ledger_entry import CustodialLedgerEntryRow
+    from tallykeep.repositories import custodial_ledger_entry as cle_repo
+
+    _SATS = 100_000_000
+
+    btc_balance_sats, other_balances, all_entries, _ = validate_account_credentials(
         adapter_id=adapter_id,
         api_key=api_key,
         api_secret=api_secret,
@@ -352,10 +361,41 @@ def create_account_holding(
         connection_status="healthy",
         consecutive_error_count=0,
         ledger_cursor_at=None,
+        polling_interval_seconds=600,
+        observation_key_last_four=api_key[-4:] if len(api_key) >= 4 else api_key,
+        non_btc_balances=other_balances,
         created_at=now,
         updated_at=now,
     )
     cp_repo.create(session, provider)
+    session.flush()
+
+    # Persist all ledger entries fetched during validation so the account detail
+    # page is fully populated the moment creation returns — no async gap.
+    newest_ts: datetime | None = None
+    for entry in all_entries:
+        fee_sats: int | None = None
+        if entry.fee is not None:
+            fee_sats = int(round(entry.fee * _SATS))
+        row = CustodialLedgerEntryRow(
+            id=uuid4(),
+            holding_id=holding_id,
+            custodial_provider_id=provider_id,
+            provider_entry_id=entry.provider_entry_id,
+            kind=entry.kind,
+            asset=entry.asset,
+            amount_sats=int(round(entry.amount * _SATS)),
+            fee_sats=fee_sats,
+            status=entry.status,
+            timestamp=entry.timestamp,
+            raw_payload=entry.raw,
+        )
+        cle_repo.upsert(session, row)
+        if newest_ts is None or entry.timestamp > newest_ts:
+            newest_ts = entry.timestamp
+
+    if newest_ts is not None:
+        cp_repo.update_ledger_cursor(session, provider_id, cursor_at=newest_ts)
 
     return holding, provider, btc_balance_sats, other_balances
 
@@ -444,7 +484,21 @@ def refresh_provider_balance(
     *,
     secret_store: SecretStore,
 ) -> CustodialProvider:
-    """Immediately poll balance and update the provider row."""
+    """Immediately poll balance + ledger entries and update the provider row.
+
+    This is the on-demand path (force-refresh endpoint). It fetches the same
+    data as the worker's CustodialPoller but runs in the backend process so it
+    is always available when the user explicitly requests a refresh.
+
+    The `last_polled_at` timestamp written here is checked by the worker's
+    interval guard, so the two paths do not race: if a force-refresh just ran,
+    the worker will skip its next scheduled cycle for this provider.
+    """
+    from tallykeep.models.custodial_ledger_entry import CustodialLedgerEntryRow
+    from tallykeep.repositories import custodial_ledger_entry as cle_repo
+
+    _SATS = 100_000_000
+
     provider = get_provider(session, provider_id)
     try:
         api_key = secret_store.get_secret(provider.api_credential_reference).decode()
@@ -460,6 +514,9 @@ def refresh_provider_balance(
         adapter = build_adapter(provider.adapter_id, api_key=api_key, api_secret=api_secret,
                                 api_passphrase=api_passphrase)
         balance = adapter.get_balance()
+        other_balances = adapter.get_other_balances()
+        cursor = cp_repo.get_ledger_cursor(session, provider_id)
+        new_entries, newest_ts = adapter.fetch_ledger_since(cursor)
     except ProviderAuthError as exc:
         cp_repo.update_error(session, provider_id,
                              error=str(exc), polled_at=datetime.now(UTC))
@@ -469,8 +526,32 @@ def refresh_provider_balance(
                              error=str(exc), polled_at=datetime.now(UTC))
         raise ProviderConnectionError(str(exc)) from exc
 
-    updated = cp_repo.update_balance(session, provider_id,
-                                     balance_sats=balance, polled_at=datetime.now(UTC))
+    now = datetime.now(UTC)
+    updated = cp_repo.update_balance(session, provider_id, balance_sats=balance, polled_at=now)
+    cp_repo.update_non_btc_balances(session, provider_id, balances=other_balances)
+
+    for entry in new_entries:
+        fee_sats: int | None = None
+        if entry.fee is not None:
+            fee_sats = int(round(entry.fee * _SATS))
+        row = CustodialLedgerEntryRow(
+            id=uuid4(),
+            holding_id=provider.holding_id,
+            custodial_provider_id=provider.id,
+            provider_entry_id=entry.provider_entry_id,
+            kind=entry.kind,
+            asset=entry.asset,
+            amount_sats=int(round(entry.amount * _SATS)),
+            fee_sats=fee_sats,
+            status=entry.status,
+            timestamp=entry.timestamp,
+            raw_payload=entry.raw,
+        )
+        cle_repo.upsert(session, row)
+
+    if newest_ts is not None:
+        cp_repo.update_ledger_cursor(session, provider_id, cursor_at=newest_ts)
+
     return updated or provider
 
 
@@ -501,6 +582,64 @@ def verify_whitelist(
 
     updated = cp_repo.get(session, provider_id)
     return (updated or provider), result.is_whitelisted, result.error
+
+
+def delete_account_holding(
+    session: Session,
+    holding_id: UUID,
+    *,
+    secret_store: SecretStore,
+) -> None:
+    """Delete an Account Holding and its CustodialProvider (cascade + secret cleanup).
+
+    Raises TreasuryServiceError if the holding doesn't exist or isn't an Account type.
+    """
+    holding = holding_service.get_holding(session, holding_id)
+    if holding is None:
+        raise TreasuryServiceError(f"Holding {holding_id} not found")
+    if holding.holding_type != HoldingType.ACCOUNT:
+        raise TreasuryServiceError("Only Account holdings can be deleted via this path")
+
+    provider = cp_repo.get_by_holding_id(session, holding_id)
+    if provider is not None:
+        # Clean up secrets — best-effort, don't fail if already gone.
+        for ref in [
+            provider.api_credential_reference,
+            provider.api_secret_reference,
+            provider.api_passphrase_reference,
+        ]:
+            if ref:
+                try:
+                    secret_store.delete_secret(ref)
+                except (KeyError, Exception):
+                    pass
+        cp_repo.delete_by_holding_id(session, holding_id)
+
+    holding_repo.delete_row(session, holding_id)
+
+
+def update_polling_interval(
+    session: Session,
+    holding_id: UUID,
+    *,
+    interval_seconds: int,
+) -> CustodialProvider:
+    """Update the polling cadence for the Account's CustodialProvider.
+
+    Valid values: {60, 300, 600, 1800, 3600}. Raises InvalidPollingInterval otherwise.
+    """
+    if interval_seconds not in VALID_POLLING_INTERVALS:
+        raise InvalidPollingInterval(
+            f"polling_interval_seconds must be one of "
+            f"{sorted(VALID_POLLING_INTERVALS)}, got {interval_seconds}"
+        )
+    provider = cp_repo.get_by_holding_id(session, holding_id)
+    if provider is None:
+        raise ProviderNotFound(f"No CustodialProvider for holding {holding_id}")
+    updated = cp_repo.update_polling_interval(
+        session, provider.id, interval_seconds=interval_seconds
+    )
+    return updated or provider
 
 
 # --- SweepPolicy CRUD ----------------------------------------------------------
@@ -839,6 +978,8 @@ __all__ = [
     "ProviderConnectionError",
     "PolicyHasUnacknowledgedWarnings",
     "WrongExecutionStatus",
+    "InvalidPollingInterval",
+    "VALID_POLLING_INTERVALS",
     "validate_account_credentials",
     "create_account_holding",
     "get_provider",
@@ -846,6 +987,8 @@ __all__ = [
     "patch_provider",
     "refresh_provider_balance",
     "verify_whitelist",
+    "delete_account_holding",
+    "update_polling_interval",
     "execute_sweep_now",
     "create_sweep_policy",
     "get_sweep_policy",

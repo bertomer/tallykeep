@@ -337,6 +337,98 @@ Rules:
 - `whitelist_address` is the outflow destination bound to the Account's withdrawal credential. It must be derivable from a Descriptor whose Holding is a self-custody Holding (Purse / Strongbox / Vault). Cross-Account whitelisting (Account → another Account) is out of current scope; the natural destination for an outflow is the user's self-custody.
 - The SweepPolicy validator strongly recommends the whitelist destination be an offline-signed Holding (Strongbox or Vault); see SweepPolicy section for the sweep-destination rule.
 
+### CustodialLedgerEntry
+
+The on-disk mirror of a single row in a CustodialProvider's ledger
+feed (deposits, withdrawals, trades, fees, transfers). Per ADR-0013,
+the table is a **mirror** of the provider's feed, not a cache —
+TallyKeep persists what it observes so the Operations tab on the
+Account detail page renders honestly even when the provider is
+unreachable, the user revoked the API key, or the cycle is paused.
+Distinct from `LedgerEntry` (which is the unified, Holding-affecting
+record): a CustodialLedgerEntry is a provider-side row scoped to one
+Account; some CustodialLedgerEntries that correspond to TK-initiated
+flows additionally link to a `LedgerEntry` (the chain-side leg).
+
+```python
+@dataclass
+class CustodialLedgerEntry:
+    id: UUID
+    holding_id: UUID                    # the Account this entry belongs to
+    custodial_provider_id: UUID
+    provider_entry_id: str                 # provider's stable row id; upsert key
+    kind: CustodialLedgerKind
+    amount_sats: int                    # signed: positive = into Account, negative = out
+    fee_sats: int | None                # known when the provider reports it
+    timestamp: datetime                 # provider's event time
+    raw_payload: dict                   # full provider record, JSONB pass-through
+
+    # TK-initiated event linkage — all nullable. Populated by the
+    # reconciler subscriber when the entry matches a pending
+    # sweep_execution. Pure observation when all three stay null.
+    linked_sweep_execution_id: UUID | None
+    linked_counterparty_holding_id: UUID | None  # the TK Holding on the other side of the TK-initiated flow
+    linked_chain_ledger_entry_id: UUID | None    # the chain-side LedgerEntry produced by the on-chain leg
+    reconciled_at: datetime | None      # when the reconciler attempted matching (null = not yet attempted)
+
+    created_at: datetime
+    updated_at: datetime                # last upsert from a poll cycle
+```
+
+```python
+class CustodialLedgerKind(Enum):
+    """
+    Narrow TK enum. Stable across providers; covers the kinds TK
+    models structurally. Provider-specific kinds outside this set
+    normalize to OTHER and remain fully readable via `raw_payload`.
+    """
+    TRADE      = "trade"        # buy or sell on the provider (one entry per BTC leg in v1)
+    DEPOSIT    = "deposit"      # incoming funds at the provider
+    WITHDRAWAL = "withdrawal"   # outgoing funds at the provider
+    TRANSFER   = "transfer"     # sub-account / internal transfer
+    FEE        = "fee"          # provider-side fee not absorbed into another entry
+    OTHER      = "other"        # anything not in the explicit per-adapter mapping (staking, margin, adjustments, dividends, NFT events, ...)
+```
+
+Rules:
+
+- `(custodial_provider_id, provider_entry_id)` is a uniqueness key —
+  it's the upsert anchor on each observation cycle. A new
+  observation that returns a refid already in the table triggers
+  an *update* with `treasury.custodial.ledger_entry_updated`, not
+  an insert; a refid not previously seen triggers an insert with
+  `treasury.custodial.ledger_entry_added`.
+- `kind` is set by the `CustodialProviderAdapter.normalize_ledger_entry`
+  call, which carries a per-provider mapping table from the provider's
+  kinds to the TK enum. The fallback is always `OTHER`; the adapter
+  never raises on an unrecognized kind. The full provider record is
+  preserved in `raw_payload`.
+- For v1, the table is BTC-only. Kraken trades return one ledger row
+  per asset leg (paired by Kraken's `refid`); the adapter emits the
+  BTC leg only and stashes the fiat leg inside `raw_payload`.
+  Non-BTC-only entries (e.g. EUR/USDT trade) are dropped at
+  normalization time. If `multi-asset-aggregation` (per
+  `pre-implementation.md`) decides the other way later, the schema
+  gains an `asset_code` column and the adapter stops dropping; the
+  raw_payload pass-through means no provider-side re-poll is needed.
+- The three linkage FKs are populated by the reconciler subscriber
+  (`concerns/sweep_policies.md §5. Reconciliation`), not by the
+  poller. They stay null when an entry is pure provider-side
+  observation ("the user did this on the provider's site"). Matching
+  criteria are conservative — false positives ("we said TK did this")
+  are a trust break, false negatives are honest.
+- `linked_counterparty_holding_id` is the TK Holding on the *other*
+  side of a TK-initiated flow, not the Account this entry already
+  belongs to. For an outflow (Account → Strongbox), the
+  counterparty is the Strongbox; for an inflow (Purse → Account),
+  the counterparty is the Purse.
+- The current Account-removal cascade (per the Account-detail page
+  iteration) hard-deletes `custodial_ledger_entry` rows along with
+  the Holding. This is a deliberate divergence from the file's
+  default ON DELETE RESTRICT convention; the Holding-deletion
+  iteration in `future_iterations.md` will revisit and likely shift
+  to null-the-back-pointer semantics.
+
 ### LedgerEntry
 
 The user-facing record of a value movement. May be backed by different underlying primitives.
@@ -698,6 +790,12 @@ Descriptor 1──* Address 1──* UTXO
 
 LedgerEntry *──* Holding (via LedgerEntryHoldingLink)
 LedgerEntry  ──→ OnChainTransaction (or LightningPayment, or CustodialEvent)
+
+CustodialLedgerEntry *──1 Holding (the Account it observes)
+                     ──→ CustodialProvider
+                     ┄┄→ SweepExecution      (linked_sweep_execution_id, nullable)
+                     ┄┄→ Holding             (linked_counterparty_holding_id, nullable)
+                     ┄┄→ LedgerEntry         (linked_chain_ledger_entry_id, nullable)
 
 PaymentRequest 1──0..1 LedgerEntry  (resulting_ledger_entry_id)
 Invoice 1──0..1 LedgerEntry         (resulting_ledger_entry_id)

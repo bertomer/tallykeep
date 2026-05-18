@@ -11,13 +11,12 @@
   import { page } from '$app/stores';
   import { goto } from '$app/navigation';
   import { auth, authHeaders } from '$lib/stores/auth.svelte';
+  import { preferences } from '$lib/stores/preferences.svelte';
   import { secureStorage } from '$lib/native-bridge';
   import WordmarkIcony from '$lib/components/WordmarkIcony.svelte';
   import BottomNav from '$lib/components/BottomNav.svelte';
   import Icon from '$lib/components/Icon.svelte';
   import AddHoldingSheet from '$lib/components/AddHoldingSheet.svelte';
-
-  type Unit = 'sats' | 'btc';
 
   interface HoldingSummary {
     holding_id: string;
@@ -34,16 +33,11 @@
     scan_status: string;
   }
 
-  let unit = $state<Unit>('sats');
   let totalSats = $state(0);
   let holdings = $state<HoldingSummary[]>([]);
   let serverUrl = $state('');
 
   let showPicker = $derived($page.url.searchParams.get('sheet') === 'add');
-
-  function cycleUnit() {
-    unit = unit === 'sats' ? 'btc' : 'sats';
-  }
 
   function formatSats(n: number): string {
     return n.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
@@ -108,13 +102,13 @@
       <div class="label-line">Total balance</div>
       <div class="amount-line">
         <span class="amount">
-          {unit === 'sats' ? formatSats(totalSats) : formatBtc(totalSats)}
+          {preferences.unit === 'sats' ? formatSats(totalSats) : formatBtc(totalSats)}
         </span>
         <span class="unit-label">
-          {unit === 'sats' ? 'sats' : 'BTC'}<button
+          {preferences.unit === 'sats' ? 'sats' : 'BTC'}<button
             class="unit-toggle"
             aria-label="Cycle unit: sats / BTC"
-            onclick={cycleUnit}
+            onclick={preferences.cycleUnit}
           >↻</button>
         </span>
       </div>
@@ -145,7 +139,7 @@
               {/if}
             </span>
             <span class="holding-amt">
-              {unit === 'sats' ? formatSats(h.confirmed_sats) : formatBtc(h.confirmed_sats)}<span class="unit">{unit === 'sats' ? 'sats' : 'BTC'}</span>
+              {preferences.unit === 'sats' ? formatSats(h.confirmed_sats) : formatBtc(h.confirmed_sats)}<span class="unit">{preferences.unit === 'sats' ? 'sats' : 'BTC'}</span>
             </span>
           </button></li>
         {/each}

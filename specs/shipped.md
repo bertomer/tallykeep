@@ -14,6 +14,44 @@ commit.
 
 ---
 
+## 2026-05-18 — Account detail page + custodial polling architecture
+
+Five Account detail page screens shipped: Operations (populated + empty state),
+Settings, Forget bottom-sheet modal, and Connection-error toast. The page is
+SSE-driven (balance + ledger entries update in realtime), with a status-card
+connection-state dot, a unit toggle shared with Home, and six coming-soon stub
+routes for deferred sub-flows (Rename, Change polling, Forget → all wired;
+Deposit / Withdraw / Convert → stubs). Tapping a Kraken Account row on Home
+now navigates to `/holding/[id]`.
+
+**Backend — KrakenAdapter normalization fixes:** `receive` and `spend` Kraken
+ledger types now map to `trade` kind (not `deposit`/`withdrawal` — they are
+trade-settlement legs, not on-chain movements). `transaction` type is
+direction-disambiguated: `direction=in` → `deposit`, `direction=out` →
+`withdrawal`. `reward`/`staking` → `other`. Direction-based sign normalization:
+ccxt strips signs from amounts; `direction=out, amount>0` is negated.
+
+**Backend — `CustodialPollHandler` architectural refactor:** collapsed two-poller
+design into a single self-contained handler in the backend process. Handler owns
+its own 15-second scheduler thread (`_run_scheduler` / `_tick`), dispatches poll
+threads directly, and no longer subscribes to any Redis event. The worker's
+`CustodialPoller` and the `system.custodial.poll_requested` event topic are
+retired — handler self-schedules against `polling_interval_seconds` per provider.
+`poll_all_immediately()` called from `POST /api/v1/unlock` bypasses the interval
+guard so data is current immediately after login. `poll_provider_immediately(id)`
+called from `POST /api/v1/holdings/account` after creation so entries are
+present before the user reaches the detail page.
+
+**Backend — ledger entries persisted at account creation:** `create_account_holding`
+now persists all entries returned by `validate_account_credentials` in the same
+DB transaction (upsert via `cle_repo`). Previously these were fetched for the
+wizard preview and discarded, leaving a balance/entries mismatch on the detail page.
+
+Canonical docs touched at closeout: `api/openapi.yaml` (5328 lines),
+`specs/decisions/0013-custodial-ledger-mirror-posture.md` (ADR-0013).
+
+---
+
 ## 2026-05-17 — Account observation scope amendment + ledger polling
 
 ADR-0012 landed end-to-end: the Account credential now requires both Kraken

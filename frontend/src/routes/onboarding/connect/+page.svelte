@@ -12,7 +12,7 @@
 
   // State
   let showManualEntry = $state(false);
-  let serverUrl = $state('');
+  let serverUrl = $state('http://localhost:5173');
   let pairingToken = $state('');
   let errorMessage = $state('');
   let loading = $state(false);

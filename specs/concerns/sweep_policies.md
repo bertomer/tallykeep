@@ -193,16 +193,79 @@ broadcast (non-Account), set `status=ONCHAIN_PENDING` and store
 
 ### 5. Reconciliation
 
-When the chain scanner detects the corresponding incoming
-transaction at the destination (matching by amount and
-approximate timing), it links it. Set
-`sweep_execution.status=COMPLETED`, store `confirmed_txid` and
-`completed_at`.
+Reconciliation closes the loop between three sources of truth: the
+TK domain (the `sweep_execution` row TK wrote at pre-check), the
+provider-side ledger (a `custodial_ledger_entry` row mirrored from
+the provider's feed per ADR-0013), and the chain-side ledger (a
+`LedgerEntry` produced by the chain scanner). Two-sided matching;
+both sides may fire in either order depending on the provider's
+internal queue and on-chain confirmation timing.
 
-Auto-suggest the resulting LedgerEntry's category as
-`CUSTODIAL_WITHDRAWAL` (for Account sources) or
-`INTERNAL_TRANSFER` (for inter-Holding rebalances). User
-confirms.
+**Chain-side matching (was: the only side).** When the chain
+scanner detects the corresponding incoming transaction at the
+destination — matching by destination address (and, for Account
+outflows, the whitelist address) plus amount within tolerance plus
+approximate timing — it links the resulting chain-side `LedgerEntry`
+to the pending `sweep_execution`. Set
+`sweep_execution.status=COMPLETED`, store `confirmed_txid` and
+`completed_at`. Auto-suggest the resulting LedgerEntry's category
+as `CUSTODIAL_WITHDRAWAL` (for Account sources) or
+`INTERNAL_TRANSFER` (for inter-Holding rebalances). User confirms.
+
+**Custodial-side matching (per ADR-0013).** The reconciler
+subscriber listens to `treasury.custodial.ledger_entry_added`. On a
+new entry of `kind=withdrawal` (Account is the source side) or
+`kind=deposit` (Account is the destination side), it attempts to
+match against pending `sweep_execution` rows:
+
+| Direction | Match criteria |
+|---|---|
+| **Outflow** (Account → TK Holding) — incoming `withdrawal` entry on this Account | Same `custodial_provider_id`; sweep_execution status in `(REQUESTED, AWAITING_USER_CONFIRMATION, DISPATCHED)`; amount within tolerance (configurable, default ±provider-reported fee or a small fraction of intended amount); timestamp within window (configurable, default ±N minutes from `sweep_execution.triggered_at`). |
+| **Inflow** (TK Holding → Account) — incoming `deposit` entry on this Account | Same `custodial_provider_id`; sweep_execution status in `(DISPATCHED, ONCHAIN_PENDING)`; amount within tolerance (allowing for on-chain fee deduction); timestamp within window (default wider — provider deposit credits lag on-chain confirmation); **address match** against the Account's pinned `deposit_address` (the provider should not credit a different address, but the check is cheap insurance). |
+
+On match, the reconciler:
+
+- Populates `custodial_ledger_entry.linked_sweep_execution_id`,
+  `linked_counterparty_holding_id` (the other side of the sweep —
+  `destination_holding_id` for an outflow, `source_holding_id` for
+  an inflow), and `linked_chain_ledger_entry_id` (if the chain side
+  has already landed; otherwise null, set later when the chain
+  matcher fires).
+- Sets `custodial_ledger_entry.reconciled_at = NOW()`.
+- For outflows: advances the `sweep_execution` to `DISPATCHED` if
+  not already (the provider just acknowledged), stores the
+  provider's withdrawal id in `provider_withdrawal_id`.
+- For inflows: advances the `sweep_execution` to `COMPLETED` once
+  both sides have linked (chain leg + provider deposit credit).
+
+On no-match within the time window, the reconciler sets
+`reconciled_at = NOW()` with all linkage FKs still null. The entry
+is pure observation — the user did this on the provider's site, not
+through TK. Honest framing; no judgment.
+
+**Conservative matching is locked.** False positives ("TK reports a
+sweep completed, but actually the user did a manual withdrawal at
+the same time for the same amount") are a trust break. False
+negatives just leave a `custodial_ledger_entry` row unlinked, which
+is the same display as a true external action. When the matcher is
+ambiguous between two candidate `sweep_execution` rows, it links to
+neither and flags the entry for the next iteration's "manual
+linkage" UI surface (deferred).
+
+**Three-way coherence.** After both sides have fired, the linkage
+graph for a successful TK-initiated flow is:
+
+```
+sweep_execution ─┬─ custodial_ledger_entry (linked_sweep_execution_id)
+                 └─ chain LedgerEntry      (resulting_ledger_entry_id-style match,
+                                            also reachable via
+                                            custodial_ledger_entry
+                                            .linked_chain_ledger_entry_id)
+```
+
+The Operations tab on the Account detail page can surface this
+linkage visually in a later iteration (per `future_iterations.md`);
+v1 keeps entries text-only and the linkage stays in the data layer.
 
 ### 6. Failure paths
 

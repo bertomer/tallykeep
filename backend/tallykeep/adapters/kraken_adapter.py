@@ -38,6 +38,16 @@ logger = logging.getLogger(__name__)
 _BTC_SATS = 100_000_000
 
 
+def _is_btc_currency(asset: str) -> bool:
+    """True for any Kraken/ccxt code that represents Bitcoin.
+
+    Kraken native: XXBT / XBT.  ccxt unified: BTC.
+    Staking variants append ".S" (e.g. XXBT.S, XBT.S, BTC.S) — still BTC.
+    """
+    base = asset.split(".")[0].upper()
+    return base in ("BTC", "XBT", "XXBT")
+
+
 def _btc_to_sats(btc: float | str | None) -> int:
     if btc is None:
         return 0
@@ -310,22 +320,47 @@ class KrakenAdapter(CustodialProviderAdapter):
         except (ccxt.AuthenticationError, ccxt.ExchangeError) as exc:
             return WhitelistVerification(is_whitelisted=False, error=str(exc))
 
-    _CCXT_KIND_MAP: dict[str, str] = {
+    # Maps Kraken/ccxt kind strings to TK's CustodialLedgerKind enum values.
+    # Unknown kinds fall through to 'other'; the full provider record is always
+    # preserved in raw_payload regardless of the normalised kind.
+    _KIND_MAP: dict[str, str] = {
         "trade": "trade",
         "deposit": "deposit",
         "withdrawal": "withdrawal",
         "fee": "fee",
         "transfer": "transfer",
-        "staking": "staking",
-        "earn": "staking",
         "margin": "trade",
         "rollover": "fee",
+        # Staking / earn variants — Kraken uses "earn" in newer API, "staking" in older.
+        # ccxt may pass either through unchanged.
+        "earn": "reward",
+        "staking": "reward",
+        "reward": "reward",
+        "dividend": "reward",
+        # Kraken trade settlement legs. Kraken emits "receive" for the asset
+        # credited and "spend" for the asset debited in a trade. These are
+        # trade entries, not actual on-chain deposits/withdrawals.
+        "receive": "trade",
+        "spend": "trade",
     }
+
+    def _normalise_kind(self, raw_kind: str, direction: str = "") -> str:
+        if raw_kind == "transaction":
+            return "deposit" if direction == "in" else "withdrawal"
+        return self._KIND_MAP.get(raw_kind, "other")
 
     def fetch_ledger_since(
         self, since: datetime | None
     ) -> tuple[list[CustodialLedgerEntry], datetime | None]:
-        """Fetch Kraken unified ledger entries via ccxt's fetch_ledger."""
+        """Fetch Kraken unified ledger entries via ccxt's fetch_ledger.
+
+        BTC-only v1 surface:
+          - Entries for non-BTC assets are dropped entirely.
+          - Trade entries (Kraken emits one row per asset leg, paired by refid):
+            only the BTC leg is materialised; the fiat/stable leg's raw record is
+            merged into raw_payload under the key "fiat_leg_raw" so nothing is lost.
+          - Unknown kinds map to 'other'.
+        """
         since_ms = int(since.timestamp() * 1000) if since is not None else None
         try:
             raw = self._call(
@@ -335,23 +370,86 @@ class KrakenAdapter(CustodialProviderAdapter):
             logger.warning("KrakenAdapter.fetch_ledger_since: fetch failed; returning empty")
             return [], since
 
+        # Diagnostic: log currency and type breakdown so we can see what ccxt returned.
+        currency_counts: dict[str, int] = {}
+        type_counts: dict[str, int] = {}
+        for item in raw:
+            c = str(item.get("currency") or "")
+            t = str(item.get("type") or "")
+            currency_counts[c] = currency_counts.get(c, 0) + 1
+            type_counts[t] = type_counts.get(t, 0) + 1
+        logger.info(
+            "KrakenAdapter.fetch_ledger_since: %d raw entries, currencies=%s, types=%s",
+            len(raw), currency_counts, type_counts,
+        )
+
+        # Group all items by refid so we can stash fiat trade legs.
+        by_refid: dict[str, list[dict]] = {}
+        for item in raw:
+            refid = str(item.get("referenceId") or item.get("id") or "")
+            by_refid.setdefault(refid, []).append(item)
+
         entries: list[CustodialLedgerEntry] = []
         newest_ts: datetime | None = None
 
+        seen_refids: set[str] = set()
+
         for item in raw:
-            ts = _ts_to_dt(item.get("timestamp"), since or datetime(2020, 1, 1, tzinfo=UTC))
+            refid = str(item.get("referenceId") or item.get("id") or "")
+            asset = str(item.get("currency") or "")
             raw_kind = (item.get("type") or "").lower()
-            kind = self._CCXT_KIND_MAP.get(raw_kind, raw_kind or "transfer")
+            direction = str(item.get("direction") or "")
+            kind = self._normalise_kind(raw_kind, direction)
+
+            # v1: only BTC entries materialise.
+            # Accepts BTC / XBT / XXBT and their staking variants (e.g. XXBT.S).
+            if not _is_btc_currency(asset):
+                continue
+            asset = "BTC"
+
+            # For trade entries paired by refid, deduplicate: only emit once.
+            if kind == "trade" and refid in seen_refids:
+                continue
+            seen_refids.add(refid)
+
+            ts = _ts_to_dt(item.get("timestamp"), since or datetime(2020, 1, 1, tzinfo=UTC))
             amount = float(item.get("amount") or 0.0)
+            # Normalize sign: credits are positive, debits are negative.
+            # Kraken's own API uses signed amounts, but ccxt may normalise to
+            # unsigned + direction="out". Guard against double-negation by only
+            # applying when amount is still positive.
+            if direction == "out" and amount > 0:
+                amount = -amount
+            # ccxt unified ledger fee is a dict {"cost": ..., "currency": ...};
+            # fall back gracefully if it's a plain float or missing.
+            fee_raw = item.get("fee")
+            if isinstance(fee_raw, dict):
+                fee: float | None = float(fee_raw.get("cost") or 0.0) or None
+            elif fee_raw is not None:
+                fee = float(fee_raw)
+            else:
+                fee = None
+
+            # Build enriched raw payload: for trades, stash fiat legs under "fiat_leg_raw".
+            enriched_raw = dict(item)
+            if kind == "trade":
+                fiat_legs = [
+                    leg for leg in by_refid.get(refid, [])
+                    if not _is_btc_currency(str(leg.get("currency") or ""))
+                ]
+                if fiat_legs:
+                    enriched_raw["fiat_leg_raw"] = fiat_legs
+
             entries.append(
                 CustodialLedgerEntry(
-                    provider_entry_id=str(item.get("id") or ""),
+                    provider_entry_id=refid,
                     kind=kind,
-                    asset=str(item.get("currency") or ""),
+                    asset=asset,
                     amount=amount,
+                    fee=fee,
                     status=str(item.get("status") or "success"),
                     timestamp=ts,
-                    raw=dict(item),
+                    raw=enriched_raw,
                 )
             )
             if newest_ts is None or ts > newest_ts:

@@ -382,6 +382,9 @@ class TestCustodialProvider:
                 connection_status="healthy",
                 consecutive_error_count=0,
                 ledger_cursor_at=None,
+                polling_interval_seconds=600,
+                observation_key_last_four=None,
+                non_btc_balances={},
                 created_at=NOW,
                 updated_at=NOW,
             )

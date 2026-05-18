@@ -1,0 +1,653 @@
+<!--
+  Title: Mobile — Account detail · Operations tab (populated)
+  Status: validated  (Rémy greenlight 2026-05-17 closing the Account-detail-page design pass — iteration B mockup set: populated Operations, empty Operations, Settings, Remove confirm, connection-error toast)
+  Date last touched: 2026-05-17
+  Replaces: nothing on disk; first Account-detail mockup. Revised
+            2026-05-17 after first design-review pass with Rémy:
+            unit display matches home convention (single unit +
+            ↻ toggle, no doubled sats/BTC), action-button icons
+            switched to card-with-arrow metaphor for crystal-clear
+            in/out semantics, buttons promoted to light-CTA weight,
+            tab-strip active underline switched to brand verdigris
+            (not Holding-type colour).
+
+  Design notes:
+  - **Page chrome.** App bar with back chevron + account name
+    centered. The provider / connection-status / freshness line
+    lives in a status-card below the app bar (not in the app bar
+    itself) — keeps the app bar reusable across Holding types and
+    gives the status content room to breathe.
+  - **Type-anchor.** Thin limestone stripe on the left edge of the
+    status-card matches the Holdings-list-row convention from the
+    home page: stripe colour identifies the Holding type
+    (limestone for Account, per palette v2 §4). Subtle, not
+    decorative — same accent the user saw on the Holdings row
+    they tapped to land here. The page-type anchor lives in the
+    status card only; downstream chrome (tab strip, action
+    buttons) uses brand verdigris instead so the pattern carries
+    across other Holding-type detail pages without recolouring.
+  - **Connection-status dot.** Three colours: green (healthy),
+    amber (degraded — transient or rate-limited), red (auth failed
+    or unreachable, after the N-consecutive-error threshold). The
+    dot's data source per Holding type:
+      - Account: backend's connection to the provider API
+        (Kraken etc.) — `treasury.custodial.connection_state_changed`
+        SSE topic from iteration A.
+      - Chain-based Holdings (Purse / Strongbox / Vault): backend's
+        connection to bitcoind — `system.chain.connection_state_changed`
+        SSE topic (also from iteration A).
+    Same UI affordance, per-Holding-type meaning. Locked.
+  - **Freshness indicator: "Updated 2 min ago", NOT a refresh
+    button.** The architecture is SSE-driven (per iteration A's
+    consistency rule); the user should never need to manually
+    refresh. The timestamp updates two ways: (a) frontend interval
+    ticks the relative time as it grows ("2 min ago" → "3 min
+    ago" → …), (b) any SSE event from this Account resets the
+    timestamp to the event's `observed_at`. Vocabulary discipline:
+    never "Last polled X ago" in the UI — "polled" is
+    implementation language; the user doesn't care that it's
+    polled.
+  - **Refresh affordances — two complementary paths:**
+      1. **Pull-down-to-refresh** on the whole page (the entire
+         scroll area accepts the gesture, not just the activity
+         list). When the user is at scroll position 0 and pulls
+         further, overscroll triggers a force-poll request to the
+         backend. When mid-list, pull-down just scrolls back to
+         the top — no conflict with normal scrolling. Standard
+         iOS/Android gesture, no chrome at rest.
+      2. **Tap the status card** to force-refresh. Explicit,
+         discoverable, doesn't depend on scroll position. The
+         status card is the natural target because it owns the
+         freshness display. On press, the green dot briefly
+         becomes a spinner; on response, dot returns + freshness
+         resets. No chrome at rest (no refresh icon visible) —
+         the affordance is the whole card.
+  - **Hero — single unit, per home convention.** Big-font BTC
+    balance in the user's active unit (sats default, BTC if the
+    user has flipped the home-page toggle). The small ↻ toggle
+    sits as a superscript next to the unit label and cycles the
+    *whole page* between sats and BTC — same component, same
+    behaviour as the home-page hero. NO simultaneous BTC + sats
+    display anywhere. NO grey fiat-conversion sub-line in this
+    iteration; that line earns its place if/when cross-board
+    fiat conversion lands as a feature.
+  - **Cap-and-overflow non-BTC row.** Same shape as Step 2 of the
+    wizard. List the top 3 currency tickers, then "+ N more".
+    Non-interactive (no tap-to-expand) — tapping a list of 150
+    asset positions has no clear purpose; if/when a price oracle
+    lands we revisit. Hidden entirely if zero non-BTC balances.
+  - **Action row — Deposit + Withdraw, both real, light-CTA
+    weight.** Auto-sweep parked for this iteration (its rules
+    surface in the Settings tab as a section with CTA →
+    coming-soon). Per the feedback_no_dead_capability memory: the
+    mockup specifies the target — both buttons exist and route
+    to their real flows. The *implementation* iteration routes
+    Withdraw and Deposit to coming-soon stubs until their
+    dependent flows ship.
+  - **Action-button icons — card-with-arrow metaphor.** A small
+    rounded rectangle represents the Account (the card); a
+    chevron arrow shows the direction relative to the card:
+    Deposit = arrow going INTO the card (head inside), Withdraw
+    = arrow going OUT of the card (head outside). This sidesteps
+    the vertical-arrow ambiguity (up vs down is read differently
+    by users depending on whether they treat the Account or
+    their own self-custody as the "home"); the in/out semantics
+    are unambiguous regardless of perspective. The chevron is
+    vertical (top of the card) for layout efficiency at 16px;
+    the direction of the head is what carries the meaning.
+  - **Action-button visual weight — light CTA.** Primary-soft
+    background, primary-strong text/icon. Equally weighted
+    (Deposit and Withdraw are siblings in the user's mental
+    model). Heavier than outline-only, lighter than full
+    filled-primary (which would compete with primary CTAs
+    elsewhere in the app).
+  - **Tabs — Operations | Settings.** Two-tab segmented control,
+    swipeable + tap-to-switch. "Operations" is the user-facing
+    word for the activity-feed surface (matches Rémy's banking-
+    app reference vocabulary). "Settings" is the configure-this-
+    Account surface (provider info, keys, sweep rules, deposit
+    address, whitelist, danger zone). The third "Danger" tab was
+    considered and rejected in favour of putting danger-zone at
+    the bottom of Settings (less navigation weight, GitHub /
+    Vercel convention; type-to-confirm prevents misfire).
+  - **Tab strip active-tab underline = brand verdigris.** Not the
+    Holding-type colour. The status-card stripe already identifies
+    the page type (limestone); the tab strip is a generic
+    navigation pattern that needs to read consistently across
+    Account / Purse / Strongbox / Vault detail pages. Using brand
+    verdigris keeps the navigation chrome stable across types.
+  - **Activity feed — text-only descriptors, no kind-icons.** Per
+    the 2026-05-17 Step 2 follow-up decision: Kraken returns
+    more ledger kinds than the obvious three (deposit / trade /
+    withdraw) — there are fees, transfers, stake events, rebates,
+    internal adjustments, kinds we haven't enumerated.
+    Committing to per-kind icons before iteration B has done the
+    full enumeration locks in a vocabulary we might have to
+    redraw. Defer icon design to a follow-up. For now the text
+    descriptor alone ("Deposit · BTC", "Trade · BTC/EUR",
+    "Withdraw · BTC", "Fee · BTC") carries the row.
+  - **Sign-based amount colour.** The visual cue for direction
+    works without icons: positive amounts render in success-text
+    colour, negative in danger-text colour. Neutral kinds render
+    in default text. The convention is universal across kinds —
+    Kraken can surface 50 new kinds tomorrow, each will have a
+    sign (or zero), so the colour rule scales.
+  - **Amounts shown — single unit, matches hero.** Unlike the
+    Step 2 wizard preview (which omits amounts), the Operations
+    tab IS the activity-feed surface: amounts are the
+    substantive content. Each entry shows the amount in whatever
+    unit the user's home preference dictates — sats default, BTC
+    if they've flipped the toggle. The ↻ on the hero applies to
+    the whole page, so the activity feed re-renders in the new
+    unit on toggle. NO simultaneous sats + BTC; NO grey fiat
+    sub-line.
+  - **Activity row meta line.** Below the title row sits the
+    relative-time string ("2h ago", "yesterday", "5d ago"). When
+    the entry is older than ~7 days, format switches to absolute
+    date ("May 10"). Hover/long-press could surface the precise
+    timestamp; coding-agent call.
+  - **Activity feed scrolling.** The visible list is the tail of
+    persisted `custodial_ledger_entry` rows for this Account,
+    most recent first. Lazy-load older entries on scroll. SSE
+    drives live insertion at the top — new entries slide in
+    without requiring a page refresh, per the consistency rule
+    locked in iteration A.
+  - **TK-initiated vs external events distinction.** Deferred —
+    captured in `future_iterations.md` "Custodial ledger
+    mirroring posture and TK-initiated event linkage". This
+    mockup renders all entries identically; the visual
+    distinction lands when that arbitration closes.
+  - **Bottom nav.** Standard 4-item nav, "Home" active because
+    the user is still in the home-section of the app (the detail
+    page is reached from the Holdings list).
+  - **Out of scope for this mockup.** Settings tab (own mockup);
+    empty-state Operations (own mockup); connection-error variant
+    (own mockup); SweepPolicy execution row styling within the
+    activity feed (lives with the SweepPolicy iteration);
+    pull-to-refresh spinner and tap-to-refresh spinner (transient
+    states, no chrome surface).
+
+  Sample data:
+  - Provider: Kraken
+  - Connection: healthy (green dot)
+  - Updated: 2 min ago
+  - BTC balance: 4 231 055 sats (active unit)
+  - Other assets: USDT, ETH, ADA + 9 more
+  - 6 visible ledger entries.
+-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>TallyKeep — Mobile — Account detail · Operations (populated)</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="_shared/tokens.css">
+<link rel="stylesheet" href="_shared/shell.css">
+<style>
+  .phone-screen { background: var(--color-bg); }
+
+  /* ---------- App bar ---------- */
+  .app-bar {
+    height: var(--mobile-app-bar);
+    flex-shrink: 0;
+    display: grid;
+    grid-template-columns: 44px 1fr 44px;
+    align-items: center;
+    padding: 0 var(--space-2);
+    background: var(--color-surface);
+    border-bottom: 1px solid var(--color-border);
+  }
+  .app-bar .back-btn {
+    width: 36px; height: 36px;
+    display: inline-flex; align-items: center; justify-content: center;
+    background: transparent; border: 0;
+    border-radius: var(--radius-md);
+    color: var(--color-text);
+    cursor: pointer;
+    justify-self: start;
+    margin-left: var(--space-2);
+  }
+  .app-bar .back-btn:hover { background: var(--color-bg); }
+  .app-bar .back-btn svg {
+    width: 22px; height: 22px;
+    stroke: currentColor; fill: none;
+    stroke-width: 2; stroke-linecap: round; stroke-linejoin: round;
+  }
+  .app-bar-title {
+    text-align: center;
+    font-size: var(--font-size-base);
+    font-weight: var(--font-weight-semibold);
+    color: var(--color-text);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  /* ---------- Scroll area (whole page pull-to-refresh target) ---------- */
+  .scroll-area {
+    flex: 1;
+    overflow-y: auto;
+  }
+
+  /* ---------- Status card (provider + connection + freshness, tap to refresh) ---------- */
+  /* Reset <button> defaults (text-align center, intrinsic width,
+     system font) so the card matches the original <div> rendering. */
+  .status-card {
+    margin: var(--space-3) var(--space-4) 0;
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-left: 4px solid var(--color-holding-account);
+    border-radius: var(--radius-md);
+    padding: var(--space-3) var(--space-4);
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    cursor: pointer;
+    text-align: left;
+    width: calc(100% - var(--space-4) * 2);
+    font-family: inherit;
+  }
+  .status-card:hover { background: var(--color-surface-raised); }
+  .status-provider {
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-weight-semibold);
+    color: var(--color-text);
+  }
+  .status-line {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-2);
+    font-size: var(--font-size-xs);
+    color: var(--color-text-muted);
+    line-height: 1.4;
+  }
+  .status-sep { color: var(--color-text-dim); }
+  .status-dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    display: inline-block;
+    flex-shrink: 0;
+  }
+  .status-dot--healthy     { background: var(--color-success); }
+  .status-dot--degraded    { background: var(--color-warning); }
+  .status-dot--unreachable { background: var(--color-danger); }
+  .status-state {
+    color: var(--color-text);
+    font-weight: var(--font-weight-medium);
+  }
+
+  /* ---------- Hero (balance + non-BTC summary, single unit per home convention) ---------- */
+  .detail-hero {
+    padding: var(--space-5) var(--space-4) var(--space-3);
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+  }
+  .hero-amount-line {
+    display: flex;
+    align-items: baseline;
+    gap: var(--space-2);
+  }
+  .hero-amount {
+    font-family: var(--font-sans);
+    font-size: 36px;
+    font-weight: var(--font-weight-semibold);
+    color: var(--color-text);
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+  }
+  .hero-unit-label {
+    font-size: var(--font-size-md);
+    color: var(--color-text-muted);
+    font-weight: var(--font-weight-medium);
+    line-height: 1;
+  }
+  .unit-toggle {
+    background: transparent; border: 0;
+    padding: 0 0 0 2px; margin: 0;
+    font-size: 0.7em; vertical-align: super; line-height: 1;
+    color: var(--color-text-muted);
+    cursor: pointer; font-family: inherit;
+  }
+  .hero-other-assets {
+    font-size: var(--font-size-xs);
+    color: var(--color-text-dim);
+    margin-top: var(--space-1);
+  }
+  .hero-other-assets .other-label {
+    color: var(--color-text-muted);
+    margin-right: var(--space-1);
+  }
+
+  /* ---------- Action row (light CTA, card-with-arrow icons) ---------- */
+  .action-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--space-3);
+    padding: var(--space-2) var(--space-4) var(--space-4);
+  }
+  .action-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-2);
+    padding: var(--space-3) var(--space-4);
+    background: var(--color-primary-soft);
+    border: 0;
+    border-radius: var(--radius-md);
+    font-family: inherit;
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-weight-semibold);
+    color: var(--color-primary-strong);
+    cursor: pointer;
+  }
+  .action-btn:hover {
+    /* deeper tint on hover for clear interactive feedback */
+    background: #c9e3d9;
+  }
+  .action-btn svg {
+    width: 18px; height: 18px;
+    stroke: currentColor; fill: none;
+    stroke-width: 2; stroke-linecap: round; stroke-linejoin: round;
+  }
+
+  /* ---------- Tab strip (segmented control, brand-color underline) ---------- */
+  .tab-strip {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    background: var(--color-bg);
+    border-top: 1px solid var(--color-border);
+    border-bottom: 1px solid var(--color-border);
+  }
+  .tab {
+    padding: var(--space-3) 0;
+    background: transparent;
+    border: 0;
+    font-family: inherit;
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-weight-medium);
+    color: var(--color-text-muted);
+    cursor: pointer;
+    position: relative;
+  }
+  .tab:hover { color: var(--color-text); }
+  .tab--active {
+    color: var(--color-text);
+    font-weight: var(--font-weight-semibold);
+  }
+  .tab--active::after {
+    content: '';
+    position: absolute;
+    left: 12%;
+    right: 12%;
+    bottom: -1px;
+    height: 2px;
+    background: var(--color-primary);
+    border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+  }
+
+  /* ---------- Activity list (single-unit amounts, sign-based color) ---------- */
+  .activity-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    background: var(--color-surface);
+  }
+  .activity-entry {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: var(--space-3);
+    padding: var(--space-3) var(--space-4);
+    border-bottom: 1px solid var(--color-border);
+  }
+  .activity-entry:last-child { border-bottom: 0; }
+  .activity-main {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+  }
+  .activity-title {
+    font-size: var(--font-size-sm);
+    color: var(--color-text);
+    font-weight: var(--font-weight-medium);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .activity-time {
+    font-size: var(--font-size-xs);
+    color: var(--color-text-muted);
+  }
+  .activity-amount {
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-weight-semibold);
+    color: var(--color-text);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+    align-self: center;
+    text-align: right;
+  }
+  .activity-amount--positive { color: var(--color-success-text-on-soft); }
+  .activity-amount--negative { color: var(--color-danger-text-on-soft); }
+  .activity-amount .unit {
+    color: var(--color-text-dim);
+    font-size: 10px;
+    margin-left: var(--space-1);
+    font-weight: var(--font-weight-normal);
+  }
+
+  /* ---------- Bottom nav (reused from home) ---------- */
+  .bottom-nav {
+    height: var(--mobile-bottom-nav);
+    flex-shrink: 0;
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    background: var(--color-surface);
+    border-top: 1px solid var(--color-border);
+  }
+  .nav-item {
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    gap: 2px;
+    padding: var(--space-2) 0;
+    font-size: 10px;
+    color: var(--color-text-dim);
+    background: transparent; border: 0; cursor: pointer;
+  }
+  .nav-item .nav-ico {
+    width: 22px; height: 22px;
+    stroke: currentColor; fill: none;
+    stroke-width: 2; stroke-linecap: round; stroke-linejoin: round;
+  }
+  .nav-item.active {
+    color: var(--color-primary-strong);
+    font-weight: var(--font-weight-semibold);
+    position: relative;
+  }
+  .nav-item.active::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 20%;
+    right: 20%;
+    height: 2px;
+    background: var(--color-primary);
+    border-radius: 0 0 var(--radius-sm) var(--radius-sm);
+  }
+  .nav-item.enabled-inactive { color: var(--color-text-muted); }
+  .nav-item.disabled { color: var(--color-text-dim); opacity: 0.4; cursor: not-allowed; }
+</style>
+</head>
+<body>
+
+<div class="mockup-meta">
+  <strong>Mobile — Account detail · Operations (populated)</strong> ·
+  <span class="status-validated">validated</span> ·
+  2026-05-17 · 360×800
+</div>
+
+<div class="phone-frame">
+  <div class="phone-screen">
+
+    <div class="app-bar">
+      <button class="back-btn" aria-label="Back to Holdings">
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <polyline points="15 6 9 12 15 18"/>
+        </svg>
+      </button>
+      <div class="app-bar-title">Kraken account</div>
+      <div></div>
+    </div>
+
+    <div class="scroll-area">
+
+      <!-- Status card (tap-target: tap anywhere to force-refresh) -->
+      <button class="status-card" type="button" aria-label="Account connection status — tap to refresh">
+        <span class="status-provider">Kraken</span>
+        <span class="status-line">
+          <span class="status-dot status-dot--healthy" aria-hidden="true"></span>
+          <span class="status-state">Connected</span>
+          <span class="status-sep">·</span>
+          <span>Updated 2 min ago</span>
+        </span>
+      </button>
+
+      <!-- Hero balance — single unit, ↻ toggle cycles whole page sats ↔ BTC -->
+      <div class="detail-hero">
+        <div class="hero-amount-line">
+          <span class="hero-amount">4 231 055</span>
+          <span class="hero-unit-label">sats<button class="unit-toggle" aria-label="Cycle unit: sats / BTC">↻</button></span>
+        </div>
+        <div class="hero-other-assets">
+          <span class="other-label">Other assets:</span>
+          USDT, ETH, ADA · + 9 more
+        </div>
+      </div>
+
+      <!-- Action row — light-CTA, card-with-arrow icons -->
+      <div class="action-row">
+        <button class="action-btn" type="button" aria-label="Deposit BTC to this Account">
+          <!-- Deposit: arrow goes INTO the card (head inside) -->
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <rect x="4" y="12" width="16" height="9" rx="1.5"/>
+            <line x1="12" y1="3" x2="12" y2="15"/>
+            <polyline points="8 11 12 15 16 11"/>
+          </svg>
+          Deposit
+        </button>
+        <button class="action-btn" type="button" aria-label="Withdraw BTC from this Account">
+          <!-- Withdraw: arrow goes OUT of the card (head outside) -->
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <rect x="4" y="12" width="16" height="9" rx="1.5"/>
+            <line x1="12" y1="15" x2="12" y2="3"/>
+            <polyline points="8 7 12 3 16 7"/>
+          </svg>
+          Withdraw
+        </button>
+      </div>
+
+      <!-- Tab strip -->
+      <div class="tab-strip" role="tablist">
+        <button class="tab tab--active" role="tab" aria-selected="true">Operations</button>
+        <button class="tab" role="tab" aria-selected="false">Settings</button>
+      </div>
+
+      <!-- Activity feed — single unit (matches hero), sign-based color -->
+      <ul class="activity-list" aria-label="Recent activity">
+
+        <li class="activity-entry">
+          <span class="activity-main">
+            <span class="activity-title">Deposit · BTC</span>
+            <span class="activity-time">2h ago</span>
+          </span>
+          <span class="activity-amount activity-amount--positive">+500 000<span class="unit">sats</span></span>
+        </li>
+
+        <li class="activity-entry">
+          <span class="activity-main">
+            <span class="activity-title">Trade · BTC/EUR</span>
+            <span class="activity-time">yesterday</span>
+          </span>
+          <span class="activity-amount activity-amount--positive">+1 200 000<span class="unit">sats</span></span>
+        </li>
+
+        <li class="activity-entry">
+          <span class="activity-main">
+            <span class="activity-title">Withdraw · BTC</span>
+            <span class="activity-time">5d ago</span>
+          </span>
+          <span class="activity-amount activity-amount--negative">−5 000 000<span class="unit">sats</span></span>
+        </li>
+
+        <li class="activity-entry">
+          <span class="activity-main">
+            <span class="activity-title">Fee · BTC</span>
+            <span class="activity-time">5d ago</span>
+          </span>
+          <span class="activity-amount activity-amount--negative">−1 500<span class="unit">sats</span></span>
+        </li>
+
+        <li class="activity-entry">
+          <span class="activity-main">
+            <span class="activity-title">Trade · BTC/EUR</span>
+            <span class="activity-time">May 10</span>
+          </span>
+          <span class="activity-amount activity-amount--positive">+800 000<span class="unit">sats</span></span>
+        </li>
+
+        <li class="activity-entry">
+          <span class="activity-main">
+            <span class="activity-title">Deposit · BTC</span>
+            <span class="activity-time">May 8</span>
+          </span>
+          <span class="activity-amount activity-amount--positive">+2 000 000<span class="unit">sats</span></span>
+        </li>
+
+      </ul>
+
+    </div>
+
+    <!-- Bottom nav -->
+    <div class="bottom-nav">
+      <button class="nav-item active">
+        <svg class="nav-ico" viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M 3 11 L 12 4 L 21 11"/>
+          <polyline points="5 10 5 20 19 20 19 10"/>
+        </svg>
+        Home
+      </button>
+      <button class="nav-item enabled-inactive">
+        <svg class="nav-ico" viewBox="0 0 24 24" aria-hidden="true">
+          <polyline points="4 12 9 17 20 6"/>
+        </svg>
+        Activity
+      </button>
+      <button class="nav-item enabled-inactive">
+        <svg class="nav-ico" viewBox="0 0 24 24" aria-hidden="true">
+          <circle cx="12" cy="12" r="3"/>
+          <path d="M 12 2 L 12 6 M 12 18 L 12 22 M 4 12 L 8 12 M 16 12 L 20 12 M 6.34 6.34 L 8.46 8.46 M 15.54 15.54 L 17.66 17.66 M 6.34 17.66 L 8.46 15.54 M 15.54 8.46 L 17.66 6.34"/>
+        </svg>
+        Settings
+      </button>
+      <button class="nav-item disabled">
+        <svg class="nav-ico" viewBox="0 0 24 24" aria-hidden="true">
+              <circle cx="12" cy="12" r="9"/>
+          <line x1="12" y1="8" x2="12" y2="12"/>
+          <line x1="12" y1="16" x2="12.01" y2="16"/>
+        </svg>
+        Help
+      </button>
+    </div>
+
+  </div>
+</div>
+
+</body>
+</html>

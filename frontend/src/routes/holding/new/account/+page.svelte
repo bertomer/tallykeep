@@ -39,6 +39,7 @@
   interface LedgerEntryPreview {
     kind: string;
     asset: string;
+    amount_sats: number;
     timestamp: string;
   }
 
@@ -628,7 +629,7 @@
     <div class="activity-preview" aria-label="Recent activity from Kraken ledger">
       <div class="activity-head">
         <span class="activity-label">Recent activity</span>
-        <span class="activity-meta">From your ledger</span>
+        <span class="activity-meta">BTC movements only</span>
       </div>
       {#if validateResult.recent_ledger_entries.length === 0}
         <p class="activity-empty">No activity yet — your entries will surface here as they happen on Kraken.</p>
@@ -637,6 +638,9 @@
           {#each validateResult.recent_ledger_entries as entry (entry.timestamp + entry.kind + entry.asset)}
           <li class="activity-entry">
             <span class="activity-title">{formatEntryTitle(entry.kind, entry.asset)}</span>
+            <span class="activity-amount {entry.amount_sats >= 0 ? 'amount--pos' : 'amount--neg'}">
+              {entry.amount_sats >= 0 ? '+' : '−'}{Math.abs(entry.amount_sats).toLocaleString('en-US')} sats
+            </span>
             <span class="activity-time">{formatRelativeTime(entry.timestamp)}</span>
           </li>
           {/each}
@@ -1085,24 +1089,36 @@
     padding: 0;
   }
   .activity-entry {
-    display: flex;
-    justify-content: space-between;
-    align-items: baseline;
-    gap: var(--space-3);
+    display: grid;
+    grid-template-columns: 1fr auto;
+    grid-template-rows: auto auto;
+    gap: 0 var(--space-3);
     padding: var(--space-2) 0;
-    min-width: 0;
   }
   .activity-entry + .activity-entry { border-top: 1px solid var(--color-border); }
   .activity-title {
     font-size: var(--font-size-sm);
     color: var(--color-text);
     font-weight: var(--font-weight-medium);
+    grid-column: 1;
+    grid-row: 1;
   }
+  .activity-amount {
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-weight-semibold);
+    font-variant-numeric: tabular-nums;
+    grid-column: 2;
+    grid-row: 1;
+    text-align: right;
+  }
+  .amount--pos { color: var(--color-success, #22c55e); }
+  .amount--neg { color: var(--color-text-muted); }
   .activity-time {
     font-size: var(--font-size-xs);
     color: var(--color-text-muted);
     font-weight: var(--font-weight-normal);
-    flex-shrink: 0;
+    grid-column: 1;
+    grid-row: 2;
   }
   .activity-overflow {
     margin: var(--space-2) 0 0;

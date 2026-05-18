@@ -1,0 +1,250 @@
+<!--
+  Title: Mobile — Account detail · Forget confirm
+  Status: validated  (Rémy greenlight 2026-05-17 closing the Account-detail-page design pass — iteration B mockup set: populated Operations, empty Operations, Settings, Remove confirm, connection-error toast)
+  Date last touched: 2026-05-17
+  Replaces: nothing on disk. Revised 2026-05-17 after first design
+            review with Rémy. The type-to-confirm input was dropped
+            (too heavy for a reversible action; re-adding this
+            Account is one wizard-run away), replaced with a simple
+            two-button confirm: light-red Cancel + destructive-red
+            Forget. Action verb switched 2026-05-17 from "Remove"
+            to "Forget" — TK never custodies user funds and never
+            destroys anything outside its own observation surface,
+            so "Forget" describes what TK does more honestly than
+            "Remove" or "Delete". Cross-type vocabulary lock: every
+            Holding's Settings tab uses "Forget" as the destructive
+            action verb.
+
+  Design notes:
+  - Bottom-sheet pattern. The modal rises from the bottom of the
+    screen, rounded top corners, dimmed backdrop covering the
+    Settings tab beneath. Standard mobile pattern (Revolut, Wise,
+    N26 destructive confirms all use this). Bottom sheet is more
+    thumb-friendly than a centered dialog and matches iOS/Android
+    native conventions.
+  - Underlying surface dimmed but visible. The Settings tab visible
+    underneath (faded ~40% opacity overlay) preserves context. The
+    user can see they came from a settings page. No full occlusion.
+    Tapping the dimmed area does NOT dismiss the modal (banking-app
+    convention for destructive confirms). Only Cancel or the
+    drag-down gesture dismisses.
+  - Title. "Forget this Account?" — direct question, no softening.
+    The user invoked this; the page acknowledges the intent.
+    "Forget" rather than "Remove" or "Delete" because TK literally
+    just forgets the credentials and stops observing — the user's
+    Kraken account and funds are untouched.
+  - Description. Four short sentences, one idea each, no
+    clause-joining em-dash per the feedback_no_midsentence_emdash
+    rule for user-facing copy.
+      1. What TK does (forget credentials, stop observing).
+      2. What TK does NOT do (touch the provider-side account).
+      3. What the user keeps (funds and history at the provider).
+      4. The reversal path (re-add via the wizard).
+    No "are you sure?" inside the body. The two-button confirm plus
+    the soft-red visual context is the are-you-sure.
+  - No type-to-confirm input. Dropped after the 2026-05-17 review.
+    Reasoning: the action is genuinely reversible. The user can
+    re-add this Account in 3 wizard steps if they misfire.
+    Type-to-confirm is justified when the action destroys
+    unrecoverable data (e.g. wiping a seed backup). Here the data is
+    the API credential (which the user can re-create on Kraken's
+    site if needed) and the cached ledger entries (which Kraken
+    still has). Over-gating a reversible action just adds friction
+    without security gain.
+  - Two-button confirm, both danger-themed.
+      - Cancel: light-red. `danger-soft` background, danger-text-
+        on-soft text, danger-border. Communicates "you're in a
+        delete-decision context" without claiming to BE destructive.
+        Sits to the LEFT (safe-action position per iOS convention).
+      - Forget: destructive red. `danger` filled background, white
+        text. The destructive primary. Sits to the RIGHT
+        (forward-action position).
+    The two-tone red signals "this whole sheet is about the delete
+    decision; one button cancels, one commits". Visual separation
+    comes from the fill / text contrast, not from one button being
+    neutral.
+  - Forget button enabled by default. No input to validate against.
+    The user taps Forget and the destructive-to-TK-state action
+    fires. The visual weight plus the soft-red context is the
+    confirmation surface.
+  - Keyboard handling note for the coding agent. Enter triggers
+    Forget (primary destructive action). Escape (hardware)
+    dismisses (= Cancel).
+  - Per-type body copy. This Account variant says "TallyKeep
+    forgets the API credentials and stops observing this Account".
+    Future detail pages (Strongbox, Vault, watch-only Purse) use
+    parallel copy ("TallyKeep forgets the descriptor and stops
+    scanning the chain for these addresses"). The TK-managed Purse
+    case is the load-bearing exception: TK also destroys the
+    on-device seed via NativeBridge, so the modal body adds an
+    explicit warning — "If you haven't backed up the recovery
+    phrase, you'll lose access to these funds permanently." That
+    Purse-managed warning is the only Holding-type case where
+    Forget has material on-chain consequences. Not in scope for
+    this Account mockup; flagged here for the Purse-detail
+    iteration.
+  - Out of scope for this mockup. Post-forget state (Account
+    vanishes from Home, redirect target) is the coding agent's
+    call; mockup ends at the user tapping Forget. Loading state
+    during the backend call is transient.
+
+  Sample data:
+  - Account name: "Kraken account"
+  - Both buttons enabled at rest
+-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>TallyKeep — Mobile — Account detail · Forget confirm</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="_shared/tokens.css">
+<link rel="stylesheet" href="_shared/shell.css">
+<style>
+  /* .phone-screen keeps shell.css defaults (position: absolute; inset: 0;
+     display: flex; overflow: hidden) — the absolute children below
+     anchor against it natively. */
+  .phone-screen { background: var(--color-bg); }
+
+  .context-shadow {
+    position: absolute; inset: 0;
+    background: var(--color-bg); z-index: 0;
+  }
+  .context-bar {
+    height: var(--mobile-app-bar);
+    background: var(--color-surface);
+    border-bottom: 1px solid var(--color-border);
+    display: flex; align-items: center; justify-content: center;
+    font-size: var(--font-size-base);
+    font-weight: var(--font-weight-semibold);
+    color: var(--color-text-dim);
+  }
+  .context-card {
+    margin: var(--space-3) var(--space-4);
+    height: 56px;
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-left: 4px solid var(--color-holding-account);
+    border-radius: var(--radius-md);
+  }
+  .context-row {
+    margin: var(--space-3) var(--space-4);
+    height: 16px;
+    background: var(--color-text-muted);
+    opacity: 0.15;
+    border-radius: var(--radius-sm);
+  }
+  .context-row.short { width: 40%; }
+  .context-row.medium { width: 60%; }
+  .context-row.tall { height: 60px; }
+
+  .modal-backdrop {
+    position: absolute; inset: 0;
+    background: rgba(0, 0, 0, 0.4);
+    z-index: 1;
+  }
+
+  .modal-sheet {
+    position: absolute;
+    left: 0; right: 0; bottom: 0;
+    background: var(--color-surface);
+    border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+    padding: var(--space-3) var(--space-5) var(--space-5);
+    z-index: 2;
+    box-shadow: 0 -8px 24px rgba(0, 0, 0, 0.18);
+  }
+  .modal-sheet .drag-handle {
+    width: 36px; height: 4px;
+    margin: 0 auto var(--space-4);
+    background: var(--color-border-strong);
+    border-radius: var(--radius-pill);
+  }
+  .modal-title {
+    font-size: var(--font-size-lg);
+    font-weight: var(--font-weight-semibold);
+    color: var(--color-text);
+    margin: 0 0 var(--space-2);
+    line-height: var(--line-height-tight);
+  }
+  .modal-body {
+    font-size: var(--font-size-sm);
+    color: var(--color-text-muted);
+    line-height: var(--line-height-default);
+    margin: 0 0 var(--space-4);
+  }
+
+  .modal-actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--space-3);
+  }
+  .btn {
+    padding: var(--space-3) var(--space-4);
+    border: 0;
+    border-radius: var(--radius-md);
+    font-family: inherit;
+    font-size: var(--font-size-base);
+    font-weight: var(--font-weight-semibold);
+    cursor: pointer;
+  }
+  .btn-cancel {
+    background: var(--color-danger-soft);
+    border: 1px solid var(--color-danger-border);
+    color: var(--color-danger-text-on-soft);
+  }
+  .btn-cancel:hover { background: #ecc5b6; }
+  .btn-danger {
+    background: var(--color-danger);
+    color: #ffffff;
+  }
+  .btn-danger:hover { background: #9b2a14; }
+</style>
+</head>
+<body>
+
+<div class="mockup-meta">
+  <strong>Mobile — Account detail · Forget confirm</strong> ·
+  <span class="status-validated">validated</span> ·
+  2026-05-17 · 360×800
+</div>
+
+<div class="phone-frame">
+  <div class="phone-screen">
+
+    <div class="context-shadow">
+      <div class="context-bar">Kraken account</div>
+      <div class="context-card"></div>
+      <div class="context-row tall"></div>
+      <div class="context-row short"></div>
+      <div class="context-row"></div>
+      <div class="context-row medium"></div>
+      <div class="context-row tall"></div>
+    </div>
+
+    <div class="modal-backdrop"></div>
+
+    <div class="modal-sheet" role="dialog" aria-modal="true" aria-labelledby="forget-title">
+      <div class="drag-handle" aria-hidden="true"></div>
+      <h2 id="forget-title" class="modal-title">Forget this Account?</h2>
+      <p class="modal-body">
+        TallyKeep forgets the API credentials and stops observing
+        this Account. Your account on Kraken itself is unaffected.
+        You keep your funds and history with the provider. You can
+        re-add this Account later by running the Add Account wizard
+        again.
+      </p>
+
+      <div class="modal-actions">
+        <button class="btn btn-cancel" type="button">Cancel</button>
+        <button class="btn btn-danger" type="button">Forget</button>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+</body>
+</html>
