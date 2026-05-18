@@ -311,22 +311,34 @@ Specific API request/response shapes live in `api/openapi.yaml`.
   `runtime_configuration.custodial_polling.interval_seconds`.
 - On demand: refresh endpoint (path in `api/openapi.yaml`).
 
-**Lock-aware lifecycle and catch-up (ADR-0015).** The
-`CustodialPoller` is secret-gated: it cannot run while the
-backend is locked because Account credentials are encrypted at
-rest. The worker's `CustodialPollScheduler` emits ticks
-unconditionally; the poller silently ignores them while paused.
-On `system.unlocked`, the poller transitions to active and runs
-one **immediate catch-up cycle per active Account, in parallel**
-(asyncio gather over the active set). The catch-up cycle is the
-same code path as a heartbeat-driven cycle: it paginates the
-provider's ledger against the persisted cursor from
-`last_polled_at` and upserts new or mutated rows against
-`(custodial_provider_id, provider_entry_id)`. Practical catch-up
-time per Account: hundreds of milliseconds in the common case
-(no missed entries); single-digit seconds after a multi-day
-lock; tens of seconds after a long lock with heavy venue
-activity.
+**Where the cycle runs (ADR-0015, refined by ADR-0016).** One
+custodial poll cycle is a **backend-side** operation. The worker
+orchestrates (a scheduler emits a tick or a one-shot dispatch
+arrives or `system.unlocked` fires); the orchestrator
+(`CustodialPoller` in the worker) issues a
+`POST /api/v1/internal/custodial/{provider_id}/poll-cycle` call
+on the backend; the backend's handler owns the credential
+decryption, the ccxt call to Kraken, the persistence path, and
+the event emission. The worker holds no credential, imports no
+adapter, and does not call Kraken directly. This keeps ccxt and
+the `CustodialProviderAdapter` hierarchy in a single process.
+
+**Lock-aware lifecycle and catch-up.** Account credentials are
+encrypted at rest under the passphrase; the cycle endpoint
+returns `423 Locked` when the backend is locked, and the
+orchestrator silently drops the cycle. The worker's
+`CustodialPollScheduler` emits ticks unconditionally — gating
+happens at the endpoint, not in the orchestrator. On
+`system.unlocked` (topic-only payload, no secret), the
+orchestrator fires **one immediate cycle dispatch per active
+Account, in parallel** via `asyncio.gather`. Each dispatch
+paginates against the persisted cursor from `last_polled_at`
+and upserts new or mutated rows against `(custodial_provider_id,
+provider_entry_id)` — the same code path as a heartbeat-driven
+cycle. Practical catch-up time per Account: hundreds of
+milliseconds in the common case (no missed entries); single-
+digit seconds after a multi-day lock; tens of seconds after a
+long lock with heavy venue activity.
 
 During the catch-up window, `connection_state` reads `degraded`;
 the Account detail page's "Updated N minutes ago" indicator
@@ -337,9 +349,9 @@ stamp carry the UX honestly. On cycle completion,
 catches up.
 
 The chain side has no equivalent catch-up: `ChainListener` runs
-always (descriptors are plaintext), so the on-chain ledger is
-current at unlock time regardless of how long the backend was
-locked.
+always (descriptors are plaintext, no credential needed), so the
+on-chain ledger is current at unlock time regardless of how long
+the backend was locked.
 
 Each cycle fetches BTC balance, other-asset balances (read-only
 display only — never actionable on the provider's side), and new

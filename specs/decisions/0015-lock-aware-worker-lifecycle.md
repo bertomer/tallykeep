@@ -1,10 +1,26 @@
 # ADR-0015 — Lock-aware worker lifecycle
 
 - **Date:** 2026-05
-- **Status:** Accepted
+- **Status:** Accepted; refined by ADR-0016
 - **Decided by:** Rémy
 - **Authored by:** Claude during the polling-architecture cleanup
   brainstorm, May 2026
+
+> **Refinement (ADR-0016).** This ADR's "Decision" section
+> described `CustodialPoller` calling Kraken directly via ccxt
+> from the worker process. The first coding pass against that
+> shape surfaced two latent issues — a passphrase on the bus
+> (to give the worker access to decrypted credentials) and a
+> ccxt / adapter duplication between backend and worker.
+> ADR-0016 corrects the shape: ccxt and `CustodialProviderAdapter`
+> live only in the backend; the worker's `CustodialPoller` is a
+> pure orchestrator that dispatches cycles via
+> `POST /api/v1/internal/custodial/{provider_id}/poll-cycle`.
+> The lifecycle in this ADR (worker always up, secret-gated
+> components, `system.locked` / `system.unlocked` events) is
+> unchanged. What changes is **where** the cycle code runs and
+> **how** the worker dispatches. Read ADR-0016 alongside this
+> one.
 
 ## Context
 

@@ -174,6 +174,24 @@ Each layer protects against a different failure mode:
 - The **event bus** protects coupling. New subscribers attach
   without touching producers.
 
+**Adapter process locality (ADR-0016).** Adapters that require
+**decrypted secrets** to operate — `CustodialProviderAdapter`
+and its concrete subclasses, future `LightningProviderAdapter`
+(when macaroons are encrypted at rest) — live **only in the
+backend process**. The worker does not import them and does not
+hold credentials. Worker components that need a custodial cycle
+or a Lightning RPC dispatch via an **internal-only HTTP route**
+on the backend (path prefix `/api/v1/internal/`, bound to
+`127.0.0.1`); the backend handler runs the adapter call,
+persists, and emits domain events on the bus. The credential
+never leaves the backend's address space.
+
+Credential-free adapters — `NodeAdapter` (bitcoind JSON-RPC),
+`ChainEventAdapter` (bitcoind ZeroMQ) — execute wherever their
+consumer runs. `ChainListener` runs in the worker and uses
+these adapters directly, lock-independent, since descriptors
+are plaintext on disk.
+
 ## Persistence-first for non-losable events
 
 Redis pub/sub is not durable. A subscriber that's down when an
@@ -248,40 +266,57 @@ need a decrypted secret to do their job:
 - `CategorizerSuggester`, `LiveUpdateBridge`, `AuditReconciler` —
   operate on already-persisted data or on the bus itself.
 
-**Secret-gated components** (require decrypted credentials):
+**Secret-gated components** (need a custodial cycle but do not
+hold credentials themselves — they orchestrate, the backend
+executes; see ADR-0016):
 
-- `CustodialPoller` — calls custodial-provider APIs using
-  decrypted credentials.
-- `SweepEngine` outflow path — fires the provider's withdraw API
-  using the withdrawal credential.
-- Future Lightning components consuming encrypted macaroons.
+- `CustodialPoller` — dispatches one custodial poll cycle by
+  calling `POST /api/v1/internal/custodial/{provider_id}/poll-cycle`
+  on the backend. The backend's handler owns ccxt, owns the
+  credential, owns persistence and event emission. The worker
+  component holds no credential and imports no adapter class.
+- `SweepEngine` outflow path — dispatches sweep execution via an
+  internal backend endpoint (sharpened during the SweepPolicy
+  iteration); the backend's handler owns the withdraw API call
+  and the withdrawal credential.
+- Future Lightning components — dispatch via internal endpoints
+  on the same pattern.
 
-Two events under the `system.*` namespace drive the gating:
+The "secret-gated" label is preserved for clarity, but no worker
+component decrypts a secret. Gating happens at the endpoint: if
+the backend is locked, the internal route returns `423`; the
+worker silently drops the cycle. The `system.locked` /
+`system.unlocked` events remain useful as **hints** that drive
+the catch-up burst and avoid wasteful dispatch but are not the
+authoritative source of truth — the endpoint is.
+
+Two events under the `system.*` namespace drive the gating hint:
 
 - `system.locked` — emitted at backend startup before any unlock,
-  and (future) on explicit re-lock. Secret-gated subscribers
-  transition to a paused state; subsequent scheduler ticks are
-  silently ignored.
+  and (future) on explicit re-lock. **Topic-only payload — no
+  passphrase, no flag, no secret.** Secret-gated subscribers
+  short-circuit any pending dispatch and stop scheduling new
+  cycles.
 - `system.unlocked` — emitted by `POST /api/v1/unlock` on
-  successful passphrase validation. Secret-gated subscribers
-  transition to active state and run one **immediate catch-up
-  cycle** before resuming the normal heartbeat-driven schedule.
-  The catch-up cycle is the same code path as a regular cycle,
-  paginated against the persisted cursor from `last_polled_at` —
-  not a special code path.
+  successful passphrase validation. **Topic-only payload.**
+  `CustodialPoller` reacts by firing N parallel
+  `POST .../poll-cycle` calls via `asyncio.gather` — one per
+  active provider, the **immediate catch-up cycle**. Each call
+  paginates against the persisted cursor from `last_polled_at`;
+  the catch-up uses the same backend handler as a heartbeat-
+  driven cycle, not a special code path.
 
 Schedulers (the `*Scheduler` heartbeat emitters) do not consult
-lock state. They emit ticks unconditionally; the readiness gate
-lives at the subscriber. A paused subscriber does not
-meaningfully lose ticks — when it resumes, the immediate
-catch-up cycle subsumes whatever ticks it missed.
+lock state. They emit ticks unconditionally. The orchestrator
+either dispatches and gets `423` (when locked, harmless) or
+dispatches and gets a cycle result (when unlocked).
 
 The unlock endpoint emits `system.unlocked` on the bus and
 returns; it does **not** call any poller in-process. Likewise,
 post-Account-creation immediate polls and manual "Refresh now"
-requests dispatch as one-shot RQ jobs to the worker — the
-endpoint returns 202 with a `job_id`, the cycle runs in the
-worker, events arrive on SSE.
+requests dispatch as one-shot jobs to the worker — the endpoint
+returns 202 with a `job_id`, the worker dispatches the cycle to
+the backend's internal endpoint, events arrive on SSE.
 
 ## Request shape
 
@@ -321,6 +356,14 @@ in `api/openapi.yaml`.
   ADR-0003); the public-ship event hardens it further.
 - CORS — backend accepts requests only from the local frontend
   origin.
+- **Internal-only route prefix `/api/v1/internal/`** (per
+  ADR-0016). Routes under this prefix are loopback-only,
+  consumed by the worker process or other in-stack components;
+  they are not exposed to the frontend or to any external
+  caller. Future hardening (process-local shared token, file-
+  permission gated; CORS denylist) lives in the hosted-tier
+  iteration. In the dev phase, the localhost binding is the
+  boundary like for every other route.
 
 ## Configuration model
 

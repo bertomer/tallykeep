@@ -67,4 +67,5 @@ iteration-done sanity sweep (`PROCESS.md §4.6`) checks it.
 - [0012 — Observation credential carries balance + ledger scopes](0012-observation-scope-expansion.md) — Accepted; supersedes the permission-list section of 0011
 - [0013 — Custodial ledger is mirrored, not cached](0013-custodial-ledger-mirror-posture.md) — Accepted; migrated from `custodial-ledger-mirror-posture` future-iterations entry
 - [0014 — Backlog lives in a folder, not a flat file](0014-backlog-as-folder.md) — Accepted
-- [0015 — Lock-aware worker lifecycle](0015-lock-aware-worker-lifecycle.md) — Accepted
+- [0015 — Lock-aware worker lifecycle](0015-lock-aware-worker-lifecycle.md) — Accepted; refined by 0016
+- [0016 — Custodial-provider ACL lives only in the backend](0016-custodial-acl-backend-only.md) — Accepted
