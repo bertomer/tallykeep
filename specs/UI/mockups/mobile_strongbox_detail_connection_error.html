@@ -1,62 +1,60 @@
 <!--
-  Title: Mobile — Purse detail · Settings tab (WATCH_ONLY)
-  Status: validated  (Rémy greenlight 2026-05-19 closing the Purse-detail-page design pass; 2026-05-20 retrofit adds the descriptor-reveal Copy CTA per the sharpened privacy-first-reveal scope — see Strongbox-detail-page design pass and mobile_strongbox_detail_settings.html for the visual contract of the revealed-with-Copy state)
+  Title: Mobile — Strongbox detail · Operations tab (connection-error toast variant)
+  Status: validated  (Rémy greenlight 2026-05-20 closing the Strongbox-detail-page design pass)
   Date last touched: 2026-05-20
-  Replaces: nothing on disk; sibling to
-            mobile_purse_detail_operations_populated.html.
+  Replaces: nothing on disk; chain-side cross-type analogue of
+            mobile_purse_detail_connection_error.html.
 
   Design notes:
-  - Same chrome as the Operations mockups; below the tab strip,
-    the content area swaps to Settings.
-  - **Settings active tab.** Verdigris underline sits under
-    "Settings".
-  - **Section pattern.** iOS-style cards: uppercase label above
-    each card, value on line 1, description on line 2,
-    right-aligned CTA chip when an action exists.
-  - **Sections, top to bottom (WATCH_ONLY variant):**
-      1. Wallet — info-only "Watch-only" + creation date. No CTA.
-      2. Display name — current name + Rename CTA. Pulled out of
-         Danger zone (Rename is reversible / non-destructive).
-         Cross-type lockstep with Account-detail Settings.
-      3. Descriptor — masked at rest + "Show" CTA. **On the
-         revealed state** (not shown in this masked-state
-         mockup; see mobile_strongbox_detail_settings.html for
-         the cross-type visual contract): full descriptor in
-         a bordered mono card + Hide + **Copy** CTAs.
-         Sharpened 2026-05-20: the no-Copy lock applied to
-         signing material only (recovery phrases, xprv); the
-         prior "no Copy on descriptor" call from the
-         2026-05-19 design pass was an over-application of
-         the privacy-first-reveal rule and is corrected here.
-         Descriptors are public-key data routinely pasted
-         between wallet clients. Sensitive-screen flag still
-         set on reveal (over-the-shoulder privacy).
-      4. Auto-sweep rules — "None" + "Add rule" → coming-soon.
-      5. Instant payments — **capability-gated for WATCH_ONLY**:
-         row visible but greyed, copy "Needs on-device keys ·
-         Lightning needs signing capability. Add the keys to
-         this Purse to enable instant payments." Activate CTA
-         disabled (`aria-disabled`). Cross-client capability
-         gating principle: seed-using affordances follow the
-         same three-state pattern (active on seed-holding
-         device, greyed elsewhere with appropriate
-         explanation).
-      6. Danger zone — **Forget only** (Rename moved to
-         section 2). WATCH_ONLY Forget body branches to:
-         "TallyKeep forgets the descriptor and stops scanning
-         the chain. Funds at your source wallet are
-         unaffected. Any categories you've assigned to this
-         Purse's activity are erased with it."
-  - **No Recovery phrase row** — WATCH_ONLY has no on-device
-    keys; row would be a category error.
-  - **No Upgrade-to-spending entry in Settings** — the natural
-    funnel is Send → Send-blocked screen → "Add the keys".
+  - Same chrome and same connection-error pattern as Purse
+    detail. The substantive difference is none — connection
+    state for Strongbox is also `system.chain.connection_state_changed`
+    (bitcoind RPC/ZMQ health). Per-type lock from the Account-
+    detail iteration: same UI affordance, same chain meaning.
+  - **Two surfaces communicate the error state:**
+      1. **Persistent: red dot in the status card** with
+         "Connection lost · Last seen 12 min ago". Always
+         visible while the issue persists. The status card
+         remains tap-to-retry.
+      2. **Transient: slide-in toast** at the top of the
+         scroll area, just below the app bar. Slides down on
+         the transition into the error state, auto-dismisses
+         after ~5 seconds, slides back down on each failed
+         retry attempt, manual dismiss via the ×.
+  - **Page content stays normal.** Cached chain-side ledger
+    entries render with no muting; the user can browse the
+    last-known state.
+  - **Hero shows last-known balance.** The status card's
+    "Last seen 12 min ago" carries the freshness signal.
+  - **Action row stays visible.** Send and Receive remain
+    active visually (both route to coming-soon stubs in this
+    iteration regardless, so chain reachability doesn't
+    change their behaviour today; when Send + Receive ship,
+    Receive doesn't need chain reachability for address
+    derivation, and Send surfaces the chain-error in its own
+    sub-flow).
+  - **Toast anatomy.** Same as Purse detail.
+      - Compact card: `danger-soft` background, `danger-border`,
+        light shadow.
+      - Title row: "Cannot reach the Bitcoin network" + close ×.
+      - Action row: "Try again now" CTA inline.
+  - **Animation note (coding agent).** Toast slides DOWN from
+    above the app bar on appearance, UP to dismiss. ~250ms
+    transform transition.
+
+  Sample data:
+  - Display name: "Cold storage"
+  - signing_device_label: "Coldcard Mk4 in safe"
+  - Connection: unreachable (red dot)
+  - Last seen: 12 min ago
+  - Balance: 5 480 000 sats (last-known)
+  - Toast visible at top.
 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>TallyKeep — Mobile — Purse detail · Settings (Watch-only)</title>
+<title>TallyKeep — Mobile — Strongbox detail · Operations (connection error)</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -75,6 +73,8 @@
     padding: 0 var(--space-2);
     background: var(--color-surface);
     border-bottom: 1px solid var(--color-border);
+    position: relative;
+    z-index: 2;
   }
   .app-bar .back-btn {
     width: 36px; height: 36px;
@@ -102,13 +102,63 @@
     white-space: nowrap;
   }
 
-  .scroll-area { flex: 1; overflow-y: auto; padding-bottom: var(--space-5); }
+  .scroll-area { flex: 1; overflow-y: auto; position: relative; }
+
+  .connection-toast {
+    margin: var(--space-3) var(--space-4) 0;
+    background: var(--color-danger-soft);
+    border: 1px solid var(--color-danger-border);
+    border-radius: var(--radius-md);
+    padding: var(--space-3) var(--space-4);
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+    box-shadow: var(--shadow-sm);
+  }
+  .toast-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-2);
+  }
+  .toast-title {
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-weight-semibold);
+    color: var(--color-danger-text-on-soft);
+  }
+  .toast-close {
+    background: transparent; border: 0; padding: 0;
+    width: 24px; height: 24px;
+    display: inline-flex; align-items: center; justify-content: center;
+    color: var(--color-danger-text-on-soft);
+    cursor: pointer;
+    border-radius: var(--radius-sm);
+  }
+  .toast-close:hover { background: rgba(0,0,0,0.05); }
+  .toast-close svg {
+    width: 14px; height: 14px;
+    stroke: currentColor; fill: none;
+    stroke-width: 2; stroke-linecap: round; stroke-linejoin: round;
+  }
+  .toast-retry {
+    align-self: flex-start;
+    background: var(--color-surface);
+    border: 1px solid var(--color-danger-border);
+    border-radius: var(--radius-pill);
+    padding: var(--space-1) var(--space-3);
+    font-family: inherit;
+    font-size: var(--font-size-xs);
+    font-weight: var(--font-weight-semibold);
+    color: var(--color-danger-text-on-soft);
+    cursor: pointer;
+  }
+  .toast-retry:hover { background: var(--color-danger-soft); }
 
   .status-card {
     margin: var(--space-3) var(--space-4) 0;
     background: var(--color-surface);
     border: 1px solid var(--color-border);
-    border-left: 4px solid var(--color-holding-purse);
+    border-left: 4px solid var(--color-holding-strongbox);
     border-radius: var(--radius-md);
     padding: var(--space-3) var(--space-4);
     display: flex;
@@ -135,7 +185,7 @@
   }
   .status-sep { color: var(--color-text-dim); }
   .status-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; flex-shrink: 0; }
-  .status-dot--healthy { background: var(--color-success); }
+  .status-dot--unreachable { background: var(--color-danger); }
   .status-state { color: var(--color-text); font-weight: var(--font-weight-medium); }
 
   .detail-hero {
@@ -230,91 +280,54 @@
     border-radius: var(--radius-sm) var(--radius-sm) 0 0;
   }
 
-  .settings-label {
-    margin: var(--space-4) var(--space-5) var(--space-2);
-    font-size: var(--font-size-xs);
-    color: var(--color-text-muted);
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-    font-weight: var(--font-weight-semibold);
-  }
-  .settings-label--danger { color: var(--color-danger); }
-
-  .settings-card {
-    margin: 0 var(--space-4);
+  .activity-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
     background: var(--color-surface);
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius-md);
-    padding: var(--space-3) var(--space-4);
   }
-  .settings-card + .settings-label { margin-top: var(--space-5); }
-
-  .settings-row {
+  .activity-entry {
     display: grid;
     grid-template-columns: 1fr auto;
-    align-items: center;
     gap: var(--space-3);
-    padding: var(--space-2) 0;
+    padding: var(--space-3) var(--space-4);
+    border-bottom: 1px solid var(--color-border);
   }
-  .settings-row + .settings-row { border-top: 1px solid var(--color-border); }
-
-  .settings-body { min-width: 0; }
-  .settings-value {
+  .activity-entry:last-child { border-bottom: 0; }
+  .activity-main {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+  }
+  .activity-title {
     font-size: var(--font-size-sm);
     color: var(--color-text);
     font-weight: var(--font-weight-medium);
-  }
-  .settings-value--not-configured {
-    color: var(--color-text-muted);
-    font-style: italic;
-  }
-  .settings-value--mono {
-    font-family: var(--font-mono);
-    letter-spacing: 0.04em;
-  }
-  .settings-meta {
-    font-size: var(--font-size-xs);
-    color: var(--color-text-dim);
-    margin-top: 2px;
-    line-height: var(--line-height-default);
-  }
-
-  .settings-cta {
-    background: transparent;
-    border: 1px solid var(--color-border-strong);
-    border-radius: var(--radius-pill);
-    padding: var(--space-1) var(--space-3);
-    font-family: inherit;
-    font-size: var(--font-size-xs);
-    font-weight: var(--font-weight-semibold);
-    color: var(--color-text);
-    cursor: pointer;
-    flex-shrink: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
     white-space: nowrap;
   }
-  .settings-cta:hover { background: var(--color-bg); }
-  .settings-cta--danger {
-    color: var(--color-danger);
-    border-color: var(--color-danger-border);
+  .activity-time {
+    font-size: var(--font-size-xs);
+    color: var(--color-text-muted);
   }
-  .settings-cta--danger:hover {
-    background: var(--color-danger-soft);
+  .activity-amount {
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-weight-semibold);
+    color: var(--color-text);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+    align-self: center;
+    text-align: right;
   }
-  .settings-cta--disabled {
+  .activity-amount--positive { color: var(--color-success-text-on-soft); }
+  .activity-amount--negative { color: var(--color-danger-text-on-soft); }
+  .activity-amount .unit {
     color: var(--color-text-dim);
-    border-color: var(--color-border);
-    cursor: help;
-  }
-  .settings-cta--disabled:hover {
-    background: var(--color-bg);
-  }
-
-  .settings-row--gated .settings-value,
-  .settings-row--gated .settings-meta {
-    color: var(--color-text-dim);
-  }
-  .settings-row--gated .settings-value--not-configured {
-    color: var(--color-text-dim);
+    font-size: 10px;
+    margin-left: var(--space-1);
+    font-weight: var(--font-weight-normal);
   }
 
   .bottom-nav {
@@ -361,9 +374,9 @@
 <body>
 
 <div class="mockup-meta">
-  <strong>Mobile — Purse detail · Settings (Watch-only)</strong> ·
+  <strong>Mobile — Strongbox detail · Operations (connection error · toast)</strong> ·
   <span class="status-validated">validated</span> ·
-  2026-05-19 · 360×800
+  2026-05-20 · 360×800
 </div>
 
 <div class="phone-frame">
@@ -375,25 +388,40 @@
           <polyline points="15 6 9 12 15 18"/>
         </svg>
       </button>
-      <div class="app-bar-title">Phoenix backup</div>
+      <div class="app-bar-title">Cold storage</div>
       <div></div>
     </div>
 
     <div class="scroll-area">
 
-      <button class="status-card" type="button" aria-label="Wallet connection status — tap to refresh">
-        <span class="status-mode">Watch-only</span>
+      <!-- Slide-in toast -->
+      <div class="connection-toast" role="alert">
+        <div class="toast-row">
+          <span class="toast-title">Cannot reach the Bitcoin network</span>
+          <button class="toast-close" type="button" aria-label="Dismiss">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <line x1="6" y1="6" x2="18" y2="18"/>
+              <line x1="18" y1="6" x2="6" y2="18"/>
+            </svg>
+          </button>
+        </div>
+        <button class="toast-retry" type="button">Try again now</button>
+      </div>
+
+      <!-- Status card (red dot, persistent) -->
+      <button class="status-card" type="button" aria-label="Wallet connection status — tap to retry">
+        <span class="status-mode">Coldcard Mk4 in safe</span>
         <span class="status-line">
-          <span class="status-dot status-dot--healthy" aria-hidden="true"></span>
-          <span class="status-state">Connected</span>
+          <span class="status-dot status-dot--unreachable" aria-hidden="true"></span>
+          <span class="status-state">Connection lost</span>
           <span class="status-sep">·</span>
-          <span>Updated 4 min ago</span>
+          <span>Last seen 12 min ago</span>
         </span>
       </button>
 
       <div class="detail-hero">
         <div class="hero-amount-line">
-          <span class="hero-amount">425 000</span>
+          <span class="hero-amount">5 480 000</span>
           <span class="hero-unit-label">sats<button class="unit-toggle" aria-label="Cycle unit: sats / BTC">↻</button></span>
         </div>
       </div>
@@ -420,80 +448,54 @@
       </div>
 
       <div class="tab-strip" role="tablist">
-        <button class="tab" role="tab" aria-selected="false">Operations</button>
-        <button class="tab tab--active" role="tab" aria-selected="true">Settings</button>
+        <button class="tab tab--active" role="tab" aria-selected="true">Operations</button>
+        <button class="tab" role="tab" aria-selected="false">Settings</button>
       </div>
 
-      <!-- Wallet -->
-      <div class="settings-label">Wallet</div>
-      <div class="settings-card">
-        <div class="settings-row">
-          <div class="settings-body">
-            <div class="settings-value">Watch-only</div>
-            <div class="settings-meta">Imported from descriptor on May 14, 2026. TallyKeep doesn't hold the keys for this Purse.</div>
-          </div>
-        </div>
-      </div>
+      <!-- Cached activity feed -->
+      <ul class="activity-list" aria-label="Recent activity">
 
-      <!-- Display name -->
-      <div class="settings-label">Display name</div>
-      <div class="settings-card">
-        <div class="settings-row">
-          <div class="settings-body">
-            <div class="settings-value">Phoenix backup</div>
-            <div class="settings-meta">How this Purse appears across TallyKeep.</div>
-          </div>
-          <button class="settings-cta" type="button">Rename</button>
-        </div>
-      </div>
+        <li class="activity-entry">
+          <span class="activity-main">
+            <span class="activity-title">Received · BTC</span>
+            <span class="activity-time">2d ago</span>
+          </span>
+          <span class="activity-amount activity-amount--positive">+1 200 000<span class="unit">sats</span></span>
+        </li>
 
-      <!-- Descriptor -->
-      <div class="settings-label">Descriptor</div>
-      <div class="settings-card">
-        <div class="settings-row">
-          <div class="settings-body">
-            <div class="settings-value settings-value--mono">•••• AbCdEf</div>
-            <div class="settings-meta">The public-key descriptor TallyKeep watches on the chain.</div>
-          </div>
-          <button class="settings-cta" type="button">Show</button>
-        </div>
-      </div>
+        <li class="activity-entry">
+          <span class="activity-main">
+            <span class="activity-title">Received · BTC</span>
+            <span class="activity-time">May 12</span>
+          </span>
+          <span class="activity-amount activity-amount--positive">+850 000<span class="unit">sats</span></span>
+        </li>
 
-      <!-- Auto-sweep rules -->
-      <div class="settings-label">Auto-sweep rules</div>
-      <div class="settings-card">
-        <div class="settings-row">
-          <div class="settings-body">
-            <div class="settings-value settings-value--not-configured">None</div>
-            <div class="settings-meta">Move BTC out of this Purse automatically on a schedule or threshold.</div>
-          </div>
-          <button class="settings-cta" type="button">Add rule</button>
-        </div>
-      </div>
+        <li class="activity-entry">
+          <span class="activity-main">
+            <span class="activity-title">Received · BTC</span>
+            <span class="activity-time">May 3</span>
+          </span>
+          <span class="activity-amount activity-amount--positive">+1 100 000<span class="unit">sats</span></span>
+        </li>
 
-      <!-- Instant payments — capability-gated for WATCH_ONLY -->
-      <div class="settings-label">Instant payments</div>
-      <div class="settings-card">
-        <div class="settings-row settings-row--gated">
-          <div class="settings-body">
-            <div class="settings-value settings-value--not-configured">Needs on-device keys</div>
-            <div class="settings-meta">Lightning needs signing capability. Add the keys to this Purse to enable instant payments.</div>
-          </div>
-          <button class="settings-cta settings-cta--disabled" type="button" aria-disabled="true">Activate</button>
-        </div>
-      </div>
+        <li class="activity-entry">
+          <span class="activity-main">
+            <span class="activity-title">Sent · BTC</span>
+            <span class="activity-time">Apr 26</span>
+          </span>
+          <span class="activity-amount activity-amount--negative">−2 000 000<span class="unit">sats</span></span>
+        </li>
 
-      <!-- Danger zone — Forget only -->
-      <div class="settings-label settings-label--danger">Danger zone</div>
-      <div class="settings-card">
-        <div class="settings-row">
-          <div class="settings-body">
-            <div class="settings-value">Forget this Purse</div>
-            <div class="settings-meta">TallyKeep forgets the descriptor and stops scanning the chain. Funds at your source wallet are unaffected. Any categories you've assigned to this Purse's activity are erased with it.</div>
-          </div>
-          <button class="settings-cta settings-cta--danger" type="button">Forget</button>
-        </div>
-      </div>
+        <li class="activity-entry">
+          <span class="activity-main">
+            <span class="activity-title">Received · BTC</span>
+            <span class="activity-time">Apr 19</span>
+          </span>
+          <span class="activity-amount activity-amount--positive">+960 000<span class="unit">sats</span></span>
+        </li>
+
+      </ul>
 
     </div>
 

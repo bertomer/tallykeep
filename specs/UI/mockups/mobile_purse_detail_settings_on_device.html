@@ -1,7 +1,7 @@
 <!--
   Title: Mobile — Purse detail · Settings tab (ON_DEVICE_TK_GENERATED)
-  Status: validated  (Rémy greenlight 2026-05-19 closing the Purse-detail-page design pass)
-  Date last touched: 2026-05-19
+  Status: validated  (Rémy greenlight 2026-05-19 closing the Purse-detail-page design pass; 2026-05-20 retrofit adds the descriptor-reveal Copy CTA per the sharpened privacy-first-reveal scope — see Strongbox-detail-page design pass and mobile_strongbox_detail_settings.html for the visual contract of the revealed-with-Copy state)
+  Date last touched: 2026-05-20
   Replaces: nothing on disk; sibling to
             mobile_purse_detail_settings_watch_only.html.
 
@@ -13,7 +13,13 @@
       2. Display name — current name + Rename CTA. Pulled out
          of Danger zone (cross-type lockstep).
       3. Descriptor — same masked-with-reveal pattern as
-         the watch-only variant.
+         the watch-only variant; 2026-05-20 retrofit adds a
+         **Copy** CTA on the revealed state. See
+         mobile_strongbox_detail_settings.html for the
+         cross-type visual contract of the
+         revealed-with-Copy state. Descriptors are public-key
+         data; the privacy-first-reveal rule applies to
+         signing material only.
       4. Recovery phrase — simple settings card in this
          iteration ("View recovery phrase" + "View" CTA →
          coming-soon stub). The wizard-style reveal tile

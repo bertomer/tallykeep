@@ -42,7 +42,7 @@ stays on this path. The split between "server unlock" and "phone auth" was an ab
 with no real-world caller; collapsing it fixed the `-KeepDb` restart flow where the server
 started locked and the phone had no working path to unlock it.
 
-**Dev tooling:** `dev-reset.ps1` / `dev-reset.sh` gain `-KeepDb` / `--keep-db` (wipes
+**Dev tooling:** the dev-reset.ps1 / dev-reset.sh scripts gain `-KeepDb` / `--keep-db` (wipes
 Redis + bitcoind, preserves postgres) and `-ResetPassphrase` / `--reset-passphrase`
 (clears crypto_parameters + canary so the store can be re-initialized without a full
 wipe). The `purse_mode` case mismatch fixed: backend enum values are lowercase

@@ -1,0 +1,227 @@
+<!--
+  Title: Mobile — Strongbox detail · Forget confirm
+  Status: validated  (Rémy greenlight 2026-05-20 closing the Strongbox-detail-page design pass)
+  Date last touched: 2026-05-20
+  Replaces: nothing on disk; Strongbox-type variant of the
+            Forget modal pattern locked in the Purse-detail
+            iteration (mobile_purse_detail_forget_confirm.html).
+
+  Design notes:
+  - Bottom-sheet pattern, same chrome as the Purse / Account
+    forget modals. Dimmed Settings tab silhouette behind, drag
+    handle, title, body, two-button confirm.
+  - **5-second fill-bar timer on the Forget button.** Cross-type
+    lock from the Purse-detail iteration. Identical visual
+    treatment: button disabled with a countdown label
+    ("Forget · 5" through "Forget · 1") and a fill-bar that
+    sweeps background-position from `danger-soft` to full
+    `danger` over 5 seconds. Cancel is active throughout.
+  - **No load-bearing warning panel above the body.** This is
+    the substantive difference vs the ON_DEVICE_* Purse Forget
+    modal: there's no seed on the TallyKeep side to destroy,
+    so the seed-backup warning has no analogue. The user's
+    keys live on the hardware wallet and remain there.
+  - **Forget operationally** for a Strongbox:
+      1. Backend Forget call deletes the descriptor row and
+         related chain-side state.
+      2. User returns to Home; the Strongbox row is gone.
+    No `NativeBridge.secureStorage.delete` call — Strongbox
+    never had a secureStorage entry.
+  - **Tapping the backdrop does NOT dismiss.** Banking-app
+    convention. Only Cancel or the drag-down gesture dismisses.
+  - **Keyboard handling.** Enter triggers Forget only when the
+    button is enabled (after countdown). Escape always
+    dismisses = Cancel.
+  - **Sample state shown:** mid-countdown ("Forget · 3"),
+    button disabled. Cancel always available.
+  - **Title.** "Forget this Strongbox?" — direct question,
+    same noun-substitution shape as the Purse variant.
+  - **Body copy** (three short sentences, no clause-joining
+    em-dash):
+      (1) What TK does (forgets descriptor, stops scanning);
+      (2) what this does NOT do (hardware wallet and keys
+          unaffected);
+      (3) categorization loss (user-assigned categories on
+          this Strongbox's chain-side ledger entries are
+          erased — applies same as Purse).
+-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>TallyKeep — Mobile — Strongbox detail · Forget confirm</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="_shared/tokens.css">
+<link rel="stylesheet" href="_shared/shell.css">
+<style>
+  .phone-screen { background: var(--color-bg); }
+
+  .context-shadow {
+    position: absolute; inset: 0;
+    background: var(--color-bg); z-index: 0;
+  }
+  .context-bar {
+    height: var(--mobile-app-bar);
+    background: var(--color-surface);
+    border-bottom: 1px solid var(--color-border);
+    display: flex; align-items: center; justify-content: center;
+    font-size: var(--font-size-base);
+    font-weight: var(--font-weight-semibold);
+    color: var(--color-text-dim);
+  }
+  .context-card {
+    margin: var(--space-3) var(--space-4);
+    height: 56px;
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-left: 4px solid var(--color-holding-strongbox);
+    border-radius: var(--radius-md);
+  }
+  .context-row {
+    margin: var(--space-3) var(--space-4);
+    height: 16px;
+    background: var(--color-text-muted);
+    opacity: 0.15;
+    border-radius: var(--radius-sm);
+  }
+  .context-row.short  { width: 40%; }
+  .context-row.medium { width: 60%; }
+  .context-row.tall   { height: 60px; }
+
+  .modal-backdrop {
+    position: absolute; inset: 0;
+    background: rgba(0, 0, 0, 0.4);
+    z-index: 1;
+  }
+
+  .modal-sheet {
+    position: absolute;
+    left: 0; right: 0; bottom: 0;
+    background: var(--color-surface);
+    border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+    padding: var(--space-3) var(--space-5) var(--space-5);
+    z-index: 2;
+    box-shadow: 0 -8px 24px rgba(0, 0, 0, 0.18);
+  }
+  .modal-sheet .drag-handle {
+    width: 36px; height: 4px;
+    margin: 0 auto var(--space-4);
+    background: var(--color-border-strong);
+    border-radius: var(--radius-pill);
+  }
+  .modal-title {
+    font-size: var(--font-size-lg);
+    font-weight: var(--font-weight-semibold);
+    color: var(--color-text);
+    margin: 0 0 var(--space-3);
+    line-height: var(--line-height-tight);
+  }
+
+  .modal-body {
+    font-size: var(--font-size-sm);
+    color: var(--color-text-muted);
+    line-height: var(--line-height-default);
+    margin: 0 0 var(--space-4);
+  }
+
+  .modal-actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--space-3);
+  }
+  .btn {
+    padding: var(--space-3) var(--space-4);
+    border: 0;
+    border-radius: var(--radius-md);
+    font-family: inherit;
+    font-size: var(--font-size-base);
+    font-weight: var(--font-weight-semibold);
+    cursor: pointer;
+  }
+  .btn-cancel {
+    background: var(--color-danger-soft);
+    border: 1px solid var(--color-danger-border);
+    color: var(--color-danger-text-on-soft);
+  }
+  .btn-cancel:hover { background: #ecc5b6; }
+  .btn-danger {
+    background: var(--color-danger);
+    color: #ffffff;
+  }
+  .btn-danger:hover { background: #9b2a14; }
+
+  /* Fill-bar countdown timer — cross-type lock from Purse. See
+     mobile_purse_detail_forget_confirm.html design notes for the
+     coding-agent contract. */
+  .btn-danger-timer {
+    background:
+      linear-gradient(to right,
+        var(--color-danger) 50%,
+        var(--color-danger-soft) 50%);
+    background-size: 200% 100%;
+    background-position: 100% 0;
+    color: var(--color-danger-text-on-soft);
+    border: 1px solid var(--color-danger-border);
+    transition: background-position 5s linear, color 5s linear;
+    cursor: not-allowed;
+  }
+  .btn-danger-timer.counting {
+    background-position: 0% 0;
+    color: #ffffff;
+  }
+  .btn-danger-timer.mid {
+    background-position: 60% 0;
+    color: #b56849;
+  }
+  .btn-danger-timer:hover { background-color: transparent; }
+</style>
+</head>
+<body>
+
+<div class="mockup-meta">
+  <strong>Mobile — Strongbox detail · Forget confirm (mid-countdown)</strong> ·
+  <span class="status-validated">validated</span> ·
+  2026-05-20 · 360×800
+</div>
+
+<div class="phone-frame">
+  <div class="phone-screen">
+
+    <!-- Dimmed Settings tab behind -->
+    <div class="context-shadow">
+      <div class="context-bar">Cold storage</div>
+      <div class="context-card"></div>
+      <div class="context-row tall"></div>
+      <div class="context-row short"></div>
+      <div class="context-row"></div>
+      <div class="context-row medium"></div>
+      <div class="context-row tall"></div>
+    </div>
+
+    <div class="modal-backdrop"></div>
+
+    <div class="modal-sheet" role="dialog" aria-modal="true" aria-labelledby="forget-title">
+      <div class="drag-handle" aria-hidden="true"></div>
+      <h2 id="forget-title" class="modal-title">Forget this Strongbox?</h2>
+
+      <p class="modal-body">
+        TallyKeep forgets the descriptor and stops scanning the
+        chain. Your hardware wallet and the keys it holds are
+        unaffected. Any categories you've assigned to this
+        Strongbox's activity are erased with it.
+      </p>
+
+      <div class="modal-actions">
+        <button class="btn btn-cancel" type="button">Cancel</button>
+        <button class="btn btn-danger-timer mid" type="button" aria-disabled="true" disabled>Forget · 3</button>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+</body>
+</html>

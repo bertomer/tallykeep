@@ -2831,11 +2831,17 @@ above each card:
   descriptor inline, with the Capacitor sensitive-screen
   flag (FLAG_SECURE / iOS sensitive-screen) when the
   NativeBridge ships. Once revealed, **Hide** replaces
-  **Show**. **No Copy affordance** — descriptors carry the
-  wallet's persistent identifier; per the privacy-first-
-  reveal memory, sensitive content gets a reveal toggle and
-  no Copy button (user can long-press text to select
-  manually if they really need to copy).
+  **Show**. **Copy CTA on the revealed state** (retrofit
+  2026-05-20, lockstep with the Strongbox-detail iteration):
+  the privacy-first-reveal memory's no-Copy rule applies to
+  signing material only (recovery phrases, xprv), not
+  descriptors. Descriptors are public-key data routinely
+  pasted between wallet clients (Sparrow, Specter,
+  Electrum); they get a Copy button on the revealed state.
+  The prior "no Copy on descriptor" call from the
+  2026-05-19 design pass was an over-application of the
+  feedback rule and is corrected here. Sensitive-screen
+  flag stays set on reveal (over-the-shoulder privacy).
 - **Auto-sweep rules** — "None" + explanation + **Add
   rule** CTA. Routes to SweepPolicy creation (coming-soon
   stub).
@@ -3053,9 +3059,12 @@ Purse is gone while the seed is still on the device.
 feedback memory. At rest: last 6 chars in mono. Tap
 **Show** → full descriptor in mono inside a bordered card,
 plus the Capacitor sensitive-screen flag (FLAG_SECURE / iOS
-sensitive-screen) when the NativeBridge ships. No Copy
-affordance in v1 (user can long-press to manually select if
-needed). Tap **Hide** to mask again.
+sensitive-screen) when the NativeBridge ships. Copy CTA on
+the revealed state (retrofit 2026-05-20 — the
+privacy-first-reveal rule applies to signing material only;
+descriptors are public-key data and get a Copy button; see
+mobile_strongbox_detail_settings.html for the cross-type
+visual contract). Tap **Hide** to mask again.
 
 ### Screens
 
@@ -3267,3 +3276,457 @@ Withdraw + card-with-arrow because Account is structurally
 a different kind of Holding (custodial pass-through, not
 the user's wallet).
 
+## Strongbox detail
+
+The per-Holding detail page for a Strongbox. Reached from
+the Home Holdings row tap. This is where the user goes to
+see their on-chain hardware-wallet balance, recent
+chain-side activity for the descriptor, and to configure
+the Strongbox (signing-device label, descriptor, sweep
+rules, removal). Design pass opened and closed 2026-05-20
+(Rémy greenlight on the six new mockups + the two Purse
+descriptor-Copy retrofits); ships under ADR-0009 (key
+custody — Strongbox keys live on the hardware wallet,
+never on any TallyKeep surface) plus the Holding-detail
+chrome conventions locked in the Purse-detail iteration.
+
+The page generalises three commitments from the
+Purse-detail iteration and adds three Strongbox-specific
+calls:
+
+1. **SSE-driven realtime** (inherited from Purse). No
+   manual refresh button; balance + chain-side ledger
+   updates land via SSE.
+2. **Banking-grade ergonomics** (inherited). Two-tab
+   layout (Operations | Settings). Single-unit hero
+   (sats default, ↻ toggle cycles the whole page —
+   same component and state-key as Home, Account, and
+   Purse detail).
+3. **Honest absence-of-affordance for deferred flows**
+   (inherited). Send / Receive / Add rule route to
+   coming-soon stubs in this iteration. The real PSBT
+   roundtrip Send + the verify-on-device Receive ship
+   with the Send + Receive iteration.
+4. **Status-card subtitle = `signing_device_label`**
+   (Strongbox-specific). The user's free-text note about
+   the hardware wallet ("Coldcard Mk4 in safe",
+   "BitBox02 — drawer") drives the status-card subtitle;
+   when empty, the subtitle falls back to "External
+   signing device". No Purse-style mode label
+   ("Watch-only" / "Spending wallet") because Strongbox
+   has no mode axis — every Strongbox is the same trust
+   shape: external signing device, TK never sees keys.
+5. **Missing-signing-metadata inline advisory**
+   (Strongbox-specific). When the descriptor was imported
+   without bip32-derivation-origin info (bare xpub paste,
+   no `[fingerprint/path]` brackets — typical of Trezor
+   Suite "Show xpub", Ledger Live, Phoenix "Wallet final",
+   BlueWallet xpub copy), a `warning-soft` advisory card
+   renders at the top of the Settings tab. Per-Holding
+   inline surfacing of a security-health item (option (c)
+   hybrid per `backlog/security-health-system.md`); the
+   centralised Security-health surface is still under
+   arbitration. **Fix this** CTA routes to coming-soon
+   in this iteration; the real remediation sub-flow
+   ships with the Security-health-system iteration.
+6. **Lightning permanently gated** (Strongbox-specific).
+   Strongbox is cold by type definition; Lightning needs
+   hot keys. The Instant payments row stays visible for
+   discoverability (no-dead-capability rule) but is
+   rendered with `--gated` styling and the CTA disabled.
+   Copy points the user at Spending wallets. Different
+   in spirit from Purse WATCH_ONLY gating (which is "fix
+   later" — add keys to upgrade) — for Strongbox the
+   gate is permanent.
+
+### Vocabulary lock
+
+- **"Operations"** / **"Settings"** — the two tab names.
+  Cross-type lock from Account / Purse detail.
+- **"External signing device"** — the status-card
+  subtitle fallback when `signing_device_label` is
+  empty, and the Wallet card's primary value line.
+  Locked.
+- **"Send" / "Receive"** — the action-row verb pair for
+  Purse / Strongbox / Vault. Cross-type lock from
+  Purse detail.
+- **"Connected" / "Connection lost"** — the
+  connection-state copy in the status card. Same
+  vocabulary as Purse; same `system.chain.connection_state_changed`
+  source (bitcoind RPC/ZMQ health).
+- **"Cannot reach the Bitcoin network"** — the
+  connection-error toast title. Cross-type lock from
+  Purse detail.
+- **"Updated N min ago" / "Last seen N min ago"** —
+  freshness vocabulary. Cross-type lock.
+- **"Forget"** — destructive action verb. Cross-type
+  lock; per-type body copy differs (no seed-destruction
+  panel for Strongbox).
+- **"Missing derivation metadata"** — advisory card
+  headline copy when bip32-derivation-origin info is
+  absent. Matches the wizard-side parseback advisory
+  copy so the user sees the same words at creation
+  time and at-rest on detail.
+- **"Descriptor"** — locked for the public-key
+  descriptor shown in Settings. Cross-type lock from
+  Purse detail.
+
+### Page chrome (consistent across tabs)
+
+Stacked top-to-bottom:
+
+- **App bar** — back chevron returns to Home; Strongbox
+  display name centered (e.g. "Cold storage" for a
+  primary HW-wallet Strongbox, "Trezor stash" for a
+  secondary one); right slot reserved for future
+  per-page actions, empty in v1.
+- **Status card** — iron left-stripe
+  (`--color-holding-strongbox`, the Strongbox-type
+  anchor from palette v2); subtitle on the first line =
+  user-set `signing_device_label` when present,
+  fallback "External signing device" when empty; dot +
+  state + middot + freshness on the second line. The
+  whole card is tap-to-refresh (force-poll on the
+  chain-scan service).
+- **Hero** — BTC balance in the user's active unit
+  (sats default), large tabular-nums; ↻ toggle next to
+  the unit label cycles the whole page sats ↔ BTC. No
+  non-BTC row (Strongbox is BTC-only by definition).
+- **Action row** — Send + Receive, light-CTA weight
+  (`primary-soft` background, `primary-strong`
+  text/icon), arrow-and-wallet icons (cross-type lock
+  from Purse). Both CTAs route to coming-soon stubs in
+  this iteration.
+- **Tab strip** — Operations | Settings, swipeable +
+  segmented control, sticky on scroll. Active-tab
+  underline = brand verdigris.
+- **Bottom nav** — Home tab active.
+
+### Operations tab
+
+The activity feed of recent chain-side `LedgerEntry`
+rows for the Strongbox's descriptor (BDK observation).
+Identical row shape to Purse Operations:
+
+- Text-only kind descriptor ("Received · BTC",
+  "Sent · BTC"). No kind icons (cross-type lock from
+  Purse).
+- Relative time ("3h ago", "yesterday", "5d ago").
+  Switches to absolute date past ~7 days ("Apr 26").
+- **Category chip** (when set) below the kind/time
+  line. Read-only on this surface; assignment lives on
+  the future Accounting page. Same posture as Purse —
+  chain-side ledger entries are the user's own
+  movements and warrant user labels.
+- Single-unit amount in the active unit, right-aligned,
+  sign-based colour (positive `success-text-on-soft`,
+  negative `danger-text-on-soft`).
+- Pull-to-refresh on the whole scroll area triggers a
+  force-poll.
+
+**Sample-data texture differs from Purse.** Strongboxes
+are typically receive-heavy (sweep destination from
+Account, occasional "move to Vault" outflow) with
+infrequent activity. Longer time gaps between rows.
+
+**Empty state** (fresh Strongbox, no chain activity yet,
+or a newly imported descriptor before the first scan
+returns): sober text-only panel. Title "No activity
+yet", sub "Incoming and outgoing payments will surface
+here as they hit the chain." No illustration.
+
+**Row layout at the density limit (cross-type lock).**
+Same 3-line ceiling as Purse. The future Pending
+section (settlement-rails iteration) lives ABOVE this
+feed, not as a fourth row line.
+
+### Settings tab
+
+Single variant (no mode axis like Purse's `purse_mode`).
+The only conditional bit is the missing-metadata
+advisory card, which renders at the top when triggered.
+
+Sections (top to bottom):
+
+- **Missing-signing-metadata advisory** (conditional —
+  only when descriptor parsed without
+  `bip32_derivation_origins`). `warning-soft` card
+  above Wallet. Title: "Missing derivation metadata".
+  Body: "Your hardware wallet may refuse to sign
+  transactions with this descriptor. Receiving funds
+  works as expected. Re-export your descriptor with
+  full origin metadata to enable signing." **Fix this**
+  CTA → coming-soon stub. Copy matches the wizard-side
+  parseback advisory
+  (`mobile_add_holding_strongbox_input_advisory_no_metadata.html`)
+  so the user sees the same words across surfaces.
+- **Wallet** — info-only. Line 1: "External signing
+  device". Line 2: "Imported on May 14, 2026. The
+  signing keys live on your hardware wallet —
+  TallyKeep never sees them." No CTA.
+- **Display name** — current display name +
+  **Rename** CTA. Cross-type lockstep with Purse /
+  Account (Rename is non-destructive; lives outside
+  Danger zone).
+- **Signing device** — current `signing_device_label`
+  (e.g. "Coldcard Mk4 in safe") + **Edit** CTA →
+  inline edit. Free-text. Persisted via the existing
+  Holding-update endpoint. When empty, value reads
+  "Not set" with a **Set** CTA. This is the field
+  that drives the status-card subtitle on every
+  surface — Home row subtitle, detail-page status
+  card, future Holdings list views.
+- **Descriptor** — last 6 chars (mono, masked) +
+  short explanation + **Show** CTA. Tap to reveal:
+  full descriptor in mono inside a bordered card,
+  followed by **Hide** + **Copy** CTAs. The Copy CTA
+  is the **NEW cross-type affordance** introduced in
+  this iteration (privacy-first-reveal rule sharpened
+  to apply to signing material only — descriptors are
+  public-key data and get Copy). Sensitive-screen
+  flag set on reveal for over-the-shoulder privacy.
+  See `mobile_strongbox_detail_settings.html` for the
+  visual contract of the revealed-with-Copy state;
+  the same contract applies to Purse descriptor
+  reveal (retrofitted in this iteration).
+- **Auto-sweep rules** — "None" + explanation +
+  **Add rule** CTA → coming-soon stub. Same chrome
+  as Purse. Strongbox is the bread-and-butter
+  destination for Account → Strongbox sweeps; the
+  copy nudges this direction ("Receive BTC into this
+  Strongbox automatically on a schedule or threshold,
+  e.g. weekly sweep from Kraken.").
+- **Instant payments** — **permanently gated.** Row
+  visible with `settings-row--gated` styling. Value
+  line: "Not available on Strongbox". Meta: "Strongbox
+  keys live on your hardware wallet only. Lightning
+  needs hot keys — activate it on a Spending wallet."
+  CTA `aria-disabled`, `cursor: help`. Same row-stays-
+  visible posture as Purse WATCH_ONLY Lightning gating,
+  but the gate is permanent (not "fix later"). No
+  upgrade-path entry.
+- **Danger zone** — last section, label in `danger`
+  text colour. **Forget only.** Body: "TallyKeep
+  forgets the descriptor and stops scanning the
+  chain. Your hardware wallet and the keys it holds
+  are unaffected. Any categories you've assigned to
+  this Strongbox's activity are erased with it." No
+  seed-destruction warning panel (no seed on TK side
+  to destroy).
+
+**No Recovery phrase row** — Strongbox keys live on
+the hardware wallet; TallyKeep never sees them. Adding
+the row would be a category error.
+
+**No Upgrade-to-spending path** — Strongbox doesn't
+upgrade. The "single-key wallet whose keys are on
+hardware" shape is what Strongbox IS. If a user wants
+hot-key spending, that's a different Holding type
+(Purse), not a mode flip on Strongbox.
+
+### Send routing
+
+Send tap → coming-soon stub in this iteration. The real
+PSBT roundtrip Send flow (compose → review →
+export-to-signing-device → re-import-signed-PSBT →
+broadcast, with the "verify destination on signing
+device" prompt at step 2) ships with the Send +
+Receive iteration. **No Send-blocked screen variant**
+analogous to Purse WATCH_ONLY — Strongbox always has a
+path to Send (PSBT roundtrip), it's just deferred.
+
+### Receive routing
+
+Receive tap → coming-soon stub. The real Receive flow
+(derive next address + verify-on-device prompt + QR +
+BIP21) ships with the Send + Receive iteration. Same
+posture as Purse Receive.
+
+### Behaviors
+
+**Unit toggle (sats ↔ BTC).** Cross-type lock from
+Purse / Home / Account. Same preference key.
+
+**Pull-to-refresh.** Cross-type lock. Standard overscroll
+gesture at scroll position 0 triggers chain-side
+force-poll.
+
+**Tap-to-refresh on the status card.** Cross-type lock.
+
+**SSE-driven live updates.** The chain-scan service
+emits ledger-entry events scoped to the Strongbox's
+descriptor; frontend subscribes and inserts new
+entries at the top of the activity feed.
+`system.chain.connection_state_changed` drives the
+status card's dot colour and triggers the
+connection-error toast on transitions to unreachable.
+
+**Connection-error toast.** Cross-type lock from Purse.
+
+**Forget flow operationally.** Frontend sequence on
+greenlight (button enabled, user taps): backend Forget
+call deletes the descriptor row and related chain-side
+state; user returns to Home; Strongbox row gone.
+**No `NativeBridge.secureStorage.delete` call** —
+Strongbox never had a secureStorage entry. This
+differs from the Purse ON_DEVICE_* Forget flow.
+
+**Descriptor reveal.** Privacy-first reveal (masked at
+rest, full on tap) + **Copy** CTA on the revealed
+state (NEW). Sensitive-screen flag on reveal. The
+revealed state shows the full descriptor in a
+bordered mono card with word-break wrapping, followed
+by Hide + Copy CTAs.
+
+**Signing-device-label edit.** Inline text input bound
+to `signing_device_label`. Persists via the existing
+Holding-update endpoint. If the existing PATCH shape
+doesn't include the field, the coding agent surfaces
+to Rémy before scoping a backend change (do not
+silently add).
+
+### Screens
+
+- **Operations tab — populated.** `mobile_strongbox_detail_operations_populated.html`.
+  Anchor mockup for the iteration. 6 chain-side
+  entries with the receive-heavy texture pattern.
+- **Operations tab — empty.** `mobile_strongbox_detail_operations_empty.html`.
+  Zero-balance, empty-state panel.
+- **Settings tab — clean descriptor.** `mobile_strongbox_detail_settings.html`.
+  Full Settings stack without the advisory card.
+  Descriptor shown in REVEALED state with the new
+  Copy CTA visible.
+- **Settings tab — missing signing metadata.** `mobile_strongbox_detail_settings_missing_metadata.html`.
+  Advisory card at the top + Fix-this CTA;
+  signing_device_label empty (status-card subtitle
+  falls back to "External signing device").
+- **Forget confirm modal.** `mobile_strongbox_detail_forget_confirm.html`.
+  Bottom-sheet, 5-second fill-bar timer (mid-countdown
+  sample), no warning panel.
+- **Connection-error toast variant.** `mobile_strongbox_detail_connection_error.html`.
+  Operations tab with red dot + slide-in toast +
+  cached entries.
+
+### Reconcilability gauntlet (per PROCESS.md §3)
+
+1. *Trust boundary.* Page sits on the phone (UI);
+   reads from the backend (cached chain-scan state +
+   `LedgerEntry` rows for the descriptor). The
+   descriptor itself is public-key data — backend
+   stores it freely. The hardware-wallet signing key
+   lives on the external device; TallyKeep never
+   touches it on any surface (ADR-0009). The page
+   never touches signing material for any flow in
+   this iteration's scope.
+2. *Keys and secrets.* No keys held by TK at all.
+   The hardware wallet holds them; the user is the
+   bridge for the PSBT roundtrip (deferred to the
+   Send + Receive iteration).
+3. *Self-hosted vs hosted.* Identical from the page's
+   POV. Both backends serve the chain-scan SSE topics
+   and ledger queries. Hosted-tier privacy notice
+   (per onboarding hosted-welcome) covers any
+   descriptor-level metadata that touches the hosted
+   backend.
+4. *Confirmation honesty.* Freshness indicator is
+   honest about staleness ("Updated N min ago" updates
+   live; resets on each chain-scan SSE event). Balance
+   is the last-known scanned value; staleness signal
+   carried by the freshness indicator and the
+   connection dot. The connection-error toast surfaces
+   transient drops; cached entries stay visible
+   without false confidence. The page does not display
+   Send / Receive state (deferred), so the
+   "no Sent ✓ before broadcast" rule applies in the
+   Send iteration, not here.
+5. *Browser-only fallback.* Fully functional in the
+   browser build. Receive (when it ships) renders the
+   address-derivation flow identically. Send (when it
+   ships) gates the actual signing step honestly —
+   browser users export the PSBT and sign on the HW
+   wallet separately; no pretend-to-sign.
+6. *Open-source and reproducibility.* SSE topics
+   consumed (`system.chain.*`) are defined by the
+   open-source backend (FastAPI + BDK). No
+   closed-source dependency on the Strongbox-detail
+   path.
+
+Verdict: reconcilable in current scope.
+
+### Notes
+
+**Cross-type chrome lock from Purse detail.** Two-tab
+layout (Operations | Settings), single-unit hero with
+shared ↻ toggle, action-row with Send + Receive
+arrow-and-wallet icons, status-card with type-stripe +
+chain-connection dot + freshness, Forget bottom-sheet
+with 5-second fill-bar timer, connection-error toast.
+None of these are designed from scratch for Strongbox;
+all generalise from the Purse-detail iteration's
+locked chrome.
+
+**Missing-signing-metadata as inline surfacing.** The
+advisory card on Strongbox detail is the at-rest
+surfacing of a security-health item — option (c)
+hybrid (per-Holding inline) in the
+`backlog/security-health-system.md` framing. When the
+centralised Security-health surface ships, it
+aggregates this item across all affected Strongboxes;
+the per-Holding inline card stays as the
+source-of-truth view (mirroring how iOS shows the
+same Health item on the activity ring AND in the
+Health app summary).
+
+**No `purse_mode` analog for Strongbox.** All Strongboxes
+are the same trust shape (external signing device, no
+TK-held keys). The `signing_device_label` free-text
+field carries the per-Strongbox personalisation
+("which device", "where it lives") that for Purse is
+encoded as `purse_mode`. The status-card subtitle
+sources from this label.
+
+**Lightning permanently gated, not "later".** The
+Lightning row's gating copy is permanent, not
+provisional. Strongbox keys are cold by type
+definition; this isn't going to change. Coding agent
+must not render this row as a "coming-soon" stub on
+tap — the on-tap explanation should reflect the
+permanence ("Lightning needs hot keys; activate it on
+a Spending wallet") and link the user to the natural
+alternative.
+
+**Descriptor reveal Copy CTA — new cross-type
+affordance.** Strongbox detail introduces the Copy
+button on revealed descriptor state. The privacy-first
+-reveal feedback memory (`feedback_privacy_first_reveal`)
+was sharpened 2026-05-20 to apply to signing material
+only — descriptors and xpubs are public-key data and
+get Copy. The Purse detail mockups + prose are
+retrofitted in this iteration's lockstep edit.
+
+**Signing-device label drives the status-card
+subtitle.** This is the per-Strongbox at-rest signal
+of "what kind of Strongbox is this". When the user
+sets a label, it appears across surfaces (Home row
+subtitle in future iterations, status card here,
+Holdings list views). When empty, surfaces fall back
+to the generic "External signing device".
+
+**No Send-blocked screen for Strongbox.** Unlike the
+Purse WATCH_ONLY case where Send had a real screen
+explaining "TallyKeep doesn't hold the keys", Strongbox
+Send is just deferred — the path is the PSBT roundtrip
+which will ship. Send tap routes to the generic
+coming-soon stub in this iteration; the real Send flow
+takes over when that iteration ships.
+
+**Categorization is Purse / Strongbox / Vault-side**
+(cross-type lock from Purse). Chain-side ledger entries
+across all three types are user-movement and warrant
+labels. The read-only chip on the Operations row uses
+the same chrome as Purse; assignment lives on the
+future Accounting page.
+
+**Action-row icons.** Same arrow-and-wallet pair as
+Purse. Cross-type lock — Vault detail (when it ships)
+will adopt the same icons.

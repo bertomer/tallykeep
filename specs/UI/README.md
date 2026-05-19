@@ -238,8 +238,21 @@ Per type:
 - **Account:** balance, recent activity, sweep policy status, manual
   sweep.
 - **Purse:** balance, send / receive, recent activity, categorization.
-- **Strongbox:** balance, send (PSBT) / receive, recent activity,
-  categorization.
+- **Strongbox:** detail page surface in `UI/mobile.md §Strongbox
+  detail` and mockups
+  `mobile_strongbox_detail_operations_populated.html`,
+  `mobile_strongbox_detail_operations_empty.html`,
+  `mobile_strongbox_detail_settings.html`,
+  `mobile_strongbox_detail_settings_missing_metadata.html`,
+  `mobile_strongbox_detail_forget_confirm.html`,
+  `mobile_strongbox_detail_connection_error.html`. Two-tab
+  layout (Operations | Settings) generalised from Purse;
+  Strongbox specifics are the `signing_device_label`-driven
+  status-card subtitle, the missing-signing-metadata inline
+  advisory card, the permanently-gated Lightning row, and the
+  descriptor-reveal Copy CTA (also retrofitted into Purse in
+  lockstep). Send / Receive deferred to the Send + Receive
+  iteration.
 - **Vault:** balance, send (PSBT) / receive, declared-vs-observable
   status, recent activity, categorization.
 

@@ -212,9 +212,10 @@
     { id: 'account',        label: 'Account wizard' },
     { id: 'account-detail', label: 'Account detail' },
     { id: 'purse',          label: 'Purse wizard' },
-    { id: 'purse-detail',   label: 'Purse detail' },
-    { id: 'strongbox',      label: 'Strongbox wizard' },
-    { id: 'vault',          label: 'Vault wizard' },
+    { id: 'purse-detail',     label: 'Purse detail' },
+    { id: 'strongbox',        label: 'Strongbox wizard' },
+    { id: 'strongbox-detail', label: 'Strongbox detail' },
+    { id: 'vault',            label: 'Vault wizard' },
   ];
 
   // Mockup index — update when adding or removing files.
@@ -365,6 +366,24 @@
     { file: 'mobile_purse_detail_operations_populated_with_pending.html',
       title: 'Purse detail — Operations + Pending section (future-iteration preview)',
       status: 'validated', group: 'purse-detail' },
+    { file: 'mobile_strongbox_detail_operations_populated.html',
+      title: 'Strongbox detail — Operations tab (populated)',
+      status: 'validated', group: 'strongbox-detail' },
+    { file: 'mobile_strongbox_detail_operations_empty.html',
+      title: 'Strongbox detail — Operations tab (empty / fresh)',
+      status: 'validated', group: 'strongbox-detail' },
+    { file: 'mobile_strongbox_detail_settings.html',
+      title: 'Strongbox detail — Settings (clean descriptor, revealed-with-Copy)',
+      status: 'validated', group: 'strongbox-detail' },
+    { file: 'mobile_strongbox_detail_settings_missing_metadata.html',
+      title: 'Strongbox detail — Settings (missing signing metadata advisory)',
+      status: 'validated', group: 'strongbox-detail' },
+    { file: 'mobile_strongbox_detail_forget_confirm.html',
+      title: 'Strongbox detail — Forget confirm (mid-countdown)',
+      status: 'validated', group: 'strongbox-detail' },
+    { file: 'mobile_strongbox_detail_connection_error.html',
+      title: 'Strongbox detail — Operations tab (connection error · chain)',
+      status: 'validated', group: 'strongbox-detail' },
   ];
 
   // Body content area for each mockup (see CSS comment above .preview).

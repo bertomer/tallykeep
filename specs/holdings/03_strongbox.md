@@ -178,6 +178,63 @@ swept into Strongbox (self-custody) as fast as policy allows.
   match observed behavior. Lives in the broader security-health
   system (pending arbitration `seed-backup-disclosure`).
 
+## Strongbox detail page
+
+The per-Holding detail page surface for a Strongbox is
+specified in `UI/mobile.md §Strongbox detail`. Cross-type
+chrome decisions (SSE-driven freshness, two-tab Operations |
+Settings layout, shared unit-toggle, "Forget" cross-type
+vocabulary lock, 5-second fill-bar Forget-button timer)
+generalise from the Purse-detail iteration; Strongbox-specific
+calls are:
+
+- **Action-row verb pair: Send + Receive** (cross-type lock
+  from Purse — the Holding *is* the user's wallet). Both
+  CTAs route to coming-soon stubs in the Holding-detail
+  iteration; the real PSBT roundtrip Send + verify-on-device
+  Receive ship with the Send + Receive iteration. **No
+  Send-blocked screen variant** like the Purse WATCH_ONLY
+  case — Strongbox always has a path (PSBT roundtrip), it's
+  just deferred.
+- **Status-card subtitle**: `signing_device_label` when set
+  (free-text user note such as "Coldcard Mk4 in safe"),
+  falling back to **"External signing device"** when empty.
+  Locked vocabulary. No Purse-style mode label because
+  Strongbox has no mode axis.
+- **Missing-signing-metadata inline advisory**: when the
+  descriptor was imported without bip32-derivation-origin
+  brackets (bare xpub paste), Settings renders a
+  `warning-soft` advisory card at the top with a **Fix
+  this** CTA → coming-soon stub. Per-Holding inline
+  surfacing of a security-health item; the centralised
+  Security-health surface is still under arbitration
+  (`seed-backup-disclosure`).
+- **Lightning permanently gated**: Strongbox is cold by type
+  definition; Lightning needs hot keys. The Instant payments
+  row stays visible (no-dead-capability rule) but is
+  permanently greyed with copy pointing the user at Spending
+  wallets. Different from Purse WATCH_ONLY gating (which is
+  "fix later — add keys to upgrade").
+- **No Recovery phrase row**: TallyKeep never holds Strongbox
+  signing material. Same logic as Purse WATCH_ONLY.
+- **Forget body copy**: "TallyKeep forgets the descriptor
+  and stops scanning the chain. Your hardware wallet and the
+  keys it holds are unaffected. Any categories you've
+  assigned to this Strongbox's activity are erased with it."
+  No load-bearing warning panel (no seed on TK side). The
+  categorization-loss line carries from the cross-type
+  Purse-detail lock.
+- **Descriptor reveal Copy CTA**: the revealed-descriptor
+  state gets a **Copy** button. The privacy-first-reveal
+  feedback rule applies to signing material only;
+  descriptors are public-key data and are routinely pasted
+  between wallet clients. Same affordance retrofitted into
+  Purse detail in lockstep.
+- **Signing-device-label inline editor**: a Settings section
+  for the user to set / edit the free-text
+  `signing_device_label` value. Persists via the existing
+  Holding-update endpoint.
+
 ## Deferred
 
 | Item | Tracked in |
