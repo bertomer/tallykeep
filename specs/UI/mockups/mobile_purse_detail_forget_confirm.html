@@ -1,0 +1,296 @@
+<!--
+  Title: Mobile — Purse detail · Forget confirm (ON_DEVICE_* variant)
+  Status: validated  (Rémy greenlight 2026-05-19 closing the Purse-detail-page design pass — iteration sketched 2026-05 in two rounds plus the round-3 categorization-loss + recovery-tile rollback + round-4 settlement-rails preview)
+  Date last touched: 2026-05-19
+  Replaces: nothing on disk. Renders the load-bearing variant —
+            ON_DEVICE_TK_GENERATED (and ON_DEVICE_USER_IMPORTED
+            when it ships). The WATCH_ONLY variant uses the same
+            structural mockup with the warning panel removed
+            and a different body copy line ("TallyKeep forgets
+            the descriptor and stops scanning the chain. Funds
+            at your source wallet are unaffected.") — coding
+            agent branches the body on `purse_mode`.
+
+  Design notes:
+  - Bottom-sheet pattern, same shape as the Account-detail
+    forget modal. Dimmed Settings tab silhouette behind, drag
+    handle, title, body, two-button confirm. The Cancel button
+    is on the left (safe-action position); the Forget button is
+    on the right (forward-action position). Both are
+    danger-tinted but distinct: light-red Cancel, full-red
+    Forget. Communicates "this whole sheet is about a destructive
+    decision".
+  - **Two Purse-specific additions vs the Account version:**
+      1. **5-second fill-bar timer on the Forget button.** At
+         rest, the button is disabled with a countdown label
+         ("Forget · 5", "Forget · 4", "Forget · 3", "Forget ·
+         2", "Forget · 1") and a fill-bar that sweeps the
+         button's background from `danger-soft` (start) to
+         full `danger` (end) over the same 5 seconds. Pattern:
+         Discord "Hold to leave call", iOS "Hold to confirm".
+         Implementation is CSS-only: a 200%-wide horizontal
+         gradient transitions its `background-position` from
+         100% (all soft visible) to 0% (all danger visible)
+         linearly over 5s. Text color animates in lockstep
+         from `danger-text-on-soft` to white. Cancel is
+         active throughout the countdown. The same fill-bar
+         timer also lands on the Account-detail forget modal
+         (separate mockup file edit) — destructive-action
+         consistency across Holding types.
+      2. **Load-bearing warning panel** above the body copy.
+         Visible only for ON_DEVICE_* Purses (this mockup
+         renders it; the WATCH_ONLY variant omits it). Copy:
+         "You told us you backed up your recovery phrase.
+         Verify your backup is intact and you can read it.
+         Once you forget this Purse, the keys are destroyed
+         and any forgotten backup is gone forever." Rendered
+         in a `danger-soft` panel with `danger-border` and
+         `danger-text-on-soft` text. Visually distinct from
+         the regular body copy below so it pulls the eye.
+  - **Forget operationally** for an ON_DEVICE_* Purse:
+      1. Frontend calls `NativeBridge.secureStorage.delete`
+         for the seed entry keyed by `holding_id`.
+      2. Backend Forget call deletes the descriptor row +
+         related chain-side state.
+      3. User returns to Home; the Purse row is gone.
+    If step 1 fails, the entire Forget aborts with a danger
+    toast. The seed is NOT destroyed if any step fails;
+    keeping the descriptor visible is preferable to silent
+    failure that leaves the user thinking the Purse is gone
+    while the seed is still on the device.
+  - **Tapping the backdrop does NOT dismiss.** Same banking-
+    app convention as the Account modal. Only Cancel or the
+    drag-down gesture dismisses.
+  - **Keyboard handling for the coding agent.** Enter triggers
+    Forget only when the button is enabled (after countdown).
+    Escape (hardware) always dismisses = Cancel.
+  - **Sample state shown:** mid-countdown ("Forget · 3"),
+    button disabled. Cancel always available. Coding agent
+    renders three other phases: initial "Forget · 5",
+    mid-countdown 4/3/2/1, ready "Forget" enabled.
+  - **Title.** "Forget this Purse?" — direct question, no
+    softening. Purse-type variant differs from Account's
+    "Forget this Account?" in just the noun.
+  - **Body copy** (ON_DEVICE_* variant): four short sentences,
+    one idea each, no clause-joining em-dash. (1) What TK
+    does (destroys keys, forgets descriptor, stops scanning);
+    (2) what this means for the funds (without a working
+    backup they become permanently inaccessible);
+    (3) categorization loss (any user-assigned categories on
+    this Purse's chain-side ledger entries are erased along
+    with the entries — applies to both modes); (4) reversal
+    path (re-import using the recovery phrase, but the
+    categorizations don't come back).
+-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>TallyKeep — Mobile — Purse detail · Forget confirm</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="_shared/tokens.css">
+<link rel="stylesheet" href="_shared/shell.css">
+<style>
+  .phone-screen { background: var(--color-bg); }
+
+  .context-shadow {
+    position: absolute; inset: 0;
+    background: var(--color-bg); z-index: 0;
+  }
+  .context-bar {
+    height: var(--mobile-app-bar);
+    background: var(--color-surface);
+    border-bottom: 1px solid var(--color-border);
+    display: flex; align-items: center; justify-content: center;
+    font-size: var(--font-size-base);
+    font-weight: var(--font-weight-semibold);
+    color: var(--color-text-dim);
+  }
+  .context-card {
+    margin: var(--space-3) var(--space-4);
+    height: 56px;
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-left: 4px solid var(--color-holding-purse);
+    border-radius: var(--radius-md);
+  }
+  .context-row {
+    margin: var(--space-3) var(--space-4);
+    height: 16px;
+    background: var(--color-text-muted);
+    opacity: 0.15;
+    border-radius: var(--radius-sm);
+  }
+  .context-row.short  { width: 40%; }
+  .context-row.medium { width: 60%; }
+  .context-row.tall   { height: 60px; }
+
+  .modal-backdrop {
+    position: absolute; inset: 0;
+    background: rgba(0, 0, 0, 0.4);
+    z-index: 1;
+  }
+
+  .modal-sheet {
+    position: absolute;
+    left: 0; right: 0; bottom: 0;
+    background: var(--color-surface);
+    border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+    padding: var(--space-3) var(--space-5) var(--space-5);
+    z-index: 2;
+    box-shadow: 0 -8px 24px rgba(0, 0, 0, 0.18);
+  }
+  .modal-sheet .drag-handle {
+    width: 36px; height: 4px;
+    margin: 0 auto var(--space-4);
+    background: var(--color-border-strong);
+    border-radius: var(--radius-pill);
+  }
+  .modal-title {
+    font-size: var(--font-size-lg);
+    font-weight: var(--font-weight-semibold);
+    color: var(--color-text);
+    margin: 0 0 var(--space-3);
+    line-height: var(--line-height-tight);
+  }
+
+  /* Load-bearing warning panel — ON_DEVICE_* only */
+  .modal-warning {
+    background: var(--color-danger-soft);
+    border: 1px solid var(--color-danger-border);
+    border-radius: var(--radius-md);
+    padding: var(--space-3) var(--space-4);
+    margin: 0 0 var(--space-3);
+    font-size: var(--font-size-sm);
+    color: var(--color-danger-text-on-soft);
+    line-height: var(--line-height-default);
+    font-weight: var(--font-weight-medium);
+  }
+
+  .modal-body {
+    font-size: var(--font-size-sm);
+    color: var(--color-text-muted);
+    line-height: var(--line-height-default);
+    margin: 0 0 var(--space-4);
+  }
+
+  .modal-actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--space-3);
+  }
+  .btn {
+    padding: var(--space-3) var(--space-4);
+    border: 0;
+    border-radius: var(--radius-md);
+    font-family: inherit;
+    font-size: var(--font-size-base);
+    font-weight: var(--font-weight-semibold);
+    cursor: pointer;
+  }
+  .btn-cancel {
+    background: var(--color-danger-soft);
+    border: 1px solid var(--color-danger-border);
+    color: var(--color-danger-text-on-soft);
+  }
+  .btn-cancel:hover { background: #ecc5b6; }
+  .btn-danger {
+    background: var(--color-danger);
+    color: #ffffff;
+  }
+  .btn-danger:hover { background: #9b2a14; }
+
+  /* Fill-bar countdown timer on the Forget button.
+     Coding-agent contract:
+       - At modal open: add classes "btn btn-danger-timer counting"
+         and aria-disabled="true". CSS transition drives the fill;
+         a 1s setInterval ticks the label "Forget · N".
+       - At countdown end (5s elapsed): drop .counting, drop
+         aria-disabled, switch label to "Forget". The button stays
+         at the fully-filled-danger state (no flash back to soft).
+       - At cancel/dismiss: cleanup interval; modal destroyed. */
+  .btn-danger-timer {
+    background:
+      linear-gradient(to right,
+        var(--color-danger) 50%,
+        var(--color-danger-soft) 50%);
+    background-size: 200% 100%;
+    background-position: 100% 0;
+    color: var(--color-danger-text-on-soft);
+    border: 1px solid var(--color-danger-border);
+    transition: background-position 5s linear, color 5s linear;
+    cursor: not-allowed;
+  }
+  .btn-danger-timer.counting {
+    background-position: 0% 0;
+    color: #ffffff;
+  }
+  /* Static mid-countdown state for this mockup ("Forget · 3",
+     2s elapsed of 5s = 40% filled). Coding agent uses .counting
+     for the real animated countdown. */
+  .btn-danger-timer.mid {
+    background-position: 60% 0;
+    color: #b56849;
+  }
+  .btn-danger-timer:hover { background-color: transparent; }
+</style>
+</head>
+<body>
+
+<div class="mockup-meta">
+  <strong>Mobile — Purse detail · Forget confirm (ON_DEVICE_*, mid-countdown)</strong> ·
+  <span class="status-validated">validated</span> ·
+  2026-05-19 · 360×800
+</div>
+
+<div class="phone-frame">
+  <div class="phone-screen">
+
+    <!-- Dimmed Settings tab behind -->
+    <div class="context-shadow">
+      <div class="context-bar">Daily wallet</div>
+      <div class="context-card"></div>
+      <div class="context-row tall"></div>
+      <div class="context-row short"></div>
+      <div class="context-row"></div>
+      <div class="context-row medium"></div>
+      <div class="context-row tall"></div>
+    </div>
+
+    <div class="modal-backdrop"></div>
+
+    <div class="modal-sheet" role="dialog" aria-modal="true" aria-labelledby="forget-title">
+      <div class="drag-handle" aria-hidden="true"></div>
+      <h2 id="forget-title" class="modal-title">Forget this Purse?</h2>
+
+      <div class="modal-warning" role="alert">
+        You told us you backed up your recovery phrase. Verify your
+        backup is intact and you can read it. Once you forget this
+        Purse, the keys are destroyed and any forgotten backup is
+        gone forever.
+      </div>
+
+      <p class="modal-body">
+        TallyKeep destroys the keys on this device, forgets the
+        descriptor, and stops scanning the chain. Without a working
+        backup of your recovery phrase, the funds in this Purse
+        become permanently inaccessible. Any categories you've
+        assigned to this Purse's activity are erased with it. You
+        can re-import this Purse from your recovery phrase, but the
+        categorizations don't come back.
+      </p>
+
+      <div class="modal-actions">
+        <button class="btn btn-cancel" type="button">Cancel</button>
+        <button class="btn btn-danger-timer mid" type="button" aria-disabled="true" disabled>Forget · 3</button>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+</body>
+</html>

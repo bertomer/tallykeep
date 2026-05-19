@@ -212,6 +212,7 @@
     { id: 'account',        label: 'Account wizard' },
     { id: 'account-detail', label: 'Account detail' },
     { id: 'purse',          label: 'Purse wizard' },
+    { id: 'purse-detail',   label: 'Purse detail' },
     { id: 'strongbox',      label: 'Strongbox wizard' },
     { id: 'vault',          label: 'Vault wizard' },
   ];
@@ -335,11 +336,35 @@
       title: 'Account detail — Settings tab (default state)',
       status: 'validated', group: 'account-detail' },
     { file: 'mobile_account_detail_remove_confirm.html',
-      title: 'Account detail — Remove (type-to-confirm modal)',
+      title: 'Account detail — Forget confirm (5-second timer)',
       status: 'validated', group: 'account-detail' },
     { file: 'mobile_account_detail_connection_error.html',
       title: 'Account detail — Operations tab (connection error)',
       status: 'validated', group: 'account-detail' },
+    { file: 'mobile_purse_detail_operations_populated.html',
+      title: 'Purse detail — Operations tab (populated, spending wallet)',
+      status: 'validated', group: 'purse-detail' },
+    { file: 'mobile_purse_detail_operations_empty.html',
+      title: 'Purse detail — Operations tab (empty / fresh)',
+      status: 'validated', group: 'purse-detail' },
+    { file: 'mobile_purse_detail_settings_watch_only.html',
+      title: 'Purse detail — Settings tab (Watch-only)',
+      status: 'validated', group: 'purse-detail' },
+    { file: 'mobile_purse_detail_settings_on_device.html',
+      title: 'Purse detail — Settings tab (Spending wallet, on-device keys)',
+      status: 'validated', group: 'purse-detail' },
+    { file: 'mobile_purse_detail_forget_confirm.html',
+      title: 'Purse detail — Forget confirm (ON_DEVICE_*, mid-countdown)',
+      status: 'validated', group: 'purse-detail' },
+    { file: 'mobile_purse_detail_connection_error.html',
+      title: 'Purse detail — Operations tab (connection error · chain)',
+      status: 'validated', group: 'purse-detail' },
+    { file: 'mobile_purse_detail_send_blocked_watch_only.html',
+      title: 'Purse detail — Send blocked (Watch-only, two paths)',
+      status: 'validated', group: 'purse-detail' },
+    { file: 'mobile_purse_detail_operations_populated_with_pending.html',
+      title: 'Purse detail — Operations + Pending section (future-iteration preview)',
+      status: 'validated', group: 'purse-detail' },
   ];
 
   // Body content area for each mockup (see CSS comment above .preview).
@@ -451,13 +476,14 @@
       const knownIds = new Set(GROUPS.map(g => g.id));
       const orphans = mockups.filter(m =>
         !knownIds.has(m.group) && matchesFilters(m));
-      if (orphans.length > 0) {
+      if (orphans.length) {
         const heading = document.createElement('h2');
         heading.className = 'section-heading';
         heading.innerHTML = `
-          <span>Ungrouped</span>
+          <span>Orphans (unknown group)</span>
           <span class="section-count">${orphans.length}</span>`;
         sectionsEl.appendChild(heading);
+
         const grid = document.createElement('div');
         grid.className = 'grid';
         for (const m of orphans) {
@@ -472,32 +498,34 @@
 
     if (!anyShown) {
       sectionsEl.innerHTML = `
-        <div class="empty">
-          No mockups match the current filters.
-        </div>`;
+        <div class="empty">No mockups match the current filters.</div>`;
     }
   }
 
-  function wireFilters() {
-    document.addEventListener('click', e => {
-      const btn = e.target.closest('.filter-btn');
-      if (!btn) return;
-      if (btn.dataset.status !== undefined) {
-        currentStatus = btn.dataset.status;
-        document.querySelectorAll('[data-status]').forEach(b =>
-          b.classList.toggle('active', b === btn));
-      } else if (btn.dataset.group !== undefined) {
-        currentGroup = btn.dataset.group;
-        document.querySelectorAll('[data-group]').forEach(b =>
-          b.classList.toggle('active', b === btn));
-      }
+  buildGroupFilters();
+  render();
+
+  // Status filter pills
+  document.querySelectorAll('[data-status]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('[data-status]').forEach(b =>
+        b.classList.remove('active'));
+      btn.classList.add('active');
+      currentStatus = btn.dataset.status;
       render();
     });
-  }
+  });
 
-  buildGroupFilters();
-  wireFilters();
-  render();
+  // Group filter pills (built dynamically, so use click delegation)
+  groupFiltersEl.addEventListener('click', e => {
+    const btn = e.target.closest('[data-group]');
+    if (!btn) return;
+    groupFiltersEl.querySelectorAll('[data-group]').forEach(b =>
+      b.classList.remove('active'));
+    btn.classList.add('active');
+    currentGroup = btn.dataset.group;
+    render();
+  });
 </script>
 </body>
 </html>

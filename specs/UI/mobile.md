@@ -2404,14 +2404,19 @@ above each card:
   CTA. Routes to SweepPolicy creation (its own iteration).
 - **Polling** — current cadence (default 10 min) + **Change**
   CTA. Real in v1: picker for 1 / 5 / 10 / 30 / 60 min.
+- **Display name** — current display name + **Rename**
+  CTA. Pulled out of Danger zone 2026-05-19 (cross-type
+  lockstep with the Purse-detail iteration). Rename is
+  reversible / non-destructive; grouping with Forget was a
+  category error. Position: between Polling and Danger zone.
 - **Danger zone** — last section, label in `danger` text
-  colour. Two rows: Rename (neutral CTA) + Forget (`danger`-
-  coloured CTA). Forget opens the two-button bottom-sheet
-  confirm modal. The verb is "Forget" rather than "Remove" or
-  "Delete" — TK never custodies user funds and never destroys
-  anything outside its own observation surface; "Forget"
-  describes what TK actually does. Locked across all Holding
-  types (see Cross-type vocabulary lock below).
+  colour. **Forget only** (Rename moved out — see Display
+  name section). Forget opens the two-button bottom-sheet
+  confirm modal. The verb is "Forget" rather than "Remove"
+  or "Delete" — TK never custodies user funds and never
+  destroys anything outside its own observation surface;
+  "Forget" describes what TK actually does. Locked across
+  all Holding types (see Cross-type vocabulary lock below).
 
 **Whitelist destination** section is conditional — appears
 between Deposit address and Auto-sweep rules once the
@@ -2559,6 +2564,19 @@ via the Add Account wizard); the friction wasn't earning its
 keep. Two-tone red confirm (light-red Cancel + red Forget)
 carries the are-you-sure.
 
+**5-second fill-bar Forget timer.** Added 2026-05-19 in
+lockstep with the Purse-detail iteration. The Forget button is
+initially disabled with a countdown label ("Forget · 5",
+"Forget · 4", …) **and a fill-bar that sweeps the button's
+background from `danger-soft` to full `danger` over the
+5 seconds** — pattern: Discord "Hold to leave call", iOS
+"Hold to confirm". Cancel is active throughout. Misfire-
+prevention chrome — gives the user 5 seconds to read the body
+and prevents a tap-storm from firing the destructive path,
+with a visual cue that the action is "charging up". Same
+timer + fill-bar lives on the Purse-detail Forget modal;
+destructive-action consistency across Holding types.
+
 **"Forget" cross-type vocabulary lock.** The destructive Settings-
 tab action is **"Forget"** across all Holding types — not
 "Remove" or "Delete". Reasoning: TK never custodies user funds
@@ -2594,4 +2612,658 @@ surface. For most Holding types, Forget literally just means
 The "Forget" vocabulary is locked across iteration B (Account
 detail) and inherited by the future Purse / Strongbox / Vault
 detail iterations.
+
+
+## Purse detail
+
+The per-Holding detail page for a Purse. Reached from the Home
+Holdings row tap. This is where the user goes to see their
+on-chain wallet balance, recent chain-side activity for the
+descriptor, and to configure the Purse (descriptor, recovery
+phrase access, sweep rules, Lightning, removal). Design pass
+opened and closed 2026-05-19 (Rémy greenlight on all eight
+validated mockups, including the future-iteration Pending-
+section preview); ships under ADR-0006 (purse modes) +
+ADR-0007 (browser-first with NativeBridge gates) +
+ADR-0009 (key custody model).
+
+The page anchors around three commitments inherited from the
+Account-detail iteration, plus three Purse-specific calls:
+
+1. **SSE-driven realtime** (inherited). No manual refresh
+   button anywhere. Balance + chain-side ledger updates land
+   via SSE; the user trusts the page to be live.
+2. **Banking-grade ergonomics** (inherited). Two-tab layout
+   (Operations | Settings) matches Revolut / N26 / Boursorama.
+   Single-unit hero (sats default, ↻ toggle cycles the whole
+   page — same component and state-key as Home and Account
+   detail).
+3. **Honest absence-of-affordance for deferred flows**
+   (inherited). Send / Receive / Add rule / Activate Lightning /
+   View recovery phrase / Upgrade-to-spending all render as
+   real action surfaces but route to coming-soon (or to the
+   real Send-blocked screen for WATCH_ONLY Send specifically).
+4. **One detail page across all three purse modes** (Purse-
+   specific). Mode-driven gating on a single page: same chrome,
+   same Operations tab, Settings differs by mode. The mode
+   shows up as a subtitle in the status card and as one
+   Settings section that varies. Forced-fork into per-mode
+   pages would share 80% chrome and drift over time; the
+   single-page-with-gating shape lets the page evolve once.
+5. **Send + Receive verb pair** (Purse-specific). For
+   Purse / Strongbox / Vault the Holding *is* the user's
+   wallet — "Send" = BTC leaves my wallet to someone else,
+   "Receive" = BTC arrives from someone else. No perspective
+   ambiguity because the Holding *is* the frame. Account
+   keeps Deposit / Withdraw because it's structurally a
+   different kind of thing (custodial pass-through, user
+   doesn't hold keys).
+6. **Mode-dependent Send routing** (Purse-specific).
+   `WATCH_ONLY` → real `Send-blocked` screen with two paths
+   (PSBT-for-source-wallet, upgrade-to-spending — both
+   currently coming-soon). `ON_DEVICE_*` → coming-soon stub
+   (the native-sign Send flow ships in the Send iteration).
+
+### Vocabulary lock
+
+- **"Operations"** — the activity-feed tab. Same lock as the
+  Account-detail iteration. Locked across spec, code, and
+  user-facing UI for all four Holding types.
+- **"Settings"** — the configure-this-Purse tab. Distinct
+  from the app-wide Settings nav item; this one is
+  per-Holding.
+- **"Watch-only" / "Spending wallet" / "Spending wallet ·
+  imported"** — the three mode labels as they appear in
+  user-facing copy. The internal enum names
+  (`WATCH_ONLY` / `ON_DEVICE_TK_GENERATED` /
+  `ON_DEVICE_USER_IMPORTED`) never appear in the UI. Locked.
+- **"Send" / "Receive"** — the action-row verb pair for
+  Purse / Strongbox / Vault. Cross-type lock.
+- **"Connected" / "Connection lost"** — the connection-state
+  copy in the status card. Same vocabulary as Account; for
+  Purse / Strongbox / Vault the dot reads
+  `system.chain.connection_state_changed` (bitcoind health)
+  instead of the provider topic.
+- **"Cannot reach the Bitcoin network"** — the
+  connection-error toast title. The user's mental model is
+  "the Bitcoin network", not "bitcoind".
+- **"Updated N min ago" / "Last seen N min ago"** — same
+  freshness vocabulary as Account. Locked.
+- **"Forget"** — destructive action verb. Cross-type lock
+  established in the Account-detail iteration. Per-type body
+  copy differs (see "Forget" section below).
+- **"Activate instant payments"** — locked vocabulary for
+  the Lightning-activation CTA in Settings. The earlier
+  "promote to Lightning wallet" framing was rejected
+  (developer-speak; "activate" is the user verb).
+- **"Recovery phrase"** — locked vocabulary for the BIP39
+  mnemonic. Not "seed phrase", not "mnemonic". Aligned with
+  Phoenix / BlueWallet / Sparrow's user-facing copy.
+- **"Descriptor"** — locked for the public-key descriptor
+  shown in Settings. Industry-standard term (BIP 380); the
+  Add-Purse-wizard already exposes it.
+
+### Page chrome (consistent across tabs)
+
+Stacked top-to-bottom:
+
+- **App bar** — back chevron returns to Home; Purse display
+  name centered (e.g. "Daily wallet" for an
+  ON_DEVICE_TK_GENERATED Purse, "Phoenix backup" for a
+  WATCH_ONLY Purse imported from Phoenix); right slot
+  reserved for future per-page actions, empty in v1.
+- **Status card** — auburn left-stripe
+  (`--color-holding-purse`, the Purse-type anchor from
+  palette v2 §4); mode label on the first line ("Watch-only" /
+  "Spending wallet" / "Spending wallet · imported"); dot +
+  state + middot + freshness on the second line. The whole
+  card is tap-to-refresh (force-poll on the chain-scan
+  service).
+- **Hero** — BTC balance in the user's active unit (sats
+  default), large tabular-nums; ↻ toggle next to the unit
+  label cycles the whole page sats ↔ BTC. **No non-BTC
+  cap-and-overflow row** (Purse is BTC-only by definition;
+  the Account row is structurally absent here).
+- **Action row** — Send + Receive, light-CTA weight
+  (`primary-soft` background, `primary-strong` text/icon),
+  arrow-and-wallet icons (Send: arrow leaving the wallet
+  upward; Receive: arrow descending into the wallet). The
+  icon pair is the new cross-type standard for Holdings
+  that are the user's own wallet — Strongbox and Vault
+  detail pages will adopt the same pair when those
+  iterations ship.
+- **Tab strip** — Operations | Settings, swipeable +
+  segmented control, sticky on scroll. Active-tab underline
+  = brand verdigris (same as Account detail).
+- **Bottom nav** — Home tab active.
+
+### Operations tab
+
+The activity feed of recent chain-side `LedgerEntry` rows
+for the Purse's descriptor (BDK observation). Each entry:
+
+- Text-only kind descriptor ("Received · BTC", "Sent · BTC").
+  No kind icons — same posture as the Account-detail Step 2
+  follow-up: don't commit to per-kind iconography before
+  the kind vocabulary has settled (Consolidation,
+  Self-transfer, change handling, etc. will all need their
+  own bucket eventually).
+- Relative time ("3h ago", "yesterday", "5d ago"). Switches
+  to absolute date past ~7 days ("May 10").
+- **Category chip** (when a category is set) below the
+  kind/time line — small muted pill (`color-text-muted`
+  on `color-bg`, pill radius). The chip is read-only on
+  this surface; assigning, renaming, and managing
+  categories happens on the dedicated Accounting page
+  (future navbar surface). Uncategorized rows render no
+  chip — no faint "Add category" affordance on the row
+  itself (avoids row-level clutter; the Accounting page
+  is the discoverable home for that workflow). **Purse-
+  only**: on-chain user-side movements warrant user
+  labels (the user decided to send BTC because they were
+  paying rent). Custodial Account ledger entries are the
+  provider's classifications of events that happened in
+  the provider's system (Kraken's "reward", "trade",
+  "fee") — categorizing those at the user-intent layer
+  is a category error, so Account-detail Operations
+  stays uncategorized. The categorization model is
+  captured in `backlog/push-driven-categorization-workflow.md`;
+  this iteration ships only the display chip.
+- Single-unit amount in the active unit, right-aligned,
+  sign-based color (positive `success-text-on-soft`,
+  negative `danger-text-on-soft`).
+- Pull-to-refresh on the whole scroll area triggers a
+  force-poll. No chrome at rest.
+
+**Empty state** (fresh Purse, no chain activity yet, or a
+newly imported watch-only Purse before the first scan
+returns): sober text-only panel. Title "No activity yet",
+sub "Incoming and outgoing payments will surface here as
+they hit the chain." No illustration.
+
+**Row layout is intentionally at the density limit.** Three
+lines per row (kind/time, optional category chip, amount)
+is a deliberate ceiling — adding a fourth line for
+settlement / confirmation status on every row would
+clutter the feed and add noise to entries that have long
+since settled past finality. The settlement-rails iteration
+(per `backlog/settlement-rails-payment-status-with-confirmation-probability.md`)
+will introduce a separate **Pending section above this
+main feed** that carries in-transit transactions with their
+finality percentage / block depth, and auto-promotes rows
+to this main feed when a configurable finality threshold
+is crossed. The current iteration's main-feed row layout
+is sized to stay compact under that future shape. Coding
+agent should not add a confirmation-status line to the
+current rows; the next iteration adds the Pending section
+above, not a fourth row line.
+
+**Pending-section visual contract (future-iteration
+preview).** `mobile_purse_detail_operations_populated_with_pending.html`
+sketches the target layout: an uppercase "Pending" section
+label above the main feed; tinted card rows on
+`primary-soft`; three lines per pending row (kind +
+amount / settlement-status + finality % / time + optional
+category) with an inline progress bar at the bottom of
+each row. Section collapses entirely when empty. The
+mockup is `Status: draft` and **out of the current
+iteration's coding scope** — it ships with the
+Settlement-rails iteration. It exists in this iteration so
+the visual contract is locked while we're already in the
+Operations tab design, rather than re-litigated later.
+
+### Settings tab — WATCH_ONLY variant
+
+Per-section configuration cards, iOS-style uppercase labels
+above each card:
+
+- **Wallet** — info-only. Line 1: "Watch-only". Line 2:
+  "Imported from descriptor on May 14, 2026. TallyKeep
+  doesn't hold the keys for this Purse." No CTA.
+- **Display name** — current display name + **Rename**
+  CTA. Pulled out of Danger zone in this iteration's
+  round-2 design pass; Rename is reversible and
+  non-destructive, grouping it with Forget was a category
+  error. Cross-type lockstep — the Account-detail Settings
+  mockup gets the same correction.
+- **Descriptor** — last 6 chars (mono, masked) + short
+  explanation + **Show** CTA. Tap to reveal the full
+  descriptor inline, with the Capacitor sensitive-screen
+  flag (FLAG_SECURE / iOS sensitive-screen) when the
+  NativeBridge ships. Once revealed, **Hide** replaces
+  **Show**. **No Copy affordance** — descriptors carry the
+  wallet's persistent identifier; per the privacy-first-
+  reveal memory, sensitive content gets a reveal toggle and
+  no Copy button (user can long-press text to select
+  manually if they really need to copy).
+- **Auto-sweep rules** — "None" + explanation + **Add
+  rule** CTA. Routes to SweepPolicy creation (coming-soon
+  stub).
+- **Instant payments** — **capability-gated for WATCH_ONLY**
+  (no on-device keys anywhere TallyKeep can reach). Row
+  visible with greyed styling, copy "Needs on-device keys ·
+  Lightning needs signing capability. Add the keys to this
+  Purse to enable instant payments." The **Activate** CTA
+  is disabled (`aria-disabled`, cursor: help) and on tap
+  surfaces a small explanation pointing the user to the
+  upgrade-path flow. The row stays visible (discoverability)
+  rather than being hidden, but doesn't promise a capability
+  it cannot deliver — per the no-dead-capability rule. See
+  the "Cross-client capability gating" note below for the
+  full three-state model.
+- **Danger zone** — last section, label in `danger` text
+  colour. **Forget only** (Rename moved out — see Display
+  name section). The WATCH_ONLY Forget body: "TallyKeep
+  forgets the descriptor and stops scanning the chain.
+  Funds at your source wallet are unaffected. Any
+  categories you've assigned to this Purse's activity are
+  erased with it." No seed-destruction warning panel
+  because there's no seed to destroy, but the
+  categorization-loss line carries across both modes
+  (Forget destroys the user's labels regardless of mode).
+
+**No Recovery phrase row** for WATCH_ONLY — the row would
+be a category error (no on-device keys to back up).
+
+**No Upgrade-to-spending entry in Settings** — the natural
+funnel is Send → Send-blocked screen → "Add the keys to
+this Purse". A Settings duplicate would split the funnel.
+The mode subtitle in the status card carries the at-rest
+signal that this is a watch-only Purse; the intent-driven
+Send funnel carries the action.
+
+### Settings tab — ON_DEVICE_TK_GENERATED variant
+
+Same shape as WATCH_ONLY (Display name section, Auto-sweep
+rules, Forget-only Danger zone) with four differences:
+
+- **Wallet** — Line 1: "Spending wallet". Line 2: "TallyKeep
+  generated this wallet's keys on May 14, 2026. They live on
+  this device only."
+- **Recovery phrase** (new row, between Descriptor and
+  Auto-sweep rules) — simple settings card in this
+  iteration. "View recovery phrase" + "View" CTA →
+  coming-soon stub. The wizard-style reveal tile (echoing
+  `mobile_add_holding_purse_generate.html`) was prototyped
+  2026-05-19 and deferred at Rémy's call: design the tile
+  alongside the real revealed-phrase screen rather than
+  introduce half-baked visual continuity here. When the
+  reveal mechanic ships (Security-health-system iteration,
+  lockstep with `seed-backup-disclosure`), the post-tap
+  revealed screen replicates
+  `mobile_add_holding_purse_generate_revealed.html`
+  exactly (same 12-word grid, handling instructions,
+  biometric gate, Capacitor sensitive-screen flag) — that
+  part is locked. The tile chrome around the reveal
+  trigger gets designed alongside it.
+- **Instant payments** — **active variant** on the seed-
+  holding Capacitor device (the sample mockup state).
+  Activate CTA → coming-soon. On a non-seed-holding client
+  (different phone, browser PWA, desktop PWA), the row
+  gates the same way as the WATCH_ONLY variant — greyed,
+  copy "These keys live on the device where this Purse was
+  created. Open TallyKeep there to activate instant
+  payments." Not mocked separately — same chrome as
+  WATCH_ONLY-greyed with different on-tap copy. Cross-client
+  capability gating principle below.
+- **Danger zone — Forget** — body copy emphasises seed
+  destruction AND categorization loss: "TallyKeep destroys
+  the keys on this device, forgets the descriptor, and
+  stops scanning the chain. Without a working backup of
+  your recovery phrase, the funds in this Purse become
+  permanently inaccessible. Any categories you've assigned
+  to this Purse's activity are erased with it. You can
+  re-import this Purse from your recovery phrase, but the
+  categorizations don't come back." Forget opens the
+  bottom-sheet modal at
+  `mobile_purse_detail_forget_confirm.html` which renders
+  the load-bearing warning panel + the fill-bar 5-second
+  timer.
+
+#### Cross-client capability gating
+
+Any seed-using affordance on the Purse detail page follows
+the same three-state pattern, evaluated at runtime per
+client (per ADR-0006 + ADR-0007):
+
+- **ON_DEVICE_* × the Capacitor device that holds the
+  seed** → row active, CTA fires the real flow (or routes
+  to coming-soon in this iteration's scope: Lightning,
+  Recovery-phrase reveal, native Send).
+- **ON_DEVICE_* × any other client** (different phone,
+  browser PWA on desktop or mobile) → row visible, greyed
+  with `settings-row--gated` styling, CTA disabled. On-tap
+  explanation: "These keys live on the device where this
+  Purse was created. Open TallyKeep there to [activate
+  instant payments / view your recovery phrase / send]."
+- **WATCH_ONLY × any client** → row visible, greyed, CTA
+  disabled. On-tap explanation: "[Capability] needs
+  signing capability. Add the keys to this Purse to enable
+  [it]." Links to the upgrade-path entry.
+
+Affordances covered by this gating today: Instant payments
+activation, Recovery phrase reveal, native Send. The
+runtime check is `NativeBridge.secureStorage.has(holding_id)`
+plus the `purse_mode` value; gating happens client-side, the
+backend never sees the capability question.
+
+### Settings tab — ON_DEVICE_USER_IMPORTED variant
+
+Not mocked in this iteration because the creation flow
+(upgrade-path) doesn't ship yet. Structurally identical to
+ON_DEVICE_TK_GENERATED with disclosure-copy framing
+differences:
+
+- **Wallet** line 2: "You imported this wallet's keys on …"
+  (instead of "TallyKeep generated …").
+- **Forget** warning copy stays the same — once the seed
+  is on this device, the destruction consequence is the
+  same regardless of where the seed originally came from.
+
+Sharpens with the `purse-upgrade-path` arbitration close
+(per `pre-implementation.md`) and the matching iteration
+file in `backlog/`.
+
+### Send routing — per purse_mode
+
+- **`WATCH_ONLY` × any client.** Send tap → real screen
+  `mobile_purse_detail_send_blocked_watch_only.html`. The
+  screen explains "TallyKeep doesn't hold the keys for this
+  Purse" and offers two paths:
+    1. **Sign with [source wallet]** — coming-soon stub.
+       The PSBT-export sub-flow (construct PSBT,
+       show as QR or copyable / file) ships with the Send
+       iteration. Source wallet name pulls from the Purse's
+       import metadata when available ("Phoenix",
+       "BlueWallet", "Sparrow"); generic "your source
+       wallet" when not.
+    2. **Add the keys to this Purse** — coming-soon stub.
+       Upgrade-path entry; ships per
+       `backlog/purse-upgrade-path-watch-only-on-device-imported.md`
+       once the structural arbitration closes.
+- **`ON_DEVICE_*` × Capacitor on the device that holds the
+  seed.** Send tap → coming-soon stub (the native Send flow
+  ships in the Send iteration). The seed-presence check
+  happens via `NativeBridge.secureStorage.has(holding_id)`
+  per ADR-0006; runtime per-client capability check.
+- **`ON_DEVICE_*` × any other client (different phone, or
+  browser PWA anywhere).** Send tap → coming-soon stub. The
+  "open on the device that holds the keys" gate is a
+  separate screen designed in the Send iteration.
+
+### Receive routing
+
+All Purse modes → coming-soon stub. Receive is mode-agnostic
+(address derivation is a public operation; backend can
+derive for any registered descriptor), but the Receive flow
+has its own UX surface (QR + BIP21 + tap-to-copy) and ships
+in its own iteration. No special-case routing per mode.
+
+### Behaviors
+
+**Unit toggle (sats ↔ BTC).** The ↻ next to the hero unit
+label cycles the whole page's amount displays (hero +
+activity entries). State is shared with the home-page hero
+and Account-detail hero — same preference key, same
+component. No per-page divergence.
+
+**Pull-to-refresh.** Standard iOS/Android overscroll gesture
+at scroll position 0 triggers a chain-side force-poll. When
+mid-list, the gesture scrolls back to top without triggering
+refresh. No conflict with normal scrolling.
+
+**Tap-to-refresh on the status card.** Tapping anywhere on
+the status card triggers a chain-side force-poll.
+Complementary path for users who don't know the pull gesture.
+Same affordance as Account detail.
+
+**SSE-driven live updates.** The chain-scan service emits
+ledger-entry events scoped to the Purse's descriptor;
+frontend subscribes and inserts new entries at the top of
+the activity feed and updates the displayed balance
+atomically. `system.chain.connection_state_changed` drives
+the status card's dot colour and triggers the
+connection-error toast on transitions to unreachable. SSE
+topic names land with the coding agent's implementation —
+they follow the conventions established in the Add-Purse-
+wizard iteration and the Account-detail iteration.
+
+**Connection-error toast.** On transition to unreachable, a
+`danger-soft` toast slides down from below the app bar with
+title "Cannot reach the Bitcoin network", dismiss ×, and
+"Try again now" CTA. Auto-dismisses after ~5 seconds.
+Re-appears on each failed retry. The page content itself
+renders normally — only the status card's red dot is
+persistent. The toast is the transient action prompt; the
+dot is the at-rest state.
+
+**Forget flow operationally (ON_DEVICE_*).** Frontend
+sequence on greenlight (Forget button enabled, user taps):
+(1) `NativeBridge.secureStorage.delete(holding_id)` — destroy
+the on-device seed entry; (2) backend Forget call — delete
+the descriptor row and related chain-side state; (3) user
+returns to Home, Purse row gone. If step 1 fails (Capacitor
+bridge unresponsive, secure-storage error), the entire
+Forget aborts with a `danger`-soft toast. The seed is NOT
+destroyed if any step fails; keeping the descriptor visible
+beats silent failure that leaves the user thinking the
+Purse is gone while the seed is still on the device.
+
+**Descriptor reveal.** Privacy-first-reveal pattern per the
+feedback memory. At rest: last 6 chars in mono. Tap
+**Show** → full descriptor in mono inside a bordered card,
+plus the Capacitor sensitive-screen flag (FLAG_SECURE / iOS
+sensitive-screen) when the NativeBridge ships. No Copy
+affordance in v1 (user can long-press to manually select if
+needed). Tap **Hide** to mask again.
+
+### Screens
+
+- **Operations tab — populated.** `mobile_purse_detail_operations_populated.html`.
+  Default state, ON_DEVICE_TK_GENERATED, non-zero balance, 6 chain-side entries.
+  Anchor mockup for the iteration; chrome conventions
+  defined here propagate to all six variants.
+- **Operations tab — empty.** `mobile_purse_detail_operations_empty.html`.
+  Fresh-Purse state: balance zero, sober text-only
+  empty-state panel.
+- **Settings tab — WATCH_ONLY.** `mobile_purse_detail_settings_watch_only.html`.
+  Mode = Watch-only, Wallet / Descriptor / Auto-sweep /
+  Instant payments / Danger zone (no Recovery phrase row).
+- **Settings tab — ON_DEVICE_TK_GENERATED.** `mobile_purse_detail_settings_on_device.html`.
+  Mode = Spending wallet, all six sections including
+  Recovery phrase (coming-soon stub).
+- **Forget confirm modal.** `mobile_purse_detail_forget_confirm.html`.
+  ON_DEVICE_* variant with the load-bearing warning panel
+  + 5-second timer (mid-countdown sample state).
+- **Connection-error toast variant.** `mobile_purse_detail_connection_error.html`.
+  Operations tab with red dot in the status card + slide-in
+  toast at the top + cached activity entries rendered
+  normally. Chain-side error, not provider-side.
+- **Send-blocked (WATCH_ONLY).** `mobile_purse_detail_send_blocked_watch_only.html`.
+  Real screen, sub-page chrome (no bottom nav), two
+  option cards (Sign with source wallet / Add the keys to
+  this Purse).
+
+### Reconcilability gauntlet (per PROCESS.md §3)
+
+1. *Trust boundary.* Page sits on the phone (UI); reads
+   from the backend (cached chain-scan state +
+   `LedgerEntry` rows for the descriptor). The descriptor
+   itself is public-key data — backend stores it freely.
+   Seeds for ON_DEVICE_* Purses live in the Capacitor
+   client's Keychain/Keystore, never reach the backend
+   (ADR-0009). The page never touches seeds for any flow
+   in this iteration's scope (Forget destroys the seed on
+   the client side before the backend Forget; the reveal
+   is deferred).
+2. *Keys and secrets.* WATCH_ONLY: no keys held by TK at
+   all. ON_DEVICE_*: seed in Capacitor secure storage on
+   the specific device that ran creation; biometric-gated
+   reveal (deferred to security-health iteration); seed
+   destruction on Forget via NativeBridge. No spending key
+   ever crosses to backend in any mode.
+3. *Self-hosted vs hosted.* Identical from the page's POV.
+   Both backends serve the chain-scan SSE topics and the
+   ledger queries; the connection-state dot reflects
+   whichever backend's chain-scan service the user is
+   connected to. Hosted-tier privacy notice (per
+   onboarding hosted-welcome) covers any descriptor-
+   level metadata that touches the hosted backend.
+4. *Confirmation honesty.* Freshness indicator is honest
+   about staleness ("Updated N min ago" updates live;
+   resets on each chain-scan SSE event). Balance is the
+   last-known scanned value; staleness signal carried by
+   the freshness indicator and the connection dot. The
+   connection-error toast surfaces transient drops; cached
+   entries stay visible without false confidence that the
+   data is live. The page does not display Send / Receive
+   state (no in-flight TX on this iteration — Send is
+   deferred), so the "no Sent ✓ before broadcast" rule
+   applies in the Send iteration, not here.
+5. *Browser-only fallback.* Fully functional in browser
+   build for WATCH_ONLY Purses (no signing path used).
+   For ON_DEVICE_*, the descriptor and the activity feed
+   render the same; Send is gated honestly (currently
+   routed to coming-soon; the Send iteration's "open on
+   the device that holds the keys" gate handles the
+   browser case). Forget on ON_DEVICE_* in browser PWA:
+   the secure-storage delete is a no-op in the browser
+   stub (no seed there to delete) — the backend Forget
+   still runs. Coding agent must surface this explicitly:
+   for an ON_DEVICE_* Purse Forget from a browser PWA, a
+   pre-modal warning must indicate that the seed lives on
+   the Capacitor device, not here, and Forgetting from
+   the browser will only destroy the backend record (the
+   on-device copy stays). This pre-modal sub-case is out
+   of scope for the initial mockup set; the coding agent
+   flags it for a follow-up if a real browser+Capacitor
+   user surfaces.
+6. *Open-source and reproducibility.* SSE topics consumed
+   (`system.chain.*`) are defined by the open-source
+   backend (FastAPI + BDK). NativeBridge secure-storage
+   interface is open-source MIT (per ADR-0007). No
+   closed-source dependency on the Purse-detail path.
+
+Verdict: reconcilable in current scope. The browser-Forget
+edge case is documented above with a coding-agent action
+item.
+
+### Notes
+
+**Two-tab structure inherited.** "Operations" and "Settings"
+remain the two tabs for the Purse detail page. Cross-type
+chrome lock from the Account-detail iteration.
+
+**Connection-status dot semantics confirmed.** Chain-based
+Holdings (Purse / Strongbox / Vault) use
+`system.chain.connection_state_changed` (bitcoind health).
+Same UI affordance as Account, per-type meaning. Locked.
+
+**Activity feed kind-icons deferred (same posture as
+Account).** Text-only kind descriptors. The chain-side kind
+vocabulary will grow once Blueprint analysis lands
+(Consolidation, Self-transfer, change detection); committing
+to per-kind icons before that vocabulary settles risks
+lock-in. Sign-based amount colour does the visual lift.
+
+**TK-initiated vs external on-chain event distinction
+deferred.** v1 renders all entries identically. The
+linkage data (whether a chain-side `Sent` originated from
+a TK-managed Send vs an external broadcast on the same
+descriptor) is captured in the chain-scan layer; the visual
+distinction lands when the linked-event arbitration closes.
+
+**Deferred CTAs route to coming-soon stubs.** Send (for
+ON_DEVICE_*; WATCH_ONLY's Send is real), Receive, Add
+rule, Activate Lightning (on-seed-device only — gated for
+all other cases), View recovery phrase. All route to a
+parameterized coming-soon screen mirroring
+`mobile_add_holding_coming_soon.html`.
+
+**Single Forget mockup covers both Purse modes.**
+`mobile_purse_detail_forget_confirm.html` renders the
+ON_DEVICE_* variant (the load-bearing one with the warning
+panel + seed-destruction body copy). The WATCH_ONLY variant
+omits the warning panel and uses shorter body copy ending
+with the categorization-loss line. Coding agent branches
+the body on `purse_mode`. The 5-second fill-bar timer
+applies to both variants.
+
+**Forget destroys user-assigned categorizations (both
+Purse modes).** When the user Forgets a Purse, TallyKeep
+deletes the descriptor and the chain-side `LedgerEntry`
+rows for it. User-assigned categories live on those
+entries, so they're erased too. This is irreversible —
+re-importing the same Purse from its recovery phrase (or
+re-importing the same descriptor for a WATCH_ONLY Purse)
+restores the wallet's tracking, but the categorization
+work doesn't come back: TK can't reattach old labels to
+freshly-rescanned entries. The Forget body copy spells
+this out on both variants — the user should know before
+they hit Forget. This was Rémy's catch in the 2026-05-19
+round-3 review. Applies regardless of mode because
+categorization is a Purse-level user investment, not a
+seed-level one.
+
+**5-second fill-bar Forget timer cross-type lock.** Same
+5-second disabled countdown on the Forget button as the
+Account-detail iteration (extended in lockstep with this
+iteration), with the matching **fill-bar background
+animation** sweeping from `danger-soft` to full `danger`
+over the 5s. Pattern: Discord "Hold to leave call", iOS
+"Hold to confirm". Implementation is CSS-only via a
+200%-wide horizontal gradient with animated
+`background-position`. Strongbox and Vault detail pages,
+when they ship, inherit both the timer and the fill-bar.
+
+**Rename out of Danger zone (cross-type lockstep).** Rename
+moved to its own "Display name" section on both Purse
+Settings variants and on the Account Settings mockup
+(2026-05-19 round-2 design pass). Rename is reversible and
+non-destructive; grouping it with Forget overloaded the
+Danger zone with a non-destructive action. Cross-type lock:
+Strongbox and Vault detail Settings will follow the same
+pattern.
+
+**Categorization is Purse-side, not Account-side.**
+Chain-side ledger entries (Purse / Strongbox / Vault) are
+the user's own movements and warrant user labels. Custodial
+Account ledger entries are the provider's classifications
+of events that happened in the provider's system —
+categorizing a Kraken "reward" or "trade" entry at the
+user-intent layer is a category error. The Operations tab
+on the Purse detail surfaces a read-only category chip on
+rows that have one; the Account-detail Operations tab does
+not. Assigning, renaming, and managing categories
+themselves lives on the dedicated Accounting page (future
+navbar surface), captured in
+`backlog/push-driven-categorization-workflow.md`.
+
+**Pending section (future-iteration preview, locked
+visually).** `mobile_purse_detail_operations_populated_with_pending.html`
+sketches a separate Pending section above the main feed,
+where in-transit transactions surface with finality
+percentage + block depth + inline progress bar. Out of
+this iteration's coding scope; ships with the
+Settlement-rails iteration per
+`backlog/settlement-rails-payment-status-with-confirmation-probability.md`.
+The visual contract was locked in this iteration so the
+next agent inherits the layout decision rather than
+re-litigating it.
+
+**Status card subtitle = mode label.** "Watch-only" /
+"Spending wallet" / "Spending wallet · imported" lives on
+status-card line 1 (analogous to Account's line 1 =
+provider name). Line 2 = chain-connection state +
+freshness. The user's at-rest signal of "what kind of
+Purse is this" is locked.
+
+**Action-row icons (cross-type call).** Arrow-and-wallet
+pair: Send = arrow leaving the wallet upward, Receive =
+arrow descending into the wallet. Locked for Purse;
+Strongbox and Vault detail pages will adopt the same pair
+when those iterations ship. Account keeps Deposit /
+Withdraw + card-with-arrow because Account is structurally
+a different kind of Holding (custodial pass-through, not
+the user's wallet).
 

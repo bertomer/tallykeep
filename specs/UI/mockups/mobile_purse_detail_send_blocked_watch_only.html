@@ -1,0 +1,303 @@
+<!--
+  Title: Mobile — Purse detail · Send (blocked, WATCH_ONLY)
+  Status: validated  (Rémy greenlight 2026-05-19 closing the Purse-detail-page design pass — iteration sketched 2026-05 in two rounds plus the round-3 categorization-loss + recovery-tile rollback + round-4 settlement-rails preview)
+  Date last touched: 2026-05-19
+  Replaces: nothing on disk. New screen for the WATCH_ONLY
+            Purse's Send tap.
+
+  Design notes:
+  - **This is a real screen, not a coming-soon stub.** Reached
+    by tapping Send on a WATCH_ONLY Purse's detail page. The
+    underlying truth (TallyKeep doesn't hold this Purse's
+    keys) is permanent for this Purse mode, not a
+    deferred-iteration issue — so a coming-soon stub would be
+    dishonest. The screen explains the situation and offers
+    two paths.
+  - **Why a dedicated screen rather than a sheet.** The two
+    options are forward-references to other flows; both deserve
+    full-screen real estate when they ship. Treating the
+    Send-blocked state as a destination (its own page) instead
+    of a confirmation sheet makes the user's "I want to spend
+    from this Purse" intent the load-bearing fact, with both
+    paths receiving equal weight.
+  - **Chrome.** Sub-page chrome (back chevron + centered title
+    "Send"), no bottom nav (sub-page convention from the
+    Add-Holding wizards). The user's mental anchor is "I'm
+    in the Send flow for [Purse name]".
+  - **Hero block.** Title "Keys aren't on this device" + a
+    short explanation paragraph. Sober, no danger framing —
+    this isn't an error; it's how watch-only wallets work.
+    The user picked WATCH_ONLY at registration time (or
+    inherited it from an import flow); the screen acknowledges
+    that without scolding.
+  - **Two option cards, stacked, equal weight.**
+      1. **"Sign with [source wallet]"** — Construct a PSBT
+         on TallyKeep, show it as a QR (or copyable text /
+         file export later) for the source wallet to sign and
+         broadcast. The source-wallet name pulls from the
+         Purse's import metadata when available ("Phoenix",
+         "BlueWallet", "Sparrow"); generic "your source
+         wallet" when not. CTA routes to coming-soon — the
+         PSBT-export sub-flow ships with the Send iteration.
+      2. **"Add the keys to this Purse"** — Upgrade-path
+         entry: import the source wallet's seed phrase or
+         xprv to this Purse so TallyKeep can sign natively.
+         CTA routes to coming-soon. The upgrade flow ships
+         per `backlog/purse-upgrade-path-watch-only-on-device-imported.md`
+         (lockstep with the structural arbitration in
+         `pre-implementation.md`'s `purse-upgrade-path`).
+  - **Card pattern.** Each card has an icon (left), title +
+    description (center, vertical stack), right chevron
+    (implicit "this navigates somewhere"). Tap anywhere on
+    the card activates it. Matches the
+    `mobile_add_holding_picker.html` row pattern from the
+    Add-Holding picker.
+  - **No power-user-toggle clutter.** The earlier
+    `holdings/02_purse.md` Send-flow §"WATCH_ONLY Purse"
+    sketch had Send hidden by default with a power-user
+    toggle to expose PSBT export. That sketch predates this
+    screen; the new shape promotes PSBT export to a primary
+    option (because it's the only honest spending path for
+    a WATCH_ONLY user who hasn't decided to import their
+    seed). The canonical doc is updated to reflect the new
+    target.
+  - **Mode-specific routing recap.** This screen exists for
+    WATCH_ONLY only. Tapping Send on ON_DEVICE_* (or
+    ON_DEVICE_USER_IMPORTED when it ships) routes to the
+    generic coming-soon stub; the native Send flow ships in
+    the Send iteration. The runtime per-client capability
+    check (per ADR-0006) for ON_DEVICE_* on a non-seed-
+    holding device adds a separate gate, designed in the
+    Send iteration.
+
+  Sample data:
+  - Purse name in app bar context: "Phoenix backup"
+    (illustrative — pulled from the Purse's display name at
+    runtime).
+  - Source wallet name in option 1: "Phoenix" (illustrative —
+    pulled from the Purse's source-wallet metadata; generic
+    "your source wallet" when absent).
+-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>TallyKeep — Mobile — Purse detail · Send (blocked, watch-only)</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="_shared/tokens.css">
+<link rel="stylesheet" href="_shared/shell.css">
+<style>
+  .phone-screen { background: var(--color-bg); }
+
+  .app-bar {
+    height: var(--mobile-app-bar);
+    flex-shrink: 0;
+    display: grid;
+    grid-template-columns: 44px 1fr 44px;
+    align-items: center;
+    padding: 0 var(--space-2);
+    background: var(--color-surface);
+    border-bottom: 1px solid var(--color-border);
+  }
+  .app-bar .back-btn {
+    width: 36px; height: 36px;
+    display: inline-flex; align-items: center; justify-content: center;
+    background: transparent; border: 0;
+    border-radius: var(--radius-md);
+    color: var(--color-text);
+    cursor: pointer;
+    justify-self: start;
+    margin-left: var(--space-2);
+  }
+  .app-bar .back-btn:hover { background: var(--color-bg); }
+  .app-bar .back-btn svg {
+    width: 22px; height: 22px;
+    stroke: currentColor; fill: none;
+    stroke-width: 2; stroke-linecap: round; stroke-linejoin: round;
+  }
+  .app-bar-title {
+    text-align: center;
+    font-size: var(--font-size-base);
+    font-weight: var(--font-weight-semibold);
+    color: var(--color-text);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .scroll-area { flex: 1; overflow-y: auto; }
+
+  .send-hero {
+    padding: var(--space-6) var(--space-5) var(--space-4);
+    text-align: left;
+  }
+  .send-hero .title {
+    font-size: var(--font-size-xl);
+    font-weight: var(--font-weight-semibold);
+    color: var(--color-text);
+    margin: 0 0 var(--space-3);
+    line-height: var(--line-height-tight);
+  }
+  .send-hero .body {
+    font-size: var(--font-size-sm);
+    color: var(--color-text-muted);
+    line-height: var(--line-height-default);
+    margin: 0;
+  }
+
+  .options-section-label {
+    margin: var(--space-4) var(--space-5) var(--space-2);
+    font-size: var(--font-size-xs);
+    color: var(--color-text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    font-weight: var(--font-weight-semibold);
+  }
+
+  .option-card {
+    display: grid;
+    grid-template-columns: 40px 1fr 18px;
+    align-items: center;
+    gap: var(--space-3);
+    margin: 0 var(--space-4) var(--space-3);
+    padding: var(--space-4);
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    text-align: left;
+    font-family: inherit;
+    width: calc(100% - var(--space-4) * 2);
+  }
+  .option-card:hover {
+    background: var(--color-surface-raised);
+    border-color: var(--color-border-strong);
+  }
+  .option-icon {
+    width: 40px; height: 40px;
+    border-radius: var(--radius-md);
+    background: var(--color-primary-soft);
+    color: var(--color-primary-strong);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .option-icon svg {
+    width: 22px; height: 22px;
+    stroke: currentColor; fill: none;
+    stroke-width: 2; stroke-linecap: round; stroke-linejoin: round;
+  }
+  .option-body { min-width: 0; }
+  .option-title {
+    font-size: var(--font-size-base);
+    font-weight: var(--font-weight-semibold);
+    color: var(--color-text);
+    line-height: var(--line-height-tight);
+  }
+  .option-desc {
+    font-size: var(--font-size-xs);
+    color: var(--color-text-muted);
+    margin-top: 4px;
+    line-height: var(--line-height-default);
+  }
+  .option-chevron {
+    width: 18px; height: 18px;
+    color: var(--color-text-dim);
+  }
+  .option-chevron svg {
+    width: 18px; height: 18px;
+    stroke: currentColor; fill: none;
+    stroke-width: 2; stroke-linecap: round; stroke-linejoin: round;
+  }
+</style>
+</head>
+<body>
+
+<div class="mockup-meta">
+  <strong>Mobile — Purse detail · Send (blocked, watch-only)</strong> ·
+  <span class="status-validated">validated</span> ·
+  2026-05-19 · 360×800
+</div>
+
+<div class="phone-frame">
+  <div class="phone-screen">
+
+    <div class="app-bar">
+      <button class="back-btn" aria-label="Back to Phoenix backup">
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <polyline points="15 6 9 12 15 18"/>
+        </svg>
+      </button>
+      <div class="app-bar-title">Send</div>
+      <div></div>
+    </div>
+
+    <div class="scroll-area">
+
+      <div class="send-hero">
+        <h1 class="title">Keys aren't on this device</h1>
+        <p class="body">
+          You added this Purse by importing a descriptor, so
+          TallyKeep watches the wallet but doesn't hold its
+          keys. To spend, the signing has to happen where the
+          keys live.
+        </p>
+      </div>
+
+      <div class="options-section-label">Pick how you want to sign</div>
+
+      <button class="option-card" type="button">
+        <span class="option-icon" aria-hidden="true">
+          <!-- QR-like glyph for "show as QR to source wallet" -->
+          <svg viewBox="0 0 24 24">
+            <rect x="3" y="3"  width="7" height="7" rx="1"/>
+            <rect x="14" y="3" width="7" height="7" rx="1"/>
+            <rect x="3" y="14" width="7" height="7" rx="1"/>
+            <line x1="14" y1="14" x2="17" y2="14"/>
+            <line x1="14" y1="17" x2="14" y2="20"/>
+            <line x1="17" y1="17" x2="21" y2="17"/>
+            <line x1="20" y1="20" x2="21" y2="20"/>
+          </svg>
+        </span>
+        <span class="option-body">
+          <span class="option-title">Sign with Phoenix</span>
+          <span class="option-desc">TallyKeep builds a payment for Phoenix to sign and broadcast. You'll scan a QR with Phoenix.</span>
+        </span>
+        <span class="option-chevron" aria-hidden="true">
+          <svg viewBox="0 0 24 24">
+            <polyline points="9 6 15 12 9 18"/>
+          </svg>
+        </span>
+      </button>
+
+      <button class="option-card" type="button">
+        <span class="option-icon" aria-hidden="true">
+          <!-- Key + plus glyph for "add the keys" -->
+          <svg viewBox="0 0 24 24">
+            <circle cx="9" cy="14" r="4"/>
+            <line x1="12" y1="11" x2="20" y2="3"/>
+            <line x1="17" y1="6" x2="20" y2="9"/>
+            <line x1="14" y1="9" x2="17" y2="12"/>
+          </svg>
+        </span>
+        <span class="option-body">
+          <span class="option-title">Add the keys to this Purse</span>
+          <span class="option-desc">Import the recovery phrase from your source wallet so TallyKeep can sign payments here directly.</span>
+        </span>
+        <span class="option-chevron" aria-hidden="true">
+          <svg viewBox="0 0 24 24">
+            <polyline points="9 6 15 12 9 18"/>
+          </svg>
+        </span>
+      </button>
+
+    </div>
+
+  </div>
+</div>
+
+</body>
+</html>

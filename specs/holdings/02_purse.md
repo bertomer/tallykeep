@@ -10,7 +10,7 @@ The Purse type carries a single mode field with three values:
 
 | `purse_mode` | On-device keys? | Seed source | Spending |
 |---|---|---|---|
-| `WATCH_ONLY` | No | Lives in another wallet (Phoenix, BlueWallet, Mutiny, Sparrow hot mode, etc.) | Send button greyed out; tap surfaces "Import the seed of this wallet into TallyKeep to enable spending" (per pending arbitration `purse-upgrade-path`), or redirect to the source wallet. |
+| `WATCH_ONLY` | No | Lives in another wallet (Phoenix, BlueWallet, Mutiny, Sparrow hot mode, etc.) | Send button visible; tap routes to a real "Send blocked" screen (`UI/mobile.md §Purse detail` → Send routing) with two paths: sign with the source wallet via PSBT, or add the keys to this Purse (upgrade-path entry per `backlog/purse-upgrade-path-watch-only-on-device-imported.md`). |
 | `ON_DEVICE_TK_GENERATED` | Yes | TallyKeep generated the seed during Add-Holding | Native sign via NativeBridge (biometric → sign in-app → broadcast). |
 | `ON_DEVICE_USER_IMPORTED` | Yes | User pasted a BIP39 mnemonic / xprv from another wallet (Mutiny shutdown migration, Phoenix-on-the-way-out, etc.) | Same as `ON_DEVICE_TK_GENERATED`. Differs only in disclosure copy and security-health framing (user already has a backup; "TallyKeep gave you this seed" wording does not apply). |
 
@@ -74,7 +74,7 @@ outcomes:
 
 | Purse mode × client | Outcome |
 |---|---|
-| `WATCH_ONLY` × any client | Always view-only. Send greyed out; tap surfaces import-seed affordance or source-wallet redirect. |
+| `WATCH_ONLY` × any client | Always view-only from TK's POV. Send button visible at the detail page; tap routes to the "Send blocked" screen with two paths: sign with the source wallet (PSBT QR), or add the keys to this Purse (upgrade-path). |
 | `ON_DEVICE_*` × Capacitor on the device that holds the seed | Send enabled. Biometric → sign in-app → broadcast. |
 | `ON_DEVICE_*` × Capacitor on a different device, or browser PWA anywhere | "Go sign on the device that holds the seed" gate. No PSBT export. No pretend-to-sign. |
 
@@ -155,13 +155,28 @@ for the upgrade affordance.
 
 ### `WATCH_ONLY` Purse
 
-Send is hidden by default. Primary affordance points the user at
-the source wallet ("Spend in [wallet]" with a deep-link where
-supported). A power-user toggle exposes "Construct PSBT for
-export" for the rare workflow that wants it.
+Send button is visible on the Purse detail page; tapping it
+routes to a real "Send blocked" screen (see
+`UI/mobile.md §Purse detail` → Send routing for the screen
+spec, mockup `mobile_purse_detail_send_blocked_watch_only.html`).
+The screen acknowledges that TallyKeep doesn't hold this
+Purse's keys and presents two equally-weighted paths:
 
-TallyKeep aggregates and observes; doesn't compete on spending
-UX where the source wallet already owns it.
+1. **Sign with the source wallet (PSBT)** — TallyKeep
+   constructs a PSBT and displays it as a QR (or copyable /
+   file later) for the source wallet (Phoenix, BlueWallet,
+   etc.) to sign and broadcast. Source-wallet name pulls
+   from import metadata when available.
+2. **Add the keys to this Purse** — Upgrade-path entry:
+   import the source wallet's recovery phrase to this
+   Purse so TallyKeep can sign natively. The flow ships
+   per `backlog/purse-upgrade-path-watch-only-on-device-imported.md`.
+
+The earlier "Send hidden by default + power-user PSBT-export
+toggle" sketch is retired: it hid the affordance that's
+load-bearing for a WATCH_ONLY user who wants to spend, and
+the new shape makes the choice between PSBT and upgrade
+explicit rather than burying one behind a toggle.
 
 ### `ON_DEVICE_TK_GENERATED` / `ON_DEVICE_USER_IMPORTED` Purse — on the device that holds the seed
 
@@ -237,14 +252,63 @@ arbitration) is Purse-specific in that it applies to
 `ON_DEVICE_TK_GENERATED` and `ON_DEVICE_USER_IMPORTED` Purses —
 both modes where TallyKeep holds the seed.
 
+## Purse detail page
+
+The per-Holding detail page surface for a Purse is specified
+in `UI/mobile.md §Purse detail`. Cross-type chrome decisions
+(SSE-driven freshness, two-tab Operations | Settings layout,
+shared unit-toggle, "Forget" cross-type vocabulary lock,
+5-second Forget-button timer for misfire prevention) carry
+over from the Account-detail iteration; Purse-specific
+calls are:
+
+- **Action-row verb pair: Send + Receive** (not Deposit /
+  Withdraw), because the Holding *is* the user's wallet —
+  no perspective ambiguity. The unified arrow-and-wallet
+  icon pair is the cross-type standard for Purse /
+  Strongbox / Vault detail pages.
+- **Status-card mode subtitle**: "Watch-only" / "Spending
+  wallet" / "Spending wallet · imported" — the user-facing
+  rendering of `purse_mode`. Locked vocabulary.
+- **Per-mode Send routing**: WATCH_ONLY taps the real
+  Send-blocked screen (see §Send flow above); ON_DEVICE_*
+  taps a coming-soon stub until the Send iteration ships.
+- **Per-mode Settings**: WATCH_ONLY omits the Recovery
+  phrase row; ON_DEVICE_TK_GENERATED includes it (routes
+  to coming-soon, deferred to the Security-health-system
+  iteration). ON_DEVICE_USER_IMPORTED Settings variant
+  sharpens with the upgrade-path iteration.
+- **Per-mode Forget**: WATCH_ONLY uses the descriptor-only
+  body copy ("funds at your source wallet are unaffected");
+  ON_DEVICE_* uses the load-bearing seed-destruction
+  warning panel + body copy spelling out the
+  permanent-loss-if-unbacked-up consequence. The warning
+  panel is non-negotiable for ON_DEVICE_*; it is the only
+  Holding-type case where Forget has on-chain consequences.
+  **Both variants** end with a categorization-loss
+  disclosure ("Any categories you've assigned to this
+  Purse's activity are erased with it") — Forget destroys
+  the chain-side ledger entries the user's category labels
+  attach to, regardless of mode. Re-importing the Purse
+  brings back tracking but not categorization work.
+- **Lightning (instant payments) activation**: a per-Purse
+  Settings entry exists for "Activate instant payments".
+  CTA routes to coming-soon until the Lightning iteration
+  ships (`backlog/lightning-support.md`).
+
+The detail page is the home for the upgrade-to-spending
+affordance for WATCH_ONLY Purses; per the design pass, the
+entry point is the Send-blocked screen (intent-driven
+funnel), not a separate promotion banner or Settings card.
+
 ## Deferred
 
 | Item | Tracked in |
 |---|---|
 | Pairing-based PSBT roundtrip between TallyKeep instances | `backlog/psbt-by-qr-roundtrip-on-mobile.md` |
 | Auto-sweep from an on-device Purse (and the broader Holding-to-Holding sweep UX) | `backlog/holding-to-holding-sweeps-beyond-account-originated.md` |
-| `ON_DEVICE_USER_IMPORTED` upgrade flow details | `pre-implementation.md` `purse-upgrade-path` |
-| Seed-backup disclosure full system | `pre-implementation.md` `seed-backup-disclosure` |
+| `ON_DEVICE_USER_IMPORTED` upgrade flow details | `pre-implementation.md` `purse-upgrade-path` + `backlog/purse-upgrade-path-watch-only-on-device-imported.md` |
+| Seed-backup disclosure full system | `pre-implementation.md` `seed-backup-disclosure` + `backlog/security-health-system.md` |
 | Lightning support per Purse | `concerns/lightning_placeholder.md` + `backlog/lightning-support.md` |
 | Receive in static / merchant mode | `backlog/receive-in-static-merchant-mode.md` |
 | Possible Purse / Strongbox vocabulary collapse (observation mode) | `backlog/possible-purse-strongbox-collapse.md` |

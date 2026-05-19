@@ -1,109 +1,48 @@
 <!--
-  Title: Mobile — Account detail · Settings tab (default state)
-  Status: validated  (Rémy re-greenlight 2026-05-19 on the lockstep changes from the Purse-detail iteration  (was validated 2026-05-17; 2026-05-19 edit pulls Rename out of the Danger zone into its own "Display name" section — cross-type lockstep with the Purse-detail iteration's correction. Rename is reversible / non-destructive; grouping it with Forget was a category error. Pending Rémy's re-greenlight on this small structural change.)
+  Title: Mobile — Purse detail · Settings tab (ON_DEVICE_TK_GENERATED)
+  Status: validated  (Rémy greenlight 2026-05-19 closing the Purse-detail-page design pass)
   Date last touched: 2026-05-19
   Replaces: nothing on disk; sibling to
-            mobile_account_detail_operations_populated.html.
+            mobile_purse_detail_settings_watch_only.html.
 
   Design notes:
-  - Same chrome as the populated/empty Operations mockups (app
-    bar, status card, hero, action row, tab strip, bottom nav).
-    The page-header chrome is consistent across tabs — the user
-    is on the same Account regardless of which tab they're
-    viewing. Below the tab strip, the content area swaps to
-    Settings.
-  - **Settings active tab.** Tab strip's verdigris underline now
-    sits under "Settings" (not Operations). Same component, same
-    sticky behaviour.
-  - **Section pattern.** Each settings topic is a card with:
-      - uppercase section label above the card (iOS-style),
-      - primary value or state on the first line,
-      - secondary description / meta on the second line,
-      - right-aligned CTA chip when an action exists.
-    Sections are vertically stacked with consistent spacing.
-  - **Sections in user-relevant order** (top to bottom):
-      1. **Provider** — display name + connection-establishment
-         date. Pure info, no CTA.
-      2. **Observation key** — last-4 chars of the API key (rest
-         masked) + configured date + "Replace key" CTA. Replace
-         routes to a coming-soon stub in v1 (per iteration B's
-         scope — see `backlog/` for the eventual
-         credential-rotation iteration).
-      3. **Withdrawal key** — "Not configured" + short
-         explanation + "Set up" CTA. Routes to the withdrawal
-         sub-flow (per
-         `backlog/account-withdrawal-key-sub-flow.md`). Once configured, this section
-         shows the last-4 chars of the withdraw key + a
-         Replace/Revoke CTA (out of scope for this mockup).
-      4. **Deposit address** — "Not configured" + short
-         explanation + "Set up" CTA. Routes to the deposit-
-         address-capture surface (per
-         `backlog/deposit-send-to-account-flow.md`). Once configured, this
-         section shows the address (truncated middle) + Replace
-         affordance (out of scope for this mockup).
-      5. **Auto-sweep rules** — "None" + explanation + "Add
-         rule" CTA. Routes to the SweepPolicy creation surface
-         (its own iteration). Once rules exist, this section
-         renders a small per-rule list (one summary line per
-         rule, e.g. "Outflow weekly Friday 03:00 → Strongbox" /
-         "Inflow 0.01 BTC monthly ← Purse") with edit / delete
-         per-row.
-      6. **Polling** — current cadence (default 10 min) + Change
-         CTA. Routes to a simple picker (1, 5, 10, 30, 60 min
-         per the spec). This one is real in v1 — no coming-soon
-         stub. The picker is small enough to live in this
-         iteration's scope; flag if the coding agent disagrees.
-      7. **Danger zone** — Rename + Forget, visually grouped as
-         the last section. Sober at rest (no red banner); the
-         destructive action's CTA is what carries the red. "Forget"
-         rather than "Remove" or "Delete" because TK never custodies
-         user funds and never destroys anything outside its own
-         observation surface — the verb describes what TK actually
-         does. Cross-type vocabulary lock across all Holding types.
-  - **Whitelist destination — section deferred until withdrawal
-    key is configured.** Honest absence-of-affordance: there's
-    no whitelist to display until the user sets up the
-    withdrawal credential. Once withdrawal key is in place, a
-    new "Withdrawal whitelist" section appears between Deposit
-    address and Auto-sweep rules. Out of scope for this mockup
-    (which is the fresh-account default state).
-  - **Danger zone visual treatment.** Pattern: GitHub /
-    Vercel-style sober card; section label colored in danger
-    text, destructive CTA in danger color, rest stays sober.
-    No red banner, no scary chrome. The visual weight comes
-    from the action button's color, not from the section
-    background.
-  - **Rename action.** Tap "Rename" opens an inline text input
-    (replaces the value line) or a small sheet — coding-agent
-    call, both work. Current implementation isn't visualised
-    here; only the at-rest state.
-  - **Forget action.** Tap "Forget" opens the two-button
-    bottom-sheet confirm modal (see
-    `mobile_account_detail_remove_confirm.html`).
-  - **Sticky tab strip.** Same as the Operations tab — the tab
-    strip pins to the top of the scroll area when the user
-    scrolls past the hero / action row. Allows the user to
-    switch back to Operations without scrolling all the way up.
-  - **Pull-down-to-refresh on Settings tab — same behaviour as
-    Operations.** Refresh hits the Account observation, which
-    re-fetches the credential status, polling cadence, sweep
-    rules. The Settings tab's content is mostly local state but
-    the per-row "is configured?" booleans depend on backend.
-
-  Sample data:
-  - Provider: Kraken
-  - Connection: healthy
-  - Updated: 2 min ago
-  - Balance: 4 231 055 sats
-  - Observation key configured May 16, 2026, last 4 chars "AbCd"
-  - Withdrawal key, deposit address, sweep rules: all not
-    configured (fresh account state, v1 scope)
+  - Same chrome as the watch-only variant; sections differ
+    per `purse_mode`.
+  - **Sections, top to bottom (ON_DEVICE_TK_GENERATED):**
+      1. Wallet — info-only "Spending wallet" + creation date.
+      2. Display name — current name + Rename CTA. Pulled out
+         of Danger zone (cross-type lockstep).
+      3. Descriptor — same masked-with-reveal pattern as
+         the watch-only variant.
+      4. Recovery phrase — simple settings card in this
+         iteration ("View recovery phrase" + "View" CTA →
+         coming-soon stub). The wizard-style reveal tile
+         (echoing mobile_add_holding_purse_generate.html) is
+         deferred to the Security-health iteration per Rémy
+         2026-05-19: design the tile alongside the real
+         revealed-phrase screen rather than introducing it
+         half-baked. When that ships, the post-tap revealed
+         screen replicates
+         mobile_add_holding_purse_generate_revealed.html
+         exactly — that part is locked.
+      5. Auto-sweep rules — "None" + "Add rule" → coming-soon.
+      6. Instant payments — **active variant** on the
+         seed-holding Capacitor device. Activate CTA →
+         coming-soon. On non-seed-holding clients, the row
+         gates the same way as WATCH_ONLY (greyed, "These
+         keys live on the device where this Purse was
+         created"). Not mocked separately.
+      7. Danger zone — **Forget only** (Rename moved to
+         section 2). ON_DEVICE_* Forget body: load-bearing
+         seed-destruction warning panel + body copy
+         spelling out permanent-loss-if-unbacked-up
+         consequence + categorization loss.
 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>TallyKeep — Mobile — Account detail · Settings</title>
+<title>TallyKeep — Mobile — Purse detail · Settings (Spending wallet)</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -113,7 +52,6 @@
 <style>
   .phone-screen { background: var(--color-bg); }
 
-  /* ---------- App bar ---------- */
   .app-bar {
     height: var(--mobile-app-bar);
     flex-shrink: 0;
@@ -150,19 +88,13 @@
     white-space: nowrap;
   }
 
-  /* ---------- Scroll area ---------- */
-  .scroll-area {
-    flex: 1;
-    overflow-y: auto;
-    padding-bottom: var(--space-5);
-  }
+  .scroll-area { flex: 1; overflow-y: auto; padding-bottom: var(--space-5); }
 
-  /* ---------- Status card ---------- */
   .status-card {
     margin: var(--space-3) var(--space-4) 0;
     background: var(--color-surface);
     border: 1px solid var(--color-border);
-    border-left: 4px solid var(--color-holding-account);
+    border-left: 4px solid var(--color-holding-purse);
     border-radius: var(--radius-md);
     padding: var(--space-3) var(--space-4);
     display: flex;
@@ -174,7 +106,7 @@
     font-family: inherit;
   }
   .status-card:hover { background: var(--color-surface-raised); }
-  .status-provider {
+  .status-mode {
     font-size: var(--font-size-sm);
     font-weight: var(--font-weight-semibold);
     color: var(--color-text);
@@ -188,21 +120,13 @@
     line-height: 1.4;
   }
   .status-sep { color: var(--color-text-dim); }
-  .status-dot {
-    width: 8px; height: 8px;
-    border-radius: 50%;
-    display: inline-block;
-    flex-shrink: 0;
-  }
+  .status-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; flex-shrink: 0; }
   .status-dot--healthy { background: var(--color-success); }
   .status-state { color: var(--color-text); font-weight: var(--font-weight-medium); }
 
-  /* ---------- Hero ---------- */
   .detail-hero {
     padding: var(--space-5) var(--space-4) var(--space-3);
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-2);
+    display: flex; flex-direction: column; gap: var(--space-2);
   }
   .hero-amount-line { display: flex; align-items: baseline; gap: var(--space-2); }
   .hero-amount {
@@ -226,14 +150,7 @@
     color: var(--color-text-muted);
     cursor: pointer; font-family: inherit;
   }
-  .hero-other-assets {
-    font-size: var(--font-size-xs);
-    color: var(--color-text-dim);
-    margin-top: var(--space-1);
-  }
-  .hero-other-assets .other-label { color: var(--color-text-muted); margin-right: var(--space-1); }
 
-  /* ---------- Action row ---------- */
   .action-row {
     display: grid;
     grid-template-columns: 1fr 1fr;
@@ -262,7 +179,6 @@
     stroke-width: 2; stroke-linecap: round; stroke-linejoin: round;
   }
 
-  /* ---------- Tab strip ---------- */
   .tab-strip {
     display: grid;
     grid-template-columns: 1fr 1fr;
@@ -300,7 +216,6 @@
     border-radius: var(--radius-sm) var(--radius-sm) 0 0;
   }
 
-  /* ---------- Settings sections ---------- */
   .settings-label {
     margin: var(--space-4) var(--space-5) var(--space-2);
     font-size: var(--font-size-xs);
@@ -372,7 +287,6 @@
     background: var(--color-danger-soft);
   }
 
-  /* ---------- Bottom nav ---------- */
   .bottom-nav {
     height: var(--mobile-bottom-nav);
     flex-shrink: 0;
@@ -417,9 +331,9 @@
 <body>
 
 <div class="mockup-meta">
-  <strong>Mobile — Account detail · Settings (default state)</strong> ·
+  <strong>Mobile — Purse detail · Settings (Spending wallet)</strong> ·
   <span class="status-validated">validated</span> ·
-  2026-05-17 · 360×800
+  2026-05-19 · 360×800
 </div>
 
 <div class="phone-frame">
@@ -431,14 +345,14 @@
           <polyline points="15 6 9 12 15 18"/>
         </svg>
       </button>
-      <div class="app-bar-title">Kraken account</div>
+      <div class="app-bar-title">Daily wallet</div>
       <div></div>
     </div>
 
     <div class="scroll-area">
 
-      <button class="status-card" type="button" aria-label="Account connection status — tap to refresh">
-        <span class="status-provider">Kraken</span>
+      <button class="status-card" type="button" aria-label="Wallet connection status — tap to refresh">
+        <span class="status-mode">Spending wallet</span>
         <span class="status-line">
           <span class="status-dot status-dot--healthy" aria-hidden="true"></span>
           <span class="status-state">Connected</span>
@@ -449,31 +363,29 @@
 
       <div class="detail-hero">
         <div class="hero-amount-line">
-          <span class="hero-amount">4 231 055</span>
+          <span class="hero-amount">1 250 000</span>
           <span class="hero-unit-label">sats<button class="unit-toggle" aria-label="Cycle unit: sats / BTC">↻</button></span>
-        </div>
-        <div class="hero-other-assets">
-          <span class="other-label">Other assets:</span>
-          USDT, ETH, ADA · + 9 more
         </div>
       </div>
 
       <div class="action-row">
-        <button class="action-btn" type="button" aria-label="Deposit BTC to this Account">
+        <button class="action-btn" type="button" aria-label="Send BTC from this wallet">
           <svg viewBox="0 0 24 24" aria-hidden="true">
-            <rect x="4" y="12" width="16" height="9" rx="1.5"/>
-            <line x1="12" y1="3" x2="12" y2="15"/>
-            <polyline points="8 11 12 15 16 11"/>
+            <rect x="5" y="11" width="14" height="9" rx="2"/>
+            <line x1="5" y1="15" x2="19" y2="15"/>
+            <line x1="12" y1="9" x2="12" y2="2"/>
+            <polyline points="8 6 12 2 16 6"/>
           </svg>
-          Deposit
+          Send
         </button>
-        <button class="action-btn" type="button" aria-label="Withdraw BTC from this Account">
+        <button class="action-btn" type="button" aria-label="Receive BTC into this wallet">
           <svg viewBox="0 0 24 24" aria-hidden="true">
-            <rect x="4" y="12" width="16" height="9" rx="1.5"/>
-            <line x1="12" y1="15" x2="12" y2="3"/>
-            <polyline points="8 7 12 3 16 7"/>
+            <rect x="5" y="11" width="14" height="9" rx="2"/>
+            <line x1="5" y1="15" x2="19" y2="15"/>
+            <line x1="12" y1="2" x2="12" y2="9"/>
+            <polyline points="8 5 12 9 16 5"/>
           </svg>
-          Withdraw
+          Receive
         </button>
       </div>
 
@@ -482,13 +394,13 @@
         <button class="tab tab--active" role="tab" aria-selected="true">Settings</button>
       </div>
 
-      <!-- Provider -->
-      <div class="settings-label">Provider</div>
+      <!-- Wallet -->
+      <div class="settings-label">Wallet</div>
       <div class="settings-card">
         <div class="settings-row">
           <div class="settings-body">
-            <div class="settings-value">Kraken</div>
-            <div class="settings-meta">Connected via API since May 16, 2026</div>
+            <div class="settings-value">Spending wallet</div>
+            <div class="settings-meta">TallyKeep generated this wallet's keys on May 14, 2026. They live on this device only.</div>
           </div>
         </div>
       </div>
@@ -498,46 +410,34 @@
       <div class="settings-card">
         <div class="settings-row">
           <div class="settings-body">
-            <div class="settings-value">Kraken account</div>
-            <div class="settings-meta">How this Account appears across TallyKeep.</div>
+            <div class="settings-value">Daily wallet</div>
+            <div class="settings-meta">How this Purse appears across TallyKeep.</div>
           </div>
           <button class="settings-cta" type="button">Rename</button>
         </div>
       </div>
 
-      <!-- Observation key -->
-      <div class="settings-label">Observation key</div>
+      <!-- Descriptor -->
+      <div class="settings-label">Descriptor</div>
       <div class="settings-card">
         <div class="settings-row">
           <div class="settings-body">
-            <div class="settings-value settings-value--mono">•••• AbCd</div>
-            <div class="settings-meta">Configured May 16, 2026</div>
+            <div class="settings-value settings-value--mono">•••• ZyXw98</div>
+            <div class="settings-meta">The public-key descriptor TallyKeep watches on the chain.</div>
           </div>
-          <button class="settings-cta" type="button">Replace</button>
+          <button class="settings-cta" type="button">Show</button>
         </div>
       </div>
 
-      <!-- Withdrawal key -->
-      <div class="settings-label">Withdrawal key</div>
+      <!-- Recovery phrase — simple settings card in this iteration -->
+      <div class="settings-label">Recovery phrase</div>
       <div class="settings-card">
         <div class="settings-row">
           <div class="settings-body">
-            <div class="settings-value settings-value--not-configured">Not configured</div>
-            <div class="settings-meta">Required to send BTC out of this Account to your other Holdings.</div>
+            <div class="settings-value">View recovery phrase</div>
+            <div class="settings-meta">The 12-word phrase that recovers this wallet's keys. Sensitive — only shown after biometric.</div>
           </div>
-          <button class="settings-cta" type="button">Set up</button>
-        </div>
-      </div>
-
-      <!-- Deposit address -->
-      <div class="settings-label">Deposit address</div>
-      <div class="settings-card">
-        <div class="settings-row">
-          <div class="settings-body">
-            <div class="settings-value settings-value--not-configured">Not configured</div>
-            <div class="settings-meta">Required to send BTC into this Account from your other Holdings.</div>
-          </div>
-          <button class="settings-cta" type="button">Set up</button>
+          <button class="settings-cta" type="button">View</button>
         </div>
       </div>
 
@@ -547,31 +447,31 @@
         <div class="settings-row">
           <div class="settings-body">
             <div class="settings-value settings-value--not-configured">None</div>
-            <div class="settings-meta">Move BTC in or out automatically on a schedule or threshold.</div>
+            <div class="settings-meta">Move BTC in or out of this Purse automatically on a schedule or threshold.</div>
           </div>
           <button class="settings-cta" type="button">Add rule</button>
         </div>
       </div>
 
-      <!-- Polling -->
-      <div class="settings-label">Polling</div>
+      <!-- Instant payments — active on the seed-holding device -->
+      <div class="settings-label">Instant payments</div>
       <div class="settings-card">
         <div class="settings-row">
           <div class="settings-body">
-            <div class="settings-value">Every 10 minutes</div>
-            <div class="settings-meta">How often TallyKeep observes balance and ledger changes at Kraken.</div>
+            <div class="settings-value settings-value--not-configured">Not enabled</div>
+            <div class="settings-meta">Add Lightning to this wallet for small, instant, low-fee payments.</div>
           </div>
-          <button class="settings-cta" type="button">Change</button>
+          <button class="settings-cta" type="button">Activate</button>
         </div>
       </div>
 
-      <!-- Danger zone — Forget only (Rename moved to its own "Display name" section above, 2026-05-19 lockstep with the Purse-detail iteration) -->
+      <!-- Danger zone — Forget only -->
       <div class="settings-label settings-label--danger">Danger zone</div>
       <div class="settings-card">
         <div class="settings-row">
           <div class="settings-body">
-            <div class="settings-value">Forget this Account</div>
-            <div class="settings-meta">TallyKeep forgets the credentials and stops observing. Your Kraken account itself is unaffected.</div>
+            <div class="settings-value">Forget this Purse</div>
+            <div class="settings-meta">TallyKeep destroys the keys on this device. Without a working recovery-phrase backup, the funds become permanently inaccessible. Any categories you've assigned to this Purse's activity are erased with it.</div>
           </div>
           <button class="settings-cta settings-cta--danger" type="button">Forget</button>
         </div>

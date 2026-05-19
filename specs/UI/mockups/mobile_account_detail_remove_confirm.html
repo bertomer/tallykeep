@@ -1,96 +1,48 @@
 <!--
   Title: Mobile — Account detail · Forget confirm
-  Status: validated  (Rémy greenlight 2026-05-17 closing the Account-detail-page design pass — iteration B mockup set: populated Operations, empty Operations, Settings, Remove confirm, connection-error toast)
-  Date last touched: 2026-05-17
+  Status: validated  (Rémy re-greenlight 2026-05-19 on the lockstep changes from the Purse-detail iteration. Was validated 2026-05-17; 2026-05-19 edit added the 5-second fill-bar timer on the Forget button + pulled Rename out of the Danger zone into its own "Display name" section. Cross-type lockstep with the Purse-detail iteration.)
+  Date last touched: 2026-05-19
   Replaces: nothing on disk. Revised 2026-05-17 after first design
-            review with Rémy. The type-to-confirm input was dropped
-            (too heavy for a reversible action; re-adding this
-            Account is one wizard-run away), replaced with a simple
-            two-button confirm: light-red Cancel + destructive-red
-            Forget. Action verb switched 2026-05-17 from "Remove"
-            to "Forget" — TK never custodies user funds and never
-            destroys anything outside its own observation surface,
-            so "Forget" describes what TK does more honestly than
-            "Remove" or "Delete". Cross-type vocabulary lock: every
-            Holding's Settings tab uses "Forget" as the destructive
-            action verb.
+            review with Rémy: type-to-confirm dropped, "Remove"
+            renamed to "Forget" across all Holding types.
+            2026-05-19: 5-second fill-bar countdown added; pattern
+            consistency with the Purse-detail Forget modal.
 
   Design notes:
-  - Bottom-sheet pattern. The modal rises from the bottom of the
-    screen, rounded top corners, dimmed backdrop covering the
-    Settings tab beneath. Standard mobile pattern (Revolut, Wise,
-    N26 destructive confirms all use this). Bottom sheet is more
-    thumb-friendly than a centered dialog and matches iOS/Android
-    native conventions.
-  - Underlying surface dimmed but visible. The Settings tab visible
-    underneath (faded ~40% opacity overlay) preserves context. The
-    user can see they came from a settings page. No full occlusion.
-    Tapping the dimmed area does NOT dismiss the modal (banking-app
-    convention for destructive confirms). Only Cancel or the
+  - Bottom-sheet pattern. Modal rises from the bottom, rounded top,
+    dimmed backdrop covers the Settings tab beneath. Standard mobile
+    pattern (Revolut, Wise, N26 destructive confirms).
+  - Underlying Settings tab dimmed but visible — preserves context.
+    Tapping the dimmed area does NOT dismiss. Only Cancel or the
     drag-down gesture dismisses.
-  - Title. "Forget this Account?" — direct question, no softening.
-    The user invoked this; the page acknowledges the intent.
-    "Forget" rather than "Remove" or "Delete" because TK literally
-    just forgets the credentials and stops observing — the user's
-    Kraken account and funds are untouched.
-  - Description. Four short sentences, one idea each, no
-    clause-joining em-dash per the feedback_no_midsentence_emdash
-    rule for user-facing copy.
-      1. What TK does (forget credentials, stop observing).
-      2. What TK does NOT do (touch the provider-side account).
-      3. What the user keeps (funds and history at the provider).
-      4. The reversal path (re-add via the wizard).
-    No "are you sure?" inside the body. The two-button confirm plus
-    the soft-red visual context is the are-you-sure.
-  - No type-to-confirm input. Dropped after the 2026-05-17 review.
-    Reasoning: the action is genuinely reversible. The user can
-    re-add this Account in 3 wizard steps if they misfire.
-    Type-to-confirm is justified when the action destroys
-    unrecoverable data (e.g. wiping a seed backup). Here the data is
-    the API credential (which the user can re-create on Kraken's
-    site if needed) and the cached ledger entries (which Kraken
-    still has). Over-gating a reversible action just adds friction
-    without security gain.
-  - Two-button confirm, both danger-themed.
-      - Cancel: light-red. `danger-soft` background, danger-text-
-        on-soft text, danger-border. Communicates "you're in a
-        delete-decision context" without claiming to BE destructive.
-        Sits to the LEFT (safe-action position per iOS convention).
-      - Forget: destructive red. `danger` filled background, white
-        text. The destructive primary. Sits to the RIGHT
-        (forward-action position).
-    The two-tone red signals "this whole sheet is about the delete
-    decision; one button cancels, one commits". Visual separation
-    comes from the fill / text contrast, not from one button being
-    neutral.
-  - Forget button enabled by default. No input to validate against.
-    The user taps Forget and the destructive-to-TK-state action
-    fires. The visual weight plus the soft-red context is the
-    confirmation surface.
-  - Keyboard handling note for the coding agent. Enter triggers
-    Forget (primary destructive action). Escape (hardware)
-    dismisses (= Cancel).
-  - Per-type body copy. This Account variant says "TallyKeep
+  - Title "Forget this Account?" — direct question, no softening.
+  - Body copy — four short sentences: what TK does (forget API
+    credentials, stop observing); what TK does NOT do (touch the
+    provider-side account); what the user keeps (funds and history
+    at the provider); the reversal path (re-add via the wizard).
+    No clause-joining em-dash (per feedback memory).
+  - Two-button confirm, both danger-themed. Cancel light-red on
+    the LEFT (safe-action position). Forget destructive red on the
+    RIGHT (forward-action position).
+  - **5-second fill-bar timer on the Forget button.** At rest the
+    button is disabled with a countdown label ("Forget · 5" → …
+    → "Forget · 1") and a fill-bar that sweeps the button's
+    background from `danger-soft` to full `danger` over 5 seconds.
+    Pattern: Discord "Hold to leave call", iOS "Hold to confirm".
+    CSS-only via a 200%-wide horizontal gradient with animated
+    `background-position`. Lockstep with the Purse-detail Forget
+    modal where the same pattern was introduced; destructive-
+    action consistency across Holding types.
+  - **Per-type body copy.** This Account variant says "TallyKeep
     forgets the API credentials and stops observing this Account".
-    Future detail pages (Strongbox, Vault, watch-only Purse) use
-    parallel copy ("TallyKeep forgets the descriptor and stops
-    scanning the chain for these addresses"). The TK-managed Purse
-    case is the load-bearing exception: TK also destroys the
-    on-device seed via NativeBridge, so the modal body adds an
-    explicit warning — "If you haven't backed up the recovery
-    phrase, you'll lose access to these funds permanently." That
-    Purse-managed warning is the only Holding-type case where
-    Forget has material on-chain consequences. Not in scope for
-    this Account mockup; flagged here for the Purse-detail
-    iteration.
-  - Out of scope for this mockup. Post-forget state (Account
-    vanishes from Home, redirect target) is the coding agent's
-    call; mockup ends at the user tapping Forget. Loading state
-    during the backend call is transient.
+    Purse/Strongbox/Vault detail pages carry parallel copy
+    appropriate to their Holding type.
 
   Sample data:
   - Account name: "Kraken account"
-  - Both buttons enabled at rest
+  - Cancel: enabled at rest
+  - Forget: disabled at rest with countdown ("Forget · 3" shown
+    as the mid-countdown sample state); enabled after 5s.
 -->
 <!DOCTYPE html>
 <html lang="en">
@@ -104,9 +56,6 @@
 <link rel="stylesheet" href="_shared/tokens.css">
 <link rel="stylesheet" href="_shared/shell.css">
 <style>
-  /* .phone-screen keeps shell.css defaults (position: absolute; inset: 0;
-     display: flex; overflow: hidden) — the absolute children below
-     anchor against it natively. */
   .phone-screen { background: var(--color-bg); }
 
   .context-shadow {
@@ -137,9 +86,9 @@
     opacity: 0.15;
     border-radius: var(--radius-sm);
   }
-  .context-row.short { width: 40%; }
+  .context-row.short  { width: 40%; }
   .context-row.medium { width: 60%; }
-  .context-row.tall { height: 60px; }
+  .context-row.tall   { height: 60px; }
 
   .modal-backdrop {
     position: absolute; inset: 0;
@@ -175,7 +124,6 @@
     line-height: var(--line-height-default);
     margin: 0 0 var(--space-4);
   }
-
   .modal-actions {
     display: grid;
     grid-template-columns: 1fr 1fr;
@@ -201,14 +149,39 @@
     color: #ffffff;
   }
   .btn-danger:hover { background: #9b2a14; }
+
+  /* Fill-bar countdown timer — see comments in
+     mobile_purse_detail_forget_confirm.html for the full
+     coding-agent contract. Pattern: Discord "Hold to leave call". */
+  .btn-danger-timer {
+    background:
+      linear-gradient(to right,
+        var(--color-danger) 50%,
+        var(--color-danger-soft) 50%);
+    background-size: 200% 100%;
+    background-position: 100% 0;
+    color: var(--color-danger-text-on-soft);
+    border: 1px solid var(--color-danger-border);
+    transition: background-position 5s linear, color 5s linear;
+    cursor: not-allowed;
+  }
+  .btn-danger-timer.counting {
+    background-position: 0% 0;
+    color: #ffffff;
+  }
+  .btn-danger-timer.mid {
+    background-position: 60% 0;
+    color: #b56849;
+  }
+  .btn-danger-timer:hover { background-color: transparent; }
 </style>
 </head>
 <body>
 
 <div class="mockup-meta">
-  <strong>Mobile — Account detail · Forget confirm</strong> ·
+  <strong>Mobile — Account detail · Forget confirm (mid-countdown)</strong> ·
   <span class="status-validated">validated</span> ·
-  2026-05-17 · 360×800
+  2026-05-19 · 360×800
 </div>
 
 <div class="phone-frame">
@@ -239,7 +212,7 @@
 
       <div class="modal-actions">
         <button class="btn btn-cancel" type="button">Cancel</button>
-        <button class="btn btn-danger" type="button">Forget</button>
+        <button class="btn btn-danger-timer mid" type="button" aria-disabled="true" disabled>Forget · 3</button>
       </div>
     </div>
 

@@ -1,0 +1,742 @@
+<!--
+  Title: Mobile — Purse detail · Operations tab (populated + Pending section preview)
+  Status: validated  (Rémy greenlight 2026-05-19 — visual contract locked for the Settlement-rails future iteration; NOT in current Purse-detail iteration coding scope)
+  Date last touched: 2026-05-19
+  Replaces: nothing. Sibling to
+            mobile_purse_detail_operations_populated.html — that
+            file is the CURRENT iteration's coding target (main
+            feed only, no Pending section); this file is the
+            FUTURE iteration's preview (Pending section above
+            the same main feed). Main feed below is visually
+            identical between the two files.
+
+  Design notes:
+  - **Why this preview exists in the current iteration.** Rémy's
+    catch during the 2026-05-19 round-4 review: row density of
+    the main feed (3 lines per row — kind/time + category chip +
+    amount) sits at a deliberate ceiling. Adding a fourth line
+    for "Confirmed 87%" on every row would clutter the feed and
+    add noise to entries that have long since crossed finality
+    thresholds. The right shape is a separate Pending section
+    above the main feed; this preview locks that decision before
+    a future agent re-litigates it.
+
+  - **Out of current scope.** Coding agent on the current
+    Purse-detail iteration does NOT implement the Pending
+    section. They implement the main feed only, per
+    `mobile_purse_detail_operations_populated.html`. The
+    Pending section ships with the Settlement-rails iteration
+    (its own design pass, backend work, and threat-model
+    nuance). This preview is the visual contract the future
+    iteration inherits.
+
+  - **Pending section anatomy.**
+      - **Section label.** Uppercase "Pending" — banking-norm.
+        Vocabulary not yet locked; alternatives "Settling" /
+        "In transit" carry the institutional-payment-rails
+        framing more honestly but read less familiar. Final
+        call deferred to the Settlement-rails iteration's
+        design pass.
+      - **Pending rows are visually distinct.** Tinted card
+        background (light primary-soft) + small left-side
+        progress accent bar (verdigris filling left-to-right
+        proportional to settlement progress). Clearly separates
+        "in-transit" from "settled" visually without screaming.
+      - **Each Pending row carries 3 lines:**
+          1. **Kind + amount** (same as main-feed rows).
+          2. **Settlement progress text + finality %**: e.g.
+             "In mempool · ~50% by next block", "3 of 6
+             confirmations · ~99% settled". Block depth is the
+             on-chain truth; finality % is the Nakamoto
+             probability derivation. Both visible because both
+             matter (% is the differentiator vs other apps; depth
+             is what the user can verify on any block explorer).
+          3. **Relative time + optional category chip** (same
+             chip vocabulary as the main feed; user can
+             categorize before confirmation).
+      - **Inline progress bar** runs across the bottom of each
+        row (1-2px tall), filling left-to-right as confirmations
+        accumulate. Visual cue at a glance; the percentage text
+        on line 2 is the precise number. The bar feels familiar
+        from package-tracking and delivery apps — Bitcoin's
+        in-transit state is the same shape of problem, and the
+        bar matches the user's existing mental model for
+        "thing is progressing toward done".
+      - **Tap-to-detail (chevron not shown in mockup — implicit).**
+        Tapping a pending row opens the transaction detail page
+        with the full status flow (Composed → Signed →
+        Acknowledged → Settled), per the Settlement-rails
+        backlog's full sketch. Transaction detail page is its
+        own future-iteration surface.
+      - **Auto-promotion.** When a pending row crosses the
+        configured finality threshold (default ~6 confirmations
+        / ~99.99% Nakamoto probability; user-configurable per
+        Holding in the Settlement-rails iteration), the row
+        animates out of the Pending section and into the top
+        of the main feed below. Smooth visual handoff —
+        position swap + tint fade.
+      - **Empty Pending state.** The whole section (label + cards)
+        collapses to nothing when there are no pending rows. No
+        chrome at rest — the section appears only when relevant.
+        This mockup shows the section populated (2 rows); the
+        common case is 0–2 entries.
+
+  - **Main feed below is unchanged** from
+    `mobile_purse_detail_operations_populated.html`. Settled
+    rows show 3 lines (kind/time, optional category chip,
+    amount) — no confirmation % or block depth, because every
+    entry there has settled past the threshold by definition.
+    The simplicity of the main feed IS a feature: rows in the
+    main feed are "done"; the user doesn't need finality
+    information anymore.
+
+  - **Vocabulary still open** for the Settlement-rails
+    iteration:
+      - "Pending" vs "Settling" vs "In transit" — section label
+      - "~99% settled" vs "T+3 block finality" vs "Confirmed
+        with 99% probability" — finality phrasing
+      - Final wording lands with the assumptions disclosure
+        (adversary hashpower model, natural-orphan baseline)
+        per the backlog file's "false precision" caveat.
+
+  - **Hero balance shows the same number as the main mockup.**
+    Pending transactions affect the displayed balance per the
+    backend's wallet-mode logic; the visible balance is what
+    BDK reports, which factors in mempool transactions
+    according to the configured policy. No special treatment
+    here — same balance, same hero. (Whether to display a
+    separate "pending" sub-balance is captured for the
+    Settlement-rails iteration to decide.)
+
+  Sample data (the two pending rows):
+  - Outgoing Send just broadcast: −75 000 sats, in mempool,
+    ~50% finality in next block.
+  - Incoming Receive partway confirmed: +120 000 sats, 3 of
+    6 confirmations, ~99% Nakamoto finality. Auto-promotes
+    in ~30 minutes when conf 6 lands.
+  Main feed below: same 6 rows as the main mockup.
+-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>TallyKeep — Mobile — Purse detail · Operations (populated + Pending preview)</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="_shared/tokens.css">
+<link rel="stylesheet" href="_shared/shell.css">
+<style>
+  .phone-screen { background: var(--color-bg); }
+
+  /* ---------- App bar ---------- */
+  .app-bar {
+    height: var(--mobile-app-bar);
+    flex-shrink: 0;
+    display: grid;
+    grid-template-columns: 44px 1fr 44px;
+    align-items: center;
+    padding: 0 var(--space-2);
+    background: var(--color-surface);
+    border-bottom: 1px solid var(--color-border);
+  }
+  .app-bar .back-btn {
+    width: 36px; height: 36px;
+    display: inline-flex; align-items: center; justify-content: center;
+    background: transparent; border: 0;
+    border-radius: var(--radius-md);
+    color: var(--color-text);
+    cursor: pointer;
+    justify-self: start;
+    margin-left: var(--space-2);
+  }
+  .app-bar .back-btn:hover { background: var(--color-bg); }
+  .app-bar .back-btn svg {
+    width: 22px; height: 22px;
+    stroke: currentColor; fill: none;
+    stroke-width: 2; stroke-linecap: round; stroke-linejoin: round;
+  }
+  .app-bar-title {
+    text-align: center;
+    font-size: var(--font-size-base);
+    font-weight: var(--font-weight-semibold);
+    color: var(--color-text);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .scroll-area { flex: 1; overflow-y: auto; }
+
+  /* ---------- Status card ---------- */
+  .status-card {
+    margin: var(--space-3) var(--space-4) 0;
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-left: 4px solid var(--color-holding-purse);
+    border-radius: var(--radius-md);
+    padding: var(--space-3) var(--space-4);
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    cursor: pointer;
+    text-align: left;
+    width: calc(100% - var(--space-4) * 2);
+    font-family: inherit;
+  }
+  .status-card:hover { background: var(--color-surface-raised); }
+  .status-mode {
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-weight-semibold);
+    color: var(--color-text);
+  }
+  .status-line {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-2);
+    font-size: var(--font-size-xs);
+    color: var(--color-text-muted);
+    line-height: 1.4;
+  }
+  .status-sep { color: var(--color-text-dim); }
+  .status-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; flex-shrink: 0; }
+  .status-dot--healthy { background: var(--color-success); }
+  .status-state { color: var(--color-text); font-weight: var(--font-weight-medium); }
+
+  /* ---------- Hero ---------- */
+  .detail-hero {
+    padding: var(--space-5) var(--space-4) var(--space-3);
+    display: flex; flex-direction: column; gap: var(--space-2);
+  }
+  .hero-amount-line { display: flex; align-items: baseline; gap: var(--space-2); }
+  .hero-amount {
+    font-family: var(--font-sans);
+    font-size: 36px;
+    font-weight: var(--font-weight-semibold);
+    color: var(--color-text);
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+  }
+  .hero-unit-label {
+    font-size: var(--font-size-md);
+    color: var(--color-text-muted);
+    font-weight: var(--font-weight-medium);
+    line-height: 1;
+  }
+  .unit-toggle {
+    background: transparent; border: 0;
+    padding: 0 0 0 2px; margin: 0;
+    font-size: 0.7em; vertical-align: super; line-height: 1;
+    color: var(--color-text-muted);
+    cursor: pointer; font-family: inherit;
+  }
+
+  /* ---------- Action row ---------- */
+  .action-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--space-3);
+    padding: var(--space-2) var(--space-4) var(--space-4);
+  }
+  .action-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-2);
+    padding: var(--space-3) var(--space-4);
+    background: var(--color-primary-soft);
+    border: 0;
+    border-radius: var(--radius-md);
+    font-family: inherit;
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-weight-semibold);
+    color: var(--color-primary-strong);
+    cursor: pointer;
+  }
+  .action-btn:hover { background: #c9e3d9; }
+  .action-btn svg {
+    width: 18px; height: 18px;
+    stroke: currentColor; fill: none;
+    stroke-width: 2; stroke-linecap: round; stroke-linejoin: round;
+  }
+
+  /* ---------- Tab strip ---------- */
+  .tab-strip {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    background: var(--color-bg);
+    border-top: 1px solid var(--color-border);
+    border-bottom: 1px solid var(--color-border);
+  }
+  .tab {
+    padding: var(--space-3) 0;
+    background: transparent;
+    border: 0;
+    font-family: inherit;
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-weight-medium);
+    color: var(--color-text-muted);
+    cursor: pointer;
+    position: relative;
+  }
+  .tab:hover { color: var(--color-text); }
+  .tab--active {
+    color: var(--color-text);
+    font-weight: var(--font-weight-semibold);
+  }
+  .tab--active::after {
+    content: '';
+    position: absolute;
+    left: 12%;
+    right: 12%;
+    bottom: -1px;
+    height: 2px;
+    background: var(--color-primary);
+    border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+  }
+
+  /* ---------- Pending section ---------- */
+  .pending-label {
+    margin: var(--space-4) var(--space-5) var(--space-2);
+    font-size: var(--font-size-xs);
+    color: var(--color-primary-strong);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    font-weight: var(--font-weight-semibold);
+  }
+  .pending-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+    padding: 0 var(--space-4);
+  }
+  .pending-entry {
+    background: var(--color-primary-soft);
+    border: 1px solid #c9e3d9;
+    border-radius: var(--radius-md);
+    padding: var(--space-3) var(--space-4) var(--space-2);
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    position: relative;
+    overflow: hidden;
+  }
+  .pending-line1 {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    align-items: baseline;
+    gap: var(--space-3);
+  }
+  .pending-kind {
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-weight-semibold);
+    color: var(--color-text);
+  }
+  .pending-amount {
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-weight-semibold);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+  .pending-amount--positive { color: var(--color-success-text-on-soft); }
+  .pending-amount--negative { color: var(--color-danger-text-on-soft); }
+  .pending-amount .unit {
+    color: var(--color-text-dim);
+    font-size: 10px;
+    margin-left: var(--space-1);
+    font-weight: var(--font-weight-normal);
+  }
+  .pending-line2 {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: var(--space-3);
+    font-size: var(--font-size-xs);
+    color: var(--color-primary-strong);
+    font-weight: var(--font-weight-medium);
+  }
+  .pending-line2-right {
+    font-variant-numeric: tabular-nums;
+    color: var(--color-primary-strong);
+    font-weight: var(--font-weight-semibold);
+  }
+  .pending-line3 {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    margin-top: 2px;
+    font-size: 10px;
+    color: var(--color-text-muted);
+  }
+  .pending-time { color: var(--color-text-muted); }
+  .pending-category {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    color: var(--color-text-muted);
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-pill);
+    padding: 1px var(--space-2);
+    line-height: 1.2;
+  }
+  .pending-category svg {
+    width: 10px; height: 10px;
+    stroke: currentColor; fill: none;
+    stroke-width: 2; stroke-linecap: round; stroke-linejoin: round;
+  }
+  /* Progress bar across the bottom of the pending row */
+  .pending-progress {
+    margin: var(--space-2) calc(var(--space-4) * -1) calc(var(--space-2) * -1);
+    height: 3px;
+    background: rgba(255,255,255,0.6);
+    overflow: hidden;
+  }
+  .pending-progress-fill {
+    height: 100%;
+    background: var(--color-primary);
+  }
+
+  /* ---------- Main feed ---------- */
+  .feed-label {
+    margin: var(--space-4) var(--space-5) var(--space-2);
+    font-size: var(--font-size-xs);
+    color: var(--color-text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    font-weight: var(--font-weight-semibold);
+  }
+  .activity-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    background: var(--color-surface);
+  }
+  .activity-entry {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: var(--space-3);
+    padding: var(--space-3) var(--space-4);
+    border-bottom: 1px solid var(--color-border);
+  }
+  .activity-entry:last-child { border-bottom: 0; }
+  .activity-main {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+  }
+  .activity-title {
+    font-size: var(--font-size-sm);
+    color: var(--color-text);
+    font-weight: var(--font-weight-medium);
+  }
+  .activity-time {
+    font-size: var(--font-size-xs);
+    color: var(--color-text-muted);
+  }
+  .activity-category {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 10px;
+    color: var(--color-text-muted);
+    background: var(--color-bg);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-pill);
+    padding: 1px var(--space-2);
+    margin-top: 4px;
+    width: max-content;
+    line-height: 1.2;
+  }
+  .activity-category svg {
+    width: 10px; height: 10px;
+    stroke: currentColor; fill: none;
+    stroke-width: 2; stroke-linecap: round; stroke-linejoin: round;
+  }
+  .activity-amount {
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-weight-semibold);
+    color: var(--color-text);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+    align-self: center;
+    text-align: right;
+  }
+  .activity-amount--positive { color: var(--color-success-text-on-soft); }
+  .activity-amount--negative { color: var(--color-danger-text-on-soft); }
+  .activity-amount .unit {
+    color: var(--color-text-dim);
+    font-size: 10px;
+    margin-left: var(--space-1);
+    font-weight: var(--font-weight-normal);
+  }
+
+  /* ---------- Bottom nav ---------- */
+  .bottom-nav {
+    height: var(--mobile-bottom-nav);
+    flex-shrink: 0;
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    background: var(--color-surface);
+    border-top: 1px solid var(--color-border);
+  }
+  .nav-item {
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    gap: 2px;
+    padding: var(--space-2) 0;
+    font-size: 10px;
+    color: var(--color-text-dim);
+    background: transparent; border: 0; cursor: pointer;
+  }
+  .nav-item .nav-ico {
+    width: 22px; height: 22px;
+    stroke: currentColor; fill: none;
+    stroke-width: 2; stroke-linecap: round; stroke-linejoin: round;
+  }
+  .nav-item.active {
+    color: var(--color-primary-strong);
+    font-weight: var(--font-weight-semibold);
+    position: relative;
+  }
+  .nav-item.active::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 20%;
+    right: 20%;
+    height: 2px;
+    background: var(--color-primary);
+    border-radius: 0 0 var(--radius-sm) var(--radius-sm);
+  }
+  .nav-item.enabled-inactive { color: var(--color-text-muted); }
+  .nav-item.disabled { color: var(--color-text-dim); opacity: 0.4; cursor: not-allowed; }
+</style>
+</head>
+<body>
+
+<div class="mockup-meta">
+  <strong>Mobile — Purse detail · Operations (populated + Pending preview)</strong> ·
+  <span class="status-validated">validated</span> ·
+  Future-iteration preview · 2026-05-19 · 360×800
+</div>
+
+<div class="phone-frame">
+  <div class="phone-screen">
+
+    <div class="app-bar">
+      <button class="back-btn" aria-label="Back to Holdings">
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <polyline points="15 6 9 12 15 18"/>
+        </svg>
+      </button>
+      <div class="app-bar-title">Daily wallet</div>
+      <div></div>
+    </div>
+
+    <div class="scroll-area">
+
+      <button class="status-card" type="button" aria-label="Wallet connection status — tap to refresh">
+        <span class="status-mode">Spending wallet</span>
+        <span class="status-line">
+          <span class="status-dot status-dot--healthy" aria-hidden="true"></span>
+          <span class="status-state">Connected</span>
+          <span class="status-sep">·</span>
+          <span>Updated 2 min ago</span>
+        </span>
+      </button>
+
+      <div class="detail-hero">
+        <div class="hero-amount-line">
+          <span class="hero-amount">1 295 000</span>
+          <span class="hero-unit-label">sats<button class="unit-toggle" aria-label="Cycle unit: sats / BTC">↻</button></span>
+        </div>
+      </div>
+
+      <div class="action-row">
+        <button class="action-btn" type="button" aria-label="Send BTC from this wallet">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <rect x="5" y="11" width="14" height="9" rx="2"/>
+            <line x1="5" y1="15" x2="19" y2="15"/>
+            <line x1="12" y1="9" x2="12" y2="2"/>
+            <polyline points="8 6 12 2 16 6"/>
+          </svg>
+          Send
+        </button>
+        <button class="action-btn" type="button" aria-label="Receive BTC into this wallet">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <rect x="5" y="11" width="14" height="9" rx="2"/>
+            <line x1="5" y1="15" x2="19" y2="15"/>
+            <line x1="12" y1="2" x2="12" y2="9"/>
+            <polyline points="8 5 12 9 16 5"/>
+          </svg>
+          Receive
+        </button>
+      </div>
+
+      <div class="tab-strip" role="tablist">
+        <button class="tab tab--active" role="tab" aria-selected="true">Operations</button>
+        <button class="tab" role="tab" aria-selected="false">Settings</button>
+      </div>
+
+      <!-- Pending section — collapses entirely when empty. Future-iteration surface. -->
+      <div class="pending-label">Pending</div>
+      <ul class="pending-list" aria-label="Pending transactions">
+
+        <!-- Just broadcast — in mempool, no confirmations yet -->
+        <li class="pending-entry">
+          <div class="pending-line1">
+            <span class="pending-kind">Sent · BTC</span>
+            <span class="pending-amount pending-amount--negative">−75 000<span class="unit">sats</span></span>
+          </div>
+          <div class="pending-line2">
+            <span>In mempool</span>
+            <span class="pending-line2-right">~50% by next block</span>
+          </div>
+          <div class="pending-line3">
+            <span class="pending-time">2 min ago</span>
+          </div>
+          <div class="pending-progress" aria-hidden="true">
+            <div class="pending-progress-fill" style="width: 8%"></div>
+          </div>
+        </li>
+
+        <!-- Partway confirmed — 3 of 6 -->
+        <li class="pending-entry">
+          <div class="pending-line1">
+            <span class="pending-kind">Received · BTC</span>
+            <span class="pending-amount pending-amount--positive">+120 000<span class="unit">sats</span></span>
+          </div>
+          <div class="pending-line2">
+            <span>3 of 6 confirmations</span>
+            <span class="pending-line2-right">~99% settled</span>
+          </div>
+          <div class="pending-line3">
+            <span class="pending-time">28 min ago</span>
+            <span class="pending-category">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><polyline points="3 7 9 13 21 5"/></svg>
+              Salary
+            </span>
+          </div>
+          <div class="pending-progress" aria-hidden="true">
+            <div class="pending-progress-fill" style="width: 50%"></div>
+          </div>
+        </li>
+
+      </ul>
+
+      <!-- Main feed (identical to the in-scope Operations populated mockup) -->
+      <div class="feed-label">Operations</div>
+      <ul class="activity-list" aria-label="Recent activity">
+
+        <li class="activity-entry">
+          <span class="activity-main">
+            <span class="activity-title">Received · BTC</span>
+            <span class="activity-time">3h ago</span>
+            <span class="activity-category">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><polyline points="3 7 9 13 21 5"/></svg>
+              Salary
+            </span>
+          </span>
+          <span class="activity-amount activity-amount--positive">+250 000<span class="unit">sats</span></span>
+        </li>
+
+        <li class="activity-entry">
+          <span class="activity-main">
+            <span class="activity-title">Sent · BTC</span>
+            <span class="activity-time">yesterday</span>
+            <span class="activity-category">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><polyline points="3 7 9 13 21 5"/></svg>
+              Groceries
+            </span>
+          </span>
+          <span class="activity-amount activity-amount--negative">−50 000<span class="unit">sats</span></span>
+        </li>
+
+        <li class="activity-entry">
+          <span class="activity-main">
+            <span class="activity-title">Sent · BTC</span>
+            <span class="activity-time">3d ago</span>
+          </span>
+          <span class="activity-amount activity-amount--negative">−12 500<span class="unit">sats</span></span>
+        </li>
+
+        <li class="activity-entry">
+          <span class="activity-main">
+            <span class="activity-title">Received · BTC</span>
+            <span class="activity-time">5d ago</span>
+            <span class="activity-category">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><polyline points="3 7 9 13 21 5"/></svg>
+              Self-transfer
+            </span>
+          </span>
+          <span class="activity-amount activity-amount--positive">+800 000<span class="unit">sats</span></span>
+        </li>
+
+        <li class="activity-entry">
+          <span class="activity-main">
+            <span class="activity-title">Sent · BTC</span>
+            <span class="activity-time">May 10</span>
+            <span class="activity-category">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><polyline points="3 7 9 13 21 5"/></svg>
+              Rent
+            </span>
+          </span>
+          <span class="activity-amount activity-amount--negative">−45 000<span class="unit">sats</span></span>
+        </li>
+
+        <li class="activity-entry">
+          <span class="activity-main">
+            <span class="activity-title">Received · BTC</span>
+            <span class="activity-time">May 6</span>
+          </span>
+          <span class="activity-amount activity-amount--positive">+307 500<span class="unit">sats</span></span>
+        </li>
+
+      </ul>
+
+    </div>
+
+    <div class="bottom-nav">
+      <button class="nav-item active">
+        <svg class="nav-ico" viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M 3 11 L 12 4 L 21 11"/>
+          <polyline points="5 10 5 20 19 20 19 10"/>
+        </svg>
+        Home
+      </button>
+      <button class="nav-item enabled-inactive">
+        <svg class="nav-ico" viewBox="0 0 24 24" aria-hidden="true">
+          <polyline points="4 12 9 17 20 6"/>
+        </svg>
+        Activity
+      </button>
+      <button class="nav-item enabled-inactive">
+        <svg class="nav-ico" viewBox="0 0 24 24" aria-hidden="true">
+          <circle cx="12" cy="12" r="3"/>
+          <path d="M 12 2 L 12 6 M 12 18 L 12 22 M 4 12 L 8 12 M 16 12 L 20 12 M 6.34 6.34 L 8.46 8.46 M 15.54 15.54 L 17.66 17.66 M 6.34 17.66 L 8.46 15.54 M 15.54 8.46 L 17.66 6.34"/>
+        </svg>
+        Settings
+      </button>
+      <button class="nav-item disabled">
+        <svg class="nav-ico" viewBox="0 0 24 24" aria-hidden="true">
+          <circle cx="12" cy="12" r="9"/>
+          <line x1="12" y1="8" x2="12" y2="12"/>
+          <line x1="12" y1="16" x2="12.01" y2="16"/>
+        </svg>
+        Help
+      </button>
+    </div>
+
+  </div>
+</div>
+
+</body>
+</html>
