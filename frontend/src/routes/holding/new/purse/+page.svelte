@@ -445,6 +445,19 @@
           }).catch(() => { /* non-critical — home will show "scanning" if bitcoind is unreachable */ })
         )
       );
+      // DEV ONLY — migrate seed to the real holding ID so the browser localStorage
+      // fallback in native-bridge.ts (the single capacitor↔localStorage switch) can find
+      // it on the detail page.  Remove this block before personal shipping: on a real device
+      // Capacitor Keychain stores the key under holdingId from the start (not pending).
+      if (mode === 'generate' && data?.id) {
+        try {
+          const pendingPhrase = await secureStorage.get('purse-pending-mnemonic');
+          if (pendingPhrase) {
+            await secureStorage.set(data.id, pendingPhrase);
+            await secureStorage.delete('purse-pending-mnemonic');
+          }
+        } catch { /* non-fatal in dev; real device never hits this path */ }
+      }
       if (nameEditing) { holdingName = finalName; nameEditing = false; }
       step = 'success';
     } catch {

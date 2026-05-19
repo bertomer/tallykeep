@@ -1,11 +1,11 @@
 """Auth endpoints — passphrase-validate and device management.
 
-POST /api/v1/auth/passphrase-validate   — phone calls to validate passphrase for unlock.
+POST /api/v1/auth/passphrase-validate   — phone unlock: validates passphrase, unlocks
+                                          the secret store, and emits system.unlocked.
+                                          Rate-limited. Exempt from both the lock
+                                          middleware and device-credential auth so it
+                                          works from a cold (locked) server.
 DELETE /api/v1/devices/{device_id}       — revoke a paired device credential.
-
-passphrase-validate is exempt from the device-credential auth requirement because it is
-the phone's fallback when it cannot present a credential (e.g. biometric failed). It is
-NOT exempt from the lock middleware — the store must be unlocked for comparison to work.
 """
 
 from __future__ import annotations
@@ -20,7 +20,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from tallykeep.api.dependencies import get_db_session, get_secret_store
-from tallykeep.infrastructure.secrets import NotInitializedError, SecretStore
+from tallykeep.infrastructure.secrets import NotInitializedError, SecretStore, WrongPassphraseError
 from tallykeep.models.paired_device import PairedDeviceRow
 
 router = APIRouter(tags=["auth"])
@@ -90,27 +90,36 @@ async def post_passphrase_validate(
     request: Request,
     store: SecretStore = Depends(get_secret_store),
 ) -> PassphraseValidateResponse:
-    """Phone-side passphrase validation for fallback unlock.
+    """Phone unlock: validate passphrase, unlock the secret store, emit system.unlocked.
 
-    The phone forwards the typed passphrase; this endpoint validates against
-    the server's Argon2id-derived canary. Rate-limited per ADR-0008.
+    Exempt from the lock middleware so it works against a cold (locked) server.
+    Rate-limited per ADR-0008.
     """
     client_ip = request.client.host if request.client else "unknown"
     rate_limits = _get_rate_limit_store(request)
 
-    # Raise 429 if over limit; does NOT record an attempt yet.
     _check_rate_limit(rate_limits, client_ip)
 
     try:
-        valid = store.validate_passphrase(body.passphrase)
+        store.unlock(body.passphrase)
     except NotInitializedError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
-
-    if not valid:
+    except WrongPassphraseError:
         rate_limits[client_ip]["failures"] += 1
         raise HTTPException(status_code=401, detail="Wrong passphrase")
 
     rate_limits[client_ip]["failures"] = 0
+
+    bus = getattr(request.app.state, "event_bus", None)
+    if bus is not None:
+        try:
+            bus.publish(
+                "system.unlocked",
+                {"topic": "system.unlocked", "timestamp": datetime.now(UTC).isoformat()},
+            )
+        except Exception:
+            pass
+
     return PassphraseValidateResponse(valid=True)
 
 

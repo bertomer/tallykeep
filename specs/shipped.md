@@ -14,6 +14,45 @@ commit.
 
 ---
 
+## 2026-05-20 — Purse detail page + Account Forget timer + unlock consolidation
+
+Purse detail page shipped at `/holding/[id]` for `purse`-type Holdings. Two-tab layout
+(Operations | Settings), SSE-driven chain-state freshness, auburn-stripe status card with
+mode subtitle ("Watch-only" / "Spending wallet"), hero with shared unit toggle, Send +
+Receive action row. Operations tab renders chain-side ledger entries newest-first with
+sign-based amount colour; empty-state panel for quiet Purses. Settings tab branches on
+`purse_mode`: WATCH_ONLY hides the Recovery-phrase row; ON_DEVICE variants show it
+routing to a coming-soon stub. Descriptor reveal is privacy-first (masked at rest, full on
+tap). Forget bottom-sheet has a 5-second fill-bar countdown timer, per-mode warning copy,
+and explicit inline error panel if `secureStorage.delete` fails before the backend call.
+
+The same 5-second Forget timer also landed on the Account detail Forget modal.
+
+Send-blocked screen shipped at `/holding/purse/[id]/send` for WATCH_ONLY mode (two
+option cards: PSBT-export and Add-keys, both routing to coming-soon stubs). All other
+Purse sub-flow routes (Receive, Recovery, Lightning, Auto-sweep, PSBT-export, Add-keys)
+are coming-soon stubs.
+
+**Unlock consolidation (post-greenlight fix):** `POST /api/v1/unlock` removed — it was
+unreachable in practice (LockMiddleware allowlist let it through, but the phone UI never
+called it). `POST /api/v1/auth/passphrase-validate` is now the single unlock path: added
+to the LockMiddleware allowlist, calls `store.unlock()` instead of
+`store.validate_passphrase()`, and emits `system.unlocked` on success. Rate limiting
+stays on this path. The split between "server unlock" and "phone auth" was an abstraction
+with no real-world caller; collapsing it fixed the `-KeepDb` restart flow where the server
+started locked and the phone had no working path to unlock it.
+
+**Dev tooling:** `dev-reset.ps1` / `dev-reset.sh` gain `-KeepDb` / `--keep-db` (wipes
+Redis + bitcoind, preserves postgres) and `-ResetPassphrase` / `--reset-passphrase`
+(clears crypto_parameters + canary so the store can be re-initialized without a full
+wipe). The `purse_mode` case mismatch fixed: backend enum values are lowercase
+(`on_device_tk_generated`, `watch_only`); UI comparisons were against uppercase strings.
+
+Canonical docs touched at closeout: `api/openapi.yaml` (5631 lines; `POST /api/v1/unlock`
+removed).
+
+---
+
 ## 2026-05-19 — Lock-aware worker + backend-only custodial ACL (ADR-0015 / ADR-0016)
 
 `CustodialPollHandler` retired from the backend entirely — its scheduler thread,
@@ -43,7 +82,7 @@ Post-Account-creation poll and manual refresh both migrated to
 `one_shot_custodial_poll(provider_id)` RQ jobs. `AccountCreateOut` gains
 `kickoff_job_id`. Manual refresh endpoint now returns `202 Accepted + {job_id}`.
 
-`backlog/worker-restart-locked-state-handshake.md` deleted — moot under the
+backlog/worker-restart-locked-state-handshake.md deleted — moot under the
 new design: `CustodialPoller` defaults to enabled on boot, so a mid-session
 worker restart reactivates dispatch immediately without waiting for a fresh
 `system.unlocked` event.

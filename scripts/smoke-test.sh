@@ -56,7 +56,7 @@ if curl -fsS -X POST -H "Content-Type: application/json" \
     show "initialize" "ok"
 else
     if curl -fsS -X POST -H "Content-Type: application/json" \
-            -d "$INIT_BODY" "${BASE_URL}/api/v1/unlock" >/dev/null 2>&1; then
+            -d "$INIT_BODY" "${BASE_URL}/api/v1/auth/passphrase-validate" >/dev/null 2>&1; then
         show "unlock" "ok (re-unlocked existing store)"
     else
         echo "  ERROR: could not unlock with passphrase '$PASSPHRASE'." >&2

@@ -1,11 +1,18 @@
 <!--
-  Account detail — /holding/[id]
-  Mockup contract (all validated 2026-05-17):
-    mobile_account_detail_operations_populated.html
-    mobile_account_detail_operations_empty.html
-    mobile_account_detail_settings.html
-    mobile_account_detail_remove_confirm.html
-    mobile_account_detail_connection_error.html
+  Account + Purse detail — /holding/[id]
+  Mockup contract (all validated):
+    mobile_account_detail_operations_populated.html    (2026-05-17)
+    mobile_account_detail_operations_empty.html        (2026-05-17)
+    mobile_account_detail_settings.html                (2026-05-17)
+    mobile_account_detail_remove_confirm.html          (2026-05-19 — fill-bar timer)
+    mobile_account_detail_connection_error.html        (2026-05-17)
+    mobile_purse_detail_operations_populated.html      (2026-05-19)
+    mobile_purse_detail_operations_empty.html          (2026-05-19)
+    mobile_purse_detail_settings_watch_only.html       (2026-05-19)
+    mobile_purse_detail_settings_on_device.html        (2026-05-19)
+    mobile_purse_detail_forget_confirm.html            (2026-05-19)
+    mobile_purse_detail_connection_error.html          (2026-05-19)
+    mobile_purse_detail_send_blocked_watch_only.html   (2026-05-19)
 -->
 <script lang="ts">
   import { onMount, onDestroy } from 'svelte';
@@ -49,10 +56,24 @@
     holding_type: string;
     name: string;
     created_at: string;
+    purse_mode: string | null;
     account_detail: AccountDetail | null;
   }
 
-  // ─── State ───────────────────────────────────────────────────────────────────
+  interface PurseLedgerEntry {
+    id: string;
+    direction: string;
+    net_amount_sats: number;
+    timestamp: string;
+    category: string | null;
+  }
+
+  interface PurseDescriptor {
+    id: string;
+    expression: string;
+  }
+
+  // ─── Core state ──────────────────────────────────────────────────────────────
 
   let holdingId = $derived($page.params.id ?? '');
   let serverUrl = $state('');
@@ -62,7 +83,8 @@
 
   let activeTab = $state<'operations' | 'settings'>('operations');
 
-  // Connection-error toast
+  // ─── Account: connection-error toast ─────────────────────────────────────────
+
   let toastDismissed = $state(false);
   let toastVisible = $derived(
     !toastDismissed &&
@@ -70,37 +92,108 @@
     (detail.connection_status === 'unreachable' || detail.connection_status === 'auth_failed')
   );
 
-  // Toast auto-dismiss after ~5s on each appearance
   $effect(() => {
     if (!toastVisible) return;
     const t = setTimeout(() => { toastDismissed = true; }, 5000);
     return () => clearTimeout(t);
   });
 
-  // Remove-confirm bottom sheet
+  // ─── Account: forget modal with fill-bar timer ────────────────────────────────
+
   let showRemoveConfirm = $state(false);
   let removing = $state(false);
+  let forgetCountdown = $state(5);
+  let forgetCounting = $state(false);
+  let forgetReady = $derived(forgetCountdown <= 0);
 
-  // Polling inline picker
+  $effect(() => {
+    if (showRemoveConfirm) {
+      forgetCountdown = 5;
+      forgetCounting = false;
+      requestAnimationFrame(() => { forgetCounting = true; });
+      const h = setInterval(() => {
+        forgetCountdown -= 1;
+        if (forgetCountdown <= 0) clearInterval(h);
+      }, 1000);
+      return () => {
+        clearInterval(h);
+        forgetCounting = false;
+        forgetCountdown = 5;
+      };
+    }
+  });
+
+  // ─── Account: other state ─────────────────────────────────────────────────────
+
   let showPollingPicker = $state(false);
   let pollingUpdating = $state(false);
 
-  // Rename inline
   let showRenameInput = $state(false);
   let renameValue = $state('');
   let renaming = $state(false);
 
-  // Freshness ticker
+  // ─── Purse state ─────────────────────────────────────────────────────────────
+
+  let purseBalance = $state(0);
+  let purseLedger = $state<PurseLedgerEntry[]>([]);
+  let purseDescriptors = $state<PurseDescriptor[]>([]);
+  let purseChainStatus = $state('healthy');
+  let purseLastFetched = $state<number | null>(null);
+  let purseToastDismissed = $state(false);
+  let purseRefreshing = $state(false);
+  let showDescriptor = $state(false);
+  let showPurseRenameInput = $state(false);
+  let purseRenameValue = $state('');
+  let purseRenaming = $state(false);
+  let showPurseForgetModal = $state(false);
+  let purseForgetCountdown = $state(5);
+  let purseForgetCounting = $state(false);
+  let purseForgetReady = $derived(purseForgetCountdown <= 0);
+  let purseForgetRemoving = $state(false);
+  let purseForgetError = $state(false);
+  let purseEventSource: EventSource | null = null;
+
+  let purseToastVisible = $derived(
+    !purseToastDismissed &&
+    snapshot?.holding_type === 'purse' &&
+    (purseChainStatus === 'unreachable' || purseChainStatus === 'degraded')
+  );
+
+  $effect(() => {
+    if (!purseToastVisible) return;
+    const t = setTimeout(() => { purseToastDismissed = true; }, 5000);
+    return () => clearTimeout(t);
+  });
+
+  $effect(() => {
+    if (showPurseForgetModal) {
+      purseForgetCountdown = 5;
+      purseForgetCounting = false;
+      purseForgetError = false;
+      requestAnimationFrame(() => { purseForgetCounting = true; });
+      const h = setInterval(() => {
+        purseForgetCountdown -= 1;
+        if (purseForgetCountdown <= 0) clearInterval(h);
+      }, 1000);
+      return () => {
+        clearInterval(h);
+        purseForgetCounting = false;
+        purseForgetCountdown = 5;
+      };
+    }
+  });
+
+  // ─── Freshness ticker ────────────────────────────────────────────────────────
+
   let now = $state(Date.now());
   let tickInterval: ReturnType<typeof setInterval> | null = null;
 
-  // SSE cleanup
-  let eventSource: EventSource | null = null;
+  // ─── SSE cleanup handles ─────────────────────────────────────────────────────
 
-  // Force-poll state (status card spinner)
+  let eventSource: EventSource | null = null;
   let refreshing = $state(false);
 
-  // ─── Derived ─────────────────────────────────────────────────────────────────
+  // ─── Helpers ─────────────────────────────────────────────────────────────────
 
   function dotClass(status: string): string {
     if (status === 'healthy') return 'status-dot--healthy';
@@ -129,11 +222,11 @@
   }
 
   function formatSats(n: number): string {
-    return n.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
+    return n.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
   }
 
   function formatBtc(sats: number): string {
-    return (sats / 1e8).toFixed(8).replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
+    return (sats / 1e8).toFixed(8).replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
   }
 
   function formatAmount(sats: number): string {
@@ -168,7 +261,7 @@
     const tickers = Object.keys(balances).sort();
     if (tickers.length === 0) return '';
     const top = tickers.slice(0, 3).join(', ');
-    const extra = tickers.length > 3 ? ` · + ${tickers.length - 3} more` : '';
+    const extra = tickers.length > 3 ? ` · + ${tickers.length - 3} more` : '';
     return top + extra;
   }
 
@@ -181,6 +274,59 @@
     return `Every ${secs}s`;
   }
 
+  // Purse-specific helpers
+
+  function purseModeLabel(mode: string | null): string {
+    if (!mode) return 'Wallet';
+    if (mode.startsWith('on_device')) return 'Spending wallet';
+    if (mode === 'watch_only') return 'Watch-only';
+    return 'Wallet';
+  }
+
+  function purseModeDesc(mode: string | null, createdAt: string): string {
+    const date = new Date(createdAt).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+    if (mode === 'on_device_tk_generated') return `TallyKeep generated this wallet's keys on ${date}. They live on this device only.`;
+    if (mode === 'on_device_user_imported') return `You imported this wallet's keys on ${date}. They live on this device only.`;
+    if (mode === 'watch_only') return `Imported from descriptor on ${date}. TallyKeep doesn't hold the keys for this Purse.`;
+    return `Created ${date}.`;
+  }
+
+  function purseChainStatusLabel(status: string): string {
+    if (status === 'healthy') return 'Connected';
+    if (status === 'degraded') return 'Degraded';
+    if (status === 'unreachable') return 'Connection lost';
+    return 'Connected';
+  }
+
+  function purseFreshness(): string {
+    if (!purseLastFetched) return '';
+    const diffMs = now - purseLastFetched;
+    const secs = Math.floor(diffMs / 1000);
+    const prefix = purseChainStatus === 'healthy' ? 'Updated' : 'Last seen';
+    if (secs < 60) return `${prefix} just now`;
+    const mins = Math.floor(secs / 60);
+    if (mins < 60) return `${prefix} ${mins} min ago`;
+    const hrs = Math.floor(mins / 60);
+    return `${prefix} ${hrs}h ago`;
+  }
+
+  function purseEntryTitle(e: PurseLedgerEntry): string {
+    if (e.direction === 'incoming') return 'Received · BTC';
+    if (e.direction === 'outgoing') return 'Sent · BTC';
+    return 'Transfer · BTC';
+  }
+
+  function purseEntryAmountClass(e: PurseLedgerEntry): string {
+    if (e.direction === 'incoming') return 'activity-amount--positive';
+    if (e.direction === 'outgoing') return 'activity-amount--negative';
+    return '';
+  }
+
+  function purseDescriptorMasked(expr: string): string {
+    if (!expr) return '•••• ??????';
+    return `•••• ${expr.slice(-6)}`;
+  }
+
   // ─── Lifecycle ───────────────────────────────────────────────────────────────
 
   onMount(async () => {
@@ -190,12 +336,18 @@
     serverUrl = (await secureStorage.get('server_url')) ?? '';
     await fetchSnapshot();
     tickInterval = setInterval(() => { now = Date.now(); }, 30_000);
-    subscribeSSE();
+    if (snapshot?.holding_type === 'purse') {
+      await fetchPurseAll();
+      subscribePurseSSE();
+    } else {
+      subscribeSSE();
+    }
   });
 
   onDestroy(() => {
     if (tickInterval !== null) clearInterval(tickInterval);
     eventSource?.close();
+    purseEventSource?.close();
   });
 
   // ─── Data fetching ───────────────────────────────────────────────────────────
@@ -225,14 +377,54 @@
     }
   }
 
+  async function fetchPurseBalance(): Promise<void> {
+    if (!serverUrl || !holdingId) return;
+    try {
+      const resp = await fetch(`${serverUrl}/api/v1/holdings/${holdingId}/summary`, {
+        headers: authHeaders(),
+      });
+      if (!resp.ok) return;
+      const data = await resp.json();
+      purseBalance = data.confirmed_sats ?? 0;
+    } catch { /* offline */ }
+  }
+
+  async function fetchPurseLedger(): Promise<void> {
+    if (!serverUrl || !holdingId) return;
+    try {
+      const resp = await fetch(
+        `${serverUrl}/api/v1/ledger-entries?holding_id=${holdingId}&limit=50`,
+        { headers: authHeaders() }
+      );
+      if (!resp.ok) return;
+      const data = await resp.json();
+      purseLedger = data.entries ?? [];
+    } catch { /* offline */ }
+  }
+
+  async function fetchPurseDescriptors(): Promise<void> {
+    if (!serverUrl || !holdingId) return;
+    try {
+      const resp = await fetch(
+        `${serverUrl}/api/v1/descriptors?holding_id=${holdingId}`,
+        { headers: authHeaders() }
+      );
+      if (!resp.ok) return;
+      purseDescriptors = await resp.json();
+    } catch { /* offline */ }
+  }
+
+  async function fetchPurseAll(): Promise<void> {
+    await Promise.all([fetchPurseBalance(), fetchPurseLedger(), fetchPurseDescriptors()]);
+    purseLastFetched = Date.now();
+  }
+
   // ─── SSE ─────────────────────────────────────────────────────────────────────
 
   function subscribeSSE(): void {
     if (!serverUrl || !holdingId) return;
     const topics = 'treasury.custodial.cycle_completed,treasury.custodial.ledger_entry_added,treasury.custodial.connection_state_changed';
     const hdrs = authHeaders();
-    // EventSource cannot send custom headers; pass the raw credential (without
-    // the "Bearer " prefix) as ?token= so the middleware can authenticate it.
     const rawCredential = (hdrs['Authorization'] ?? '').replace('Bearer ', '');
     const tokenParam = rawCredential ? `&token=${encodeURIComponent(rawCredential)}` : '';
     const url = `${serverUrl}/api/v1/events/stream?topics=${encodeURIComponent(topics)}${tokenParam}`;
@@ -262,6 +454,43 @@
         if (data.payload.new_status !== 'healthy') {
           toastDismissed = false;
         }
+      } catch { /* ignore */ }
+    });
+  }
+
+  function subscribePurseSSE(): void {
+    if (!serverUrl || !holdingId) return;
+    const topics = 'system.chain.connection_state_changed,holding.utxo.received,holding.utxo.spent';
+    const hdrs = authHeaders();
+    const rawCredential = (hdrs['Authorization'] ?? '').replace('Bearer ', '');
+    const tokenParam = rawCredential ? `&token=${encodeURIComponent(rawCredential)}` : '';
+    const url = `${serverUrl}/api/v1/events/stream?topics=${encodeURIComponent(topics)}${tokenParam}`;
+    purseEventSource = new EventSource(url);
+
+    purseEventSource.addEventListener('system.chain.connection_state_changed', (evt: MessageEvent) => {
+      try {
+        const data = JSON.parse(evt.data);
+        const status: string = data.payload?.new_status ?? 'healthy';
+        purseChainStatus = status;
+        if (status !== 'healthy') {
+          purseToastDismissed = false;
+        }
+      } catch { /* ignore */ }
+    });
+
+    purseEventSource.addEventListener('holding.utxo.received', (evt: MessageEvent) => {
+      try {
+        const data = JSON.parse(evt.data);
+        if (data.payload?.holding_id !== holdingId) return;
+        fetchPurseAll();
+      } catch { /* ignore */ }
+    });
+
+    purseEventSource.addEventListener('holding.utxo.spent', (evt: MessageEvent) => {
+      try {
+        const data = JSON.parse(evt.data);
+        if (data.payload?.holding_id !== holdingId) return;
+        fetchPurseAll();
       } catch { /* ignore */ }
     });
   }
@@ -319,6 +548,62 @@
     renameValue = snapshot?.name ?? '';
     showRenameInput = true;
   }
+
+  async function forcePurseRefresh(): Promise<void> {
+    if (purseRefreshing) return;
+    purseRefreshing = true;
+    try {
+      await fetchPurseAll();
+    } catch { /* ignore */ } finally {
+      purseRefreshing = false;
+    }
+  }
+
+  async function forgePurse(): Promise<void> {
+    if (!snapshot || purseForgetRemoving) return;
+    purseForgetRemoving = true;
+    try {
+      if (snapshot.purse_mode?.startsWith('on_device')) {
+        try {
+          await secureStorage.delete(holdingId);
+        } catch {
+          purseForgetError = true;
+          purseForgetRemoving = false;
+          return;
+        }
+      }
+      const resp = await fetch(`${serverUrl}/api/v1/holdings/${holdingId}/archive`, {
+        method: 'POST',
+        headers: authHeaders(),
+      });
+      if (resp.ok) {
+        goto('/home');
+      }
+    } catch { /* ignore */ } finally {
+      purseForgetRemoving = false;
+    }
+  }
+
+  function openPurseRename(): void {
+    purseRenameValue = snapshot?.name ?? '';
+    showPurseRenameInput = true;
+  }
+
+  async function submitPurseRename(): Promise<void> {
+    if (!purseRenameValue.trim()) return;
+    purseRenaming = true;
+    try {
+      await fetch(`${serverUrl}/api/v1/holdings/${holdingId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', ...authHeaders() },
+        body: JSON.stringify({ name: purseRenameValue.trim() }),
+      });
+      await fetchSnapshot();
+      showPurseRenameInput = false;
+    } catch { /* ignore */ } finally {
+      purseRenaming = false;
+    }
+  }
 </script>
 
 <div class="phone-screen safe-top safe-bottom">
@@ -334,42 +619,328 @@
     <div></div>
   </div>
 
-  <!-- Scroll area (pull-to-refresh target) -->
+  <!-- Scroll area -->
   <div class="scroll-area">
 
-    <!-- Connection-error toast (slides in when connection lost / auth failed) -->
-    {#if toastVisible}
-      <div class="connection-toast" role="alert">
-        <div class="toast-row">
-          <span class="toast-title">
-            {#if detail?.connection_status === 'auth_failed'}
-              Your {detail.display_name} API key is no longer valid
-            {:else}
-              Connection lost · {freshness(detail?.last_polled_at ?? null)}
-            {/if}
-          </span>
-          <button class="toast-close" aria-label="Dismiss" onclick={() => { toastDismissed = true; }}>
-            <svg viewBox="0 0 24 24" aria-hidden="true">
-              <line x1="18" y1="6" x2="6" y2="18"/>
-              <line x1="6" y1="6" x2="18" y2="18"/>
-            </svg>
-          </button>
-        </div>
-        {#if detail?.connection_status === 'auth_failed'}
-          <button class="toast-retry" type="button"
-            onclick={() => goto(`/holding/account/${holdingId}/obs-key/replace`)}>
-            Replace key
-          </button>
-        {:else}
-          <button class="toast-retry" type="button" onclick={forcePoll}>
+    {#if snapshot?.holding_type === 'purse'}
+
+      <!-- ── Purse: connection-error toast ── -->
+      {#if purseToastVisible}
+        <div class="connection-toast" role="alert">
+          <div class="toast-row">
+            <span class="toast-title">Cannot reach the Bitcoin network</span>
+            <button class="toast-close" aria-label="Dismiss"
+              onclick={() => { purseToastDismissed = true; }}>
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <line x1="18" y1="6" x2="6" y2="18"/>
+                <line x1="6" y1="6" x2="18" y2="18"/>
+              </svg>
+            </button>
+          </div>
+          <button class="toast-retry" type="button" onclick={forcePurseRefresh}>
             Try again now
           </button>
-        {/if}
-      </div>
-    {/if}
+        </div>
+      {/if}
 
-    {#if detail}
-      <!-- Status card (tap to force-refresh) -->
+      <!-- ── Purse: status card ── -->
+      <button
+        class="status-card status-card--purse"
+        type="button"
+        aria-label="Wallet connection status — tap to refresh"
+        onclick={forcePurseRefresh}
+        disabled={purseRefreshing}
+      >
+        <span class="status-mode">{purseModeLabel(snapshot?.purse_mode ?? null)}</span>
+        <span class="status-line">
+          {#if purseRefreshing}
+            <span class="status-spinner" aria-hidden="true">⟳</span>
+          {:else}
+            <span class="status-dot {dotClass(purseChainStatus)}" aria-hidden="true"></span>
+          {/if}
+          <span class="status-state">{purseChainStatusLabel(purseChainStatus)}</span>
+          {#if purseLastFetched}
+            <span class="status-sep">·</span>
+            <span>{purseFreshness()}</span>
+          {/if}
+        </span>
+      </button>
+
+      <!-- ── Purse: hero balance ── -->
+      <div class="detail-hero">
+        <div class="hero-amount-line">
+          <span class="hero-amount">
+            {preferences.unit === 'sats' ? formatSats(purseBalance) : formatBtc(purseBalance)}
+          </span>
+          <span class="hero-unit-label">
+            {preferences.unit === 'sats' ? 'sats' : 'BTC'}<button
+              class="unit-toggle"
+              aria-label="Cycle unit: sats / BTC"
+              onclick={preferences.cycleUnit}
+            >↻</button>
+          </span>
+        </div>
+      </div>
+
+      <!-- ── Purse: action row ── -->
+      <div class="action-row">
+        <button class="action-btn" type="button" aria-label="Send BTC from this wallet"
+          onclick={() => goto(`/holding/purse/${holdingId}/send`)}>
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <rect x="5" y="11" width="14" height="9" rx="2"/>
+            <line x1="5" y1="15" x2="19" y2="15"/>
+            <line x1="12" y1="9" x2="12" y2="2"/>
+            <polyline points="8 6 12 2 16 6"/>
+          </svg>
+          Send
+        </button>
+        <button class="action-btn" type="button" aria-label="Receive BTC into this wallet"
+          onclick={() => goto(`/holding/purse/${holdingId}/receive`)}>
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <rect x="5" y="11" width="14" height="9" rx="2"/>
+            <line x1="5" y1="15" x2="19" y2="15"/>
+            <line x1="12" y1="2" x2="12" y2="9"/>
+            <polyline points="8 5 12 9 16 5"/>
+          </svg>
+          Receive
+        </button>
+      </div>
+
+      <!-- ── Purse: tab strip ── -->
+      <div class="tab-strip" role="tablist">
+        <button
+          class="tab {activeTab === 'operations' ? 'tab--active' : ''}"
+          role="tab"
+          aria-selected={activeTab === 'operations'}
+          onclick={() => { activeTab = 'operations'; }}
+        >Operations</button>
+        <button
+          class="tab {activeTab === 'settings' ? 'tab--active' : ''}"
+          role="tab"
+          aria-selected={activeTab === 'settings'}
+          onclick={() => { activeTab = 'settings'; }}
+        >Settings</button>
+      </div>
+
+      <!-- ── Purse: Operations tab ── -->
+      {#if activeTab === 'operations'}
+        {#if purseLedger.length === 0}
+          <div class="activity-empty">
+            <div class="title">No activity yet</div>
+            <div class="sub">Incoming and outgoing payments will surface here as they hit the chain.</div>
+          </div>
+        {:else}
+          <ul class="activity-list" aria-label="Recent activity">
+            {#each purseLedger as entry (entry.id)}
+              <li class="activity-entry">
+                <span class="activity-main">
+                  <span class="activity-title">{purseEntryTitle(entry)}</span>
+                  <span class="activity-time">{entryTime(entry.timestamp)}</span>
+                  {#if entry.category}
+                    <span class="activity-category">
+                      <svg viewBox="0 0 24 24" aria-hidden="true">
+                        <polyline points="3 7 9 13 21 5"/>
+                      </svg>
+                      {entry.category}
+                    </span>
+                  {/if}
+                </span>
+                <span class="activity-amount {purseEntryAmountClass(entry)}">
+                  {entry.direction === 'incoming' ? '+' : '−'}{formatAmount(entry.net_amount_sats)}<span class="unit">{preferences.unit === 'sats' ? 'sats' : 'BTC'}</span>
+                </span>
+              </li>
+            {/each}
+          </ul>
+        {/if}
+      {/if}
+
+      <!-- ── Purse: Settings tab ── -->
+      {#if activeTab === 'settings'}
+
+        <!-- Wallet -->
+        <div class="settings-label">Wallet</div>
+        <div class="settings-card">
+          <div class="settings-row">
+            <div class="settings-body">
+              <div class="settings-value">{purseModeLabel(snapshot?.purse_mode ?? null)}</div>
+              <div class="settings-meta">{purseModeDesc(snapshot?.purse_mode ?? null, snapshot?.created_at ?? '')}</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Display name -->
+        <div class="settings-label">Display name</div>
+        <div class="settings-card">
+          {#if showPurseRenameInput}
+            <div class="settings-row">
+              <div class="rename-form">
+                <input
+                  class="rename-input"
+                  type="text"
+                  bind:value={purseRenameValue}
+                  maxlength="100"
+                  placeholder="Purse name"
+                  aria-label="New Purse name"
+                />
+                <div class="rename-actions">
+                  <button class="settings-cta" type="button"
+                    onclick={() => { showPurseRenameInput = false; }}>
+                    Cancel
+                  </button>
+                  <button class="settings-cta settings-cta--primary" type="button"
+                    disabled={purseRenaming || !purseRenameValue.trim()}
+                    onclick={submitPurseRename}>
+                    {purseRenaming ? 'Saving…' : 'Save'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          {:else}
+            <div class="settings-row">
+              <div class="settings-body">
+                <div class="settings-value">{snapshot?.name ?? ''}</div>
+                <div class="settings-meta">How this Purse appears across TallyKeep.</div>
+              </div>
+              <button class="settings-cta" type="button" onclick={openPurseRename}>Rename</button>
+            </div>
+          {/if}
+        </div>
+
+        <!-- Descriptor -->
+        <div class="settings-label">Descriptor</div>
+        <div class="settings-card">
+          <div class="settings-row">
+            <div class="settings-body">
+              <div class="settings-value settings-value--mono">
+                {showDescriptor
+                  ? (purseDescriptors[0]?.expression ?? '')
+                  : purseDescriptorMasked(purseDescriptors[0]?.expression ?? '')}
+              </div>
+              <div class="settings-meta">The public-key descriptor TallyKeep watches on the chain.</div>
+            </div>
+            <button class="settings-cta" type="button"
+              onclick={() => { showDescriptor = !showDescriptor; }}>
+              {showDescriptor ? 'Hide' : 'Show'}
+            </button>
+          </div>
+        </div>
+
+        <!-- Recovery phrase (ON_DEVICE only) -->
+        {#if snapshot?.purse_mode?.startsWith('on_device')}
+          <div class="settings-label">Recovery phrase</div>
+          <div class="settings-card">
+            <div class="settings-row">
+              <div class="settings-body">
+                <div class="settings-value">View recovery phrase</div>
+                <div class="settings-meta">The 12-word phrase that recovers this wallet's keys. Sensitive — only shown after biometric.</div>
+              </div>
+              <button class="settings-cta" type="button"
+                onclick={() => goto(`/holding/purse/${holdingId}/recovery`)}>
+                View
+              </button>
+            </div>
+          </div>
+        {/if}
+
+        <!-- Auto-sweep rules -->
+        <div class="settings-label">Auto-sweep rules</div>
+        <div class="settings-card">
+          <div class="settings-row">
+            <div class="settings-body">
+              <div class="settings-value settings-value--not-configured">None</div>
+              <div class="settings-meta">Move BTC out of this Purse automatically on a schedule or threshold.</div>
+            </div>
+            <button class="settings-cta" type="button"
+              onclick={() => goto(`/holding/purse/${holdingId}/sweep/add`)}>
+              Add rule
+            </button>
+          </div>
+        </div>
+
+        <!-- Instant payments -->
+        <div class="settings-label">Instant payments</div>
+        <div class="settings-card">
+          {#if snapshot?.purse_mode?.startsWith('on_device')}
+            <div class="settings-row">
+              <div class="settings-body">
+                <div class="settings-value settings-value--not-configured">Not enabled</div>
+                <div class="settings-meta">Add Lightning to this wallet for small, instant, low-fee payments.</div>
+              </div>
+              <button class="settings-cta" type="button"
+                onclick={() => goto(`/holding/purse/${holdingId}/lightning`)}>
+                Activate
+              </button>
+            </div>
+          {:else}
+            <div class="settings-row settings-row--gated">
+              <div class="settings-body">
+                <div class="settings-value settings-value--not-configured">Needs on-device keys</div>
+                <div class="settings-meta">Lightning needs signing capability. Add the keys to this Purse to enable instant payments.</div>
+              </div>
+              <button class="settings-cta settings-cta--disabled" type="button" aria-disabled="true">
+                Activate
+              </button>
+            </div>
+          {/if}
+        </div>
+
+        <!-- Danger zone -->
+        <div class="settings-label settings-label--danger">Danger zone</div>
+        <div class="settings-card">
+          <div class="settings-row">
+            <div class="settings-body">
+              <div class="settings-value">Forget this Purse</div>
+              <div class="settings-meta">
+                {#if snapshot?.purse_mode?.startsWith('on_device')}
+                  TallyKeep destroys the keys on this device. Without a working recovery-phrase backup, the funds become permanently inaccessible. Any categories you've assigned to this Purse's activity are erased with it.
+                {:else}
+                  TallyKeep forgets the descriptor and stops scanning the chain. Funds at your source wallet are unaffected. Any categories you've assigned to this Purse's activity are erased with it.
+                {/if}
+              </div>
+            </div>
+            <button class="settings-cta settings-cta--danger" type="button"
+              onclick={() => { showPurseForgetModal = true; }}>
+              Forget
+            </button>
+          </div>
+        </div>
+
+      {/if}
+
+    {:else if detail}
+
+      <!-- ── Account: connection-error toast ── -->
+      {#if toastVisible}
+        <div class="connection-toast" role="alert">
+          <div class="toast-row">
+            <span class="toast-title">
+              {#if detail?.connection_status === 'auth_failed'}
+                Your {detail.display_name} API key is no longer valid
+              {:else}
+                Connection lost · {freshness(detail?.last_polled_at ?? null)}
+              {/if}
+            </span>
+            <button class="toast-close" aria-label="Dismiss" onclick={() => { toastDismissed = true; }}>
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <line x1="18" y1="6" x2="6" y2="18"/>
+                <line x1="6" y1="6" x2="18" y2="18"/>
+              </svg>
+            </button>
+          </div>
+          {#if detail?.connection_status === 'auth_failed'}
+            <button class="toast-retry" type="button"
+              onclick={() => goto(`/holding/account/${holdingId}/obs-key/replace`)}>
+              Replace key
+            </button>
+          {:else}
+            <button class="toast-retry" type="button" onclick={forcePoll}>
+              Try again now
+            </button>
+          {/if}
+        </div>
+      {/if}
+
+      <!-- ── Account: status card ── -->
       <button
         class="status-card"
         type="button"
@@ -392,7 +963,7 @@
         </span>
       </button>
 
-      <!-- Hero balance -->
+      <!-- ── Account: hero balance ── -->
       <div class="detail-hero">
         <div class="hero-amount-line">
           <span class="hero-amount">
@@ -416,7 +987,7 @@
         {/if}
       </div>
 
-      <!-- Action row -->
+      <!-- ── Account: action row ── -->
       <div class="action-row">
         <button class="action-btn" type="button" aria-label="Deposit BTC to this Account"
           onclick={() => goto(`/holding/account/${holdingId}/deposit`)}>
@@ -438,7 +1009,7 @@
         </button>
       </div>
 
-      <!-- Tab strip -->
+      <!-- ── Account: tab strip ── -->
       <div class="tab-strip" role="tablist">
         <button
           class="tab {activeTab === 'operations' ? 'tab--active' : ''}"
@@ -454,7 +1025,7 @@
         >Settings</button>
       </div>
 
-      <!-- ── Operations tab ── -->
+      <!-- ── Account: Operations tab ── -->
       {#if activeTab === 'operations'}
         {#if detail.ledger_entries.length === 0}
           <div class="activity-empty">
@@ -479,7 +1050,7 @@
         {/if}
       {/if}
 
-      <!-- ── Settings tab ── -->
+      <!-- ── Account: Settings tab ── -->
       {#if activeTab === 'settings'}
 
         <!-- Provider -->
@@ -658,12 +1229,12 @@
 
   <BottomNav active="home" />
 
-  <!-- Remove-confirm bottom sheet (backdrop NOT dismissable) -->
+  <!-- ── Account forget modal (fill-bar timer) ── -->
   {#if showRemoveConfirm}
     <div class="modal-backdrop" role="presentation" aria-hidden="true"></div>
-    <div class="modal-sheet" role="dialog" aria-modal="true" aria-labelledby="forget-title">
+    <div class="modal-sheet" role="dialog" aria-modal="true" aria-labelledby="acct-forget-title">
       <div class="drag-handle" aria-hidden="true"></div>
-      <h2 id="forget-title" class="modal-title">Forget this Account?</h2>
+      <h2 id="acct-forget-title" class="modal-title">Forget this Account?</h2>
       <p class="modal-body">
         TallyKeep forgets the API credentials and stops observing
         this Account. Your account on {detail?.display_name ?? 'the provider'} itself is unaffected.
@@ -677,10 +1248,74 @@
           onclick={() => { showRemoveConfirm = false; }}>
           Cancel
         </button>
-        <button class="btn btn-danger" type="button"
-          disabled={removing}
-          onclick={removeAccount}>
-          {removing ? 'Forgetting…' : 'Forget'}
+        <button
+          class="btn {forgetReady ? 'btn-danger' : `btn-danger-timer${forgetCounting ? ' counting' : ''}`}"
+          type="button"
+          disabled={!forgetReady || removing}
+          aria-disabled={!forgetReady}
+          onclick={removeAccount}
+        >
+          {forgetReady ? (removing ? 'Forgetting…' : 'Forget') : `Forget · ${forgetCountdown}`}
+        </button>
+      </div>
+    </div>
+  {/if}
+
+  <!-- ── Purse forget modal (fill-bar timer) ── -->
+  {#if showPurseForgetModal}
+    <div class="modal-backdrop" role="presentation" aria-hidden="true"></div>
+    <div class="modal-sheet" role="dialog" aria-modal="true" aria-labelledby="purse-forget-title">
+      <div class="drag-handle" aria-hidden="true"></div>
+      <h2 id="purse-forget-title" class="modal-title">Forget this Purse?</h2>
+
+      {#if snapshot?.purse_mode?.startsWith('on_device')}
+        <div class="modal-warning" role="alert">
+          You told us you backed up your recovery phrase. Verify your
+          backup is intact and you can read it. Once you forget this
+          Purse, the keys are destroyed and any forgotten backup is
+          gone forever.
+        </div>
+      {/if}
+
+      {#if purseForgetError}
+        <div class="modal-error" role="alert">
+          Couldn't delete the on-device keys. The Forget has been
+          aborted — your Purse is unchanged. Try again, or restart
+          the app and retry.
+        </div>
+      {/if}
+
+      <p class="modal-body">
+        {#if snapshot?.purse_mode?.startsWith('on_device')}
+          TallyKeep destroys the keys on this device, forgets the
+          descriptor, and stops scanning the chain. Without a working
+          backup of your recovery phrase, the funds in this Purse
+          become permanently inaccessible. Any categories you've
+          assigned to this Purse's activity are erased with it. You
+          can re-import this Purse from your recovery phrase, but the
+          categorizations don't come back.
+        {:else}
+          TallyKeep forgets the descriptor and stops scanning the
+          chain. Funds at your source wallet are unaffected. Any
+          categories you've assigned to this Purse's activity are
+          erased with it.
+        {/if}
+      </p>
+
+      <div class="modal-actions">
+        <button class="btn btn-cancel" type="button"
+          disabled={purseForgetRemoving}
+          onclick={() => { showPurseForgetModal = false; }}>
+          Cancel
+        </button>
+        <button
+          class="btn {purseForgetReady ? 'btn-danger' : `btn-danger-timer${purseForgetCounting ? ' counting' : ''}`}"
+          type="button"
+          disabled={!purseForgetReady || purseForgetRemoving}
+          aria-disabled={!purseForgetReady}
+          onclick={forgePurse}
+        >
+          {purseForgetReady ? (purseForgetRemoving ? 'Forgetting…' : 'Forget') : `Forget · ${purseForgetCountdown}`}
         </button>
       </div>
     </div>
@@ -808,7 +1443,13 @@
   }
   .status-card:hover { background: var(--color-surface-raised); }
   .status-card:disabled { cursor: default; }
+  .status-card--purse { border-left-color: var(--color-holding-purse); }
   .status-provider {
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-weight-semibold);
+    color: var(--color-text);
+  }
+  .status-mode {
     font-size: var(--font-size-sm);
     font-weight: var(--font-weight-semibold);
     color: var(--color-text);
@@ -986,6 +1627,25 @@
     font-size: var(--font-size-xs);
     color: var(--color-text-muted);
   }
+  .activity-category {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 10px;
+    color: var(--color-text-muted);
+    background: var(--color-bg);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-pill);
+    padding: 1px var(--space-2);
+    margin-top: 4px;
+    width: max-content;
+    line-height: 1.2;
+  }
+  .activity-category svg {
+    width: 10px; height: 10px;
+    stroke: currentColor; fill: none;
+    stroke-width: 2; stroke-linecap: round; stroke-linejoin: round;
+  }
   .activity-amount {
     font-size: var(--font-size-sm);
     font-weight: var(--font-weight-semibold);
@@ -1060,6 +1720,9 @@
     padding: var(--space-2) 0;
   }
   .settings-row + .settings-row { border-top: 1px solid var(--color-border); }
+  .settings-row--gated .settings-value,
+  .settings-row--gated .settings-meta { color: var(--color-text-dim); }
+  .settings-row--gated .settings-value--not-configured { color: var(--color-text-dim); }
   .settings-body { min-width: 0; }
   .settings-value {
     font-size: var(--font-size-sm);
@@ -1073,6 +1736,7 @@
   .settings-value--mono {
     font-family: var(--font-mono);
     letter-spacing: 0.04em;
+    word-break: break-all;
   }
   .settings-meta {
     font-size: var(--font-size-xs);
@@ -1106,6 +1770,12 @@
     border-color: var(--color-primary);
   }
   .settings-cta--primary:hover { background: var(--color-primary-strong); border-color: var(--color-primary-strong); }
+  .settings-cta--disabled {
+    color: var(--color-text-dim);
+    border-color: var(--color-border);
+    cursor: help;
+  }
+  .settings-cta--disabled:hover { background: var(--color-bg); }
 
   /* ── Polling picker ── */
   .polling-picker {
@@ -1175,7 +1845,7 @@
     50% { opacity: 0.5; }
   }
 
-  /* ── Remove confirm modal ── */
+  /* ── Forget modals ── */
   .modal-backdrop {
     position: absolute;
     inset: 0;
@@ -1203,6 +1873,28 @@
     color: var(--color-text);
     margin: 0 0 var(--space-2);
     line-height: var(--line-height-tight);
+  }
+  .modal-warning {
+    background: var(--color-danger-soft);
+    border: 1px solid var(--color-danger-border);
+    border-radius: var(--radius-md);
+    padding: var(--space-3) var(--space-4);
+    margin: 0 0 var(--space-3);
+    font-size: var(--font-size-sm);
+    color: var(--color-danger-text-on-soft);
+    line-height: var(--line-height-default);
+    font-weight: var(--font-weight-medium);
+  }
+  .modal-error {
+    background: var(--color-danger-soft);
+    border: 1px solid var(--color-danger-border);
+    border-radius: var(--radius-md);
+    padding: var(--space-3) var(--space-4);
+    margin: 0 0 var(--space-3);
+    font-size: var(--font-size-sm);
+    color: var(--color-danger-text-on-soft);
+    line-height: var(--line-height-default);
+    font-weight: var(--font-weight-semibold);
   }
   .modal-body {
     font-size: var(--font-size-sm);
@@ -1236,4 +1928,26 @@
     color: #ffffff;
   }
   .btn-danger:hover:not(:disabled) { background: #9b2a14; }
+
+  /* Fill-bar countdown timer — coding-agent contract (see mockup):
+     Mount without .counting; add .counting on next rAF to trigger
+     background-position transition from 100% (soft) to 0% (danger).
+     After 5s: swap to .btn-danger class (no snapback). */
+  .btn-danger-timer {
+    background:
+      linear-gradient(to right,
+        var(--color-danger) 50%,
+        var(--color-danger-soft) 50%);
+    background-size: 200% 100%;
+    background-position: 100% 0;
+    color: var(--color-danger-text-on-soft);
+    border: 1px solid var(--color-danger-border);
+    transition: background-position 5s linear, color 5s linear;
+    cursor: not-allowed;
+  }
+  .btn-danger-timer.counting {
+    background-position: 0% 0;
+    color: #ffffff;
+  }
+  .btn-danger-timer:hover { background-color: transparent; }
 </style>

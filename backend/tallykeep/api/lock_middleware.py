@@ -16,7 +16,8 @@ from starlette.middleware.base import BaseHTTPMiddleware
 # Paths that always work regardless of lock state.
 ALWAYS_ALLOWED_PREFIXES = (
     "/api/v1/health",
-    "/api/v1/unlock",
+    "/api/v1/unlock",                        # covers /unlock/initialize
+    "/api/v1/auth/passphrase-validate",      # phone unlock — also unlocks the store
     "/api/v1/server/info",
     "/api/v1/pairing",
     "/openapi.json",

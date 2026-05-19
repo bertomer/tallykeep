@@ -60,12 +60,12 @@ try {
     Show "initialize" "ok ($($r.unlocked))"
 } catch {
     if ($_.Exception.Response.StatusCode -eq 409) {
-        # Already initialized -- try unlock instead.
+        # Already initialized -- unlock via passphrase-validate.
         try {
             $r = Invoke-RestMethod -Method Post `
-                -Uri "$BaseUrl/api/v1/unlock" `
+                -Uri "$BaseUrl/api/v1/auth/passphrase-validate" `
                 -ContentType 'application/json' -Body $body
-            Show "unlock" "ok ($($r.unlocked))"
+            Show "unlock" "ok ($($r.valid))"
         } catch {
             Write-Host "  Could not unlock with passphrase '$Passphrase'." -ForegroundColor Yellow
             Write-Host "  If this is an existing stack with a different passphrase, pass -Passphrase or run dev-reset.ps1 first." -ForegroundColor Yellow

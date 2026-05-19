@@ -16,35 +16,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HealthResponse'
-  /api/v1/unlock:
-    post:
-      tags:
-      - unlock
-      summary: Post Unlock
-      operationId: post_unlock_api_v1_unlock_post
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/UnlockRequest'
-        required: true
-      responses:
-        '200':
-          description: Successful Response
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/UnlockResponse'
-        '401':
-          description: Bad passphrase
-        '503':
-          description: Crypto parameters not initialized — first run required
-        '422':
-          description: Validation Error
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/HTTPValidationError'
   /api/v1/unlock/initialize:
     post:
       tags:
@@ -146,12 +117,13 @@ paths:
       tags:
       - auth
       summary: Post Passphrase Validate
-      description: 'Phone-side passphrase validation for fallback unlock.
+      description: 'Phone unlock: validate passphrase, unlock the secret store, emit
+        system.unlocked.
 
 
-        The phone forwards the typed passphrase; this endpoint validates against
+        Exempt from the lock middleware so it works against a cold (locked) server.
 
-        the server''s Argon2id-derived canary. Rate-limited per ADR-0008.'
+        Rate-limited per ADR-0008.'
       operationId: post_passphrase_validate_api_v1_auth_passphrase_validate_post
       requestBody:
         content:
@@ -5303,15 +5275,6 @@ components:
       required:
       - passphrase
       title: UnlockRequest
-    UnlockResponse:
-      properties:
-        unlocked:
-          type: boolean
-          title: Unlocked
-      type: object
-      required:
-      - unlocked
-      title: UnlockResponse
     UserProfileResponse:
       properties:
         id:
@@ -5665,3 +5628,4 @@ components:
       - address
       - is_whitelisted
       title: WhitelistVerificationOut
+
