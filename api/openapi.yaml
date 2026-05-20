@@ -4091,6 +4091,12 @@ components:
             minimum: 0.0
           - type: 'null'
           title: Display Order
+        signing_device_label:
+          anyOf:
+          - type: string
+            maxLength: 200
+          - type: 'null'
+          title: Signing Device Label
         polling_interval_seconds:
           anyOf:
           - type: integer

@@ -5,7 +5,9 @@ import."""
 
 from __future__ import annotations
 
+from dataclasses import MISSING as _UNSET
 from datetime import UTC, datetime
+from typing import Any
 from uuid import UUID, uuid4
 
 from sqlalchemy.orm import Session
@@ -452,6 +454,7 @@ def update_holding(
     declared_security: SecurityClaim | None = None,
     display_color: str | None = None,
     display_order: int | None = None,
+    signing_device_label: Any = _UNSET,
 ) -> Holding | None:
     row = holding_repo.update_basics(
         session,
@@ -462,6 +465,7 @@ def update_holding(
         display_color=display_color,
         display_order=display_order,
         declared_security=declared_security,
+        signing_device_label=signing_device_label,
     )
     if row is None:
         return None

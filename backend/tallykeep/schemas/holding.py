@@ -144,6 +144,8 @@ class HoldingUpdate(BaseModel):
     declared_security: SecurityClaimInput | None = None
     display_color: str | None = Field(default=None, pattern=r"^#[0-9A-Fa-f]{6}$")
     display_order: int | None = Field(default=None, ge=0)
+    # Strongbox-specific: user note about the hardware wallet's location.
+    signing_device_label: str | None = Field(default=None, max_length=200)
     # Account-specific: updates the CustodialProvider polling cadence.
     polling_interval_seconds: int | None = None
 

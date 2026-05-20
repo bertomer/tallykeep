@@ -103,6 +103,10 @@ sequence in `PROCESS.md §4.4` stages 3–5.
 
 ## Active iteration
 
+No active coding iteration.
+
+<!--
+
 ### Iteration: Strongbox detail page + Purse descriptor Copy retrofit
 
 **Started:** 2026-05
@@ -488,6 +492,8 @@ the active block in this file, runs `tools/check-spec.ps1`,
 commits. **No OpenAPI regen** for this iteration unless
 task 7 surfaced a missing PATCH path. Full sequence in
 `PROCESS.md §4.4` stages 3–5.
+
+-->
 
 ---
 

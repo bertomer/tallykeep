@@ -684,6 +684,36 @@ class TestPatch:
         )
         assert response.status_code == 404
 
+    def test_patch_signing_device_label_on_strongbox(self, app_with_db) -> None:
+        client, _ = app_with_db
+        created = client.post("/api/v1/holdings/strongbox", json=_strongbox_body()).json()
+        response = client.patch(
+            f"/api/v1/holdings/{created['id']}",
+            json={"signing_device_label": "Coldcard Mk4 on desk"},
+        )
+        assert response.status_code == 200
+        assert response.json()["signing_device_label"] == "Coldcard Mk4 on desk"
+
+    def test_patch_signing_device_label_clear_with_null(self, app_with_db) -> None:
+        client, _ = app_with_db
+        created = client.post("/api/v1/holdings/strongbox", json=_strongbox_body()).json()
+        # label is "Coldcard Mk4 in safe" from the fixture; clear it
+        response = client.patch(
+            f"/api/v1/holdings/{created['id']}",
+            json={"signing_device_label": None},
+        )
+        assert response.status_code == 200
+        assert response.json()["signing_device_label"] is None
+
+    def test_patch_signing_device_label_rejected_on_purse(self, app_with_db) -> None:
+        client, _ = app_with_db
+        created = client.post("/api/v1/holdings/purse", json=_purse_body()).json()
+        response = client.patch(
+            f"/api/v1/holdings/{created['id']}",
+            json={"signing_device_label": "Coldcard"},
+        )
+        assert response.status_code == 422
+
 
 class TestChangeType:
     def test_purse_to_strongbox_records_audit_log(self, app_with_db) -> None:

@@ -436,6 +436,29 @@ condensed into `shipped.md` at closeout.
      check, hand-test of any new flow)
    - what should happen on greenlight (the closeout list
      below, so Rémy knows what "go" triggers)
+   - **any decision Rémy needs to make** — when the
+     iteration's scope anticipated a contingency ("if X is
+     missing, stop and surface to Rémy"), the agent
+     surfaced an unanticipated question, or work-in-passing
+     uncovered a non-trivial call, present it under a
+     labelled **"Decision needed"** section, separate from
+     the "what changed" list. Format:
+
+     > **Decision needed: <one-line question>.**
+     > **Option A** — <what shipping A means; tradeoffs;
+     > what files / scope it touches>.
+     > **Option B** — <same>.
+     > **Recommendation:** A because <one-line reason>.
+
+     Do **not** bury a decision-needed item inside a
+     "what shipped" bullet as a status note (e.g. "X is
+     missing, the Y action will return 422 until backend
+     adds the field" — reads as information, not a call;
+     the reader scans for action items, not subtext).
+     If you find yourself writing "needs to" or "until
+     backend adds" or "the user should decide", that
+     sentence belongs in the Decision-needed section
+     with explicit options, not in the prose summary.
 
    **The agent does not start cleanup work at this stage.** It
    does **not** regenerate `api/openapi.yaml`, does **not**

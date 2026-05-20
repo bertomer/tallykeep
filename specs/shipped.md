@@ -14,6 +14,49 @@ commit.
 
 ---
 
+## 2026-05-20 — Strongbox detail page + Purse descriptor Copy retrofit
+
+Strongbox detail page shipped at `/holding/[id]` for `strongbox`-type Holdings. Two-tab
+layout (Operations | Settings), SSE-driven freshness, iron-stripe (`#4a4d4f`) status card
+with a `signing_device_label`-driven subtitle falling back to "External signing device". Hero
+balance, Send + Receive action row (both coming-soon stubs for this iteration). Operations
+tab renders chain-side ledger entries newest-first with sign-based amount colour; empty-state
+panel for fresh Strongboxes.
+
+Settings tab: conditional missing-signing-metadata advisory card (`warning-soft` background,
+"Fix this" CTA → coming-soon stub); Wallet info-only row (creation date); Display name with
+inline Rename form; Signing device label with inline Edit form; Descriptor reveal (masked at
+rest, Show → full inline card with Copy + Hide); Auto-sweep rules (coming-soon); Instant
+payments row permanently gated (`settings-row--gated`) with Strongbox-specific copy; Danger
+zone with Forget only. Forget bottom-sheet has the 5-second fill-bar countdown timer. No
+seed-destruction warning panel (TK never holds Strongbox signing material). Connection-error
+toast on `system.chain.connection_state_changed` disconnection.
+
+**Backend addition:** `signing_device_label` (nullable str, maxLength 200) added to
+`HoldingUpdate` PATCH schema and wired through repository (`subtype_data` JSONB partial
+update via `MISSING` sentinel from Python stdlib), service, and endpoint
+(`model_fields_set` detection). Strongbox-only guard; passing this field on a
+non-Strongbox Holding returns 422. Three integration tests added.
+
+**Purse descriptor Copy retrofit:** Copy CTA added to the revealed-descriptor state on the
+Purse Settings tab (both WATCH_ONLY and ON_DEVICE modes). The privacy-first-reveal no-Copy
+lock applies to signing material only, not descriptors.
+
+**Account Rename moved out of Danger zone:** standalone "Display name" section inserted
+between Provider and Observation key, matching the Purse / Strongbox pattern. Danger zone
+now contains only "Forget this Account."
+
+**Modal z-index fix:** `modal-backdrop` raised to `z-index: 110`, `modal-sheet` to 111
+(clearing BottomNav's `position: fixed; z-index: 100`). Affects all Holding-type modals.
+
+Four new coming-soon stub routes: `strongbox/[id]/send`, `strongbox/[id]/receive`,
+`strongbox/[id]/sweep/add`, `strongbox/[id]/fix-metadata`.
+
+Canonical docs touched at closeout: `api/openapi.yaml` (156187 bytes; `signing_device_label`
+in `HoldingUpdate` and `HoldingResponse`).
+
+---
+
 ## 2026-05-20 — Purse detail page + Account Forget timer + unlock consolidation
 
 Purse detail page shipped at `/holding/[id]` for `purse`-type Holdings. Two-tab layout

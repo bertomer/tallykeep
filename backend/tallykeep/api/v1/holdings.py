@@ -11,6 +11,7 @@ Cross-type queries that aggregate balance, security analysis, etc. land in M5
 
 from __future__ import annotations
 
+from dataclasses import MISSING as _UNSET
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
@@ -624,6 +625,11 @@ async def patch_holding(
         if body.declared_security is not None
         else None
     )
+    sdl_arg = (
+        body.signing_device_label
+        if "signing_device_label" in body.model_fields_set
+        else _UNSET
+    )
     try:
         holding = holding_service.update_holding(
             session,
@@ -634,6 +640,7 @@ async def patch_holding(
             declared_security=declared_security,
             display_color=body.display_color,
             display_order=body.display_order,
+            signing_device_label=sdl_arg,
         )
         if holding is None:
             raise HTTPException(status_code=404, detail="Holding not found")

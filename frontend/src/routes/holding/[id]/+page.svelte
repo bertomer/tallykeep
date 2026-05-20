@@ -1,18 +1,24 @@
 <!--
-  Account + Purse detail — /holding/[id]
+  Account + Purse + Strongbox detail — /holding/[id]
   Mockup contract (all validated):
-    mobile_account_detail_operations_populated.html    (2026-05-17)
-    mobile_account_detail_operations_empty.html        (2026-05-17)
-    mobile_account_detail_settings.html                (2026-05-17)
-    mobile_account_detail_remove_confirm.html          (2026-05-19 — fill-bar timer)
-    mobile_account_detail_connection_error.html        (2026-05-17)
-    mobile_purse_detail_operations_populated.html      (2026-05-19)
-    mobile_purse_detail_operations_empty.html          (2026-05-19)
-    mobile_purse_detail_settings_watch_only.html       (2026-05-19)
-    mobile_purse_detail_settings_on_device.html        (2026-05-19)
-    mobile_purse_detail_forget_confirm.html            (2026-05-19)
-    mobile_purse_detail_connection_error.html          (2026-05-19)
-    mobile_purse_detail_send_blocked_watch_only.html   (2026-05-19)
+    mobile_account_detail_operations_populated.html         (2026-05-17)
+    mobile_account_detail_operations_empty.html             (2026-05-17)
+    mobile_account_detail_settings.html                     (2026-05-17)
+    mobile_account_detail_remove_confirm.html               (2026-05-19 — fill-bar timer)
+    mobile_account_detail_connection_error.html             (2026-05-17)
+    mobile_purse_detail_operations_populated.html           (2026-05-19)
+    mobile_purse_detail_operations_empty.html               (2026-05-19)
+    mobile_purse_detail_settings_watch_only.html            (2026-05-20 — Copy CTA retrofit)
+    mobile_purse_detail_settings_on_device.html             (2026-05-20 — Copy CTA retrofit)
+    mobile_purse_detail_forget_confirm.html                 (2026-05-19)
+    mobile_purse_detail_connection_error.html               (2026-05-19)
+    mobile_purse_detail_send_blocked_watch_only.html        (2026-05-19)
+    mobile_strongbox_detail_operations_populated.html       (2026-05-20)
+    mobile_strongbox_detail_operations_empty.html           (2026-05-20)
+    mobile_strongbox_detail_settings.html                   (2026-05-20)
+    mobile_strongbox_detail_settings_missing_metadata.html  (2026-05-20)
+    mobile_strongbox_detail_forget_confirm.html             (2026-05-20)
+    mobile_strongbox_detail_connection_error.html           (2026-05-20)
 -->
 <script lang="ts">
   import { onMount, onDestroy } from 'svelte';
@@ -58,6 +64,8 @@
     created_at: string;
     purse_mode: string | null;
     account_detail: AccountDetail | null;
+    signing_device_label: string | null;
+    signing_metadata_present: boolean | null;
   }
 
   interface PurseLedgerEntry {
@@ -142,6 +150,7 @@
   let purseToastDismissed = $state(false);
   let purseRefreshing = $state(false);
   let showDescriptor = $state(false);
+  let purseCopied = $state(false);
   let showPurseRenameInput = $state(false);
   let purseRenameValue = $state('');
   let purseRenaming = $state(false);
@@ -152,6 +161,59 @@
   let purseForgetRemoving = $state(false);
   let purseForgetError = $state(false);
   let purseEventSource: EventSource | null = null;
+
+  // ─── Strongbox state ──────────────────────────────────────────────────────────
+
+  let strongboxBalance = $state(0);
+  let strongboxLedger = $state<PurseLedgerEntry[]>([]);
+  let strongboxDescriptors = $state<PurseDescriptor[]>([]);
+  let strongboxChainStatus = $state('healthy');
+  let strongboxLastFetched = $state<number | null>(null);
+  let strongboxToastDismissed = $state(false);
+  let strongboxRefreshing = $state(false);
+  let showStrongboxDescriptor = $state(false);
+  let strongboxCopied = $state(false);
+  let showStrongboxRenameInput = $state(false);
+  let strongboxRenameValue = $state('');
+  let strongboxRenaming = $state(false);
+  let showSigningLabelInput = $state(false);
+  let signingLabelValue = $state('');
+  let signingLabelSaving = $state(false);
+  let showStrongboxForgetModal = $state(false);
+  let strongboxForgetCountdown = $state(5);
+  let strongboxForgetCounting = $state(false);
+  let strongboxForgetReady = $derived(strongboxForgetCountdown <= 0);
+  let strongboxForgetRemoving = $state(false);
+  let strongboxEventSource: EventSource | null = null;
+
+  let strongboxToastVisible = $derived(
+    !strongboxToastDismissed &&
+    snapshot?.holding_type === 'strongbox' &&
+    (strongboxChainStatus === 'unreachable' || strongboxChainStatus === 'degraded')
+  );
+
+  $effect(() => {
+    if (!strongboxToastVisible) return;
+    const t = setTimeout(() => { strongboxToastDismissed = true; }, 5000);
+    return () => clearTimeout(t);
+  });
+
+  $effect(() => {
+    if (showStrongboxForgetModal) {
+      strongboxForgetCountdown = 5;
+      strongboxForgetCounting = false;
+      requestAnimationFrame(() => { strongboxForgetCounting = true; });
+      const h = setInterval(() => {
+        strongboxForgetCountdown -= 1;
+        if (strongboxForgetCountdown <= 0) clearInterval(h);
+      }, 1000);
+      return () => {
+        clearInterval(h);
+        strongboxForgetCounting = false;
+        strongboxForgetCountdown = 5;
+      };
+    }
+  });
 
   let purseToastVisible = $derived(
     !purseToastDismissed &&
@@ -327,6 +389,41 @@
     return `•••• ${expr.slice(-6)}`;
   }
 
+  // Strongbox-specific helpers
+
+  function strongboxSubtitle(): string {
+    return snapshot?.signing_device_label?.trim() || 'External signing device';
+  }
+
+  function strongboxChainStatusLabel(status: string): string {
+    if (status === 'healthy') return 'Connected';
+    if (status === 'degraded') return 'Degraded';
+    if (status === 'unreachable') return 'Connection lost';
+    return 'Connected';
+  }
+
+  function strongboxFreshness(): string {
+    if (!strongboxLastFetched) return '';
+    const diffMs = now - strongboxLastFetched;
+    const secs = Math.floor(diffMs / 1000);
+    const prefix = strongboxChainStatus === 'healthy' ? 'Updated' : 'Last seen';
+    if (secs < 60) return `${prefix} just now`;
+    const mins = Math.floor(secs / 60);
+    if (mins < 60) return `${prefix} ${mins} min ago`;
+    const hrs = Math.floor(mins / 60);
+    return `${prefix} ${hrs}h ago`;
+  }
+
+  function strongboxCreatedLabel(): string {
+    if (!snapshot?.created_at) return '';
+    return new Date(snapshot.created_at).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+  }
+
+  function strongboxDescriptorMasked(expr: string): string {
+    if (!expr) return '•••• ??????';
+    return `•••• ${expr.slice(-6)}`;
+  }
+
   // ─── Lifecycle ───────────────────────────────────────────────────────────────
 
   onMount(async () => {
@@ -339,6 +436,9 @@
     if (snapshot?.holding_type === 'purse') {
       await fetchPurseAll();
       subscribePurseSSE();
+    } else if (snapshot?.holding_type === 'strongbox') {
+      await fetchStrongboxAll();
+      subscribeStrongboxSSE();
     } else {
       subscribeSSE();
     }
@@ -348,6 +448,7 @@
     if (tickInterval !== null) clearInterval(tickInterval);
     eventSource?.close();
     purseEventSource?.close();
+    strongboxEventSource?.close();
   });
 
   // ─── Data fetching ───────────────────────────────────────────────────────────
@@ -417,6 +518,48 @@
   async function fetchPurseAll(): Promise<void> {
     await Promise.all([fetchPurseBalance(), fetchPurseLedger(), fetchPurseDescriptors()]);
     purseLastFetched = Date.now();
+  }
+
+  async function fetchStrongboxBalance(): Promise<void> {
+    if (!serverUrl || !holdingId) return;
+    try {
+      const resp = await fetch(`${serverUrl}/api/v1/holdings/${holdingId}/summary`, {
+        headers: authHeaders(),
+      });
+      if (!resp.ok) return;
+      const data = await resp.json();
+      strongboxBalance = data.confirmed_sats ?? 0;
+    } catch { /* offline */ }
+  }
+
+  async function fetchStrongboxLedger(): Promise<void> {
+    if (!serverUrl || !holdingId) return;
+    try {
+      const resp = await fetch(
+        `${serverUrl}/api/v1/ledger-entries?holding_id=${holdingId}&limit=50`,
+        { headers: authHeaders() }
+      );
+      if (!resp.ok) return;
+      const data = await resp.json();
+      strongboxLedger = data.entries ?? [];
+    } catch { /* offline */ }
+  }
+
+  async function fetchStrongboxDescriptors(): Promise<void> {
+    if (!serverUrl || !holdingId) return;
+    try {
+      const resp = await fetch(
+        `${serverUrl}/api/v1/descriptors?holding_id=${holdingId}`,
+        { headers: authHeaders() }
+      );
+      if (!resp.ok) return;
+      strongboxDescriptors = await resp.json();
+    } catch { /* offline */ }
+  }
+
+  async function fetchStrongboxAll(): Promise<void> {
+    await Promise.all([fetchStrongboxBalance(), fetchStrongboxLedger(), fetchStrongboxDescriptors()]);
+    strongboxLastFetched = Date.now();
   }
 
   // ─── SSE ─────────────────────────────────────────────────────────────────────
@@ -491,6 +634,43 @@
         const data = JSON.parse(evt.data);
         if (data.payload?.holding_id !== holdingId) return;
         fetchPurseAll();
+      } catch { /* ignore */ }
+    });
+  }
+
+  function subscribeStrongboxSSE(): void {
+    if (!serverUrl || !holdingId) return;
+    const topics = 'system.chain.connection_state_changed,holding.utxo.received,holding.utxo.spent';
+    const hdrs = authHeaders();
+    const rawCredential = (hdrs['Authorization'] ?? '').replace('Bearer ', '');
+    const tokenParam = rawCredential ? `&token=${encodeURIComponent(rawCredential)}` : '';
+    const url = `${serverUrl}/api/v1/events/stream?topics=${encodeURIComponent(topics)}${tokenParam}`;
+    strongboxEventSource = new EventSource(url);
+
+    strongboxEventSource.addEventListener('system.chain.connection_state_changed', (evt: MessageEvent) => {
+      try {
+        const data = JSON.parse(evt.data);
+        const status: string = data.payload?.new_status ?? 'healthy';
+        strongboxChainStatus = status;
+        if (status !== 'healthy') {
+          strongboxToastDismissed = false;
+        }
+      } catch { /* ignore */ }
+    });
+
+    strongboxEventSource.addEventListener('holding.utxo.received', (evt: MessageEvent) => {
+      try {
+        const data = JSON.parse(evt.data);
+        if (data.payload?.holding_id !== holdingId) return;
+        fetchStrongboxAll();
+      } catch { /* ignore */ }
+    });
+
+    strongboxEventSource.addEventListener('holding.utxo.spent', (evt: MessageEvent) => {
+      try {
+        const data = JSON.parse(evt.data);
+        if (data.payload?.holding_id !== holdingId) return;
+        fetchStrongboxAll();
       } catch { /* ignore */ }
     });
   }
@@ -603,6 +783,95 @@
     } catch { /* ignore */ } finally {
       purseRenaming = false;
     }
+  }
+
+  async function copyPurseDescriptor(): Promise<void> {
+    const expr = purseDescriptors[0]?.expression ?? '';
+    if (!expr) return;
+    try {
+      await navigator.clipboard.writeText(expr);
+      purseCopied = true;
+      setTimeout(() => { purseCopied = false; }, 2000);
+    } catch { /* ignore */ }
+  }
+
+  async function forceStrongboxRefresh(): Promise<void> {
+    if (strongboxRefreshing) return;
+    strongboxRefreshing = true;
+    try {
+      await fetchStrongboxAll();
+    } catch { /* ignore */ } finally {
+      strongboxRefreshing = false;
+    }
+  }
+
+  async function forgetStrongbox(): Promise<void> {
+    if (strongboxForgetRemoving) return;
+    strongboxForgetRemoving = true;
+    try {
+      const resp = await fetch(`${serverUrl}/api/v1/holdings/${holdingId}/archive`, {
+        method: 'POST',
+        headers: authHeaders(),
+      });
+      if (resp.ok) {
+        goto('/home');
+      }
+    } catch { /* ignore */ } finally {
+      strongboxForgetRemoving = false;
+    }
+  }
+
+  function openStrongboxRename(): void {
+    strongboxRenameValue = snapshot?.name ?? '';
+    showStrongboxRenameInput = true;
+  }
+
+  async function submitStrongboxRename(): Promise<void> {
+    if (!strongboxRenameValue.trim()) return;
+    strongboxRenaming = true;
+    try {
+      await fetch(`${serverUrl}/api/v1/holdings/${holdingId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', ...authHeaders() },
+        body: JSON.stringify({ name: strongboxRenameValue.trim() }),
+      });
+      await fetchSnapshot();
+      showStrongboxRenameInput = false;
+    } catch { /* ignore */ } finally {
+      strongboxRenaming = false;
+    }
+  }
+
+  function openSigningLabelEdit(): void {
+    signingLabelValue = snapshot?.signing_device_label ?? '';
+    showSigningLabelInput = true;
+  }
+
+  async function submitSigningLabel(): Promise<void> {
+    signingLabelSaving = true;
+    try {
+      // NOTE: signing_device_label is absent from HoldingUpdate PATCH schema
+      // (additionalProperties: false) — backend gap, will return 422 until fixed.
+      await fetch(`${serverUrl}/api/v1/holdings/${holdingId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', ...authHeaders() },
+        body: JSON.stringify({ signing_device_label: signingLabelValue.trim() || null }),
+      });
+      await fetchSnapshot();
+      showSigningLabelInput = false;
+    } catch { /* ignore */ } finally {
+      signingLabelSaving = false;
+    }
+  }
+
+  async function copyStrongboxDescriptor(): Promise<void> {
+    const expr = strongboxDescriptors[0]?.expression ?? '';
+    if (!expr) return;
+    try {
+      await navigator.clipboard.writeText(expr);
+      strongboxCopied = true;
+      setTimeout(() => { strongboxCopied = false; }, 2000);
+    } catch { /* ignore */ }
   }
 </script>
 
@@ -809,20 +1078,35 @@
         <!-- Descriptor -->
         <div class="settings-label">Descriptor</div>
         <div class="settings-card">
-          <div class="settings-row">
-            <div class="settings-body">
-              <div class="settings-value settings-value--mono">
-                {showDescriptor
-                  ? (purseDescriptors[0]?.expression ?? '')
-                  : purseDescriptorMasked(purseDescriptors[0]?.expression ?? '')}
+          {#if showDescriptor}
+            <div class="descriptor-revealed">
+              <div class="settings-meta">The public-key descriptor TallyKeep watches on the chain. Safe to paste into Sparrow, Specter, or Electrum for an independent view.</div>
+              <div class="descriptor-mono-card">{purseDescriptors[0]?.expression ?? ''}</div>
+              <div class="descriptor-actions">
+                <button class="settings-cta" type="button"
+                  onclick={() => { showDescriptor = false; }}>
+                  Hide
+                </button>
+                <button class="settings-cta" type="button"
+                  onclick={copyPurseDescriptor}>
+                  {purseCopied ? 'Copied!' : 'Copy'}
+                </button>
               </div>
-              <div class="settings-meta">The public-key descriptor TallyKeep watches on the chain.</div>
             </div>
-            <button class="settings-cta" type="button"
-              onclick={() => { showDescriptor = !showDescriptor; }}>
-              {showDescriptor ? 'Hide' : 'Show'}
-            </button>
-          </div>
+          {:else}
+            <div class="settings-row">
+              <div class="settings-body">
+                <div class="settings-value settings-value--mono">
+                  {purseDescriptorMasked(purseDescriptors[0]?.expression ?? '')}
+                </div>
+                <div class="settings-meta">The public-key descriptor TallyKeep watches on the chain.</div>
+              </div>
+              <button class="settings-cta" type="button"
+                onclick={() => { showDescriptor = true; }}>
+                Show
+              </button>
+            </div>
+          {/if}
         </div>
 
         <!-- Recovery phrase (ON_DEVICE only) -->
@@ -900,6 +1184,335 @@
             </div>
             <button class="settings-cta settings-cta--danger" type="button"
               onclick={() => { showPurseForgetModal = true; }}>
+              Forget
+            </button>
+          </div>
+        </div>
+
+      {/if}
+
+    {:else if snapshot?.holding_type === 'strongbox'}
+
+      <!-- ── Strongbox: connection-error toast ── -->
+      {#if strongboxToastVisible}
+        <div class="connection-toast" role="alert">
+          <div class="toast-row">
+            <span class="toast-title">Cannot reach the Bitcoin network</span>
+            <button class="toast-close" aria-label="Dismiss"
+              onclick={() => { strongboxToastDismissed = true; }}>
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <line x1="18" y1="6" x2="6" y2="18"/>
+                <line x1="6" y1="6" x2="18" y2="18"/>
+              </svg>
+            </button>
+          </div>
+          <button class="toast-retry" type="button" onclick={forceStrongboxRefresh}>
+            Try again now
+          </button>
+        </div>
+      {/if}
+
+      <!-- ── Strongbox: status card ── -->
+      <button
+        class="status-card status-card--strongbox"
+        type="button"
+        aria-label="Wallet connection status — tap to refresh"
+        onclick={forceStrongboxRefresh}
+        disabled={strongboxRefreshing}
+      >
+        <span class="status-mode">{strongboxSubtitle()}</span>
+        <span class="status-line">
+          {#if strongboxRefreshing}
+            <span class="status-spinner" aria-hidden="true">⟳</span>
+          {:else}
+            <span class="status-dot {dotClass(strongboxChainStatus)}" aria-hidden="true"></span>
+          {/if}
+          <span class="status-state">{strongboxChainStatusLabel(strongboxChainStatus)}</span>
+          {#if strongboxLastFetched}
+            <span class="status-sep">·</span>
+            <span>{strongboxFreshness()}</span>
+          {/if}
+        </span>
+      </button>
+
+      <!-- ── Strongbox: hero balance ── -->
+      <div class="detail-hero">
+        <div class="hero-amount-line">
+          <span class="hero-amount">
+            {preferences.unit === 'sats' ? formatSats(strongboxBalance) : formatBtc(strongboxBalance)}
+          </span>
+          <span class="hero-unit-label">
+            {preferences.unit === 'sats' ? 'sats' : 'BTC'}<button
+              class="unit-toggle"
+              aria-label="Cycle unit: sats / BTC"
+              onclick={preferences.cycleUnit}
+            >↻</button>
+          </span>
+        </div>
+      </div>
+
+      <!-- ── Strongbox: action row ── -->
+      <div class="action-row">
+        <button class="action-btn" type="button" aria-label="Send BTC from this Strongbox"
+          onclick={() => goto(`/holding/strongbox/${holdingId}/send`)}>
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <rect x="5" y="11" width="14" height="9" rx="2"/>
+            <line x1="5" y1="15" x2="19" y2="15"/>
+            <line x1="12" y1="9" x2="12" y2="2"/>
+            <polyline points="8 6 12 2 16 6"/>
+          </svg>
+          Send
+        </button>
+        <button class="action-btn" type="button" aria-label="Receive BTC into this Strongbox"
+          onclick={() => goto(`/holding/strongbox/${holdingId}/receive`)}>
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <rect x="5" y="11" width="14" height="9" rx="2"/>
+            <line x1="5" y1="15" x2="19" y2="15"/>
+            <line x1="12" y1="2" x2="12" y2="9"/>
+            <polyline points="8 5 12 9 16 5"/>
+          </svg>
+          Receive
+        </button>
+      </div>
+
+      <!-- ── Strongbox: tab strip ── -->
+      <div class="tab-strip" role="tablist">
+        <button
+          class="tab {activeTab === 'operations' ? 'tab--active' : ''}"
+          role="tab"
+          aria-selected={activeTab === 'operations'}
+          onclick={() => { activeTab = 'operations'; }}
+        >Operations</button>
+        <button
+          class="tab {activeTab === 'settings' ? 'tab--active' : ''}"
+          role="tab"
+          aria-selected={activeTab === 'settings'}
+          onclick={() => { activeTab = 'settings'; }}
+        >Settings</button>
+      </div>
+
+      <!-- ── Strongbox: Operations tab ── -->
+      {#if activeTab === 'operations'}
+        {#if strongboxLedger.length === 0}
+          <div class="activity-empty">
+            <div class="title">No activity yet</div>
+            <div class="sub">Incoming and outgoing payments will surface here as they hit the chain.</div>
+          </div>
+        {:else}
+          <ul class="activity-list" aria-label="Recent activity">
+            {#each strongboxLedger as entry (entry.id)}
+              <li class="activity-entry">
+                <span class="activity-main">
+                  <span class="activity-title">{purseEntryTitle(entry)}</span>
+                  <span class="activity-time">{entryTime(entry.timestamp)}</span>
+                  {#if entry.category}
+                    <span class="activity-category">
+                      <svg viewBox="0 0 24 24" aria-hidden="true">
+                        <polyline points="3 7 9 13 21 5"/>
+                      </svg>
+                      {entry.category}
+                    </span>
+                  {/if}
+                </span>
+                <span class="activity-amount {purseEntryAmountClass(entry)}">
+                  {entry.direction === 'incoming' ? '+' : '−'}{formatAmount(entry.net_amount_sats)}<span class="unit">{preferences.unit === 'sats' ? 'sats' : 'BTC'}</span>
+                </span>
+              </li>
+            {/each}
+          </ul>
+        {/if}
+      {/if}
+
+      <!-- ── Strongbox: Settings tab ── -->
+      {#if activeTab === 'settings'}
+
+        <!-- Advisory: missing signing metadata -->
+        {#if snapshot?.signing_metadata_present === false}
+          <div class="advisory-card" role="status">
+            <div class="advisory-header">
+              <span class="advisory-title">
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M 12 3 L 22 20 L 2 20 Z"/>
+                  <line x1="12" y1="10" x2="12" y2="14"/>
+                  <line x1="12" y1="17" x2="12.01" y2="17"/>
+                </svg>
+                Missing derivation metadata
+              </span>
+              <button class="advisory-cta" type="button"
+                onclick={() => goto(`/holding/strongbox/${holdingId}/fix-metadata`)}>
+                Fix this
+              </button>
+            </div>
+            <p class="advisory-body">
+              Your hardware wallet may refuse to sign transactions with this descriptor. Receiving funds works as expected. Re-export your descriptor with full origin metadata to enable signing.
+            </p>
+          </div>
+        {/if}
+
+        <!-- Wallet -->
+        <div class="settings-label">Wallet</div>
+        <div class="settings-card">
+          <div class="settings-row">
+            <div class="settings-body">
+              <div class="settings-value">External signing device</div>
+              <div class="settings-meta">Imported on {strongboxCreatedLabel()}. The signing keys live on your hardware wallet — TallyKeep never sees them.</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Display name -->
+        <div class="settings-label">Display name</div>
+        <div class="settings-card">
+          {#if showStrongboxRenameInput}
+            <div class="settings-row">
+              <div class="rename-form">
+                <input
+                  class="rename-input"
+                  type="text"
+                  bind:value={strongboxRenameValue}
+                  maxlength="100"
+                  placeholder="Strongbox name"
+                  aria-label="New Strongbox name"
+                />
+                <div class="rename-actions">
+                  <button class="settings-cta" type="button"
+                    onclick={() => { showStrongboxRenameInput = false; }}>
+                    Cancel
+                  </button>
+                  <button class="settings-cta settings-cta--primary" type="button"
+                    disabled={strongboxRenaming || !strongboxRenameValue.trim()}
+                    onclick={submitStrongboxRename}>
+                    {strongboxRenaming ? 'Saving…' : 'Save'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          {:else}
+            <div class="settings-row">
+              <div class="settings-body">
+                <div class="settings-value">{snapshot?.name ?? ''}</div>
+                <div class="settings-meta">How this Strongbox appears across TallyKeep.</div>
+              </div>
+              <button class="settings-cta" type="button" onclick={openStrongboxRename}>Rename</button>
+            </div>
+          {/if}
+        </div>
+
+        <!-- Signing device label -->
+        <div class="settings-label">Signing device</div>
+        <div class="settings-card">
+          {#if showSigningLabelInput}
+            <div class="settings-row">
+              <div class="rename-form">
+                <input
+                  class="rename-input"
+                  type="text"
+                  bind:value={signingLabelValue}
+                  maxlength="100"
+                  placeholder="e.g. Coldcard Mk4 in safe"
+                  aria-label="Signing device label"
+                />
+                <div class="rename-actions">
+                  <button class="settings-cta" type="button"
+                    onclick={() => { showSigningLabelInput = false; }}>
+                    Cancel
+                  </button>
+                  <button class="settings-cta settings-cta--primary" type="button"
+                    disabled={signingLabelSaving}
+                    onclick={submitSigningLabel}>
+                    {signingLabelSaving ? 'Saving…' : 'Save'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          {:else}
+            <div class="settings-row">
+              <div class="settings-body">
+                {#if snapshot?.signing_device_label?.trim()}
+                  <div class="settings-value">{snapshot.signing_device_label}</div>
+                {:else}
+                  <div class="settings-value settings-value--not-configured">Not set</div>
+                {/if}
+                <div class="settings-meta">Your note about where this hardware wallet lives. Shown as the subtitle on this Strongbox's status card.</div>
+              </div>
+              <button class="settings-cta" type="button" onclick={openSigningLabelEdit}>
+                {snapshot?.signing_device_label?.trim() ? 'Edit' : 'Set'}
+              </button>
+            </div>
+          {/if}
+        </div>
+
+        <!-- Descriptor -->
+        <div class="settings-label">Descriptor</div>
+        <div class="settings-card">
+          {#if showStrongboxDescriptor}
+            <div class="descriptor-revealed">
+              <div class="settings-meta">The public-key descriptor TallyKeep watches on the chain. Safe to paste into Sparrow, Specter, or Electrum for an independent view.</div>
+              <div class="descriptor-mono-card">{strongboxDescriptors[0]?.expression ?? ''}</div>
+              <div class="descriptor-actions">
+                <button class="settings-cta" type="button"
+                  onclick={() => { showStrongboxDescriptor = false; }}>
+                  Hide
+                </button>
+                <button class="settings-cta" type="button"
+                  onclick={copyStrongboxDescriptor}>
+                  {strongboxCopied ? 'Copied!' : 'Copy'}
+                </button>
+              </div>
+            </div>
+          {:else}
+            <div class="settings-row">
+              <div class="settings-body">
+                <div class="settings-value settings-value--mono">
+                  {strongboxDescriptorMasked(strongboxDescriptors[0]?.expression ?? '')}
+                </div>
+                <div class="settings-meta">The public-key descriptor TallyKeep watches on the chain.</div>
+              </div>
+              <button class="settings-cta" type="button"
+                onclick={() => { showStrongboxDescriptor = true; }}>
+                Show
+              </button>
+            </div>
+          {/if}
+        </div>
+
+        <!-- Auto-sweep rules -->
+        <div class="settings-label">Auto-sweep rules</div>
+        <div class="settings-card">
+          <div class="settings-row">
+            <div class="settings-body">
+              <div class="settings-value settings-value--not-configured">None</div>
+              <div class="settings-meta">Receive BTC into this Strongbox automatically on a schedule or threshold (e.g. weekly sweep from Kraken).</div>
+            </div>
+            <button class="settings-cta" type="button"
+              onclick={() => goto(`/holding/strongbox/${holdingId}/sweep/add`)}>
+              Add rule
+            </button>
+          </div>
+        </div>
+
+        <!-- Instant payments — permanently gated for Strongbox -->
+        <div class="settings-label">Instant payments</div>
+        <div class="settings-card">
+          <div class="settings-row settings-row--gated">
+            <div class="settings-body">
+              <div class="settings-value">Not available on Strongbox</div>
+              <div class="settings-meta">Strongbox keys live on your hardware wallet only. Lightning needs hot keys — activate it on a Spending wallet.</div>
+            </div>
+            <button class="settings-cta settings-cta--disabled" type="button" aria-disabled="true" disabled>Activate</button>
+          </div>
+        </div>
+
+        <!-- Danger zone -->
+        <div class="settings-label settings-label--danger">Danger zone</div>
+        <div class="settings-card">
+          <div class="settings-row">
+            <div class="settings-body">
+              <div class="settings-value">Forget this Strongbox</div>
+              <div class="settings-meta">TallyKeep forgets the descriptor and stops scanning the chain. Your hardware wallet and the keys it holds are unaffected. Any categories you've assigned to this Strongbox's activity are erased with it.</div>
+            </div>
+            <button class="settings-cta settings-cta--danger" type="button"
+              onclick={() => { showStrongboxForgetModal = true; }}>
               Forget
             </button>
           </div>
@@ -1064,6 +1677,44 @@
           </div>
         </div>
 
+        <!-- Display name -->
+        <div class="settings-label">Display name</div>
+        <div class="settings-card">
+          {#if showRenameInput}
+            <div class="settings-row">
+              <div class="rename-form">
+                <input
+                  class="rename-input"
+                  type="text"
+                  bind:value={renameValue}
+                  maxlength="100"
+                  placeholder="Account name"
+                  aria-label="New account name"
+                />
+                <div class="rename-actions">
+                  <button class="settings-cta" type="button"
+                    onclick={() => { showRenameInput = false; }}>
+                    Cancel
+                  </button>
+                  <button class="settings-cta settings-cta--primary" type="button"
+                    disabled={renaming || !renameValue.trim()}
+                    onclick={submitRename}>
+                    {renaming ? 'Saving…' : 'Save'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          {:else}
+            <div class="settings-row">
+              <div class="settings-body">
+                <div class="settings-value">{snapshot?.name ?? ''}</div>
+                <div class="settings-meta">How this Account appears across TallyKeep.</div>
+              </div>
+              <button class="settings-cta" type="button" onclick={openRename}>Rename</button>
+            </div>
+          {/if}
+        </div>
+
         <!-- Observation key -->
         <div class="settings-label">Observation key</div>
         <div class="settings-card">
@@ -1166,42 +1817,6 @@
         <div class="settings-label settings-label--danger">Danger zone</div>
         <div class="settings-card">
 
-          {#if showRenameInput}
-            <div class="settings-row">
-              <div class="rename-form">
-                <input
-                  class="rename-input"
-                  type="text"
-                  bind:value={renameValue}
-                  maxlength="100"
-                  placeholder="Account name"
-                  aria-label="New account name"
-                />
-                <div class="rename-actions">
-                  <button class="settings-cta" type="button"
-                    onclick={() => { showRenameInput = false; }}>
-                    Cancel
-                  </button>
-                  <button class="settings-cta settings-cta--primary" type="button"
-                    disabled={renaming || !renameValue.trim()}
-                    onclick={submitRename}>
-                    {renaming ? 'Saving…' : 'Save'}
-                  </button>
-                </div>
-              </div>
-            </div>
-          {:else}
-            <div class="settings-row">
-              <div class="settings-body">
-                <div class="settings-value">Rename this Account</div>
-                <div class="settings-meta">Change how this Account appears across TallyKeep.</div>
-              </div>
-              <button class="settings-cta" type="button" onclick={openRename}>
-                Rename
-              </button>
-            </div>
-          {/if}
-
           <div class="settings-row">
             <div class="settings-body">
               <div class="settings-value">Forget this Account</div>
@@ -1256,6 +1871,37 @@
           onclick={removeAccount}
         >
           {forgetReady ? (removing ? 'Forgetting…' : 'Forget') : `Forget · ${forgetCountdown}`}
+        </button>
+      </div>
+    </div>
+  {/if}
+
+  <!-- ── Strongbox forget modal (fill-bar timer, no seed warning) ── -->
+  {#if showStrongboxForgetModal}
+    <div class="modal-backdrop" role="presentation" aria-hidden="true"></div>
+    <div class="modal-sheet" role="dialog" aria-modal="true" aria-labelledby="strongbox-forget-title">
+      <div class="drag-handle" aria-hidden="true"></div>
+      <h2 id="strongbox-forget-title" class="modal-title">Forget this Strongbox?</h2>
+      <p class="modal-body">
+        TallyKeep forgets the descriptor and stops scanning the
+        chain. Your hardware wallet and the keys it holds are
+        unaffected. Any categories you've assigned to this
+        Strongbox's activity are erased with it.
+      </p>
+      <div class="modal-actions">
+        <button class="btn btn-cancel" type="button"
+          disabled={strongboxForgetRemoving}
+          onclick={() => { showStrongboxForgetModal = false; }}>
+          Cancel
+        </button>
+        <button
+          class="btn {strongboxForgetReady ? 'btn-danger' : `btn-danger-timer${strongboxForgetCounting ? ' counting' : ''}`}"
+          type="button"
+          disabled={!strongboxForgetReady || strongboxForgetRemoving}
+          aria-disabled={!strongboxForgetReady}
+          onclick={forgetStrongbox}
+        >
+          {strongboxForgetReady ? (strongboxForgetRemoving ? 'Forgetting…' : 'Forget') : `Forget · ${strongboxForgetCountdown}`}
         </button>
       </div>
     </div>
@@ -1850,7 +2496,7 @@
     position: absolute;
     inset: 0;
     background: rgba(0, 0, 0, 0.4);
-    z-index: 10;
+    z-index: 110;
   }
   .modal-sheet {
     position: absolute;
@@ -1858,7 +2504,7 @@
     background: var(--color-surface);
     border-radius: var(--radius-lg) var(--radius-lg) 0 0;
     padding: var(--space-3) var(--space-5) var(--space-5);
-    z-index: 11;
+    z-index: 111;
     box-shadow: 0 -8px 24px rgba(0, 0, 0, 0.18);
   }
   .drag-handle {
@@ -1950,4 +2596,86 @@
     color: #ffffff;
   }
   .btn-danger-timer:hover { background-color: transparent; }
+
+  /* ── Strongbox stripe ── */
+  .status-card--strongbox { border-left-color: var(--color-holding-strongbox); }
+
+  /* ── Descriptor revealed state ── */
+  .descriptor-revealed {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+    padding: var(--space-2) 0;
+  }
+  .descriptor-mono-card {
+    background: var(--color-bg);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    padding: var(--space-3) var(--space-4);
+    font-family: var(--font-mono);
+    font-size: var(--font-size-xs);
+    color: var(--color-text);
+    letter-spacing: 0.02em;
+    word-break: break-all;
+    line-height: 1.5;
+  }
+  .descriptor-actions {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    justify-content: flex-end;
+  }
+
+  /* ── Security-health inline advisory card ── */
+  .advisory-card {
+    margin: var(--space-4) var(--space-4) 0;
+    background: var(--color-warning-soft);
+    border: 1px solid var(--color-warning-border);
+    border-radius: var(--radius-md);
+    padding: var(--space-3) var(--space-4);
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+  }
+  .advisory-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-2);
+  }
+  .advisory-title {
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-weight-semibold);
+    color: var(--color-warning-text-on-soft, #6a4a10);
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-2);
+  }
+  .advisory-title svg {
+    width: 16px; height: 16px;
+    stroke: currentColor; fill: none;
+    stroke-width: 2; stroke-linecap: round; stroke-linejoin: round;
+    flex-shrink: 0;
+  }
+  .advisory-body {
+    font-size: var(--font-size-xs);
+    color: var(--color-warning-text-on-soft, #6a4a10);
+    line-height: var(--line-height-default);
+    margin: 0;
+  }
+  .advisory-cta {
+    background: var(--color-surface);
+    border: 1px solid var(--color-warning-border);
+    border-radius: var(--radius-pill);
+    padding: var(--space-1) var(--space-3);
+    font-family: inherit;
+    font-size: var(--font-size-xs);
+    font-weight: var(--font-weight-semibold);
+    color: var(--color-warning-text-on-soft, #6a4a10);
+    cursor: pointer;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+  .advisory-cta:hover { background: var(--color-warning-soft); }
+  .advisory-card + .settings-label { margin-top: var(--space-4); }
 </style>

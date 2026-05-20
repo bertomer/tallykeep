@@ -7,6 +7,7 @@ dataclass exposes them as proper fields. This module is the translation layer.
 
 from __future__ import annotations
 
+from dataclasses import MISSING as _UNSET
 from datetime import UTC, datetime
 from typing import Any
 from uuid import UUID
@@ -204,8 +205,13 @@ def update_basics(
     display_color: str | None = None,
     display_order: int | None = None,
     declared_security: SecurityClaim | None = None,
+    signing_device_label: Any = _UNSET,
 ) -> HoldingRow | None:
-    """Apply a partial update — caller must commit. Returns the row or None."""
+    """Apply a partial update — caller must commit. Returns the row or None.
+
+    ``signing_device_label`` uses the ``_UNSET`` sentinel to distinguish
+    "not provided" (no change) from ``None`` (clear the label).
+    """
     row = session.get(HoldingRow, holding_id)
     if row is None:
         return None
@@ -225,6 +231,15 @@ def update_basics(
         row.declared_geographic_distribution = declared_security.geographic_distribution
         row.declared_inheritance_configured = declared_security.inheritance_configured
         row.declared_security_notes = declared_security.notes
+    if signing_device_label is not _UNSET:
+        if row.holding_type != HoldingType.STRONGBOX.value:
+            raise ValueError("signing_device_label is only valid for Strongbox holdings")
+        new_data = dict(row.subtype_data or {})
+        if signing_device_label is None:
+            new_data.pop("signing_device_label", None)
+        else:
+            new_data["signing_device_label"] = signing_device_label
+        row.subtype_data = new_data
     row.updated_at = datetime.now(UTC)
     return row
 
