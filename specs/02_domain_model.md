@@ -38,7 +38,6 @@ class Holding(ABC):
     declared_security: SecurityClaim    # what the user says this Holding is
     display_color: str                  # UI hint, hex
     display_order: int
-    is_archived: bool
     created_at: datetime
     updated_at: datetime
 ```
@@ -204,7 +203,7 @@ This model is reflected in the threat model
 - Account has no Descriptors and exactly one CustodialProvider.
 - Purse, Strongbox, and Vault have at least one Descriptor and no CustodialProvider.
 - Vault may have multisig parameters (`required_signers`, `total_signers`); Purse and Strongbox should not.
-- Holdings are soft-deleted (archived). No hard delete, to preserve LedgerEntry integrity.
+- Holdings hard-delete on Forget via a service-layer cascade (per ADR-0017). `onchain_transaction` rows are preserved (chain truth, shared across Holdings). `ledger_entry` rows are preserved when at least one other Holding still links to them via `ledger_entry_holding_link`; otherwise they cascade out with the Forgotten Holding. There is no archive / soft-delete flag — the `is_archived` column and the `POST /holdings/{id}/archive` endpoint retired with ADR-0017.
 - Every Purse has a `purse_mode` value. Required at creation; mutable only along the `WATCH_ONLY → ON_DEVICE_USER_IMPORTED` axis via the in-place upgrade flow (per `pre-implementation.md` `purse-upgrade-path`). All other transitions are forbidden — see rule 10 in the summary at the end.
 - The backend never stores any reference to the seed itself. For `purse_mode=ON_DEVICE_TK_GENERATED` (or `ON_DEVICE_USER_IMPORTED`), the seed lives only in a client device's secure local storage; the backend has no field, encrypted or otherwise, that points at it.
 
@@ -422,13 +421,17 @@ Rules:
   belongs to. For an outflow (Account → Strongbox), the
   counterparty is the Strongbox; for an inflow (Purse → Account),
   the counterparty is the Purse.
-- The current Account-removal cascade (per the Account-detail page
-  iteration) hard-deletes `custodial_ledger_entry` rows along with
-  the Holding. This is a deliberate divergence from the file's
-  default ON DELETE RESTRICT convention; a deferred
-  Holding-deletion iteration (captured for future sharpening in
-  `backlog/`) will revisit and likely shift to
-  null-the-back-pointer semantics.
+- Forget on any Holding type cascades through `custodial_ledger_entry`
+  per ADR-0017. For an Account being Forgotten, the rows where
+  `holding_id` matches are hard-deleted (along with the
+  `custodial_provider` row and the stored API credentials). For a
+  non-Account Holding being Forgotten, any
+  `linked_counterparty_holding_id` pointing at it is NULLed out —
+  the surviving Account on the other side keeps its mirror row,
+  only the dangling back-pointer disappears. The schema FK on
+  `linked_counterparty_holding_id` is `ON DELETE SET NULL` to
+  match. The Account-removal pattern was generalised here, no
+  longer a divergence; implementation tracked in the active iteration block of `next_iteration.md`.
 
 ### LedgerEntry
 
@@ -820,5 +823,5 @@ Job (standalone, linked to whatever triggered it via parameters)
 7. The whitelist address of a CustodialProvider's withdrawal credential must be owned by a self-custody Holding (Purse / Strongbox / Vault). Cross-Account whitelisting is out of current scope.
 8. No domain entity exposes a private key, seed, or signing material in any field. The type system forbids it.
 9. PaymentRequest from a Holding whose `signing_model == NOT_APPLICABLE` is rejected at construction.
-10. A Purse's `purse_mode` is mutable only along the `WATCH_ONLY → ON_DEVICE_USER_IMPORTED` axis, gated by the in-place upgrade flow defined in `pre-implementation.md` `purse-upgrade-path` (the user pastes the seed of the wallet whose descriptor was already imported; the same Purse becomes spendable from the device that holds the seed). The seed *source* itself is invariant — `ON_DEVICE_TK_GENERATED` and `ON_DEVICE_USER_IMPORTED` never convert into each other. Any other transition requires creating a new Purse and moving funds; the original is archived. The upgrade flow is target state; implementation lands when `purse-upgrade-path` arbitration closes.
+10. A Purse's `purse_mode` is mutable only along the `WATCH_ONLY → ON_DEVICE_USER_IMPORTED` axis, gated by the in-place upgrade flow defined in `pre-implementation.md` `purse-upgrade-path` (the user pastes the seed of the wallet whose descriptor was already imported; the same Purse becomes spendable from the device that holds the seed). The seed *source* itself is invariant — `ON_DEVICE_TK_GENERATED` and `ON_DEVICE_USER_IMPORTED` never convert into each other. Any other transition requires creating a new Purse and moving funds; the original is Forgotten (per ADR-0017). The upgrade flow is target state; implementation lands when `purse-upgrade-path` arbitration closes.
 11. The backend never validates client build type. The "create a TallyKeep wallet" affordance is gated client-side on the client's capability to generate and securely store a seed. The backend accepts any Purse-creation request that satisfies the schema.

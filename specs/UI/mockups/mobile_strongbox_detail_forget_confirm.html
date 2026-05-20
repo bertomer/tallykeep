@@ -1,6 +1,6 @@
 <!--
   Title: Mobile — Strongbox detail · Forget confirm
-  Status: validated  (Rémy greenlight 2026-05-20 closing the Strongbox-detail-page design pass)
+  Status: validated  (Rémy greenlight 2026-05-20 closing the Strongbox-detail-page design pass; refreshed 2026-05-20 to insert the global-totals sentence per ADR-0017 / forget-cascade-implementation iteration)
   Date last touched: 2026-05-20
   Replaces: nothing on disk; Strongbox-type variant of the
             Forget modal pattern locked in the Purse-detail
@@ -36,12 +36,20 @@
     button disabled. Cancel always available.
   - **Title.** "Forget this Strongbox?" — direct question,
     same noun-substitution shape as the Purse variant.
-  - **Body copy** (three short sentences, no clause-joining
+  - **Body copy** (four short sentences, no clause-joining
     em-dash):
       (1) What TK does (forgets descriptor, stops scanning);
       (2) what this does NOT do (hardware wallet and keys
           unaffected);
-      (3) categorization loss (user-assigned categories on
+      (3) global-totals impact (this Strongbox's balance leaves
+          your overall total) — sentence added 2026-05-20 in
+          lockstep with ADR-0017 / forget-cascade-implementation
+          iteration. Parallel structure across all four
+          Forget-confirm variants (Account, Purse WATCH_ONLY,
+          Purse ON_DEVICE_*, Strongbox); "your overall total"
+          is the UI-agnostic label, coding agent matches the
+          actual Home Fortune-view label at implementation;
+      (4) categorization loss (user-assigned categories on
           this Strongbox's chain-side ledger entries are
           erased — applies same as Purse).
 -->
@@ -204,14 +212,14 @@
     <div class="modal-backdrop"></div>
 
     <div class="modal-sheet" role="dialog" aria-modal="true" aria-labelledby="forget-title">
-      <div class="drag-handle" aria-hidden="true"></div>
       <h2 id="forget-title" class="modal-title">Forget this Strongbox?</h2>
 
       <p class="modal-body">
         TallyKeep forgets the descriptor and stops scanning the
         chain. Your hardware wallet and the keys it holds are
-        unaffected. Any categories you've assigned to this
-        Strongbox's activity are erased with it.
+        unaffected. Forgetting this Strongbox removes it from
+        your overall total. Any categories you've assigned to
+        this Strongbox's activity are erased with it.
       </p>
 
       <div class="modal-actions">

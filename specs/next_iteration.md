@@ -103,7 +103,257 @@ sequence in `PROCESS.md §4.4` stages 3–5.
 
 ## Active iteration
 
-No active coding iteration.
+### Iteration: Forget cascade implementation
+
+**Started:** 2026-05
+**Goal:** Tapping Forget on any Holding actually forgets it — descriptor, addresses, UTXOs, ledger entries owned solely by that Holding, secret credentials, and the on-device seed for `ON_DEVICE_*` Purses. The `is_archived` mechanism is gone end-to-end (column, endpoint, query param, response field, frontend caller).
+
+#### Scope (in) — required
+
+- **Backend service-layer cascade.** Extend the existing
+  `DELETE /api/v1/holdings/{holding_id}` handler (today hard-deletes
+  Accounts only; returns 422 for other types) to accept all four
+  Holding types. Transaction order, top-to-bottom, per
+  [[ADR-0017]] §1:
+    - delete `address` rows for the Holding'''s `descriptor`(s);
+    - delete `utxo` rows for the Holding'''s `descriptor`(s);
+    - delete `descriptor` rows for the Holding;
+    - delete `payment_request` and `invoice` rows for the Holding;
+    - for Accounts: delete `custodial_ledger_entry` rows where
+      `holding_id` matches, then `custodial_provider`, then clear
+      stored API-credential bytes via the existing secret-cleanup
+      path;
+    - delete `ledger_entry_holding_link` rows where `holding_id`
+      matches; for each affected `ledger_entry`, if link count is
+      now 0, delete the `ledger_entry`;
+    - delete the `holding` row itself.
+  The 422-on-non-Account guard goes away. Success response stays 204.
+
+- **Schema migration — single pass, no deprecation cycle.**
+    - Drop `holding.is_archived` column.
+    - Recreate the two indexes without the `WHERE is_archived = FALSE`
+      clause: `idx_holding_type_active` → `idx_holding_type`,
+      `idx_holding_purpose` stays the same name (filter clause
+      dropped).
+    - Change FK `custodial_ledger_entry.linked_counterparty_holding_id`
+      from `ON DELETE RESTRICT` to `ON DELETE SET NULL`.
+    - `03_data_model.md §Migrations` normally calls for a two-release
+      deprecation cycle on destructive column drops; **waived here**
+      per ADR-0017 (project in personal-use phase per ADR-0003, no
+      external user runs the current schema).
+    - **No data-migration logic.** Rémy will reset the dev DB at the
+      same time; existing `is_archived=TRUE` rows go with the column.
+
+- **Retire `POST /api/v1/holdings/{holding_id}/archive`.** Remove the
+  route from the backend.
+
+- **Retire `DELETE /api/v1/descriptors/{descriptor_id}`.** Remove the
+  route. Reasoning recorded in
+  this active iteration block (source content was captured in a backlog file pre-promotion, deleted per ADR-0014 on promotion)
+  and ADR-0017: removed because no current product flow edits the
+  descriptor set of an existing Holding, not because descriptor
+  deletion is equivalent to Holding deletion (Vaults and potentially
+  Strongboxes can hold multiple descriptors; a future multi-descriptor
+  edit flow would be its own endpoint).
+
+- **Frontend wiring change.** The Forget bottom-sheet confirm handler
+  in the three live Holding detail pages (Account, Purse, Strongbox)
+  switches its HTTP call from `POST .../{id}/archive` to
+  `DELETE .../{id}`. No new copy beyond what the refreshed mockups
+  prescribe.
+
+- **Body copy refresh in the three Forget-confirm screens.** Insert
+  the new "Forgetting this {type} removes it from your overall total"
+  sentence per the validated mockup variants (see Mockup contract).
+  Account: 5 sentences, new line in position 4 of 5. Strongbox: 4
+  sentences, new line in position 3 of 4. Purse ON_DEVICE_*: 5
+  sentences, new line in position 3 of 5. Purse WATCH_ONLY (branch
+  on `purse_mode` in the Purse Forget bottom-sheet): 4 sentences per
+  the variant note in the Purse Forget mockup header. "Your overall
+  total" is the UI-agnostic label; match the actual Home Fortune-view
+  label string used in the live UI if it differs.
+
+- **OpenAPI regeneration at closeout** per PROCESS.md §4.2. The
+  regenerated file drops:
+    - `POST /api/v1/holdings/{holding_id}/archive`;
+    - `DELETE /api/v1/descriptors/{descriptor_id}`;
+    - the `include_archived` query parameter on
+      `GET /api/v1/holdings` and `GET /api/v1/holdings/summary/global`;
+    - the `is_archived` field on `HoldingResponse`.
+
+#### Scope (out) — required
+
+- **Vault Forget UI**. Vault detail page hasn'''t shipped yet
+  (deferred per the roadmap); this iteration only touches the three
+  live detail pages. The backend cascade handles Vaults correctly
+  by construction (all four types go through the same DELETE path);
+  the Vault Forget bottom-sheet ships with the Vault detail
+  iteration.
+- **Aggregate-history loss copy for cross-Holding linkage**. Only
+  the global-totals sentence is added. The cross-Holding
+  ledger-attribution loss (when a sweep-source Holding is Forgotten,
+  the destination Account'''s incoming-tx record loses the
+  "this came from..." attribution) is real but can'''t be explained
+  without leaking schema; deliberately not surfaced in the modal.
+- **Hide/Archive feature**. Out of scope per ADR-0017. If real users
+  ever surface a need, revisit via
+  `backlog/anonymous-public-feedback-channel.md`.
+- **Multi-descriptor edit flow**. Out of scope. Would be its own
+  endpoint at its own iteration; this iteration removes the
+  half-functional `DELETE /descriptors/{id}` rather than completing
+  it.
+
+#### Affected canonical docs
+
+Already updated in lockstep with ADR-0017 (no further canonical-doc
+edits expected from the coding agent):
+
+- `02_domain_model.md` — `is_archived` removed from `Holding`,
+  soft-delete invariant replaced, CustodialLedgerEntry footnote
+  rewritten, rule #10 vocabulary lockstep.
+- `03_data_model.md` — Conventions soft-delete rule replaced,
+  `is_archived` column dropped, partial indexes lose the
+  `WHERE is_archived = FALSE` filter,
+  `linked_counterparty_holding_id` FK now `ON DELETE SET NULL`,
+  CustodialLedgerEntry footnote rewritten.
+- `concerns/observation.md` — Fortune view sums across all Holdings
+  (no "non-archived" qualifier).
+- `holdings/02_purse.md` — purse-upgrade-path forward-reference
+  vocabulary updated.
+- `decisions/0017-forget-is-hard-delete.md` — the governing ADR.
+- `decisions/README.md` — ADR-0017 indexed.
+
+`UI/mobile.md` was checked; no edits needed (the prose describes
+intent only; the body-copy surface lives in the mockup HTML per
+PROCESS.md §2 Coding agent — Visual contract).
+
+#### Mockup contract — required if iteration touches UI
+
+All three files at `Status: validated`, `Date last touched: 2026-05-20`,
+refreshed in this design pass to insert the global-totals sentence.
+Coding-agent rule (PROCESS.md §2 Coding agent — Visual contract):
+read each file before writing the corresponding screen. The mockup
+HTML is the contract; deviation is either a code bug or a spec drift
+event.
+
+- `UI/mockups/mobile_account_detail_remove_confirm.html` — Account
+  variant (5 sentences).
+- `UI/mockups/mobile_strongbox_detail_forget_confirm.html` —
+  Strongbox variant (4 sentences).
+- `UI/mockups/mobile_purse_detail_forget_confirm.html` — Purse
+  ON_DEVICE_* variant rendered; WATCH_ONLY variant documented in
+  the header `Replaces:` block (4 sentences, branch on `purse_mode`).
+
+#### Tasks — required
+
+1. **Read every mockup file in the Mockup contract**, plus
+   `decisions/0017-forget-is-hard-delete.md` and the relevant
+   sections of `02_domain_model.md` / `03_data_model.md`. Required
+   before writing any code.
+2. **Backend cascade implementation.** Extend the existing
+   `delete_holding` service-layer function (currently handling
+   Accounts only) to handle all four Holding types per the order in
+   Scope (in). Existing Account path stays as-is — it'''s the
+   pattern being generalised. One transaction per Forget.
+3. **Wire the NULL-the-back-pointer behaviour.** Verify that the
+   `ON DELETE SET NULL` FK change does the right thing for
+   `custodial_ledger_entry.linked_counterparty_holding_id` when a
+   non-Account Holding is Forgotten while another Account holds a
+   linked counterparty row. Smoke-test scenario in Acceptance.
+4. **Schema migration.** Single Alembic migration: drop
+   `is_archived`, recreate the two indexes without the filter, flip
+   the FK posture. `downgrade()` is the inverse (recreate column
+   default FALSE, partial indexes, FK back to RESTRICT).
+5. **Remove the two retiring routes** from the backend (route
+   handler + any router registration): `POST /holdings/{id}/archive`,
+   `DELETE /descriptors/{id}`.
+6. **Frontend wiring.** Switch the Forget confirm handlers on the
+   three Holding detail pages from `POST .../archive` to
+   `DELETE .../{id}`. Verify the 204 response triggers the existing
+   "return to Home + remove row" behaviour without regression.
+7. **Frontend copy refresh.** Update the Forget bottom-sheet body
+   text in the three live detail pages to match the validated
+   mockup variants. Purse Forget branches on `purse_mode` between
+   WATCH_ONLY and ON_DEVICE_* copies per the mockup header note.
+8. **Run `tools/check-spec.ps1`** (Windows) or `tools/check-spec.sh`
+   (Linux/Mac). Must pass before stage-3 handoff.
+9. **Stop and report** per PROCESS.md §4.4 stage 3. Surface the
+   live-UI label decision (whether "your overall total" matches the
+   actual Home Fortune-view label string or needs a per-installation
+   adjustment) as a Decision-needed item if it'''s ambiguous.
+
+#### Acceptance / done-when — required
+
+- **Forget a Purse with on-chain activity** — descriptor, address,
+  utxo, payment_request, invoice rows for that Purse are gone from
+  the DB. Any sweep from that Purse to a still-living Account
+  produced a shared `ledger_entry` row; that row survives and is
+  still linked to the surviving Account via
+  `ledger_entry_holding_link`.
+- **Forget an Account** — `custodial_provider` row, all
+  `custodial_ledger_entry` rows with `holding_id` matching, and the
+  stored API credentials are gone. Other Accounts that had this
+  Account as a sweep counterparty have their
+  `linked_counterparty_holding_id` set to NULL (mirror rows
+  preserved).
+- **Forget a Strongbox** — descriptor / address / utxo rows gone;
+  hardware-wallet-side state obviously untouched (it'''s on the
+  device); no `NativeBridge.secureStorage.delete` call attempted
+  (Strongbox never had a secureStorage entry).
+- **Forget an ON_DEVICE_* Purse** — `NativeBridge.secureStorage.delete`
+  fires for the `holding_id` key BEFORE the backend DELETE. If
+  secureStorage delete fails, the backend call does not proceed and
+  the inline error surfaces per the existing Purse Forget contract.
+- **The Forget bottom-sheet body copy** matches the validated
+  mockup variant for each type. Five sentences for Account, four
+  for Strongbox, four for Purse WATCH_ONLY, five for Purse
+  ON_DEVICE_*.
+- **API surface** — `POST /holdings/{id}/archive` returns 404,
+  `DELETE /descriptors/{id}` returns 404, `DELETE /holdings/{id}`
+  returns 204 for all four types, `GET /holdings` and
+  `GET /holdings/summary/global` no longer accept
+  `include_archived`, `HoldingResponse` no longer carries
+  `is_archived`. Verified via Swagger UI.
+- **`tools/check-spec.ps1` passes** (8 checks) including OpenAPI
+  regenerated at closeout per §4.2.
+
+#### Dependencies
+
+None. ADR-0017 accepted, canonical docs updated, three mockups
+validated, no arbitration blockers, no prior iteration waiting to
+ship.
+
+#### Verification (Rémy)
+
+- Run the project'''s `.ps1` smoke-test suite against the running
+  backend.
+- Walk through Swagger UI for the touched endpoints: verify
+  `DELETE /holdings/{id}` accepts all four types,
+  `POST /holdings/{id}/archive` is gone,
+  `DELETE /descriptors/{id}` is gone,
+  `HoldingResponse` no longer carries `is_archived`,
+  `include_archived` query parameter is gone.
+- Hand-test the three Holding detail pages: tap Forget, verify the
+  modal renders with the refreshed copy per variant, complete the
+  countdown, verify the row disappears from Home and the global
+  total drops by the expected amount.
+- For an Account that was a sweep destination from another (now
+  Forgotten) Holding, verify the Account'''s past incoming entries
+  still render but the cross-Holding attribution is gone (the
+  back-pointer NULL behaviour).
+- Open the three refreshed mockups at 360×800; spot-check that the
+  rendered app body copy matches.
+
+#### Closeout
+
+The agent does **not** start closeout until Rémy gives an explicit
+greenlight after stage-4 validation. On greenlight the agent:
+regenerates `api/openapi.yaml` from the running backend (per §4.2 —
+this iteration removed two routes and changed response shapes),
+appends a condensed entry to `shipped.md`, clears the active block
+in this file back to "No active coding iteration.", runs
+`tools/check-spec.ps1`, commits. Full sequence in `PROCESS.md §4.4`
+stages 3–5.
 
 <!--
 
@@ -500,5 +750,4 @@ task 7 surfaced a missing PATCH path. Full sequence in
 The rough sequence ("Onboarding → Add Holding → Holding detail
 → Send + Receive → …") for Rémy's mental model lives in
 `backlog/README.md` (Iteration roadmap section), not here.
-`next_iteration.md` carries the active block only; everything
-else is reference.
+`next_iteration.md` carries the active block only.

@@ -1,7 +1,7 @@
 <!--
   Title: Mobile — Account detail · Forget confirm
-  Status: validated  (Rémy re-greenlight 2026-05-19 on the lockstep changes from the Purse-detail iteration. Was validated 2026-05-17; 2026-05-19 edit added the 5-second fill-bar timer on the Forget button + pulled Rename out of the Danger zone into its own "Display name" section. Cross-type lockstep with the Purse-detail iteration.)
-  Date last touched: 2026-05-19
+  Status: validated  (Rémy re-greenlight 2026-05-19 on the lockstep changes from the Purse-detail iteration. Was validated 2026-05-17; 2026-05-19 edit added the 5-second fill-bar timer on the Forget button + pulled Rename out of the Danger zone into its own "Display name" section. Cross-type lockstep with the Purse-detail iteration. 2026-05-20 refresh inserts the global-totals sentence per ADR-0017 / forget-cascade-implementation iteration; body copy goes from four to five sentences.)
+  Date last touched: 2026-05-20
   Replaces: nothing on disk. Revised 2026-05-17 after first design
             review with Rémy: type-to-confirm dropped, "Remove"
             renamed to "Forget" across all Holding types.
@@ -205,9 +205,10 @@
       <p class="modal-body">
         TallyKeep forgets the API credentials and stops observing
         this Account. Your account on Kraken itself is unaffected.
-        You keep your funds and history with the provider. You can
-        re-add this Account later by running the Add Account wizard
-        again.
+        You keep your funds and history with the provider.
+        Forgetting this Account removes it from your overall total.
+        You can re-add this Account later by running the Add
+        Account wizard again.
       </p>
 
       <div class="modal-actions">

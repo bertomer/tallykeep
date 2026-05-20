@@ -284,7 +284,7 @@ in progress").
 
 ## Fortune view (global consolidation)
 
-Sums confirmed balances across non-archived Holdings. Account
+Sums confirmed balances across all Holdings (per ADR-0017 there is no archived state — Forgotten Holdings are gone from the database entirely, so "all Holdings" is unambiguous). Account
 balances use `last_known_balance_sats` with an "as of {timestamp}"
 indicator. Breaks down by holding_type and purpose. Optional
 fiat conversion gated by `display.fiat_conversion.enabled` (see

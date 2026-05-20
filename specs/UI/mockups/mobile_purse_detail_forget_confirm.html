@@ -1,15 +1,21 @@
 <!--
   Title: Mobile — Purse detail · Forget confirm (ON_DEVICE_* variant)
-  Status: validated  (Rémy greenlight 2026-05-19 closing the Purse-detail-page design pass — iteration sketched 2026-05 in two rounds plus the round-3 categorization-loss + recovery-tile rollback + round-4 settlement-rails preview)
-  Date last touched: 2026-05-19
+  Status: validated  (Rémy greenlight 2026-05-19 closing the Purse-detail-page design pass — iteration sketched 2026-05 in two rounds plus the round-3 categorization-loss + recovery-tile rollback + round-4 settlement-rails preview. 2026-05-20 refresh inserts the global-totals sentence per ADR-0017 / forget-cascade-implementation iteration; ON_DEVICE_* body copy goes from four to five sentences, WATCH_ONLY variant note in the header below goes from two to four sentences.)
+  Date last touched: 2026-05-20
   Replaces: nothing on disk. Renders the load-bearing variant —
             ON_DEVICE_TK_GENERATED (and ON_DEVICE_USER_IMPORTED
             when it ships). The WATCH_ONLY variant uses the same
-            structural mockup with the warning panel removed
-            and a different body copy line ("TallyKeep forgets
-            the descriptor and stops scanning the chain. Funds
-            at your source wallet are unaffected.") — coding
-            agent branches the body on `purse_mode`.
+            structural mockup with the warning panel removed and
+            a different four-sentence body copy: "TallyKeep
+            forgets the descriptor and stops scanning the chain.
+            Funds at your source wallet are unaffected. Forgetting
+            this Purse removes it from your overall total. Any
+            categories you've assigned to this Purse's activity
+            are erased with it." — coding agent branches the body
+            on `purse_mode`. Categorization-loss sentence applies
+            to both modes; global-totals sentence applies to
+            both modes (added 2026-05-20 in lockstep with
+            ADR-0017 / forget-cascade-implementation iteration).
 
   Design notes:
   - Bottom-sheet pattern, same shape as the Account-detail
@@ -71,14 +77,22 @@
   - **Title.** "Forget this Purse?" — direct question, no
     softening. Purse-type variant differs from Account's
     "Forget this Account?" in just the noun.
-  - **Body copy** (ON_DEVICE_* variant): four short sentences,
+  - **Body copy** (ON_DEVICE_* variant): five short sentences,
     one idea each, no clause-joining em-dash. (1) What TK
     does (destroys keys, forgets descriptor, stops scanning);
     (2) what this means for the funds (without a working
     backup they become permanently inaccessible);
-    (3) categorization loss (any user-assigned categories on
+    (3) global-totals impact (this Purse's balance leaves
+    your overall total) — sentence added 2026-05-20 in
+    lockstep with ADR-0017 / forget-cascade-implementation
+    iteration; "your overall total" is the UI-agnostic
+    label, coding agent matches the actual Home Fortune-view
+    label at implementation. Parallel structure across all
+    four Forget-confirm variants (Account, Purse WATCH_ONLY,
+    Purse ON_DEVICE_*, Strongbox);
+    (4) categorization loss (any user-assigned categories on
     this Purse's chain-side ledger entries are erased along
-    with the entries — applies to both modes); (4) reversal
+    with the entries — applies to both modes); (5) reversal
     path (re-import using the recovery phrase, but the
     categorizations don't come back).
 -->
@@ -277,7 +291,8 @@
         TallyKeep destroys the keys on this device, forgets the
         descriptor, and stops scanning the chain. Without a working
         backup of your recovery phrase, the funds in this Purse
-        become permanently inaccessible. Any categories you've
+        become permanently inaccessible. Forgetting this Purse
+        removes it from your overall total. Any categories you've
         assigned to this Purse's activity are erased with it. You
         can re-import this Purse from your recovery phrase, but the
         categorizations don't come back.

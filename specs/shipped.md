@@ -395,9 +395,7 @@ script type. Inline parseback rename. Auth guards on all pages.
 Backend: `ChainScanService.initial_scan` resilience —
 `NodeRpcError` caught per-branch, `max(height_at_scan, 1)`
 sentinel for genesis-height scans. Rescan triggered
-automatically by the wizard after holding creation.
-
-Testing: 7 unit tests for `ChainScanService` new resilience
+automatically by the wizard after holding creation.esting: 7 unit tests for `ChainScanService` new resilience
 paths. Smoke-test section 13d extended. Developer cheatsheet
 (DEV.md in the backend repo) added. API surface unchanged — no OpenAPI regen
 needed.

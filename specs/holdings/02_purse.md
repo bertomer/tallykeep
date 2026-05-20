@@ -147,7 +147,7 @@ Specific arbitration items still pending (per
 `pre-implementation.md` `purse-upgrade-path`): whether
 `purse_mode` is mutable in place (a `WATCH_ONLY` Purse becomes
 `ON_DEVICE_USER_IMPORTED` on upgrade) or whether the upgrade
-creates a new Purse and the old one is archived; exact disclosure
+creates a new Purse and the old one is Forgotten (per ADR-0017); exact disclosure
 copy; double-spend UX disclosure timing; Capacitor gate posture
 for the upgrade affordance.
 

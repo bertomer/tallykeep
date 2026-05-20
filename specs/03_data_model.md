@@ -9,8 +9,8 @@
 - All tables use UUIDv4 primary keys, except where noted (singletons use a fixed UUID; OnChainTransaction uses txid as natural key).
 - All timestamps are `TIMESTAMPTZ` in UTC.
 - Money values are stored as integer **satoshis** in `BIGINT` columns. Never floating point.
-- Soft deletes via `is_archived` flags. No hard deletes for entities that are referenced by historical records.
-- All foreign keys use ON DELETE RESTRICT. Cascading deletes would let us lose history.
+- **Forget is hard delete via service-layer cascade** (per ADR-0017). On Forget of a Holding, child rows owned 1:1 by that Holding (`descriptor`, `address`, `utxo`, `payment_request`, `invoice`, plus `custodial_provider` for Accounts) are deleted in a single transaction. `onchain_transaction` is preserved (chain truth, shared across Holdings). `ledger_entry` survives if at least one other Holding still links to it via `ledger_entry_holding_link`; otherwise it cascades out with the Forgotten Holding's link rows. There is no soft-delete / `is_archived` flag.
+- All foreign keys default to `ON DELETE RESTRICT` so the service-layer cascade is explicit and orderable. The single exception is `custodial_ledger_entry.linked_counterparty_holding_id`, which uses `ON DELETE SET NULL` — when a non-Account Holding that was the counterparty in a past sweep is Forgotten, the Account on the other side keeps its mirror row and only the back-pointer goes null.
 
 ## Schema
 
@@ -65,14 +65,13 @@ CREATE TABLE holding (
 
     display_color VARCHAR(7) NOT NULL DEFAULT '#000000',
     display_order INTEGER NOT NULL DEFAULT 0,
-    is_archived BOOLEAN NOT NULL DEFAULT FALSE,
 
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX idx_holding_type_active ON holding(holding_type) WHERE is_archived = FALSE;
-CREATE INDEX idx_holding_purpose ON holding(purpose) WHERE is_archived = FALSE;
+CREATE INDEX idx_holding_type ON holding(holding_type);
+CREATE INDEX idx_holding_purpose ON holding(purpose);
 ```
 
 ### `holding_type_change_log`
@@ -205,7 +204,7 @@ CREATE TABLE custodial_ledger_entry (
     -- reconciler subscriber (concerns/sweep_policies.md §5). Pure
     -- observation when all three stay null.
     linked_sweep_execution_id UUID REFERENCES sweep_execution(id),
-    linked_counterparty_holding_id UUID REFERENCES holding(id),           -- the TK Holding on the OTHER side of the flow
+    linked_counterparty_holding_id UUID REFERENCES holding(id) ON DELETE SET NULL,  -- the TK Holding on the OTHER side of the flow; nulls when that Holding is Forgotten (ADR-0017)
     linked_chain_ledger_entry_id UUID REFERENCES ledger_entry(id),
     reconciled_at TIMESTAMPTZ,                                            -- null = reconciler has not yet attempted matching
 
@@ -241,12 +240,16 @@ Notes:
 - `linked_counterparty_holding_id` is the TK Holding on the *other*
   side of a TK-initiated flow, not the Account this entry already
   belongs to (which is `holding_id`).
-- All three linkage FKs default to ON DELETE RESTRICT (per the
-  file's convention). The Account-detail iteration's hard-delete of
-  this table on Account removal is a deliberate divergence handled
-  by the service-layer deletion logic, not by FK cascade. The
-  deferred Holding-deletion iteration (captured for future
-  sharpening in `backlog/`) will revisit.
+- Linkage FK posture per ADR-0017: `linked_sweep_execution_id` and
+  `linked_chain_ledger_entry_id` keep the file's default
+  `ON DELETE RESTRICT`; `linked_counterparty_holding_id` uses
+  `ON DELETE SET NULL` (see the Conventions section). On Forget of
+  an Account, the service-layer cascade hard-deletes every row in
+  this table whose `holding_id` matches; on Forget of a non-Account
+  Holding that was a sweep counterparty, only the
+  `linked_counterparty_holding_id` back-pointer nulls and the
+  surviving Account's mirror row stays intact. Implementation
+  tracked in the active iteration block of `next_iteration.md`.
 
 ### `onchain_transaction`
 
@@ -615,20 +618,4 @@ The structured logger has a denylist. Any field name matching `(?i)(key|secret|p
 ### What must be backed up
 
 - The Postgres database (`pg_dump`).
-- The OS keyring (in development mode) or the encrypted secret table (in Docker mode, plus the user's passphrase remembered out-of-band).
-
-### What does not need to be backed up
-
-- bitcoind blockchain data (re-syncable).
-- Address derivations, UTXO lists, cached balances (rebuildable from descriptors plus the chain).
-- Redis (ephemeral event bus and job queue).
-
-### Recovery from total loss
-
-1. Install the app fresh.
-2. Restore Holdings by re-entering descriptors (they are not private, no urgency).
-3. Re-register custodial providers with API credentials from the user's password manager.
-4. Re-sync from chain via bitcoind.
-5. User-provided labels and categorizations are lost unless the database was backed up.
-
-The app provides `GET /api/v1/export/configuration` which outputs a JSON file containing all Holdings, Descriptors (expressions only), labels, categorizations, sweep policies, and metadata. Secrets are never in this export. This is the recommended manual backup format for users who do not want to back up the whole Postgres database.
+- The OS keyring (in development mode) or the encrypted secret table (in Docker mode, p
