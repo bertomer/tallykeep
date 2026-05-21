@@ -12,7 +12,8 @@ from datetime import UTC, datetime
 from typing import Any
 from uuid import UUID
 
-from sqlalchemy import select
+import sqlalchemy as sa
+from sqlalchemy import delete, exists, select
 from sqlalchemy.orm import Session
 
 from tallykeep.domain.enums import (
@@ -23,7 +24,22 @@ from tallykeep.domain.enums import (
     SigningModel,
 )
 from tallykeep.domain.holding import Holding, SecurityClaim
-from tallykeep.models import HoldingRow, HoldingTypeChangeLogRow
+from tallykeep.models import (
+    AddressRow,
+    BroadcastAttemptRow,
+    CustodialLedgerEntryRow,
+    CustodialProviderRow,
+    DescriptorRow,
+    HoldingRow,
+    HoldingTypeChangeLogRow,
+    InvoiceRow,
+    LedgerEntryHoldingLinkRow,
+    LedgerEntryRow,
+    PaymentRequestRow,
+    SweepExecutionRow,
+    SweepPolicyRow,
+    UTXORow,
+)
 
 
 def _row_to_domain(
@@ -45,7 +61,6 @@ def _row_to_domain(
         ),
         display_color=row.display_color,
         display_order=row.display_order,
-        is_archived=row.is_archived,
         created_at=row.created_at,
         updated_at=row.updated_at,
         custodial_provider_id=custodial_provider_id,
@@ -109,7 +124,6 @@ def insert(session: Session, holding: Holding) -> None:
         subtype_data=_build_subtype_data(holding),
         display_color=holding.display_color,
         display_order=holding.display_order,
-        is_archived=holding.is_archived,
     )
     session.add(row)
 
@@ -148,7 +162,6 @@ def insert_row(
         subtype_data=subtype_data,
         display_color=display_color,
         display_order=display_order,
-        is_archived=False,
     )
     session.add(row)
 
@@ -176,7 +189,6 @@ def list_holdings(
     *,
     holding_type: HoldingType | None = None,
     purpose: Purpose | None = None,
-    include_archived: bool = False,
 ) -> list[HoldingRow]:
     """Return raw rows; the service layer attaches descriptors/providers per row.
 
@@ -189,8 +201,6 @@ def list_holdings(
         stmt = stmt.where(HoldingRow.holding_type == holding_type.value)
     if purpose is not None:
         stmt = stmt.where(HoldingRow.purpose == purpose.value)
-    if not include_archived:
-        stmt = stmt.where(HoldingRow.is_archived.is_(False))
     stmt = stmt.order_by(HoldingRow.display_order, HoldingRow.created_at)
     return list(session.execute(stmt).scalars().all())
 
@@ -244,24 +254,151 @@ def update_basics(
     return row
 
 
-def archive(session: Session, holding_id: UUID) -> bool:
-    row = session.get(HoldingRow, holding_id)
-    if row is None:
-        return False
-    row.is_archived = True
-    row.updated_at = datetime.now(UTC)
-    return True
+def delete_cascade(session: Session, holding_id: UUID) -> bool:
+    """Hard-delete a Holding and all its related rows in FK-safe order.
 
+    Returns True if the holding existed and was deleted, False if not found.
 
-def delete_row(session: Session, holding_id: UUID) -> bool:
-    """Hard-delete a Holding row. Returns True if a row was deleted.
+    For Account holdings, the caller must clean up secrets BEFORE calling this.
+    The CustodialProvider row is deleted here; the CASCADE on its FK to
+    custodial_ledger_entry handles the CLE rows.
 
-    Only used for Account holdings removed via the Account-detail Remove flow.
-    All other subtypes use soft-delete (archive).
+    The linked_counterparty_holding_id FK on custodial_ledger_entry is
+    ON DELETE SET NULL (per ADR-0017); the DB handles that automatically when
+    the holding row is deleted in the final step.
     """
     row = session.get(HoldingRow, holding_id)
     if row is None:
         return False
+
+    # 1. Audit log
+    session.execute(
+        delete(HoldingTypeChangeLogRow).where(
+            HoldingTypeChangeLogRow.holding_id == holding_id
+        )
+    )
+
+    # 2. Sweep policies + executions.
+    #    Before deleting sweep_executions, NULL out CLE references (RESTRICT FK).
+    policy_subq = (
+        select(SweepPolicyRow.id)
+        .where(
+            sa.or_(
+                SweepPolicyRow.source_holding_id == holding_id,
+                SweepPolicyRow.destination_holding_id == holding_id,
+            )
+        )
+        .scalar_subquery()
+    )
+    session.execute(
+        sa.update(CustodialLedgerEntryRow)
+        .where(
+            CustodialLedgerEntryRow.linked_sweep_execution_id.in_(
+                select(SweepExecutionRow.id).where(
+                    SweepExecutionRow.sweep_policy_id.in_(policy_subq)
+                )
+            )
+        )
+        .values(linked_sweep_execution_id=None)
+    )
+    session.execute(
+        delete(SweepExecutionRow).where(
+            SweepExecutionRow.sweep_policy_id.in_(policy_subq)
+        )
+    )
+    session.execute(
+        delete(SweepPolicyRow).where(
+            sa.or_(
+                SweepPolicyRow.source_holding_id == holding_id,
+                SweepPolicyRow.destination_holding_id == holding_id,
+            )
+        )
+    )
+
+    # 3. Chain-side: UTXOs → addresses → descriptors (no-op for Account).
+    desc_subq = (
+        select(DescriptorRow.id)
+        .where(DescriptorRow.holding_id == holding_id)
+        .scalar_subquery()
+    )
+    session.execute(delete(UTXORow).where(UTXORow.descriptor_id.in_(desc_subq)))
+    session.execute(delete(AddressRow).where(AddressRow.descriptor_id.in_(desc_subq)))
+    session.execute(
+        delete(DescriptorRow).where(DescriptorRow.holding_id == holding_id)
+    )
+
+    # 4. Broadcast attempts → payment requests → invoices.
+    pr_subq = (
+        select(PaymentRequestRow.id)
+        .where(PaymentRequestRow.holding_id == holding_id)
+        .scalar_subquery()
+    )
+    session.execute(
+        delete(BroadcastAttemptRow).where(
+            BroadcastAttemptRow.payment_request_id.in_(pr_subq)
+        )
+    )
+    session.execute(
+        delete(PaymentRequestRow).where(PaymentRequestRow.holding_id == holding_id)
+    )
+    session.execute(
+        delete(InvoiceRow).where(InvoiceRow.holding_id == holding_id)
+    )
+
+    # 5. LedgerEntry holding links → orphaned LedgerEntries.
+    #    Before deleting orphaned entries, NULL out any CLE back-references
+    #    that carry a RESTRICT FK to ledger_entry.
+    candidate_ids = session.execute(
+        select(LedgerEntryHoldingLinkRow.ledger_entry_id).where(
+            LedgerEntryHoldingLinkRow.holding_id == holding_id
+        )
+    ).scalars().all()
+
+    if candidate_ids:
+        session.execute(
+            sa.update(CustodialLedgerEntryRow)
+            .where(
+                CustodialLedgerEntryRow.linked_chain_ledger_entry_id.in_(candidate_ids)
+            )
+            .values(linked_chain_ledger_entry_id=None)
+        )
+        # NULL out payment_request.resulting_ledger_entry_id for about-to-be-deleted entries
+        session.execute(
+            sa.update(PaymentRequestRow)
+            .where(PaymentRequestRow.resulting_ledger_entry_id.in_(candidate_ids))
+            .values(resulting_ledger_entry_id=None)
+        )
+
+    session.execute(
+        delete(LedgerEntryHoldingLinkRow).where(
+            LedgerEntryHoldingLinkRow.holding_id == holding_id
+        )
+    )
+
+    if candidate_ids:
+        # Delete entries that now have no remaining links.
+        still_linked_subq = (
+            select(LedgerEntryHoldingLinkRow.ledger_entry_id)
+            .where(
+                LedgerEntryHoldingLinkRow.ledger_entry_id.in_(candidate_ids)
+            )
+        )
+        session.execute(
+            delete(LedgerEntryRow)
+            .where(LedgerEntryRow.id.in_(candidate_ids))
+            .where(~LedgerEntryRow.id.in_(still_linked_subq))
+        )
+
+    # 6. CustodialProvider (CASCADE deletes CustodialLedgerEntry rows for Account).
+    #    No-op for non-Account holdings (no CP row exists).
+    session.execute(
+        delete(CustodialProviderRow).where(
+            CustodialProviderRow.holding_id == holding_id
+        )
+    )
+
+    # 7. Holding row itself.
+    #    linked_counterparty_holding_id FK is ON DELETE SET NULL — DB handles it.
     session.delete(row)
     return True
 
@@ -312,9 +449,8 @@ def to_domain(
 
 
 __all__ = [
-    "archive",
     "change_type",
-    "delete_row",
+    "delete_cascade",
     "get",
     "insert",
     "list_holdings",

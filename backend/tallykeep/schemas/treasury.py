@@ -57,6 +57,9 @@ class AccountValidateOut(BaseModel):
     other_asset_total_count: int
     recent_ledger_entries: list[LedgerEntryPreview] = []
     ledger_total_count: int = 0
+    # Opaque token the client passes to POST /holdings/account so the create
+    # step can skip the second Kraken round-trip (TTL: 15 min server-side).
+    setup_token: str = ""
 
 
 class CustodialProviderInput(BaseModel):

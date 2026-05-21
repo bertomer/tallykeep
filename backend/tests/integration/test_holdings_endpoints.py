@@ -475,6 +475,61 @@ class TestCreateAccount:
         assert data["code"] == "permission_mismatch"
         assert set(data["overage"]) == {"Trade", "Margin"}
 
+    def test_create_with_setup_token_makes_only_one_provider_call(
+        self, app_with_db
+    ) -> None:
+        """Core cache optimisation: validate (1 call) + create-with-token (0 calls) = 1 total."""
+        client, _ = app_with_db
+        mock_adapter = MagicMock()
+        mock_adapter.get_permissions.return_value = _clean_perms()
+        mock_adapter.get_balance.return_value = 1_000_000
+        mock_adapter.get_other_balances.return_value = {}
+        mock_adapter.fetch_ledger_since.return_value = ([], None)
+
+        with patch(
+            "tallykeep.services.treasury_service.build_adapter",
+            return_value=mock_adapter,
+        ) as mock_build:
+            validate_resp = client.post(
+                "/api/v1/holdings/account/validate", json=_validate_body()
+            )
+            assert validate_resp.status_code == 200
+            setup_token = validate_resp.json()["setup_token"]
+
+            calls_after_validate = mock_build.call_count  # exactly 1
+
+            body = _account_body()
+            body["setup_token"] = setup_token
+            create_resp = client.post("/api/v1/holdings/account", json=body)
+
+        assert create_resp.status_code == 201, create_resp.text
+        # build_adapter must NOT have been called again during the create step.
+        assert mock_build.call_count == calls_after_validate
+
+    def test_create_with_invalid_setup_token_falls_back_to_revalidate(
+        self, app_with_db
+    ) -> None:
+        """A token that was never issued (or already consumed) is silently ignored;
+        create falls back to a fresh validate call and still succeeds."""
+        client, _ = app_with_db
+        mock_adapter = MagicMock()
+        mock_adapter.get_permissions.return_value = _clean_perms()
+        mock_adapter.get_balance.return_value = 500_000
+        mock_adapter.get_other_balances.return_value = {}
+        mock_adapter.fetch_ledger_since.return_value = ([], None)
+
+        with patch(
+            "tallykeep.services.treasury_service.build_adapter",
+            return_value=mock_adapter,
+        ) as mock_build:
+            body = _account_body()
+            body["setup_token"] = "00000000-0000-0000-0000-000000000000"  # not in cache
+            response = client.post("/api/v1/holdings/account", json=body)
+
+        assert response.status_code == 201, response.text
+        # Fallback re-validate triggers one build_adapter call inside create.
+        assert mock_build.call_count == 1
+
 
 def _validate_body(
     *,
@@ -581,8 +636,30 @@ class TestValidateAccountCredentials:
         account_holdings = [h for h in holdings if h["holding_type"] == "account"]
         assert account_holdings == []
 
+    def test_validate_response_includes_setup_token(self, app_with_db) -> None:
+        client, _ = app_with_db
+        mock_adapter = MagicMock()
+        mock_adapter.get_permissions.return_value = _clean_perms()
+        mock_adapter.get_balance.return_value = 0
+        mock_adapter.get_other_balances.return_value = {}
 
-# --- list / get / patch / archive / change-type --------------------------------
+        with patch(
+            "tallykeep.services.treasury_service.build_adapter",
+            return_value=mock_adapter,
+        ):
+            response = client.post(
+                "/api/v1/holdings/account/validate", json=_validate_body()
+            )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert "setup_token" in data
+        token = data["setup_token"]
+        # Token must be a UUID string (36 chars: 8-4-4-4-12 with hyphens).
+        assert isinstance(token, str) and len(token) == 36
+
+
+# --- list / get / patch / delete / change-type ---------------------------------
 
 
 class TestListAndGet:
@@ -599,25 +676,6 @@ class TestListAndGet:
         assert len(items) == 2
         types = {item["holding_type"] for item in items}
         assert types == {"purse", "strongbox"}
-
-    def test_list_excludes_archived_by_default(self, app_with_db) -> None:
-        client, _ = app_with_db
-        created = client.post(
-            "/api/v1/holdings/purse", json=_purse_body(name="ToArchive")
-        ).json()
-        archive_response = client.post(
-            f"/api/v1/holdings/{created['id']}/archive"
-        )
-        assert archive_response.status_code == 204
-
-        items = client.get("/api/v1/holdings").json()
-        assert items == []
-
-        items = client.get(
-            "/api/v1/holdings", params={"include_archived": True}
-        ).json()
-        assert len(items) == 1
-        assert items[0]["is_archived"] is True
 
     def test_list_filtered_by_holding_type(self, app_with_db) -> None:
         client, _ = app_with_db
@@ -749,3 +807,63 @@ class TestChangeType:
             json={"new_type": "account"},
         )
         assert response.status_code == 422
+
+
+class TestDeleteHolding:
+    def test_delete_purse_returns_204_and_removes_holding(self, app_with_db) -> None:
+        client, factory = app_with_db
+        created = client.post("/api/v1/holdings/purse", json=_purse_body()).json()
+        holding_id = created["id"]
+
+        response = client.delete(f"/api/v1/holdings/{holding_id}")
+        assert response.status_code == 204
+
+        assert client.get(f"/api/v1/holdings/{holding_id}").status_code == 404
+        with factory() as session:
+            assert session.get(HoldingRow, holding_id) is None
+
+    def test_delete_strongbox_returns_204_and_removes_holding(self, app_with_db) -> None:
+        client, factory = app_with_db
+        created = client.post("/api/v1/holdings/strongbox", json=_strongbox_body()).json()
+        holding_id = created["id"]
+
+        response = client.delete(f"/api/v1/holdings/{holding_id}")
+        assert response.status_code == 204
+
+        assert client.get(f"/api/v1/holdings/{holding_id}").status_code == 404
+        with factory() as session:
+            assert session.get(HoldingRow, holding_id) is None
+
+    def test_delete_vault_returns_204_and_removes_holding(self, app_with_db) -> None:
+        client, factory = app_with_db
+        created = client.post("/api/v1/holdings/vault", json=_vault_body()).json()
+        holding_id = created["id"]
+
+        response = client.delete(f"/api/v1/holdings/{holding_id}")
+        assert response.status_code == 204
+
+        assert client.get(f"/api/v1/holdings/{holding_id}").status_code == 404
+        with factory() as session:
+            assert session.get(HoldingRow, holding_id) is None
+
+    def test_delete_unknown_returns_404(self, app_with_db) -> None:
+        client, _ = app_with_db
+        response = client.delete(
+            "/api/v1/holdings/00000000-0000-0000-0000-0000000000ff"
+        )
+        assert response.status_code == 404
+
+    def test_archive_route_removed(self, app_with_db) -> None:
+        client, _ = app_with_db
+        created = client.post("/api/v1/holdings/purse", json=_purse_body()).json()
+        response = client.post(f"/api/v1/holdings/{created['id']}/archive")
+        # Path itself is unregistered → 404 (not 405, which requires the path
+        # to exist under a different method).
+        assert response.status_code == 404
+
+    def test_delete_descriptor_route_removed(self, app_with_db) -> None:
+        client, _ = app_with_db
+        created = client.post("/api/v1/holdings/purse", json=_purse_body()).json()
+        descriptor_id = created["descriptor_ids"][0]
+        response = client.delete(f"/api/v1/descriptors/{descriptor_id}")
+        assert response.status_code == 405

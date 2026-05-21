@@ -292,7 +292,8 @@ class TestDeleteAccount:
         resp = client.delete(f"/api/v1/holdings/{uuid4()}")
         assert resp.status_code == 404
 
-    def test_delete_non_account_holding_returns_422(self, app_with_db) -> None:
+    def test_delete_purse_holding_succeeds(self, app_with_db) -> None:
+        # ADR-0017: DELETE accepts all 4 Holding types, not just Account
         client, _ = app_with_db
         purse = client.post(
             "/api/v1/holdings/purse",
@@ -320,4 +321,5 @@ class TestDeleteAccount:
         purse_id = purse.json()["id"]
 
         resp = client.delete(f"/api/v1/holdings/{purse_id}")
-        assert resp.status_code == 422
+        assert resp.status_code == 204
+        assert client.get(f"/api/v1/holdings/{purse_id}").status_code == 404

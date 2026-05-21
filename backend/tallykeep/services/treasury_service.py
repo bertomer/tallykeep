@@ -265,12 +265,13 @@ def create_account_holding(
     api_secret: str,
     api_passphrase: str | None,
     secret_store: SecretStore,
+    _prefetched: tuple | None = None,
 ) -> tuple[Holding, CustodialProvider, int, dict[str, str]]:
     """Create an Account Holding + CustodialProvider (2-key model, ADR-0011).
 
-    Validates credentials via validate_account_credentials, then persists
-    the Holding + CustodialProvider rows (whitelist fields null until the
-    withdrawal sub-flow, ADR-0011).
+    If ``_prefetched`` is provided (a tuple of btc_balance_sats, other_balances,
+    all_entries, total_count from a prior validate call), the Kraken round-trip
+    is skipped entirely. Otherwise ``validate_account_credentials`` is called.
 
     Returns (holding, provider, btc_balance_sats, other_balances).
     """
@@ -279,12 +280,15 @@ def create_account_holding(
 
     _SATS = 100_000_000
 
-    btc_balance_sats, other_balances, all_entries, _ = validate_account_credentials(
-        adapter_id=adapter_id,
-        api_key=api_key,
-        api_secret=api_secret,
-        api_passphrase=api_passphrase,
-    )
+    if _prefetched is not None:
+        btc_balance_sats, other_balances, all_entries, _ = _prefetched
+    else:
+        btc_balance_sats, other_balances, all_entries, _ = validate_account_credentials(
+            adapter_id=adapter_id,
+            api_key=api_key,
+            api_secret=api_secret,
+            api_passphrase=api_passphrase,
+        )
 
     # Persist credentials (read-only key only; withdrawal key comes later).
     holding_id = uuid4()
@@ -320,7 +324,6 @@ def create_account_holding(
         declared_security=declared_security,
         display_color=display_color,
         display_order=display_order,
-        is_archived=False,
         created_at=now,
         updated_at=now,
         descriptor_ids=[],
@@ -600,22 +603,7 @@ def delete_account_holding(
     if holding.holding_type != HoldingType.ACCOUNT:
         raise TreasuryServiceError("Only Account holdings can be deleted via this path")
 
-    provider = cp_repo.get_by_holding_id(session, holding_id)
-    if provider is not None:
-        # Clean up secrets — best-effort, don't fail if already gone.
-        for ref in [
-            provider.api_credential_reference,
-            provider.api_secret_reference,
-            provider.api_passphrase_reference,
-        ]:
-            if ref:
-                try:
-                    secret_store.delete_secret(ref)
-                except (KeyError, Exception):
-                    pass
-        cp_repo.delete_by_holding_id(session, holding_id)
-
-    holding_repo.delete_row(session, holding_id)
+    holding_service.delete_holding(session, holding_id, secret_store=secret_store)
 
 
 def update_polling_interval(

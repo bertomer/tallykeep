@@ -30,9 +30,9 @@ STUB_ROUTES: list[tuple[str, str, str]] = [
     # method, openapi-path, milestone
     # --- Holdings ---
     # M4 implemented: per-type creation (purse/strongbox/vault), list, get,
-    # patch, archive, change-type. M8 implemented: account creation.
+    # patch, delete, change-type. M8 implemented: account creation.
     # --- Descriptors ---
-    # M4 implemented: list, attach, get, patch, delete, addresses,
+    # M4 implemented: list, attach, get, patch, addresses,
     # next-receiving. M5.2 implemented: rescan, utxos, balance.
     # All tested in test_descriptor_endpoints.py / test_chain_scan.py.
     # --- Custodial providers ---

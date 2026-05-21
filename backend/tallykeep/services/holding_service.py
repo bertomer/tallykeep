@@ -26,6 +26,7 @@ from tallykeep.domain.enums import (
     SigningModel,
 )
 from tallykeep.domain.holding import Holding, SecurityClaim
+from tallykeep.infrastructure.secrets import SecretStore
 from tallykeep.repositories import descriptor as descriptor_repo
 from tallykeep.repositories import holding as holding_repo
 from tallykeep.schemas.holding import DescriptorInput
@@ -221,7 +222,6 @@ def _create_holding_with_descriptors(
         declared_security=declared_security,
         display_color=display_color,
         display_order=display_order,
-        is_archived=False,
         created_at=_now(),
         updated_at=_now(),
         descriptor_ids=descriptor_ids,
@@ -410,7 +410,6 @@ def list_holdings(
     *,
     holding_type: HoldingType | None = None,
     purpose: Purpose | None = None,
-    include_archived: bool = False,
 ) -> list[Holding]:
     from sqlalchemy import select as _sa_select
     from tallykeep.models.custodial_provider import CustodialProviderRow
@@ -419,7 +418,6 @@ def list_holdings(
         session,
         holding_type=holding_type,
         purpose=purpose,
-        include_archived=include_archived,
     )
 
     # Batch-resolve custodial_provider_id for all Account rows in one query.
@@ -485,8 +483,40 @@ def update_holding(
     )
 
 
-def archive_holding(session: Session, holding_id: UUID) -> bool:
-    return holding_repo.archive(session, holding_id)
+def delete_holding(
+    session: Session,
+    holding_id: UUID,
+    *,
+    secret_store: SecretStore,
+) -> bool:
+    """Delete any Holding type. Returns True if deleted, False if not found.
+
+    For Account holdings, API credentials are wiped from the secret store
+    (best-effort) before the cascade delete. For non-Account holdings, the
+    cascade delete is called directly.
+    """
+    from tallykeep.models.holding import HoldingRow
+    from tallykeep.repositories import custodial_provider as cp_repo
+
+    row = session.get(HoldingRow, holding_id)
+    if row is None:
+        return False
+
+    if row.holding_type == HoldingType.ACCOUNT.value:
+        provider = cp_repo.get_by_holding_id(session, holding_id)
+        if provider is not None:
+            for ref in [
+                provider.api_credential_reference,
+                provider.api_secret_reference,
+                provider.api_passphrase_reference,
+            ]:
+                if ref:
+                    try:
+                        secret_store.delete_secret(ref)
+                    except (KeyError, Exception):
+                        pass
+
+    return holding_repo.delete_cascade(session, holding_id)
 
 
 def change_holding_type(
@@ -528,11 +558,11 @@ def change_holding_type(
 
 __all__ = [
     "HoldingServiceError",
-    "archive_holding",
     "change_holding_type",
     "create_purse",
     "create_strongbox",
     "create_vault",
+    "delete_holding",
     "get_holding",
     "list_holdings",
     "update_holding",

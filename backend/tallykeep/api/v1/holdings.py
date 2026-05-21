@@ -12,16 +12,16 @@ Cross-type queries that aggregate balance, security analysis, etc. land in M5
 from __future__ import annotations
 
 from dataclasses import MISSING as _UNSET
-from uuid import UUID
+from datetime import UTC, datetime, timedelta
+from uuid import UUID, uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from sqlalchemy.orm import Session
 
 from tallykeep.adapters.descriptor_adapter import DescriptorAdapter
-from tallykeep.api.dependencies import get_db_session, get_job_queue, get_secret_store
+from tallykeep.api.dependencies import get_db_session, get_secret_store
 from tallykeep.domain.enums import HoldingType, Purpose
 from tallykeep.domain.holding import Holding, SecurityClaim
-from tallykeep.infrastructure.job_queue import JobQueue
 from tallykeep.infrastructure.secrets import SecretStore
 from tallykeep.repositories.descriptor import DescriptorAlreadyExists
 from tallykeep.schemas.holding import (
@@ -62,6 +62,43 @@ router = APIRouter(tags=["holdings"])
 _ADAPTER = DescriptorAdapter()
 
 
+# In-memory cache for account wizard setup tokens.
+# Key: opaque UUID string.
+# Value: (expires_at, adapter_id, btc_balance_sats, other_balances, all_entries, total_count)
+# TTL is 15 minutes — enough for any wizard session; if it expires the client
+# must restart the wizard (re-validate). Single-process uvicorn makes this safe.
+_SETUP_CACHE: dict[str, tuple] = {}
+_SETUP_TOKEN_TTL = timedelta(minutes=15)
+
+
+def _new_setup_token(
+    adapter_id: str,
+    btc_balance_sats: int,
+    other_balances: dict,
+    all_entries: list,
+    total_count: int,
+) -> str:
+    token = str(uuid4())
+    expires_at = datetime.now(UTC) + _SETUP_TOKEN_TTL
+    _SETUP_CACHE[token] = (expires_at, adapter_id, btc_balance_sats, other_balances, all_entries, total_count)
+    # Evict expired tokens while we have the write lock.
+    now = datetime.now(UTC)
+    for k in [k for k, v in _SETUP_CACHE.items() if v[0] < now]:
+        _SETUP_CACHE.pop(k, None)
+    return token
+
+
+def _consume_setup_token(token: str, adapter_id: str) -> tuple | None:
+    """Return pre-fetched data if the token is valid for this adapter_id, else None."""
+    entry = _SETUP_CACHE.pop(token, None)
+    if entry is None:
+        return None
+    expires_at, cached_adapter_id, btc_balance_sats, other_balances, all_entries, total_count = entry
+    if datetime.now(UTC) > expires_at or cached_adapter_id != adapter_id:
+        return None
+    return (btc_balance_sats, other_balances, all_entries, total_count)
+
+
 def _to_response(holding: Holding) -> HoldingResponse:
     return HoldingResponse(
         id=holding.id,
@@ -78,7 +115,6 @@ def _to_response(holding: Holding) -> HoldingResponse:
         ),
         display_color=holding.display_color,
         display_order=holding.display_order,
-        is_archived=holding.is_archived,
         created_at=holding.created_at,
         updated_at=holding.updated_at,
         descriptor_ids=list(holding.descriptor_ids),
@@ -249,6 +285,9 @@ async def validate_account_holding_credentials(
         )
         for e in preview_entries
     ]
+    token = _new_setup_token(
+        body.adapter_id, btc_balance_sats, other_balances, recent_entries, ledger_total
+    )
     return AccountValidateOut(
         adapter_id=body.adapter_id,
         btc_balance_sats=btc_balance_sats,
@@ -256,6 +295,7 @@ async def validate_account_holding_credentials(
         other_asset_total_count=len(sorted_assets),
         recent_ledger_entries=previews,
         ledger_total_count=ledger_total,
+        setup_token=token,
     )
 
 
@@ -265,11 +305,11 @@ async def create_account_holding(
     body: AccountCreate,
     session: Session = Depends(get_db_session),
     secret_store: SecretStore = Depends(get_secret_store),
-    job_queue: JobQueue = Depends(get_job_queue),
 ) -> AccountCreateOut:
-    from tallykeep.jobs.custodial_jobs import one_shot_custodial_poll
-
     cp = body.custodial_provider
+    _prefetched = None
+    if body.setup_token:
+        _prefetched = _consume_setup_token(body.setup_token, cp.adapter_id)
     try:
         holding, provider, btc_balance_sats, other_balances = (
             treasury_service.create_account_holding(
@@ -287,6 +327,7 @@ async def create_account_holding(
                 api_secret=cp.api_secret,
                 api_passphrase=cp.api_passphrase,
                 secret_store=secret_store,
+                _prefetched=_prefetched,
             )
         )
         session.commit()
@@ -315,19 +356,6 @@ async def create_account_holding(
     top_three = sorted_assets[:3]
     total_count = len(sorted_assets)
 
-    # Enqueue a one-shot poll so last_polled_at is set and any entries that
-    # arrived between validate and create are picked up by the worker.
-    kickoff_job_id = None
-    try:
-        kickoff_job_id = job_queue.enqueue(
-            one_shot_custodial_poll,
-            provider.id,
-            job_type="custodial_poll",
-            label=f"post-create poll for provider {provider.id}",
-        )
-    except Exception:  # noqa: BLE001 — enqueue failure must not block account creation
-        pass
-
     return AccountCreateOut(
         holding_id=holding.id,
         provider_id=provider.id,
@@ -337,7 +365,7 @@ async def create_account_holding(
         btc_balance_sats=btc_balance_sats,
         other_asset_tickers=top_three,
         other_asset_total_count=total_count,
-        kickoff_job_id=kickoff_job_id,
+        kickoff_job_id=None,
     )
 
 
@@ -348,14 +376,12 @@ async def create_account_holding(
 async def list_holdings(
     holding_type: HoldingType | None = None,
     purpose: Purpose | None = None,
-    include_archived: bool = False,
     session: Session = Depends(get_db_session),
 ) -> list[HoldingResponse]:
     holdings = holding_service.list_holdings(
         session,
         holding_type=holding_type,
         purpose=purpose,
-        include_archived=include_archived,
     )
     return [_to_response(h) for h in holdings]
 
@@ -370,7 +396,6 @@ _CUSTODY_TIER: dict[HoldingType, int] = {
 
 @router.get("/holdings/summary/global")
 async def global_holdings_summary(
-    include_archived: bool = False,
     session: Session = Depends(get_db_session),
 ):  # type: ignore[no-untyped-def]
     """Fortune view: per-Holding summary plus cross-Holding rollups.
@@ -393,9 +418,7 @@ async def global_holdings_summary(
         utxo as utxo_repo,
     )
 
-    holdings = holding_service.list_holdings(
-        session, include_archived=include_archived
-    )
+    holdings = holding_service.list_holdings(session)
     holdings.sort(
         key=lambda h: (_CUSTODY_TIER.get(h.holding_type, 99), h.display_order)
     )
@@ -455,7 +478,6 @@ async def global_holdings_summary(
                 "confirmed_sats": confirmed,
                 "descriptor_count": len(descriptors),
                 "utxo_count": utxo_count,
-                "is_archived": h.is_archived,
                 "display_color": h.display_color,
                 "display_order": h.display_order,
                 "meta": meta,
@@ -677,31 +699,15 @@ async def delete_holding(
     session: Session = Depends(get_db_session),
     secret_store: SecretStore = Depends(get_secret_store),
 ) -> Response:
-    """Hard-delete an Account Holding and its CustodialProvider (cascade + secret cleanup).
+    """Hard-delete any Holding type and all its related rows (cascade).
 
-    Only Account holdings can be deleted this way; other types use the archive flow.
-    Returns 404 if the holding doesn't exist, 422 if it's not an Account.
+    For Account holdings, API credentials are wiped from the secret store first.
+    Returns 404 if the holding doesn't exist.
     """
-    try:
-        treasury_service.delete_account_holding(
-            session, holding_id, secret_store=secret_store
-        )
-        session.commit()
-    except TreasuryServiceError as exc:
-        session.rollback()
-        detail = str(exc)
-        if "not found" in detail.lower():
-            raise HTTPException(status_code=404, detail=detail) from exc
-        raise HTTPException(status_code=422, detail=detail) from exc
-    return Response(status_code=204)
-
-
-@router.post("/holdings/{holding_id}/archive", status_code=204)
-async def archive_holding(
-    holding_id: UUID, session: Session = Depends(get_db_session)
-) -> Response:
-    ok = holding_service.archive_holding(session, holding_id)
-    if not ok:
+    deleted = holding_service.delete_holding(
+        session, holding_id, secret_store=secret_store
+    )
+    if not deleted:
         raise HTTPException(status_code=404, detail="Holding not found")
     session.commit()
     return Response(status_code=204)

@@ -91,7 +91,6 @@ def _make_holding(
         declared_security=declared_security,
         display_color="#000000",
         display_order=0,
-        is_archived=False,
         created_at=NOW,
         updated_at=NOW,
         descriptor_ids=descriptor_ids or [],

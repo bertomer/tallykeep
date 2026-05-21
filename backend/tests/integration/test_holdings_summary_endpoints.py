@@ -104,18 +104,13 @@ def test_global_summary_aggregates_per_type_and_purpose(app_with_db) -> None:
     assert res["by_purpose"]["reserve"] == 0
 
 
-def test_global_summary_excludes_archived_by_default(app_with_db) -> None:
+def test_global_summary_excludes_deleted_holdings(app_with_db) -> None:
     client, _ = app_with_db
     purse = client.post("/api/v1/holdings/purse", json=_purse_body()).json()
-    client.post(f"/api/v1/holdings/{purse['id']}/archive")
+    client.delete(f"/api/v1/holdings/{purse['id']}")
 
-    default = client.get("/api/v1/holdings/summary/global").json()
-    assert all(h["holding_id"] != purse["id"] for h in default["holdings"])
-
-    full = client.get(
-        "/api/v1/holdings/summary/global?include_archived=true"
-    ).json()
-    assert any(h["holding_id"] == purse["id"] for h in full["holdings"])
+    summary = client.get("/api/v1/holdings/summary/global").json()
+    assert all(h["holding_id"] != purse["id"] for h in summary["holdings"])
 
 
 def test_holding_summary_includes_funded_balance(app_with_db_and_node) -> None:

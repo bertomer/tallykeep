@@ -752,8 +752,8 @@
           return;
         }
       }
-      const resp = await fetch(`${serverUrl}/api/v1/holdings/${holdingId}/archive`, {
-        method: 'POST',
+      const resp = await fetch(`${serverUrl}/api/v1/holdings/${holdingId}`, {
+        method: 'DELETE',
         headers: authHeaders(),
       });
       if (resp.ok) {
@@ -809,8 +809,8 @@
     if (strongboxForgetRemoving) return;
     strongboxForgetRemoving = true;
     try {
-      const resp = await fetch(`${serverUrl}/api/v1/holdings/${holdingId}/archive`, {
-        method: 'POST',
+      const resp = await fetch(`${serverUrl}/api/v1/holdings/${holdingId}`, {
+        method: 'DELETE',
         headers: authHeaders(),
       });
       if (resp.ok) {
@@ -1853,9 +1853,10 @@
       <p class="modal-body">
         TallyKeep forgets the API credentials and stops observing
         this Account. Your account on {detail?.display_name ?? 'the provider'} itself is unaffected.
-        You keep your funds and history with the provider. You can
-        re-add this Account later by running the Add Account wizard
-        again.
+        You keep your funds and history with the provider.
+        Forgetting this Account removes it from your overall total.
+        You can re-add this Account later by running the Add Account
+        wizard again.
       </p>
       <div class="modal-actions">
         <button class="btn btn-cancel" type="button"
@@ -1885,7 +1886,8 @@
       <p class="modal-body">
         TallyKeep forgets the descriptor and stops scanning the
         chain. Your hardware wallet and the keys it holds are
-        unaffected. Any categories you've assigned to this
+        unaffected. Forgetting this Strongbox removes it from your
+        overall total. Any categories you've assigned to this
         Strongbox's activity are erased with it.
       </p>
       <div class="modal-actions">
@@ -1936,14 +1938,16 @@
           TallyKeep destroys the keys on this device, forgets the
           descriptor, and stops scanning the chain. Without a working
           backup of your recovery phrase, the funds in this Purse
-          become permanently inaccessible. Any categories you've
+          become permanently inaccessible. Forgetting this Purse
+          removes it from your overall total. Any categories you've
           assigned to this Purse's activity are erased with it. You
           can re-import this Purse from your recovery phrase, but the
           categorizations don't come back.
         {:else}
           TallyKeep forgets the descriptor and stops scanning the
-          chain. Funds at your source wallet are unaffected. Any
-          categories you've assigned to this Purse's activity are
+          chain. Funds at your source wallet are unaffected.
+          Forgetting this Purse removes it from your overall total.
+          Any categories you've assigned to this Purse's activity are
           erased with it.
         {/if}
       </p>

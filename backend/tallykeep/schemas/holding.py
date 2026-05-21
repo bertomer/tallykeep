@@ -127,6 +127,9 @@ class VaultCreate(_HoldingCreateBase):
 
 class AccountCreate(_HoldingCreateBase):
     custodial_provider: CustodialProviderInput
+    # Token returned by /validate; when present and valid the create step
+    # skips the second Kraken round-trip entirely (see holdings.py cache).
+    setup_token: str | None = None
 
 
 # --- inputs: management ------------------------------------------------------
@@ -183,7 +186,6 @@ class HoldingResponse(BaseModel):
     declared_security: SecurityClaimResponse
     display_color: str
     display_order: int
-    is_archived: bool
     created_at: datetime
     updated_at: datetime
 

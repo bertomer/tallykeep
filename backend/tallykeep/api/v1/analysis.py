@@ -249,7 +249,7 @@ def _run_recompute(holding_id: UUID | None, database_url: str) -> int:
             _ah(session, holding_id)
             count = 1
         else:
-            rows = _hr.list_holdings(session, include_archived=False)
+            rows = _hr.list_holdings(session)
             for row in rows:
                 _ah(session, row.id)
             count = len(rows)
@@ -276,7 +276,7 @@ async def recompute_analysis(
         count = 1
     else:
         from tallykeep.repositories import holding as holding_repo
-        count = len(holding_repo.list_holdings(session, include_archived=False))
+        count = len(holding_repo.list_holdings(session))
 
     job_id = job_queue.enqueue(
         _run_recompute,

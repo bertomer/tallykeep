@@ -14,6 +14,44 @@ commit.
 
 ---
 
+## 2026-05-22 — Forget cascade implementation + Account wizard setup-token cache
+
+**Forget cascade (all 4 Holding types).** `DELETE /api/v1/holdings/{id}` now accepts
+Account, Purse, Strongbox, and Vault. Transaction cascade order: addresses → UTXOs →
+descriptors → payment_requests / invoices → (Account only) custodial ledger entries +
+custodial provider + API-credential wipe → ledger_entry_holding_link orphan cleanup →
+holding row. `ON DELETE SET NULL` FK change for
+`custodial_ledger_entry.linked_counterparty_holding_id` — sweep-destination Accounts retain
+their incoming entries after the source Holding is Forgotten, with the back-pointer NULLed.
+
+**Schema migration (ADR-0017).** `holding.is_archived` column dropped; two partial indexes
+recreated without the `WHERE is_archived = FALSE` filter; FK posture change above. Two-release
+deprecation cycle waived per ADR-0017 (personal-use phase, no external users on current
+schema).
+
+**Retired routes.** `POST /api/v1/holdings/{id}/archive` and
+`DELETE /api/v1/descriptors/{id}` removed. FastAPI returns 404 for these paths (no route
+template — 404, not 405). `include_archived` query parameter dropped from `GET /holdings`
+and `GET /holdings/summary/global`. `is_archived` field dropped from `HoldingResponse`.
+
+**Frontend wiring.** Forget confirm handlers on Account, Purse, and Strongbox detail pages
+switched from `POST …/archive` to `DELETE …/{id}`. Body copy refreshed on all three to match
+validated mockup variants (5 sentences Account, 4 Strongbox, 4 Purse WATCH_ONLY, 5 Purse
+ON_DEVICE_*). Purse Forget branches on `purse_mode`.
+
+**Account wizard setup-token cache.** `POST /holdings/account/validate` now returns a
+`setup_token` UUID in its response. `POST /holdings/account` accepts an optional
+`setup_token`; when present and valid (15 min TTL, single-use), the second Kraken
+`validate_account_credentials` call is skipped — 8 Kraken round-trips reduced to 4. Fallback
+to full re-validate if token is absent, expired, or adapter_id mismatch. In-memory dict safe
+because uvicorn runs single-process (no `--workers`). Three new integration tests.
+Smoke-test `Invoke-WebRequest` calls hardened with `-UseBasicParsing`.
+
+Canonical docs touched at closeout: `api/openapi.yaml` (regenerated; retired routes +
+schemas removed, `setup_token` fields added).
+
+---
+
 ## 2026-05-20 — Strongbox detail page + Purse descriptor Copy retrofit
 
 Strongbox detail page shipped at `/holding/[id]` for `strongbox`-type Holdings. Two-tab

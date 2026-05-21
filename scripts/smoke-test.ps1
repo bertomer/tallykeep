@@ -187,7 +187,6 @@ foreach ($h in $list) {
 Section "9. Get one holding"
 $got = Invoke-RestMethod -Uri "$BaseUrl/api/v1/holdings/$purseId" -Headers $Headers
 Show "name"            $got.name
-Show "is_archived"     $got.is_archived
 Show "descriptor count" $got.descriptor_ids.Count
 
 Section "10. Descriptor + its derived addresses"
@@ -344,10 +343,10 @@ try {
         -Uri "$BaseUrl/api/v1/descriptors/$managedDescId/rescan" -Headers $Headers
     Show "managed rescan utxos"  $managedRescan.utxos_discovered
     Show "managed rescan height" $managedRescan.height_at_scan
-    # Archive immediately so it doesn't interfere with section 14 counts.
-    Invoke-WebRequest -Method Post -Uri "$BaseUrl/api/v1/holdings/$managedPurseId/archive" `
-        -Headers $Headers | Out-Null
-    Show "managed archived"      "ok"
+    # Forget immediately so it doesn't interfere with section 14 counts.
+    $null = Invoke-WebRequest -Method Delete -Uri "$BaseUrl/api/v1/holdings/$managedPurseId" `
+        -UseBasicParsing -Headers $Headers
+    Show "managed forgotten"     "ok"
 } catch {
     if ($_.Exception.Response.StatusCode -eq 409) {
         Show "managed skipped" "already imported (run dev-reset.ps1)"
@@ -605,7 +604,7 @@ if (-not $bankingSkipped) {
     Show "invoice.bip21"          $bip21Preview
 
     # QR code
-    $qrResp = Invoke-WebRequest -Uri "$BaseUrl/api/v1/banking/invoices/$invId/qr" -Headers $Headers
+    $qrResp = Invoke-WebRequest -UseBasicParsing -Uri "$BaseUrl/api/v1/banking/invoices/$invId/qr" -Headers $Headers
     Show "invoice QR content-type" ($qrResp.Headers.'Content-Type')
 
     # List invoices
@@ -735,7 +734,7 @@ Show "resume-all.resumed" $resumed.resumed
 
 # 15.9 Disable then delete
 Invoke-RestMethod -Method Post -Uri "$BaseUrl/api/v1/sweep-policies/$spId/disable" -Headers $Headers | Out-Null
-$del = Invoke-WebRequest -Method Delete -Uri "$BaseUrl/api/v1/sweep-policies/$spId" -Headers $Headers
+$del = Invoke-WebRequest -UseBasicParsing -Method Delete -Uri "$BaseUrl/api/v1/sweep-policies/$spId" -Headers $Headers
 Show "delete policy status" $del.StatusCode
 
 # 15.10 Sweep executions list (empty)
@@ -850,8 +849,8 @@ try {
 
 # DELETE /jobs/{unknown} — 404
 try {
-    Invoke-WebRequest -Method Delete -Uri "$BaseUrl/api/v1/jobs/00000000-0000-0000-0000-000000000001" `
-        -Headers $Headers | Out-Null
+    $null = Invoke-WebRequest -UseBasicParsing -Method Delete -Uri "$BaseUrl/api/v1/jobs/00000000-0000-0000-0000-000000000001" `
+        -Headers $Headers
     Show "delete unknown" '(unexpected 200!)'
 } catch {
     $sc = $_.Exception.Response.StatusCode.value__
@@ -902,19 +901,17 @@ foreach ($pair in @(
 }
 
 
-# --- 18. Archive & cleanup ----------------------------------------------------
+# --- 18. Forget & cleanup -----------------------------------------------------
 
-Section "18. Archive the smoke-test holdings"
-$resp = Invoke-WebRequest -Method Post -Uri "$BaseUrl/api/v1/holdings/$purseId/archive" -Headers $Headers
+Section "18. Forget the smoke-test holdings"
+$resp = Invoke-WebRequest -UseBasicParsing -Method Delete -Uri "$BaseUrl/api/v1/holdings/$purseId" -Headers $Headers
 Show "purse status" $resp.StatusCode
-$resp2 = Invoke-WebRequest -Method Post -Uri "$BaseUrl/api/v1/holdings/$vaultId/archive" -Headers $Headers
+$resp2 = Invoke-WebRequest -UseBasicParsing -Method Delete -Uri "$BaseUrl/api/v1/holdings/$vaultId" -Headers $Headers
 Show "vault status" $resp2.StatusCode
 
-Section "19. Verify archived holdings are hidden by default, visible with include_archived"
-$default = Invoke-RestMethod -Uri "$BaseUrl/api/v1/holdings" -Headers $Headers
-$archived = Invoke-RestMethod -Uri "$BaseUrl/api/v1/holdings?include_archived=true" -Headers $Headers
-Show "without archived" $default.Count
-Show "with archived"    $archived.Count
+Section "19. Verify forgotten holdings are gone"
+$remaining = Invoke-RestMethod -Uri "$BaseUrl/api/v1/holdings" -Headers $Headers
+Show "remaining count" $remaining.Count
 
 
 Write-Host ""

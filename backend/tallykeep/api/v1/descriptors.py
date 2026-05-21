@@ -128,7 +128,7 @@ def _vault_auto_name_with_collision(
     session: Session,
     base_name: str,
 ) -> str:
-    """Append " (N)" suffix if a non-archived Vault with `base_name` already exists."""
+    """Append " (N)" suffix if a Vault with `base_name` already exists."""
     from tallykeep.domain.enums import HoldingType
     from tallykeep.models import HoldingRow
     from sqlalchemy import select
@@ -137,7 +137,6 @@ def _vault_auto_name_with_collision(
         session.execute(
             select(HoldingRow.name).where(
                 HoldingRow.holding_type == HoldingType.VAULT.value,
-                HoldingRow.is_archived.is_(False),
             )
         ).scalars().all()
     )
@@ -470,34 +469,6 @@ async def patch_descriptor(
         raise HTTPException(status_code=404, detail="Descriptor not found")
     session.commit()
     return _descriptor_to_response(descriptor)
-
-
-@router.delete("/descriptors/{descriptor_id}", status_code=204)
-async def delete_descriptor(
-    descriptor_id: UUID, session: Session = Depends(get_db_session)
-) -> Response:
-    """Hard-delete a descriptor.
-
-    Refuses if any addresses still reference it. Address cascade-cleanup is
-    M5 territory; for now archive the owning holding instead of deleting the
-    descriptor.
-    """
-    addresses = descriptor_repo.list_addresses_for_descriptor(
-        session, descriptor_id, limit=1
-    )
-    if addresses:
-        raise HTTPException(
-            status_code=409,
-            detail=(
-                "Descriptor has derived addresses. Address cleanup lands "
-                "in M5; archive the owning holding instead."
-            ),
-        )
-    ok = descriptor_repo.delete_descriptor(session, descriptor_id)
-    if not ok:
-        raise HTTPException(status_code=404, detail="Descriptor not found")
-    session.commit()
-    return Response(status_code=204)
 
 
 # --- addresses ---------------------------------------------------------------

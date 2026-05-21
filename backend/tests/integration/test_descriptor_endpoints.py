@@ -206,14 +206,14 @@ def test_patch_empty_body_rejected(app_with_db) -> None:
     assert response.status_code == 422
 
 
-def test_delete_descriptor_with_addresses_returns_409(app_with_db) -> None:
+def test_delete_descriptor_route_removed(app_with_db) -> None:
+    # ADR-0017: DELETE /descriptors/{id} retired; path exists (PATCH is live) → 405
     client, _ = app_with_db
     h = client.post("/api/v1/holdings/purse", json=_purse_body()).json()
     descriptor_id = h["descriptor_ids"][0]
 
     response = client.delete(f"/api/v1/descriptors/{descriptor_id}")
-    assert response.status_code == 409
-    assert "addresses" in response.text.lower()
+    assert response.status_code == 405
 
 
 # --- addresses ---------------------------------------------------------------

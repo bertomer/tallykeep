@@ -81,7 +81,7 @@ class CustodialLedgerEntryRow(Base):
         ForeignKey("sweep_execution.id", ondelete="RESTRICT"), nullable=True
     )
     linked_counterparty_holding_id: Mapped[UUID | None] = mapped_column(
-        ForeignKey("holding.id", ondelete="RESTRICT"), nullable=True
+        ForeignKey("holding.id", ondelete="SET NULL"), nullable=True
     )
     linked_chain_ledger_entry_id: Mapped[UUID | None] = mapped_column(
         ForeignKey("ledger_entry.id", ondelete="RESTRICT"), nullable=True

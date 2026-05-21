@@ -119,3 +119,6 @@ h64Dr93ocC7y8s1PJsjq/htpDQNXlwqYy9tjGMERURLpH+gV2W8Gpqx9XZqd7UiG+1/SkutcqV8zSe28
 
 "Clé privée" Kraken read + mess
 4oJYS7dqGbPU4TMVbi3nWaOOgrTNLgBuw4ZjwP2Nr+MzYj6Obc4usuSPbpy8rkUJf8MAm8IYfSXb6jmVFDrygA==
+
+
+you're a coding agent. follow specs/process.md. your work is prepared in specs/next_iteration.md. If you have any question, don't hesitate to ask me.

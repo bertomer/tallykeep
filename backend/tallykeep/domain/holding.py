@@ -61,7 +61,6 @@ class Holding:
     declared_security: SecurityClaim
     display_color: str  # hex, e.g. "#10b981"
     display_order: int
-    is_archived: bool
     created_at: datetime
     updated_at: datetime
 

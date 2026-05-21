@@ -51,6 +51,7 @@
     other_asset_total_count: number;
     recent_ledger_entries: LedgerEntryPreview[];
     ledger_total_count: number;
+    setup_token: string;
   }
 
   // From POST /holdings/account — holding committed to DB.
@@ -256,6 +257,7 @@
           api_key: apiKey.trim(),
           api_secret: privateKey.trim(),
         },
+        setup_token: validateResult.setup_token,
       };
 
       const res = await fetch(`${serverUrl}/api/v1/holdings/account`, {

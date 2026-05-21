@@ -39,16 +39,8 @@ class HoldingRow(Base):
             "purpose IN ('spending','reserve','long_term','transit','undeclared')",
             name="purpose_in_set",
         ),
-        Index(
-            "ix_holding_holding_type_active",
-            "holding_type",
-            postgresql_where=text("is_archived = FALSE"),
-        ),
-        Index(
-            "ix_holding_purpose_active",
-            "purpose",
-            postgresql_where=text("is_archived = FALSE"),
-        ),
+        Index("ix_holding_holding_type", "holding_type"),
+        Index("ix_holding_purpose", "purpose"),
     )
 
     id: Mapped[UUID] = mapped_column(primary_key=True)
@@ -77,8 +69,6 @@ class HoldingRow(Base):
     display_order: Mapped[int] = mapped_column(
         Integer, nullable=False, server_default=text("0")
     )
-    is_archived: Mapped[bool] = mapped_column(nullable=False, server_default=text("FALSE"))
-
     created_at: Mapped[datetime] = mapped_column(
         TIMESTAMP(timezone=True), nullable=False, server_default=text("NOW()")
     )
