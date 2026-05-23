@@ -442,7 +442,7 @@ class KrakenAdapter(CustodialProviderAdapter):
 
             entries.append(
                 CustodialLedgerEntry(
-                    provider_entry_id=refid,
+                    provider_entry_id=str(item.get("id") or refid),
                     kind=kind,
                     asset=asset,
                     amount=amount,

@@ -1,24 +1,35 @@
 <!--
-  Account + Purse + Strongbox detail — /holding/[id]
+  Account + Purse + Strongbox + Vault detail — /holding/[id]
   Mockup contract (all validated):
-    mobile_account_detail_operations_populated.html         (2026-05-17)
-    mobile_account_detail_operations_empty.html             (2026-05-17)
-    mobile_account_detail_settings.html                     (2026-05-17)
-    mobile_account_detail_remove_confirm.html               (2026-05-19 — fill-bar timer)
-    mobile_account_detail_connection_error.html             (2026-05-17)
-    mobile_purse_detail_operations_populated.html           (2026-05-19)
-    mobile_purse_detail_operations_empty.html               (2026-05-19)
-    mobile_purse_detail_settings_watch_only.html            (2026-05-20 — Copy CTA retrofit)
-    mobile_purse_detail_settings_on_device.html             (2026-05-20 — Copy CTA retrofit)
-    mobile_purse_detail_forget_confirm.html                 (2026-05-19)
-    mobile_purse_detail_connection_error.html               (2026-05-19)
-    mobile_purse_detail_send_blocked_watch_only.html        (2026-05-19)
-    mobile_strongbox_detail_operations_populated.html       (2026-05-20)
-    mobile_strongbox_detail_operations_empty.html           (2026-05-20)
-    mobile_strongbox_detail_settings.html                   (2026-05-20)
-    mobile_strongbox_detail_settings_missing_metadata.html  (2026-05-20)
-    mobile_strongbox_detail_forget_confirm.html             (2026-05-20)
-    mobile_strongbox_detail_connection_error.html           (2026-05-20)
+    mobile_account_detail_operations_populated.html                  (2026-05-17)
+    mobile_account_detail_operations_empty.html                      (2026-05-17)
+    mobile_account_detail_settings.html                              (2026-05-17)
+    mobile_account_detail_remove_confirm.html                        (2026-05-19 — fill-bar timer)
+    mobile_account_detail_connection_error.html                      (2026-05-17)
+    mobile_purse_detail_operations_populated.html                    (2026-05-19)
+    mobile_purse_detail_operations_empty.html                        (2026-05-19)
+    mobile_purse_detail_settings_watch_only.html                     (2026-05-20 — Copy CTA retrofit)
+    mobile_purse_detail_settings_on_device.html                      (2026-05-20 — Copy CTA retrofit)
+    mobile_purse_detail_forget_confirm.html                          (2026-05-19)
+    mobile_purse_detail_connection_error.html                        (2026-05-19)
+    mobile_purse_detail_send_blocked_watch_only.html                 (2026-05-19)
+    mobile_strongbox_detail_operations_populated.html                (2026-05-20)
+    mobile_strongbox_detail_operations_empty.html                    (2026-05-20)
+    mobile_strongbox_detail_settings.html                            (2026-05-20)
+    mobile_strongbox_detail_settings_missing_metadata.html           (2026-05-20)
+    mobile_strongbox_detail_forget_confirm.html                      (2026-05-20)
+    mobile_strongbox_detail_connection_error.html                    (2026-05-20)
+    mobile_vault_detail_operations_populated_csv_mixed.html          (2026-05-22)
+    mobile_vault_detail_operations_populated_cltv.html               (2026-05-22)
+    mobile_vault_detail_operations_populated_matured.html            (2026-05-22)
+    mobile_vault_detail_operations_empty.html                        (2026-05-22)
+    mobile_vault_detail_settings_multisig_csv.html                   (2026-05-22)
+    mobile_vault_detail_settings_singlesig_cltv.html                 (2026-05-22)
+    mobile_vault_detail_settings_missing_metadata.html               (2026-05-22)
+    mobile_vault_detail_descriptor_revealed_multisig.html            (2026-05-22)
+    mobile_vault_detail_lockup_schedule_expanded.html                (2026-05-22)
+    mobile_vault_detail_forget_confirm.html                          (2026-05-22)
+    mobile_vault_detail_connection_error.html                        (2026-05-22)
 -->
 <script lang="ts">
   import { onMount, onDestroy } from 'svelte';
@@ -66,6 +77,12 @@
     account_detail: AccountDetail | null;
     signing_device_label: string | null;
     signing_metadata_present: boolean | null;
+    // Vault-specific
+    required_signers: number | null;
+    total_signers: number | null;
+    timelock_kind: string | null;
+    timelock_value: number | null;
+    recovery_setup_notes: string | null;
   }
 
   interface PurseLedgerEntry {
@@ -79,6 +96,29 @@
   interface PurseDescriptor {
     id: string;
     expression: string;
+  }
+
+  interface VaultDescriptor {
+    id: string;
+    expression: string;
+    last_scanned_height: number;
+  }
+
+  interface VaultUtxo {
+    id: string;
+    value_sats: number;
+    confirmation_height: number | null;
+    is_spent: boolean;
+  }
+
+  interface VaultLockupSegments {
+    availableSats: number;
+    soonerSats: number;
+    laterSats: number;
+    totalSats: number;
+    soonerBoundaryBlock: number | null;
+    laterBoundaryBlock: number | null;
+    cltvUnlockBlock: number | null;
   }
 
   // ─── Core state ──────────────────────────────────────────────────────────────
@@ -244,6 +284,114 @@
       };
     }
   });
+
+  // ─── Vault state ─────────────────────────────────────────────────────────────
+
+  let vaultBalance = $state(0);
+  let vaultLedger = $state<PurseLedgerEntry[]>([]);
+  let vaultDescriptors = $state<VaultDescriptor[]>([]);
+  let vaultUtxos = $state<VaultUtxo[]>([]);
+  let vaultChainTip = $state<number | null>(null);
+  let vaultChainStatus = $state('healthy');
+  let vaultLastFetched = $state<number | null>(null);
+  let vaultToastDismissed = $state(false);
+  let vaultRefreshing = $state(false);
+  let showVaultDescriptor = $state(false);
+  let showVaultDescriptorFull = $state(false);
+  let vaultCopied = $state(false);
+  let showVaultRenameInput = $state(false);
+  let vaultRenameValue = $state('');
+  let vaultRenaming = $state(false);
+  let showVaultRecoveryNotesInput = $state(false);
+  let vaultRecoveryNotesValue = $state('');
+  let vaultRecoveryNotesSaving = $state(false);
+  let showVaultForgetModal = $state(false);
+  let vaultForgetCountdown = $state(5);
+  let vaultForgetCounting = $state(false);
+  let vaultForgetReady = $derived(vaultForgetCountdown <= 0);
+  let vaultForgetRemoving = $state(false);
+  let vaultEventSource: EventSource | null = null;
+
+  let vaultToastVisible = $derived(
+    !vaultToastDismissed &&
+    snapshot?.holding_type === 'vault' &&
+    (vaultChainStatus === 'unreachable' || vaultChainStatus === 'degraded')
+  );
+
+  $effect(() => {
+    if (!vaultToastVisible) return;
+    const t = setTimeout(() => { vaultToastDismissed = true; }, 5000);
+    return () => clearTimeout(t);
+  });
+
+  $effect(() => {
+    if (showVaultForgetModal) {
+      vaultForgetCountdown = 5;
+      vaultForgetCounting = false;
+      requestAnimationFrame(() => { vaultForgetCounting = true; });
+      const h = setInterval(() => {
+        vaultForgetCountdown -= 1;
+        if (vaultForgetCountdown <= 0) clearInterval(h);
+      }, 1000);
+      return () => {
+        clearInterval(h);
+        vaultForgetCounting = false;
+        vaultForgetCountdown = 5;
+      };
+    }
+  });
+
+  // Lockup bar: computed from utxos + chain tip + timelock params
+  let vaultLockup = $derived<VaultLockupSegments | null>((() => {
+    const kind = snapshot?.timelock_kind ?? null;
+    const value = snapshot?.timelock_value ?? null;
+    if (!kind || value == null) return null;
+    const confirmed = vaultUtxos.filter(u => u.confirmation_height != null && !u.is_spent);
+    const totalSats = confirmed.reduce((s, u) => s + u.value_sats, 0);
+    if (totalSats === 0) return null;
+    if (kind === 'cltv') {
+      const unlockBlock = value;
+      const isUnlocked = vaultChainTip != null && vaultChainTip >= unlockBlock;
+      return {
+        availableSats: isUnlocked ? totalSats : 0,
+        soonerSats: 0,
+        laterSats: isUnlocked ? 0 : totalSats,
+        totalSats,
+        soonerBoundaryBlock: null,
+        laterBoundaryBlock: isUnlocked ? null : unlockBlock,
+        cltvUnlockBlock: unlockBlock,
+      };
+    }
+    if (kind === 'csv') {
+      const tip = vaultChainTip ?? 0;
+      const withUnlock = confirmed.map(u => ({ ...u, unlockHeight: u.confirmation_height! + value }));
+      const available = withUnlock.filter(u => u.unlockHeight <= tip);
+      const locked = withUnlock.filter(u => u.unlockHeight > tip).sort((a, b) => a.unlockHeight - b.unlockHeight);
+      const availableSats = available.reduce((s, u) => s + u.value_sats, 0);
+      const lockedSats = locked.reduce((s, u) => s + u.value_sats, 0);
+      if (lockedSats === 0) {
+        return { availableSats, soonerSats: 0, laterSats: 0, totalSats, soonerBoundaryBlock: null, laterBoundaryBlock: null, cltvUnlockBlock: null };
+      }
+      const medianTarget = lockedSats / 2;
+      let cumulative = 0;
+      let soonerSats = 0;
+      let soonerBoundaryBlock: number | null = null;
+      let laterSats = 0;
+      let laterBoundaryBlock: number | null = null;
+      for (const utxo of locked) {
+        if (cumulative < medianTarget) {
+          soonerSats += utxo.value_sats;
+          soonerBoundaryBlock = utxo.unlockHeight;
+        } else {
+          laterSats += utxo.value_sats;
+          laterBoundaryBlock = utxo.unlockHeight;
+        }
+        cumulative += utxo.value_sats;
+      }
+      return { availableSats, soonerSats, laterSats, totalSats, soonerBoundaryBlock, laterBoundaryBlock, cltvUnlockBlock: null };
+    }
+    return null;
+  })());
 
   // ─── Freshness ticker ────────────────────────────────────────────────────────
 
@@ -424,6 +572,98 @@
     return `•••• ${expr.slice(-6)}`;
   }
 
+  // Vault-specific helpers
+
+  const _GENESIS_TS = 1231006505; // seconds
+  function estimateBlockDate(blockHeight: number | null): string {
+    if (blockHeight == null) return '';
+    const ts = (_GENESIS_TS + blockHeight * 600) * 1000;
+    return new Date(ts).toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+  }
+
+  function csvDurationLabel(blocks: number): string {
+    if (blocks >= 52560) return `${Math.floor(blocks / 52560)}-year`;
+    if (blocks >= 4320)  return `${Math.floor(blocks / 4320)}-month`;
+    return `${Math.max(1, Math.floor(blocks / 144))}-day`;
+  }
+
+  function vaultIsMultisig(): boolean {
+    return (snapshot?.total_signers ?? 1) > 1;
+  }
+
+  function vaultSubtitle(): string {
+    const kind = snapshot?.timelock_kind ?? null;
+    const value = snapshot?.timelock_value ?? null;
+    const m = snapshot?.required_signers ?? null;
+    const n = snapshot?.total_signers ?? null;
+    const multi = n != null && n > 1;
+    if (kind === 'cltv') {
+      const dateStr = value != null ? estimateBlockDate(value) : '…';
+      return multi ? `${m}-of-${n} · unlocks ~${dateStr}` : `Single-sig · unlocks ~${dateStr}`;
+    }
+    if (kind === 'csv') {
+      const dur = value != null ? csvDurationLabel(value) : '…';
+      return multi ? `${m}-of-${n} · ${dur} lock per deposit` : `Single-sig · ${dur} lock per deposit`;
+    }
+    return multi ? `${m}-of-${n} multisig` : 'Single-sig';
+  }
+
+  function vaultChainStatusLabel(status: string): string {
+    if (status === 'healthy') return 'Connected';
+    if (status === 'degraded') return 'Degraded';
+    if (status === 'unreachable') return 'Connection lost';
+    return 'Connected';
+  }
+
+  function vaultFreshness(): string {
+    if (!vaultLastFetched) return '';
+    const diffMs = now - vaultLastFetched;
+    const secs = Math.floor(diffMs / 1000);
+    const prefix = vaultChainStatus === 'healthy' ? 'Updated' : 'Last seen';
+    if (secs < 60) return `${prefix} just now`;
+    const mins = Math.floor(secs / 60);
+    if (mins < 60) return `${prefix} ${mins} min ago`;
+    return `${prefix} ${Math.floor(mins / 60)}h ago`;
+  }
+
+  function vaultCreatedLabel(): string {
+    if (!snapshot?.created_at) return '';
+    return new Date(snapshot.created_at).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+  }
+
+  function vaultDescriptorMasked(expr: string): string {
+    if (!expr) return '•••• ??????';
+    return `•••• ${expr.slice(-6)}`;
+  }
+
+  function vaultScriptTypeLabel(): string {
+    return vaultIsMultisig() ? 'Native SegWit · P2WSH multisig' : 'Native SegWit · P2WPKH';
+  }
+
+  interface VaultCosigner {
+    index: number;
+    fingerprint: string | null;
+    hasMetadata: boolean;
+  }
+
+  function parseVaultCosigners(expression: string): VaultCosigner[] {
+    if (!expression) return [];
+    const results: VaultCosigner[] = [];
+    const pattern = /(?:\[([a-fA-F0-9]{8}[^\]]*)\])?xpub[a-zA-Z0-9]+/g;
+    let match;
+    let index = 0;
+    while ((match = pattern.exec(expression)) !== null) {
+      const fp = match[1] ? match[1].slice(0, 8).toLowerCase() : null;
+      results.push({ index: index++, fingerprint: fp, hasMetadata: fp !== null });
+    }
+    return results;
+  }
+
+  function vaultMissingMetadataCount(): number {
+    const expr = vaultDescriptors[0]?.expression ?? '';
+    return parseVaultCosigners(expr).filter(c => !c.hasMetadata).length;
+  }
+
   // ─── Lifecycle ───────────────────────────────────────────────────────────────
 
   onMount(async () => {
@@ -439,6 +679,9 @@
     } else if (snapshot?.holding_type === 'strongbox') {
       await fetchStrongboxAll();
       subscribeStrongboxSSE();
+    } else if (snapshot?.holding_type === 'vault') {
+      await fetchVaultAll();
+      subscribeVaultSSE();
     } else {
       subscribeSSE();
     }
@@ -449,6 +692,7 @@
     eventSource?.close();
     purseEventSource?.close();
     strongboxEventSource?.close();
+    vaultEventSource?.close();
   });
 
   // ─── Data fetching ───────────────────────────────────────────────────────────
@@ -562,6 +806,67 @@
     strongboxLastFetched = Date.now();
   }
 
+  async function fetchVaultBalance(): Promise<void> {
+    if (!serverUrl || !holdingId) return;
+    try {
+      const resp = await fetch(`${serverUrl}/api/v1/holdings/${holdingId}/summary`, {
+        headers: authHeaders(),
+      });
+      if (!resp.ok) return;
+      const data = await resp.json();
+      vaultBalance = data.confirmed_sats ?? 0;
+    } catch { /* offline */ }
+  }
+
+  async function fetchVaultLedger(): Promise<void> {
+    if (!serverUrl || !holdingId) return;
+    try {
+      const resp = await fetch(
+        `${serverUrl}/api/v1/ledger-entries?holding_id=${holdingId}&limit=50`,
+        { headers: authHeaders() }
+      );
+      if (!resp.ok) return;
+      const data = await resp.json();
+      vaultLedger = data.entries ?? [];
+    } catch { /* offline */ }
+  }
+
+  async function fetchVaultDescriptors(): Promise<void> {
+    if (!serverUrl || !holdingId) return;
+    try {
+      const resp = await fetch(
+        `${serverUrl}/api/v1/descriptors?holding_id=${holdingId}`,
+        { headers: authHeaders() }
+      );
+      if (!resp.ok) return;
+      const descriptors: VaultDescriptor[] = await resp.json();
+      vaultDescriptors = descriptors;
+      // Use last_scanned_height as initial chain tip approximation
+      if (descriptors.length > 0) {
+        const maxScanned = Math.max(...descriptors.map(d => d.last_scanned_height ?? 0));
+        if (maxScanned > (vaultChainTip ?? 0)) vaultChainTip = maxScanned;
+      }
+    } catch { /* offline */ }
+  }
+
+  async function fetchVaultUtxos(): Promise<void> {
+    if (!serverUrl || !holdingId) return;
+    try {
+      const resp = await fetch(
+        `${serverUrl}/api/v1/utxos?holding_id=${holdingId}&only_unspent=true`,
+        { headers: authHeaders() }
+      );
+      if (!resp.ok) return;
+      const data = await resp.json();
+      vaultUtxos = data.utxos ?? [];
+    } catch { /* offline */ }
+  }
+
+  async function fetchVaultAll(): Promise<void> {
+    await Promise.all([fetchVaultBalance(), fetchVaultLedger(), fetchVaultDescriptors(), fetchVaultUtxos()]);
+    vaultLastFetched = Date.now();
+  }
+
   // ─── SSE ─────────────────────────────────────────────────────────────────────
 
   function subscribeSSE(): void {
@@ -671,6 +976,49 @@
         const data = JSON.parse(evt.data);
         if (data.payload?.holding_id !== holdingId) return;
         fetchStrongboxAll();
+      } catch { /* ignore */ }
+    });
+  }
+
+  function subscribeVaultSSE(): void {
+    if (!serverUrl || !holdingId) return;
+    const topics = 'system.chain.connection_state_changed,holding.utxo.received,holding.utxo.spent,chain.block.new';
+    const hdrs = authHeaders();
+    const rawCredential = (hdrs['Authorization'] ?? '').replace('Bearer ', '');
+    const tokenParam = rawCredential ? `&token=${encodeURIComponent(rawCredential)}` : '';
+    const url = `${serverUrl}/api/v1/events/stream?topics=${encodeURIComponent(topics)}${tokenParam}`;
+    vaultEventSource = new EventSource(url);
+
+    vaultEventSource.addEventListener('system.chain.connection_state_changed', (evt: MessageEvent) => {
+      try {
+        const data = JSON.parse(evt.data);
+        const status: string = data.payload?.new_status ?? 'healthy';
+        vaultChainStatus = status;
+        if (status !== 'healthy') vaultToastDismissed = false;
+      } catch { /* ignore */ }
+    });
+
+    vaultEventSource.addEventListener('chain.block.new', (evt: MessageEvent) => {
+      try {
+        const data = JSON.parse(evt.data);
+        const height: number | null = data.payload?.height ?? null;
+        if (height != null && height > (vaultChainTip ?? 0)) vaultChainTip = height;
+      } catch { /* ignore */ }
+    });
+
+    vaultEventSource.addEventListener('holding.utxo.received', (evt: MessageEvent) => {
+      try {
+        const data = JSON.parse(evt.data);
+        if (data.payload?.holding_id !== holdingId) return;
+        fetchVaultAll();
+      } catch { /* ignore */ }
+    });
+
+    vaultEventSource.addEventListener('holding.utxo.spent', (evt: MessageEvent) => {
+      try {
+        const data = JSON.parse(evt.data);
+        if (data.payload?.holding_id !== holdingId) return;
+        fetchVaultAll();
       } catch { /* ignore */ }
     });
   }
@@ -871,6 +1219,81 @@
       await navigator.clipboard.writeText(expr);
       strongboxCopied = true;
       setTimeout(() => { strongboxCopied = false; }, 2000);
+    } catch { /* ignore */ }
+  }
+
+  async function forceVaultRefresh(): Promise<void> {
+    if (vaultRefreshing) return;
+    vaultRefreshing = true;
+    try {
+      await fetchVaultAll();
+    } catch { /* ignore */ } finally {
+      vaultRefreshing = false;
+    }
+  }
+
+  async function forgetVault(): Promise<void> {
+    if (vaultForgetRemoving) return;
+    vaultForgetRemoving = true;
+    try {
+      const resp = await fetch(`${serverUrl}/api/v1/holdings/${holdingId}`, {
+        method: 'DELETE',
+        headers: authHeaders(),
+      });
+      if (resp.ok) goto('/home');
+    } catch { /* ignore */ } finally {
+      vaultForgetRemoving = false;
+    }
+  }
+
+  function openVaultRename(): void {
+    vaultRenameValue = snapshot?.name ?? '';
+    showVaultRenameInput = true;
+  }
+
+  async function submitVaultRename(): Promise<void> {
+    if (!vaultRenameValue.trim()) return;
+    vaultRenaming = true;
+    try {
+      await fetch(`${serverUrl}/api/v1/holdings/${holdingId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', ...authHeaders() },
+        body: JSON.stringify({ name: vaultRenameValue.trim() }),
+      });
+      await fetchSnapshot();
+      showVaultRenameInput = false;
+    } catch { /* ignore */ } finally {
+      vaultRenaming = false;
+    }
+  }
+
+  function openVaultRecoveryNotes(): void {
+    vaultRecoveryNotesValue = snapshot?.recovery_setup_notes ?? '';
+    showVaultRecoveryNotesInput = true;
+  }
+
+  async function submitVaultRecoveryNotes(): Promise<void> {
+    vaultRecoveryNotesSaving = true;
+    try {
+      await fetch(`${serverUrl}/api/v1/holdings/${holdingId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', ...authHeaders() },
+        body: JSON.stringify({ recovery_setup_notes: vaultRecoveryNotesValue.trim() || null }),
+      });
+      await fetchSnapshot();
+      showVaultRecoveryNotesInput = false;
+    } catch { /* ignore */ } finally {
+      vaultRecoveryNotesSaving = false;
+    }
+  }
+
+  async function copyVaultDescriptor(): Promise<void> {
+    const expr = vaultDescriptors[0]?.expression ?? '';
+    if (!expr) return;
+    try {
+      await navigator.clipboard.writeText(expr);
+      vaultCopied = true;
+      setTimeout(() => { vaultCopied = false; }, 2000);
     } catch { /* ignore */ }
   }
 </script>
@@ -1520,6 +1943,443 @@
 
       {/if}
 
+    {:else if snapshot?.holding_type === 'vault'}
+
+      <!-- ── Vault: connection-error toast ── -->
+      {#if vaultToastVisible}
+        <div class="connection-toast" role="alert">
+          <div class="toast-row">
+            <span class="toast-title">Cannot reach the Bitcoin network</span>
+            <button class="toast-close" aria-label="Dismiss"
+              onclick={() => { vaultToastDismissed = true; }}>
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <line x1="18" y1="6" x2="6" y2="18"/>
+                <line x1="6" y1="6" x2="18" y2="18"/>
+              </svg>
+            </button>
+          </div>
+          <button class="toast-retry" type="button" onclick={forceVaultRefresh}>
+            Try again now
+          </button>
+        </div>
+      {/if}
+
+      <!-- ── Vault: status card ── -->
+      <button
+        class="status-card status-card--vault"
+        type="button"
+        aria-label="Wallet connection status — tap to refresh"
+        onclick={forceVaultRefresh}
+        disabled={vaultRefreshing}
+      >
+        <span class="status-mode">{vaultSubtitle()}</span>
+        <span class="status-line">
+          {#if vaultRefreshing}
+            <span class="status-spinner" aria-hidden="true">⟳</span>
+          {:else}
+            <span class="status-dot {dotClass(vaultChainStatus)}" aria-hidden="true"></span>
+          {/if}
+          <span class="status-state">{vaultChainStatusLabel(vaultChainStatus)}</span>
+          {#if vaultLastFetched}
+            <span class="status-sep">·</span>
+            <span>{vaultFreshness()}</span>
+          {/if}
+        </span>
+      </button>
+
+      <!-- ── Vault: lockup bar ── -->
+      {#if snapshot?.timelock_kind}
+        {#if vaultLastFetched !== null}
+          {#if vaultBalance === 0 || vaultUtxos.filter(u => u.confirmation_height != null && !u.is_spent).length === 0}
+            <div class="lockup-card">
+              <div class="empty-bar-note">No deposits yet</div>
+            </div>
+          {:else if vaultLockup}
+            <div class="lockup-card" aria-label="Vault lockup schedule">
+              <div class="lockup-bar" role="img" aria-label="Vault deposit lockup schedule">
+                {#if vaultLockup.availableSats > 0}
+                  <span
+                    class="lockup-seg lockup-seg--available"
+                    style="flex: {vaultLockup.availableSats}"
+                  >{formatBtc(vaultLockup.availableSats)}</span>
+                {/if}
+                {#if vaultLockup.soonerSats > 0}
+                  <span
+                    class="lockup-seg lockup-seg--sooner"
+                    style="flex: {vaultLockup.soonerSats}"
+                  >{formatBtc(vaultLockup.soonerSats)}</span>
+                {/if}
+                {#if vaultLockup.laterSats > 0}
+                  <span
+                    class="lockup-seg lockup-seg--later"
+                    style="flex: {vaultLockup.laterSats}"
+                  >{formatBtc(vaultLockup.laterSats)}</span>
+                {/if}
+              </div>
+              <div class="lockup-legend">
+                {#if vaultLockup.availableSats > 0}
+                  <span class="lockup-label" style="flex: {vaultLockup.availableSats}; justify-content: flex-start;">
+                    Available · ready to move
+                  </span>
+                {/if}
+                {#if vaultLockup.soonerSats > 0}
+                  <span class="lockup-label" style="flex: {vaultLockup.soonerSats}; justify-content: center;">
+                    <svg viewBox="0 0 24 24" aria-hidden="true" class="lockup-lock-ico"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M 8 11 V 7 a 4 4 0 0 1 8 0 v 4"/></svg>
+                    By ~{estimateBlockDate(vaultLockup.soonerBoundaryBlock)}
+                  </span>
+                {/if}
+                {#if vaultLockup.laterSats > 0}
+                  <span class="lockup-label" style="flex: {vaultLockup.laterSats}; justify-content: flex-end;">
+                    <svg viewBox="0 0 24 24" aria-hidden="true" class="lockup-lock-ico"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M 8 11 V 7 a 4 4 0 0 1 8 0 v 4"/></svg>
+                    {#if snapshot?.timelock_kind === 'cltv' && vaultLockup.cltvUnlockBlock != null}
+                      Unlocks ~{estimateBlockDate(vaultLockup.cltvUnlockBlock)} (block {vaultLockup.cltvUnlockBlock.toLocaleString()})
+                    {:else}
+                      By ~{estimateBlockDate(vaultLockup.laterBoundaryBlock)}
+                    {/if}
+                  </span>
+                {/if}
+              </div>
+            </div>
+          {/if}
+        {/if}
+      {/if}
+
+      <!-- ── Vault: hero balance ── -->
+      <div class="detail-hero detail-hero--compact">
+        <div class="hero-amount-line">
+          <span class="hero-amount">
+            {preferences.unit === 'sats' ? formatSats(vaultBalance) : formatBtc(vaultBalance)}
+          </span>
+          <span class="hero-unit-label">
+            {preferences.unit === 'sats' ? 'sats' : 'BTC'}<button
+              class="unit-toggle"
+              aria-label="Cycle unit: sats / BTC"
+              onclick={preferences.cycleUnit}
+            >↻</button>
+          </span>
+        </div>
+      </div>
+
+      <!-- ── Vault: action row (both deferred) ── -->
+      <div class="action-row">
+        <button class="action-btn action-btn--deferred" type="button"
+          aria-label="Vault spending ships in a later iteration" aria-disabled="true">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <rect x="5" y="11" width="14" height="9" rx="2"/>
+            <line x1="5" y1="15" x2="19" y2="15"/>
+            <line x1="12" y1="9" x2="12" y2="2"/>
+            <polyline points="8 6 12 2 16 6"/>
+          </svg>
+          Send
+        </button>
+        <button class="action-btn action-btn--deferred" type="button"
+          aria-label="Vault receiving ships in a later iteration" aria-disabled="true">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <rect x="5" y="11" width="14" height="9" rx="2"/>
+            <line x1="5" y1="15" x2="19" y2="15"/>
+            <line x1="12" y1="2" x2="12" y2="9"/>
+            <polyline points="8 5 12 9 16 5"/>
+          </svg>
+          Receive
+        </button>
+      </div>
+
+      <!-- ── Vault: tab strip ── -->
+      <div class="tab-strip" role="tablist">
+        <button
+          class="tab {activeTab === 'operations' ? 'tab--active' : ''}"
+          role="tab"
+          aria-selected={activeTab === 'operations'}
+          onclick={() => { activeTab = 'operations'; }}
+        >Operations</button>
+        <button
+          class="tab {activeTab === 'settings' ? 'tab--active' : ''}"
+          role="tab"
+          aria-selected={activeTab === 'settings'}
+          onclick={() => { activeTab = 'settings'; }}
+        >Settings</button>
+      </div>
+
+      <!-- ── Vault: Operations tab ── -->
+      {#if activeTab === 'operations'}
+        {#if vaultLedger.length === 0}
+          <div class="activity-empty">
+            <div class="title">No activity yet</div>
+            <div class="sub">Incoming and outgoing payments will surface here as they hit the chain.</div>
+          </div>
+        {:else}
+          <ul class="activity-list" aria-label="Recent activity">
+            {#each vaultLedger as entry (entry.id)}
+              <li class="activity-entry">
+                <span class="activity-main">
+                  <span class="activity-title">{purseEntryTitle(entry)}</span>
+                  <span class="activity-time">{entryTime(entry.timestamp)}</span>
+                  {#if entry.category}
+                    <span class="activity-category">
+                      <svg viewBox="0 0 24 24" aria-hidden="true">
+                        <polyline points="3 7 9 13 21 5"/>
+                      </svg>
+                      {entry.category}
+                    </span>
+                  {/if}
+                </span>
+                <span class="activity-amount {purseEntryAmountClass(entry)}">
+                  {entry.direction === 'incoming' ? '+' : '−'}{formatAmount(entry.net_amount_sats)}<span class="unit">{preferences.unit === 'sats' ? 'sats' : 'BTC'}</span>
+                </span>
+              </li>
+            {/each}
+          </ul>
+        {/if}
+      {/if}
+
+      <!-- ── Vault: Settings tab ── -->
+      {#if activeTab === 'settings'}
+
+        <!-- Wallet (info-only) -->
+        <div class="settings-label">Wallet</div>
+        <div class="settings-card">
+          <div class="settings-row">
+            <div class="settings-body">
+              <div class="settings-value">{vaultSubtitle()}</div>
+              <div class="settings-meta">Imported on {vaultCreatedLabel()}. TallyKeep never sees the keys for this Vault.</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Display name -->
+        <div class="settings-label">Display name</div>
+        <div class="settings-card">
+          {#if showVaultRenameInput}
+            <div class="settings-row">
+              <div class="rename-form">
+                <input
+                  class="rename-input"
+                  type="text"
+                  bind:value={vaultRenameValue}
+                  maxlength="100"
+                  placeholder="Vault name"
+                  aria-label="New Vault name"
+                />
+                <div class="rename-actions">
+                  <button class="settings-cta" type="button"
+                    onclick={() => { showVaultRenameInput = false; }}>
+                    Cancel
+                  </button>
+                  <button class="settings-cta settings-cta--primary" type="button"
+                    disabled={vaultRenaming || !vaultRenameValue.trim()}
+                    onclick={submitVaultRename}>
+                    {vaultRenaming ? 'Saving…' : 'Save'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          {:else}
+            <div class="settings-row">
+              <div class="settings-body">
+                <div class="settings-value">{snapshot?.name ?? ''}</div>
+                <div class="settings-meta">How this Vault appears across TallyKeep.</div>
+              </div>
+              <button class="settings-cta" type="button" onclick={openVaultRename}>Rename</button>
+            </div>
+          {/if}
+        </div>
+
+        <!-- Recovery setup notes -->
+        <div class="settings-label">Recovery setup notes</div>
+        <div class="settings-card">
+          {#if showVaultRecoveryNotesInput}
+            <div class="settings-row">
+              <div class="rename-form">
+                <textarea
+                  class="rename-input vault-notes-input"
+                  bind:value={vaultRecoveryNotesValue}
+                  maxlength="2000"
+                  placeholder="e.g. Coldcard in fireproof safe, Jade with Alice, Jade with Bob…"
+                  aria-label="Recovery setup notes"
+                  rows="4"
+                ></textarea>
+                <div class="rename-actions">
+                  <button class="settings-cta" type="button"
+                    onclick={() => { showVaultRecoveryNotesInput = false; }}>
+                    Cancel
+                  </button>
+                  <button class="settings-cta settings-cta--primary" type="button"
+                    disabled={vaultRecoveryNotesSaving}
+                    onclick={submitVaultRecoveryNotes}>
+                    {vaultRecoveryNotesSaving ? 'Saving…' : 'Save'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          {:else}
+            <div class="settings-row">
+              <div class="settings-body">
+                {#if snapshot?.recovery_setup_notes?.trim()}
+                  <div class="settings-value vault-notes-display">{snapshot.recovery_setup_notes}</div>
+                {:else}
+                  <div class="settings-value settings-value--not-configured">Not set</div>
+                {/if}
+                <div class="settings-meta">Your notes on where the hardware wallets are, how to reach cosigners, etc. No signing key data — safe to write in plain text.</div>
+              </div>
+              <button class="settings-cta" type="button" onclick={openVaultRecoveryNotes}>
+                {snapshot?.recovery_setup_notes?.trim() ? 'Edit' : 'Set'}
+              </button>
+            </div>
+          {/if}
+        </div>
+
+        <!-- Descriptor -->
+        <div class="settings-label">Descriptor</div>
+        <div class="settings-card">
+          {#if vaultMissingMetadataCount() > 0}
+            <div class="descriptor-warning">
+              <span class="descriptor-warning-text">
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M 12 3 L 22 20 L 2 20 Z"/>
+                  <line x1="12" y1="10" x2="12" y2="14"/>
+                  <line x1="12" y1="17" x2="12.01" y2="17"/>
+                </svg>
+                {vaultMissingMetadataCount()} cosigner{vaultMissingMetadataCount() === 1 ? '' : 's'} missing metadata
+              </span>
+              <button class="settings-cta" type="button" onclick={() => {}}>Fix this</button>
+            </div>
+          {/if}
+
+          {#if showVaultDescriptor}
+            <div class="descriptor-revealed">
+              <!-- Script type header -->
+              <div class="descriptor-type-row">
+                <span class="descriptor-type-label">{vaultScriptTypeLabel()}</span>
+                {#if vaultIsMultisig()}
+                  <span class="descriptor-param-pill">{snapshot?.required_signers} of {snapshot?.total_signers}</span>
+                {/if}
+                {#if snapshot?.timelock_kind}
+                  <span class="descriptor-param-pill">with {snapshot.timelock_kind.toUpperCase()} timelock</span>
+                {/if}
+              </div>
+
+              <!-- Per-cosigner rows -->
+              {#if parseVaultCosigners(vaultDescriptors[0]?.expression ?? '').length > 0}
+                <div class="cosigner-list">
+                  {#each parseVaultCosigners(vaultDescriptors[0]?.expression ?? '') as cosigner (cosigner.index)}
+                    <div class="cosigner-row">
+                      <span class="cosigner-index">{cosigner.index + 1}</span>
+                      {#if cosigner.fingerprint}
+                        <span class="cosigner-fp">{cosigner.fingerprint}</span>
+                      {:else}
+                        <span class="cosigner-fp cosigner-fp--missing">
+                          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M 12 3 L 22 20 L 2 20 Z"/><line x1="12" y1="10" x2="12" y2="14"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+                          ????????
+                        </span>
+                      {/if}
+                      <span class="cosigner-label-value cosigner-label-value--placeholder">Add label</span>
+                      <button class="settings-cta" type="button" onclick={() => {}}>Add</button>
+                    </div>
+                  {/each}
+                </div>
+              {/if}
+
+              <!-- Timelock parameters row -->
+              {#if snapshot?.timelock_kind && snapshot?.timelock_value != null}
+                <div class="descriptor-timelock-row">
+                  <span class="descriptor-timelock-key">Timelock</span>
+                  <span class="descriptor-timelock-val">
+                    {#if snapshot.timelock_kind === 'cltv'}
+                      Block {snapshot.timelock_value.toLocaleString()} (~{estimateBlockDate(snapshot.timelock_value)})
+                    {:else}
+                      {csvDurationLabel(snapshot.timelock_value)} per deposit ({snapshot.timelock_value.toLocaleString()} blocks)
+                    {/if}
+                  </span>
+                </div>
+              {/if}
+
+              <!-- Show full descriptor toggle -->
+              <button class="descriptor-show-full-link" type="button"
+                onclick={() => { showVaultDescriptorFull = !showVaultDescriptorFull; }}>
+                {showVaultDescriptorFull ? 'Hide full descriptor' : 'Show full descriptor'}
+              </button>
+
+              {#if showVaultDescriptorFull}
+                <div class="descriptor-mono-card">{vaultDescriptors[0]?.expression ?? ''}</div>
+              {/if}
+
+              <div class="descriptor-actions">
+                <button class="settings-cta" type="button"
+                  onclick={() => { showVaultDescriptor = false; showVaultDescriptorFull = false; }}>
+                  Hide
+                </button>
+                <button class="settings-cta" type="button" onclick={copyVaultDescriptor}>
+                  {vaultCopied ? 'Copied!' : 'Copy'}
+                </button>
+              </div>
+            </div>
+          {:else}
+            <div class="settings-row">
+              <div class="settings-body">
+                <div class="settings-value settings-value--mono">
+                  {vaultDescriptorMasked(vaultDescriptors[0]?.expression ?? '')}
+                </div>
+                <div class="settings-meta">The public-key descriptor TallyKeep watches on the chain.</div>
+              </div>
+              <button class="settings-cta" type="button"
+                onclick={() => { showVaultDescriptor = true; }}>
+                Show
+              </button>
+            </div>
+          {/if}
+        </div>
+
+        <!-- Auto-sweep rules -->
+        <div class="settings-label">Auto-sweep rules</div>
+        <div class="settings-card">
+          <div class="settings-row">
+            <div class="settings-body">
+              <div class="settings-value settings-value--not-configured">None</div>
+              <div class="settings-meta">Receive BTC into this Vault automatically on a schedule or threshold.</div>
+            </div>
+            <button class="settings-cta" type="button" onclick={() => {}}>Add rule</button>
+          </div>
+        </div>
+
+        <!-- Instant payments — permanently gated for Vault -->
+        <div class="settings-label">Instant payments</div>
+        <div class="settings-card">
+          <div class="settings-row settings-row--gated">
+            <div class="settings-body">
+              <div class="settings-value">Not available on Vault</div>
+              <div class="settings-meta">
+                {vaultIsMultisig()
+                  ? 'Vault keys live on your hardware wallets only. Lightning needs hot keys — activate it on a Spending wallet.'
+                  : 'Your Vault key lives on your hardware wallet only. Lightning needs hot keys — activate it on a Spending wallet.'}
+              </div>
+            </div>
+            <button class="settings-cta settings-cta--disabled" type="button" aria-disabled="true" disabled>Activate</button>
+          </div>
+        </div>
+
+        <!-- Danger zone -->
+        <div class="settings-label settings-label--danger">Danger zone</div>
+        <div class="settings-card">
+          <div class="settings-row">
+            <div class="settings-body">
+              <div class="settings-value">Forget this Vault</div>
+              <div class="settings-meta">
+                TallyKeep forgets the descriptor and stops scanning the chain.
+                {vaultIsMultisig()
+                  ? ' Your hardware wallets and the keys they hold are unaffected.'
+                  : ' Your hardware wallet and the keys it holds are unaffected.'}
+                Any categories you've assigned to this Vault's activity are erased with it.
+              </div>
+            </div>
+            <button class="settings-cta settings-cta--danger" type="button"
+              onclick={() => { showVaultForgetModal = true; }}>
+              Forget
+            </button>
+          </div>
+        </div>
+
+      {/if}
+
     {:else if detail}
 
       <!-- ── Account: connection-error toast ── -->
@@ -1904,6 +2764,39 @@
           onclick={forgetStrongbox}
         >
           {strongboxForgetReady ? (strongboxForgetRemoving ? 'Forgetting…' : 'Forget') : `Forget · ${strongboxForgetCountdown}`}
+        </button>
+      </div>
+    </div>
+  {/if}
+
+  <!-- ── Vault forget modal (fill-bar timer, no seed warning) ── -->
+  {#if showVaultForgetModal}
+    <div class="modal-backdrop" role="presentation" aria-hidden="true"></div>
+    <div class="modal-sheet" role="dialog" aria-modal="true" aria-labelledby="vault-forget-title">
+      <div class="drag-handle" aria-hidden="true"></div>
+      <h2 id="vault-forget-title" class="modal-title">Forget this Vault?</h2>
+      <p class="modal-body">
+        TallyKeep forgets the descriptor and stops scanning the
+        chain. {vaultIsMultisig()
+          ? 'Your hardware wallets and the keys they hold are unaffected.'
+          : 'Your hardware wallet and the keys it holds are unaffected.'}
+        Forgetting this Vault removes it from your overall total.
+        Any categories you've assigned to this Vault's activity are erased with it.
+      </p>
+      <div class="modal-actions">
+        <button class="btn btn-cancel" type="button"
+          disabled={vaultForgetRemoving}
+          onclick={() => { showVaultForgetModal = false; }}>
+          Cancel
+        </button>
+        <button
+          class="btn {vaultForgetReady ? 'btn-danger' : `btn-danger-timer${vaultForgetCounting ? ' counting' : ''}`}"
+          type="button"
+          disabled={!vaultForgetReady || vaultForgetRemoving}
+          aria-disabled={!vaultForgetReady}
+          onclick={forgetVault}
+        >
+          {vaultForgetReady ? (vaultForgetRemoving ? 'Forgetting…' : 'Forget') : `Forget · ${vaultForgetCountdown}`}
         </button>
       </div>
     </div>
@@ -2369,7 +3262,7 @@
     gap: var(--space-3);
     padding: var(--space-2) 0;
   }
-  .settings-row + .settings-row { border-top: 1px solid var(--color-border); }
+  :global(.settings-row + .settings-row) { border-top: 1px solid var(--color-border); }
   .settings-row--gated .settings-value,
   .settings-row--gated .settings-meta { color: var(--color-text-dim); }
   .settings-row--gated .settings-value--not-configured { color: var(--color-text-dim); }
@@ -2603,6 +3496,231 @@
 
   /* ── Strongbox stripe ── */
   .status-card--strongbox { border-left-color: var(--color-holding-strongbox); }
+
+  /* ── Vault stripe ── */
+  .status-card--vault { border-left-color: var(--color-holding-vault); }
+
+  /* ── Vault: hero compact (after lockup bar) ── */
+  .detail-hero--compact { padding-top: var(--space-4); }
+
+  /* ── Vault: lockup bar ── */
+  .lockup-card {
+    margin: var(--space-3) var(--space-4) 0;
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    padding: var(--space-3) var(--space-4);
+  }
+  .lockup-bar {
+    display: flex;
+    height: 26px;
+    border-radius: var(--radius-sm);
+    overflow: hidden;
+  }
+  .lockup-seg {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    font-weight: var(--font-weight-semibold);
+    font-variant-numeric: tabular-nums;
+    min-width: 0;
+    overflow: hidden;
+  }
+  .lockup-seg--available { background: #c0dd97; color: #173404; }
+  .lockup-seg--sooner    { background: #b4b2a9; color: #1f1e1b; }
+  .lockup-seg--later     { background: #5f5e5a; color: #f1efe8; }
+  .lockup-legend {
+    display: flex;
+    margin-top: var(--space-2);
+    font-size: var(--font-size-xs);
+    color: var(--color-text-muted);
+    line-height: 1.3;
+    gap: var(--space-2);
+  }
+  .lockup-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    min-width: 0;
+  }
+  .lockup-lock-ico {
+    width: 11px; height: 11px;
+    stroke: currentColor; fill: none;
+    stroke-width: 2; stroke-linecap: round; stroke-linejoin: round;
+    flex-shrink: 0;
+  }
+  .empty-bar-note {
+    font-size: var(--font-size-sm);
+    color: var(--color-text-muted);
+    font-style: italic;
+    padding: var(--space-2) 0;
+    text-align: center;
+  }
+
+  /* ── Vault: deferred action buttons ── */
+  .action-btn--deferred {
+    background: var(--color-bg);
+    border: 1px solid var(--color-border);
+    color: var(--color-text-dim);
+    opacity: 0.65;
+    cursor: help;
+  }
+  .action-btn--deferred:hover { background: var(--color-surface); }
+
+  /* ── Vault: recovery notes textarea ── */
+  .vault-notes-input {
+    resize: vertical;
+    min-height: 80px;
+    font-family: inherit;
+    font-size: var(--font-size-sm);
+  }
+  .vault-notes-display {
+    font-size: var(--font-size-sm);
+    white-space: pre-wrap;
+    word-break: break-word;
+    font-weight: var(--font-weight-normal);
+  }
+
+  /* ── Vault: descriptor warning advisory inside tile ── */
+  .descriptor-warning {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-2);
+    background: var(--color-warning-soft);
+    border: 1px solid var(--color-warning-border);
+    border-radius: var(--radius-md);
+    padding: var(--space-2) var(--space-3);
+    margin-bottom: var(--space-3);
+  }
+  .descriptor-warning-text {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-2);
+    font-size: var(--font-size-xs);
+    font-weight: var(--font-weight-semibold);
+    color: var(--color-warning-text-on-soft, #6a4a10);
+  }
+  .descriptor-warning-text svg {
+    width: 14px; height: 14px;
+    stroke: currentColor; fill: none;
+    stroke-width: 2; stroke-linecap: round; stroke-linejoin: round;
+    flex-shrink: 0;
+  }
+
+  /* ── Vault: structured descriptor reveal ── */
+  .descriptor-type-row {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+    padding-bottom: var(--space-2);
+    border-bottom: 1px solid var(--color-border);
+    margin-bottom: var(--space-2);
+  }
+  .descriptor-type-label {
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-weight-semibold);
+    color: var(--color-text);
+  }
+  .descriptor-param-pill {
+    font-size: var(--font-size-xs);
+    font-weight: var(--font-weight-semibold);
+    color: var(--color-text-muted);
+    background: var(--color-bg);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-pill);
+    padding: 1px var(--space-2);
+    white-space: nowrap;
+  }
+
+  /* ── Vault: cosigner list ── */
+  .cosigner-list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+    margin-bottom: var(--space-2);
+  }
+  .cosigner-row {
+    display: grid;
+    grid-template-columns: 20px 1fr auto auto;
+    align-items: center;
+    gap: var(--space-2);
+  }
+  .cosigner-index {
+    font-size: var(--font-size-xs);
+    color: var(--color-text-dim);
+    font-weight: var(--font-weight-semibold);
+    text-align: right;
+  }
+  .cosigner-fp {
+    font-family: var(--font-mono);
+    font-size: var(--font-size-xs);
+    color: var(--color-text);
+    letter-spacing: 0.04em;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .cosigner-fp--missing {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    color: var(--color-warning-text-on-soft, #6a4a10);
+  }
+  .cosigner-fp--missing svg {
+    width: 11px; height: 11px;
+    stroke: currentColor; fill: none;
+    stroke-width: 2; stroke-linecap: round; stroke-linejoin: round;
+    flex-shrink: 0;
+  }
+  .cosigner-label-value {
+    font-size: var(--font-size-xs);
+    color: var(--color-text);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .cosigner-label-value--placeholder {
+    color: var(--color-text-dim);
+    font-style: italic;
+  }
+
+  /* ── Vault: timelock row in descriptor reveal ── */
+  .descriptor-timelock-row {
+    display: grid;
+    grid-template-columns: 72px 1fr;
+    gap: var(--space-2);
+    align-items: baseline;
+    padding: var(--space-2) 0;
+    border-top: 1px solid var(--color-border);
+    margin-top: var(--space-1);
+  }
+  .descriptor-timelock-key {
+    font-size: var(--font-size-xs);
+    color: var(--color-text-muted);
+    font-weight: var(--font-weight-medium);
+  }
+  .descriptor-timelock-val {
+    font-size: var(--font-size-xs);
+    color: var(--color-text);
+    word-break: break-word;
+  }
+
+  /* ── Vault: show full descriptor link ── */
+  .descriptor-show-full-link {
+    background: transparent;
+    border: 0;
+    padding: 0;
+    font-family: inherit;
+    font-size: var(--font-size-xs);
+    color: var(--color-primary);
+    cursor: pointer;
+    text-decoration: underline;
+    text-align: left;
+  }
+  .descriptor-show-full-link:hover { color: var(--color-primary-strong); }
 
   /* ── Descriptor revealed state ── */
   .descriptor-revealed {

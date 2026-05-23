@@ -453,6 +453,7 @@ def update_holding(
     display_color: str | None = None,
     display_order: int | None = None,
     signing_device_label: Any = _UNSET,
+    recovery_setup_notes: Any = _UNSET,
 ) -> Holding | None:
     row = holding_repo.update_basics(
         session,
@@ -464,6 +465,7 @@ def update_holding(
         display_order=display_order,
         declared_security=declared_security,
         signing_device_label=signing_device_label,
+        recovery_setup_notes=recovery_setup_notes,
     )
     if row is None:
         return None

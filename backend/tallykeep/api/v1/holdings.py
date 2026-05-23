@@ -652,6 +652,11 @@ async def patch_holding(
         if "signing_device_label" in body.model_fields_set
         else _UNSET
     )
+    rsn_arg = (
+        body.recovery_setup_notes
+        if "recovery_setup_notes" in body.model_fields_set
+        else _UNSET
+    )
     try:
         holding = holding_service.update_holding(
             session,
@@ -663,6 +668,7 @@ async def patch_holding(
             display_color=body.display_color,
             display_order=body.display_order,
             signing_device_label=sdl_arg,
+            recovery_setup_notes=rsn_arg,
         )
         if holding is None:
             raise HTTPException(status_code=404, detail="Holding not found")

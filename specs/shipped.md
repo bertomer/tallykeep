@@ -14,6 +14,59 @@ commit.
 
 ---
 
+## 2026-05-23 — Vault detail page
+
+Full detail page shipped at `/holding/[id]` for `vault`-type Holdings. Two-tab layout
+(Operations | Settings), SSE-driven freshness, brass-stripe status card (`#b89968`) with a
+per-shape subtitle resolver (five variants: single-sig + CLTV, single-sig + CSV, pure multisig,
+multisig + CLTV, multisig + CSV). Hero balance with shared unit toggle. Send + Receive both
+greyed (deferred to Vault Send iteration per ADR-0010) with Vault-specific deferred-reason copy.
+
+**Lockup bar.** Sats-weighted three-bucket grouping (Available / Sooner / Later). CLTV renders
+as a single-segment degenerate case; pure multisig (no timelock) renders no bar. Amount-only
+inside each segment; status/date label below with lock-icon prefix on locked segments. Tap a
+segment → scrolls Operations to the matching UTXO. Tap the bar header chevron → expanded
+per-deposit schedule panel showing Available / Sooner / Later groupings with full date rows.
+
+**Operations tab.** SSE-driven activity feed from chain-side ledger entries, identical row
+shape to Strongbox / Purse. Empty-state panel for fresh Vaults.
+
+**Settings tab.** Seven cards in locked order: Wallet info (shape-and-lock summary, creation
+date); Display name (Rename CTA); Recovery setup notes (free-text editor, new this iteration);
+Descriptor (masked at rest → structured per-cosigner reveal with per-xpub label editors,
+timelock-parameter row, raw-descriptor sub-link, Copy CTA); Auto-sweep rules (coming-soon stub);
+Instant payments (permanently gated, Vault-specific copy); Danger zone (Forget only,
+shape-branched body copy: plural "wallets" for multisig, singular for single-sig + timelock).
+
+**Missing-derivation-metadata advisory.** Aggregated count ("N cosigners missing metadata")
+inside the masked descriptor tile header; per-xpub warning icons in the revealed state.
+"Fix this" → coming-soon stub.
+
+**Forget bottom-sheet.** 5-second fill-bar timer (cross-type lock from Purse); body copy
+branches on `total_signers` (≠1 → multisig copy, 1 → single-sig copy). Wired to the
+`DELETE /api/v1/holdings/{id}` cascade (ADR-0017). No `secureStorage.delete` call (no seed
+on TK side for Vault).
+
+**Connection-error toast.** `system.chain.connection_state_changed` subscription; lockup bar
+continues to render cached state without error decoration.
+
+**Backend addition.** `recovery_setup_notes` (nullable str, maxLength 2000) added to
+`HoldingUpdate` PATCH schema. Wired through repository (`subtype_data` JSONB partial update
+via `MISSING` sentinel, Vault-type guard), service, and endpoint (`model_fields_set`
+detection). Parallel to the `signing_device_label` pattern introduced in the Strongbox iteration.
+
+**Bug fixes (found during validation).** Account wizard `each_key_duplicate` Svelte crash:
+keyed `{#each}` for the activity preview now uses the loop index (static display list, never
+reordered). Kraken adapter `provider_entry_id` collision: internal-transfer ledger entries
+share the same `referenceId` but carry distinct per-entry `id`s — `provider_entry_id` now
+set to `item["id"]` rather than `refid`, eliminating `UniqueViolation` on account creation
+when a Kraken Earn stake-and-unstake pair appears in the same ledger window.
+
+Canonical docs touched at closeout: `api/openapi.yaml` (regenerated; `recovery_setup_notes`
+in `HoldingUpdate` and `HoldingResponse`).
+
+---
+
 ## 2026-05-22 — Forget cascade implementation + Account wizard setup-token cache
 
 **Forget cascade (all 4 Holding types).** `DELETE /api/v1/holdings/{id}` now accepts

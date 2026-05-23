@@ -149,6 +149,8 @@ class HoldingUpdate(BaseModel):
     display_order: int | None = Field(default=None, ge=0)
     # Strongbox-specific: user note about the hardware wallet's location.
     signing_device_label: str | None = Field(default=None, max_length=200)
+    # Vault-specific: free-text recovery setup notes.
+    recovery_setup_notes: str | None = Field(default=None, max_length=2000)
     # Account-specific: updates the CustodialProvider polling cadence.
     polling_interval_seconds: int | None = None
 

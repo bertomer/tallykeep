@@ -216,11 +216,12 @@ def update_basics(
     display_order: int | None = None,
     declared_security: SecurityClaim | None = None,
     signing_device_label: Any = _UNSET,
+    recovery_setup_notes: Any = _UNSET,
 ) -> HoldingRow | None:
     """Apply a partial update — caller must commit. Returns the row or None.
 
-    ``signing_device_label`` uses the ``_UNSET`` sentinel to distinguish
-    "not provided" (no change) from ``None`` (clear the label).
+    ``signing_device_label`` and ``recovery_setup_notes`` use the ``_UNSET``
+    sentinel to distinguish "not provided" (no change) from ``None`` (clear).
     """
     row = session.get(HoldingRow, holding_id)
     if row is None:
@@ -249,6 +250,15 @@ def update_basics(
             new_data.pop("signing_device_label", None)
         else:
             new_data["signing_device_label"] = signing_device_label
+        row.subtype_data = new_data
+    if recovery_setup_notes is not _UNSET:
+        if row.holding_type != HoldingType.VAULT.value:
+            raise ValueError("recovery_setup_notes is only valid for Vault holdings")
+        new_data = dict(row.subtype_data or {})
+        if recovery_setup_notes is None:
+            new_data.pop("recovery_setup_notes", None)
+        else:
+            new_data["recovery_setup_notes"] = recovery_setup_notes
         row.subtype_data = new_data
     row.updated_at = datetime.now(UTC)
     return row

@@ -637,7 +637,7 @@
         <p class="activity-empty">No activity yet — your entries will surface here as they happen on Kraken.</p>
       {:else}
         <ul class="activity-list">
-          {#each validateResult.recent_ledger_entries as entry (entry.timestamp + entry.kind + entry.asset)}
+          {#each validateResult.recent_ledger_entries as entry, i (i)}
           <li class="activity-entry">
             <span class="activity-title">{formatEntryTitle(entry.kind, entry.asset)}</span>
             <span class="activity-amount {entry.amount_sats >= 0 ? 'amount--pos' : 'amount--neg'}">
