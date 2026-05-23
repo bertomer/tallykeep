@@ -43,7 +43,11 @@ CREATE TABLE holding (
     holding_type VARCHAR(20) NOT NULL CHECK (holding_type IN ('account','purse','strongbox','vault')),
     name VARCHAR(100) NOT NULL,
     description TEXT,
-    purpose VARCHAR(20) NOT NULL CHECK (purpose IN ('spending','reserve','long_term','transit','undeclared')),
+    purpose VARCHAR(20) NOT NULL CHECK (purpose IN ('spending','reserve','transit','undeclared')),
+    -- Per ADR-0018, 'long_term' is not a value; Vault is long-term by type
+    -- definition (ADR-0010), so the per-Holding tag is redundant for the
+    -- only thing it governed (the Vault outgoing-payment guardrail, now
+    -- unconditional on every Vault Send per concerns/outflow.md).
 
     -- Declared security (user's claim about how this Holding is protected)
     declared_custody_model VARCHAR(30) NOT NULL,

@@ -87,9 +87,16 @@
   labels. `UI/README.md §Holding detail` per-type bullets need
   the new section structure named.
 
-- **Status:** idea (needs a dedicated brainstorm session to settle
-  the section labels + per-type contents before sharpening as an
-  iteration).
+- **Status:** **parked indefinitely (2026-05-22).** Decided during
+  the Vault-detail brainstorm: ship Vault detail in the existing
+  flat-Settings layout (consistent with shipped Strongbox / Purse),
+  and let the cross-type restructure be its own future iteration
+  if a real need surfaces. The "design twice" cost the Option B
+  lean was guarding against is gone — Vault detail uses the flat
+  layout too. Reopen if a new Holding type or a substantial
+  additional Settings affordance lands and makes the flat shape
+  visibly noisy. The section-label brainstorm work in this file
+  remains the starting point if so.
 
 - **Milestone:** TBD — sequencing options:
     - **Option A:** sharpen + ship as a cross-type iteration

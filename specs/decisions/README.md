@@ -70,3 +70,4 @@ iteration-done sanity sweep (`PROCESS.md §4.6`) checks it.
 - [0015 — Lock-aware worker lifecycle](0015-lock-aware-worker-lifecycle.md) — Accepted; refined by 0016
 - [0016 — Custodial-provider ACL lives only in the backend](0016-custodial-acl-backend-only.md) — Accepted
 - [0017 — Forget is hard delete; archive mechanism retires](0017-forget-is-hard-delete.md) — Accepted
+- [0018 — Vault is long-term by type; `Purpose.LONG_TERM` retires](0018-vault-is-long-term-by-type.md) — Accepted; extends 0010

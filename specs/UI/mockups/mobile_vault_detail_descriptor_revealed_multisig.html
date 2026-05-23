@@ -1,0 +1,185 @@
+<!--
+  Title: Mobile — Vault detail · Settings · Descriptor revealed (multisig)
+  Status: validated  (Rémy greenlight 2026-05-22 closing the Vault-detail-page design pass)
+  Date last touched: 2026-05-22
+  Replaces: nothing on disk. Demonstrates the
+            structured per-cosigner reveal pattern that
+            differentiates Vault descriptors from
+            Strongbox / Purse (single-xpub) descriptors.
+
+  Design notes:
+  - **Structured per-cosigner reveal.** Instead of a flat
+    mono blob, the revealed state shows:
+      1. Header line: script type + (M, N) + timelock note.
+      2. One row per xpub: truncated fingerprint in mono +
+         per-row free-text label affordance (placeholder
+         "Add label" when empty).
+      3. Timelock parameters (read-only) below the cosigner
+         rows when present.
+      4. Sub-link "Show full descriptor" → reveals the raw
+         descriptor string in a bordered mono card.
+      5. Hide + Copy CTAs at the bottom. Copy copies the
+         raw descriptor string regardless of which sub-
+         state is showing.
+  - **Cosigner labels live here**, not in a separate
+    Settings card. Per the Vault-detail brainstorm: labels
+    are "part of the descriptor" rather than "data about
+    the Vault."
+  - **Sensitive-screen flag** set on reveal in Capacitor
+    (FLAG_SECURE / iOS sensitive-screen). Browser is the
+    dev surface; the NativeBridge stub is a no-op.
+  - **No Copy on signing material.** Per the privacy-first-
+    reveal feedback memory, the no-Copy rule applies to
+    signing material only — descriptors are public-key
+    data and DO get Copy.
+
+  Sample data:
+  - Display name: "Family multisig"
+  - Shape: 2-of-3 multisig + CSV (~26,280 blocks ~ 6 months)
+  - Cosigners (all with clean derivation metadata):
+      1. `abc12345` — labelled "Coldcard at home"
+      2. `def67890` — labelled "BitBox02 at mother's"
+      3. `fed98765` — no label set (placeholder "Add label")
+-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>TallyKeep — Mobile — Vault detail · Descriptor revealed (multisig)</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="_shared/tokens.css">
+<link rel="stylesheet" href="_shared/shell.css">
+<style>
+  .phone-screen { background: var(--color-bg); }
+  .app-bar { height: var(--mobile-app-bar); flex-shrink: 0; display: grid; grid-template-columns: 44px 1fr 44px; align-items: center; padding: 0 var(--space-2); background: var(--color-surface); border-bottom: 1px solid var(--color-border); }
+  .app-bar .back-btn { width: 36px; height: 36px; display: inline-flex; align-items: center; justify-content: center; background: transparent; border: 0; border-radius: var(--radius-md); color: var(--color-text); cursor: pointer; justify-self: start; margin-left: var(--space-2); }
+  .app-bar .back-btn:hover { background: var(--color-bg); }
+  .app-bar .back-btn svg { width: 22px; height: 22px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+  .app-bar-title { text-align: center; font-size: var(--font-size-base); font-weight: var(--font-weight-semibold); color: var(--color-text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .scroll-area { flex: 1; overflow-y: auto; padding-bottom: var(--space-5); }
+  .status-card { margin: var(--space-3) var(--space-4) 0; background: var(--color-surface); border: 1px solid var(--color-border); border-left: 4px solid var(--color-holding-vault); border-radius: var(--radius-md); padding: var(--space-3) var(--space-4); display: flex; flex-direction: column; gap: 2px; cursor: pointer; text-align: left; width: calc(100% - var(--space-4) * 2); font-family: inherit; }
+  .status-mode { font-size: var(--font-size-sm); font-weight: var(--font-weight-semibold); color: var(--color-text); }
+  .status-line { display: inline-flex; align-items: center; gap: var(--space-2); font-size: var(--font-size-xs); color: var(--color-text-muted); line-height: 1.4; }
+  .status-sep { color: var(--color-text-dim); }
+  .status-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; flex-shrink: 0; }
+  .status-dot--healthy { background: var(--color-success); }
+  .status-state { color: var(--color-text); font-weight: var(--font-weight-medium); }
+  .tab-strip { display: grid; grid-template-columns: 1fr 1fr; position: sticky; top: 0; z-index: 2; background: var(--color-bg); border-top: 1px solid var(--color-border); border-bottom: 1px solid var(--color-border); }
+  .tab { padding: var(--space-3) 0; background: transparent; border: 0; font-family: inherit; font-size: var(--font-size-sm); font-weight: var(--font-weight-medium); color: var(--color-text-muted); cursor: pointer; position: relative; }
+  .tab--active { color: var(--color-text); font-weight: var(--font-weight-semibold); }
+  .tab--active::after { content: ''; position: absolute; left: 12%; right: 12%; bottom: -1px; height: 2px; background: var(--color-primary); border-radius: var(--radius-sm) var(--radius-sm) 0 0; }
+  .settings-label { margin: var(--space-4) var(--space-5) var(--space-2); font-size: var(--font-size-xs); color: var(--color-text-muted); text-transform: uppercase; letter-spacing: 0.06em; font-weight: var(--font-weight-semibold); }
+  .settings-card { margin: 0 var(--space-4); background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-md); padding: var(--space-3) var(--space-4); }
+  .settings-meta { font-size: var(--font-size-xs); color: var(--color-text-dim); margin-bottom: var(--space-3); line-height: var(--line-height-default); }
+  .descriptor-shape { font-size: var(--font-size-sm); font-weight: var(--font-weight-semibold); color: var(--color-text); margin-bottom: var(--space-3); display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; }
+  .descriptor-shape .pill { background: var(--color-bg); border: 1px solid var(--color-border); border-radius: var(--radius-pill); padding: 2px var(--space-2); font-size: 10px; font-weight: var(--font-weight-semibold); color: var(--color-text); }
+  .cosigner-list { list-style: none; margin: 0 0 var(--space-3); padding: 0; }
+  .cosigner-row { display: grid; grid-template-columns: 16px 1fr auto; align-items: center; gap: var(--space-2); padding: var(--space-2) 0; }
+  .cosigner-row + .cosigner-row { border-top: 1px solid var(--color-border); }
+  .cosigner-idx { font-size: 10px; color: var(--color-text-dim); font-variant-numeric: tabular-nums; }
+  .cosigner-fp { font-family: var(--font-mono); font-size: var(--font-size-xs); color: var(--color-text); letter-spacing: 0.04em; }
+  .cosigner-label-value { font-size: var(--font-size-xs); color: var(--color-text-muted); margin-top: 2px; }
+  .cosigner-label-value--unset { font-style: italic; color: var(--color-text-dim); }
+  .settings-cta { background: transparent; border: 1px solid var(--color-border-strong); border-radius: var(--radius-pill); padding: var(--space-1) var(--space-3); font-family: inherit; font-size: var(--font-size-xs); font-weight: var(--font-weight-semibold); color: var(--color-text); cursor: pointer; flex-shrink: 0; white-space: nowrap; }
+  .settings-cta:hover { background: var(--color-bg); }
+  .timelock-row { padding: var(--space-2) 0; border-top: 1px solid var(--color-border); border-bottom: 1px solid var(--color-border); margin-bottom: var(--space-3); }
+  .timelock-key { font-size: var(--font-size-xs); color: var(--color-text-muted); text-transform: uppercase; letter-spacing: 0.06em; font-weight: var(--font-weight-semibold); }
+  .timelock-value { font-size: var(--font-size-sm); color: var(--color-text); font-weight: var(--font-weight-medium); margin-top: 2px; }
+  .timelock-approx { font-size: 10px; color: var(--color-text-dim); }
+  .full-descriptor-toggle { background: transparent; border: 0; padding: 0; font-family: inherit; font-size: var(--font-size-xs); font-weight: var(--font-weight-semibold); color: var(--color-primary-strong); cursor: pointer; text-decoration: underline; margin-bottom: var(--space-2); }
+  .descriptor-mono-card { background: var(--color-bg); border: 1px solid var(--color-border); border-radius: var(--radius-md); padding: var(--space-3) var(--space-4); font-family: var(--font-mono); font-size: 10px; color: var(--color-text); letter-spacing: 0.02em; word-break: break-all; line-height: 1.4; margin-bottom: var(--space-3); }
+  .descriptor-actions { display: flex; align-items: center; gap: var(--space-2); justify-content: flex-end; }
+  .bottom-nav { height: var(--mobile-bottom-nav); flex-shrink: 0; display: grid; grid-template-columns: repeat(4, 1fr); background: var(--color-surface); border-top: 1px solid var(--color-border); }
+  .nav-item { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; padding: var(--space-2) 0; font-size: 10px; color: var(--color-text-dim); background: transparent; border: 0; cursor: pointer; }
+  .nav-item .nav-ico { width: 22px; height: 22px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+  .nav-item.active { color: var(--color-primary-strong); font-weight: var(--font-weight-semibold); position: relative; }
+  .nav-item.active::before { content: ''; position: absolute; top: 0; left: 20%; right: 20%; height: 2px; background: var(--color-primary); border-radius: 0 0 var(--radius-sm) var(--radius-sm); }
+  .nav-item.enabled-inactive { color: var(--color-text-muted); }
+  .nav-item.disabled { color: var(--color-text-dim); opacity: 0.4; cursor: not-allowed; }
+</style>
+</head>
+<body>
+<div class="mockup-meta"><strong>Mobile — Vault detail · Descriptor revealed (multisig)</strong> · <span class="status-validated">validated</span> · 2026-05-22 · 360×800</div>
+<div class="phone-frame">
+  <div class="phone-screen">
+    <div class="app-bar">
+      <button class="back-btn" aria-label="Back"><svg viewBox="0 0 24 24" aria-hidden="true"><polyline points="15 6 9 12 15 18"/></svg></button>
+      <div class="app-bar-title">Family multisig</div>
+      <div></div>
+    </div>
+    <div class="scroll-area">
+      <div class="status-card">
+        <span class="status-mode">2-of-3 · 6-month lock per deposit</span>
+        <span class="status-line"><span class="status-dot status-dot--healthy" aria-hidden="true"></span><span class="status-state">Connected</span><span class="status-sep">·</span><span>Updated 2 min ago</span></span>
+      </div>
+      <div class="tab-strip" role="tablist">
+        <button class="tab" role="tab" aria-selected="false">Operations</button>
+        <button class="tab tab--active" role="tab" aria-selected="true">Settings</button>
+      </div>
+
+      <div class="settings-label">Descriptor</div>
+      <div class="settings-card">
+        <div class="settings-meta">The public-key descriptor TallyKeep watches on the chain. Tap a cosigner to label which device or person each key belongs to. Safe to paste into Sparrow, Specter, or Bitcoin Core for an independent view.</div>
+
+        <div class="descriptor-shape">
+          Native SegWit · P2WSH multisig
+          <span class="pill">2 of 3</span>
+          <span class="pill">with CSV timelock</span>
+        </div>
+
+        <ul class="cosigner-list">
+          <li class="cosigner-row">
+            <span class="cosigner-idx">1</span>
+            <span>
+              <span class="cosigner-fp">abc12345</span>
+              <div class="cosigner-label-value">Coldcard at home</div>
+            </span>
+            <button class="settings-cta" type="button">Edit</button>
+          </li>
+          <li class="cosigner-row">
+            <span class="cosigner-idx">2</span>
+            <span>
+              <span class="cosigner-fp">def67890</span>
+              <div class="cosigner-label-value">BitBox02 at mother's</div>
+            </span>
+            <button class="settings-cta" type="button">Edit</button>
+          </li>
+          <li class="cosigner-row">
+            <span class="cosigner-idx">3</span>
+            <span>
+              <span class="cosigner-fp">fed98765</span>
+              <div class="cosigner-label-value cosigner-label-value--unset">Add label</div>
+            </span>
+            <button class="settings-cta" type="button">Add</button>
+          </li>
+        </ul>
+
+        <div class="timelock-row">
+          <div class="timelock-key">Timelock</div>
+          <div class="timelock-value">CSV — each deposit locks for 26,280 blocks</div>
+          <div class="timelock-approx">~ 6 months per deposit</div>
+        </div>
+
+        <button class="full-descriptor-toggle" type="button">Show full descriptor</button>
+        <div class="descriptor-mono-card">wsh(and_v(v:older(26280),sortedmulti(2,[abc12345/48'/0'/0'/2']xpub6CUGRUonZSQ4TWtTMmzXdrXDtypWKiKrhko4egpiMZbpiaQL2jkwSB1icqYh2cfDfVxdx4df189oLKnC5fSwqPfgyP3hooxujYzAu3fDVmz/&lt;0;1&gt;/*,[def67890/48'/0'/0'/2']xpub6DLcL5UpQjbb6m1zZ8N2gXfPx7TYpQ3jWQ8NjyN3R5fK4Lp9TYHsmJWeyx9PMDQ6xVFKfDqV6P1jE7r6cKzNeR1CmHF8YQGgcZ4qNz9pTvX/&lt;0;1&gt;/*,[fed98765/48'/0'/0'/2']xpub6ECrZpV3MWLwCq5XKDcThJX1bv5TR3oqg9LdEXmZ6Y8XQfGgxFTLkE2dRzpz4mvQrJEKL1jdYjqQ8nN3p7XPgyHU2gFXCfV9D5SnRy/&lt;0;1&gt;/*))#kfsg7n7p</div>
+
+        <div class="descriptor-actions">
+          <button class="settings-cta" type="button">Hide</button>
+          <button class="settings-cta" type="button">Copy</button>
+        </div>
+      </div>
+
+    </div>
+    <div class="bottom-nav">
+      <button class="nav-item active"><svg class="nav-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M 3 11 L 12 4 L 21 11"/><polyline points="5 10 5 20 19 20 19 10"/></svg>Home</button>
+      <button class="nav-item enabled-inactive"><svg class="nav-ico" viewBox="0 0 24 24" aria-hidden="true"><polyline points="4 12 9 17 20 6"/></svg>Activity</button>
+      <button class="nav-item enabled-inactive"><svg class="nav-ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M 12 2 L 12 6 M 12 18 L 12 22 M 4 12 L 8 12 M 16 12 L 20 12 M 6.34 6.34 L 8.46 8.46 M 15.54 15.54 L 17.66 17.66 M 6.34 17.66 L 8.46 15.54 M 15.54 8.46 L 17.66 6.34"/></svg>Settings</button>
+      <button class="nav-item disabled"><svg class="nav-ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>Help</button>
+    </div>
+  </div>
+</div>
+</body>
+</html>

@@ -1,11 +1,13 @@
 # Vault Send for all shapes
 
 - **Captured:** 2026-05 (from module 12, pre-retirement). Re-scoped
-  2026-05-15 under ADR-0010 β: v1 ships Vault onboarding for both
-  shapes (single-sig + timelock; multisig with or without timelock)
-  via the Vault wizard. This iteration is now narrowly about Vault
-  Send — the genuinely hard surface — plus the Vault detail page
-  that hosts the Send affordance.
+  2026-05-15 under ADR-0010 β. **Narrowed 2026-05-22** — Vault
+  detail page design landed in its own iteration
+  (promoted into `next_iteration.md` as the active iteration on 2026-05-22).
+  This entry is now narrowly about Vault Send (and Receive, which
+  ships in lockstep). The detail-page-as-host language retires;
+  the Send affordance is already greyed and ready to lift when
+  Send ships.
 - **Motivation:** Per ADR-0010 β, Vault Send is deferred
   shape-agnostic because the multi-signer PSBT coordination,
   cosigner-status UI, partial-signature collection, and
@@ -13,19 +15,19 @@
   pass. Shipping Send for both shapes together preserves Vault
   detail UX uniformity — one detail page across shapes; Send
   greyed-out in v1 lifts for both at the same time when this
-  iteration ships.
+  iteration ships. Receive ships with Send: the verify-on-device-
+  for-each-cosigner ceremony belongs in the same dedicated design
+  pass.
 - **Touches:** banking layer (PSBT construction + multi-signer
-  coordination + timelock-check at broadcast), UI Vault detail
-  page (full design lands here — currently a v1 placeholder),
-  UI Vault Send flow (compose / review / export / re-import /
-  broadcast across all five Vault shape variants), threat model
+  coordination + timelock-check at broadcast), UI Vault Send +
+  Receive flows (compose / review / export / re-import /
+  broadcast across all five Vault shape variants; verify-on-
+  device-per-cosigner address ceremony for Receive), threat model
   (PSBT roundtrip with chain-side timelock check; cosigner
-  coordination ceremony), brand / mockups (cosigner annotation
-  UI, per-signer-status UI, per-UTXO unlock ledger for CSV
-  shapes).
-- **Status:** sketched. v1 ships descriptor onboarding for all
-  five Vault shapes; this iteration picks up Vault detail + Send
-  for the same five shapes.
+  coordination ceremony), brand / mockups (Send + Receive
+  surfaces; per-signer-status UI; partial-signature collection
+  UX). **Vault detail page is no longer in this iteration's
+  scope** — it shipped via the Vault-detail iteration.
 - **Milestone:** post-shipping
 - **Notes:** "Promote a Strongbox to a Vault" migration lands here
   too — a single-Holding type-relabel when the user adds multisig

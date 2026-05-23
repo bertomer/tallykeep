@@ -253,8 +253,27 @@ Per type:
   descriptor-reveal Copy CTA (also retrofitted into Purse in
   lockstep). Send / Receive deferred to the Send + Receive
   iteration.
-- **Vault:** balance, send (PSBT) / receive, declared-vs-observable
-  status, recent activity, categorization.
+- **Vault:** detail page surface in `UI/mobile.md §Vault detail`
+  and mockups `mobile_vault_detail_operations_populated_csv_mixed.html`,
+  `mobile_vault_detail_operations_populated_cltv.html`,
+  `mobile_vault_detail_operations_populated_matured.html`,
+  `mobile_vault_detail_operations_empty.html`,
+  `mobile_vault_detail_settings_multisig_csv.html`,
+  `mobile_vault_detail_settings_singlesig_cltv.html`,
+  `mobile_vault_detail_settings_missing_metadata.html`,
+  `mobile_vault_detail_descriptor_revealed_multisig.html`,
+  `mobile_vault_detail_lockup_schedule_expanded.html`,
+  `mobile_vault_detail_forget_confirm.html`,
+  `mobile_vault_detail_connection_error.html`. Two-tab layout
+  (Operations | Settings) inherited from Strongbox; Vault-
+  specifics are the lockup bar (sats-weighted three-bucket
+  collapse over CLTV / CSV unlock schedules), the structured
+  descriptor display with per-cosigner labels, the
+  missing-derivation-metadata advisory grouped into the
+  descriptor tile rather than as a wallet-wide card, the
+  shape-branched Forget body copy, and the permanently-gated
+  Send + Receive (deferred to the Vault Send iteration per
+  ADR-0010).
 
 ### Send
 

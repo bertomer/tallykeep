@@ -1,0 +1,243 @@
+<!--
+  Title: Mobile — Vault detail · Settings (multisig + CSV)
+  Status: validated  (Rémy greenlight 2026-05-22 closing the Vault-detail-page design pass)
+  Date last touched: 2026-05-22
+  Replaces: nothing on disk. Anchor Settings mockup for the
+            Vault detail iteration. Flat-list-of-cards shape
+            inherited from Strongbox / Purse (Bucket A
+            cross-type restructure parked indefinitely per
+            backlog/holding-detail-settings-reorganisation.md).
+
+  Design notes:
+  - **Card order (top to bottom):**
+      1. Wallet — info-only. Line 1: shape-and-lock summary
+         (mirrors the status card subtitle). Line 2:
+         creation date.
+      2. Display name — current name + Rename CTA. Cross-
+         type lockstep with Purse / Strongbox / Account
+         (Rename is non-destructive, lives outside Danger
+         zone).
+      3. Recovery setup notes — current free-text + Edit
+         CTA. New per Vault detail. Same shape as Strongbox's
+         signing-device-label card.
+      4. Descriptor — masked. Reveal shows the structured
+         per-cosigner view (see
+         mobile_vault_detail_descriptor_revealed_multisig.html).
+         When any xpub lacks `[fingerprint/path]` metadata,
+         the masked tile carries an aggregated indicator
+         in the header — see the
+         settings_missing_metadata variant.
+      5. Auto-sweep rules — "None" + "Add rule" CTA →
+         coming-soon stub. Cross-type lock.
+      6. Instant payments — permanently gated, same as
+         Strongbox. Vault-specific copy points at Spending
+         wallets.
+      7. Danger zone — Forget only. Body copy per the
+         multisig variant (plural "wallets"; see
+         mobile_vault_detail_forget_confirm.html).
+  - **No "Recovery phrase" row.** TallyKeep never holds
+    Vault keys. Cross-type lockstep with Strongbox.
+  - **No `purpose=long_term` row.** Per ADR-0018, the field
+    retires; Vault is long-term by type. The
+    `banking.vault_outgoing_warns` opt-out lives in global
+    Settings (designed later), not per-Vault.
+
+  Sample data:
+  - Display name: "Family multisig"
+  - Shape: 2-of-3 multisig + CSV (~26,280 blocks ~ 6 months)
+  - Recovery setup notes: "Geographic backup — Coldcard in
+    safe (home), BitBox02 in safe (mother's place), Trezor
+    at notary."
+  - Descriptor: masked (clean derivation metadata on all
+    three xpubs).
+-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>TallyKeep — Mobile — Vault detail · Settings (multisig CSV)</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="_shared/tokens.css">
+<link rel="stylesheet" href="_shared/shell.css">
+<style>
+  .phone-screen { background: var(--color-bg); }
+  .app-bar { height: var(--mobile-app-bar); flex-shrink: 0; display: grid; grid-template-columns: 44px 1fr 44px; align-items: center; padding: 0 var(--space-2); background: var(--color-surface); border-bottom: 1px solid var(--color-border); }
+  .app-bar .back-btn { width: 36px; height: 36px; display: inline-flex; align-items: center; justify-content: center; background: transparent; border: 0; border-radius: var(--radius-md); color: var(--color-text); cursor: pointer; justify-self: start; margin-left: var(--space-2); }
+  .app-bar .back-btn:hover { background: var(--color-bg); }
+  .app-bar .back-btn svg { width: 22px; height: 22px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+  .app-bar-title { text-align: center; font-size: var(--font-size-base); font-weight: var(--font-weight-semibold); color: var(--color-text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .scroll-area { flex: 1; overflow-y: auto; padding-bottom: var(--space-5); }
+  .status-card { margin: var(--space-3) var(--space-4) 0; background: var(--color-surface); border: 1px solid var(--color-border); border-left: 4px solid var(--color-holding-vault); border-radius: var(--radius-md); padding: var(--space-3) var(--space-4); display: flex; flex-direction: column; gap: 2px; cursor: pointer; text-align: left; width: calc(100% - var(--space-4) * 2); font-family: inherit; }
+  .status-card:hover { background: var(--color-surface-raised); }
+  .status-mode { font-size: var(--font-size-sm); font-weight: var(--font-weight-semibold); color: var(--color-text); }
+  .status-line { display: inline-flex; align-items: center; gap: var(--space-2); font-size: var(--font-size-xs); color: var(--color-text-muted); line-height: 1.4; }
+  .status-sep { color: var(--color-text-dim); }
+  .status-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; flex-shrink: 0; }
+  .status-dot--healthy { background: var(--color-success); }
+  .status-state { color: var(--color-text); font-weight: var(--font-weight-medium); }
+  .detail-hero { padding: var(--space-5) var(--space-4) var(--space-3); display: flex; flex-direction: column; gap: var(--space-2); }
+  .hero-amount-line { display: flex; align-items: baseline; gap: var(--space-2); }
+  .hero-amount { font-family: var(--font-sans); font-size: 36px; font-weight: var(--font-weight-semibold); color: var(--color-text); line-height: 1; font-variant-numeric: tabular-nums; }
+  .hero-unit-label { font-size: var(--font-size-md); color: var(--color-text-muted); font-weight: var(--font-weight-medium); line-height: 1; }
+  .unit-toggle { background: transparent; border: 0; padding: 0 0 0 2px; margin: 0; font-size: 0.7em; vertical-align: super; line-height: 1; color: var(--color-text-muted); cursor: pointer; font-family: inherit; }
+  .action-row { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-3); padding: var(--space-2) var(--space-4) var(--space-4); }
+  .action-btn { display: inline-flex; align-items: center; justify-content: center; gap: var(--space-2); padding: var(--space-3) var(--space-4); background: var(--color-bg); border: 1px solid var(--color-border); border-radius: var(--radius-md); font-family: inherit; font-size: var(--font-size-sm); font-weight: var(--font-weight-semibold); color: var(--color-text-dim); cursor: help; opacity: 0.65; }
+  .action-btn:hover { background: var(--color-surface); }
+  .action-btn svg { width: 18px; height: 18px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+  .tab-strip { display: grid; grid-template-columns: 1fr 1fr; position: sticky; top: 0; z-index: 2; background: var(--color-bg); border-top: 1px solid var(--color-border); border-bottom: 1px solid var(--color-border); }
+  .tab { padding: var(--space-3) 0; background: transparent; border: 0; font-family: inherit; font-size: var(--font-size-sm); font-weight: var(--font-weight-medium); color: var(--color-text-muted); cursor: pointer; position: relative; }
+  .tab:hover { color: var(--color-text); }
+  .tab--active { color: var(--color-text); font-weight: var(--font-weight-semibold); }
+  .tab--active::after { content: ''; position: absolute; left: 12%; right: 12%; bottom: -1px; height: 2px; background: var(--color-primary); border-radius: var(--radius-sm) var(--radius-sm) 0 0; }
+  .settings-label { margin: var(--space-4) var(--space-5) var(--space-2); font-size: var(--font-size-xs); color: var(--color-text-muted); text-transform: uppercase; letter-spacing: 0.06em; font-weight: var(--font-weight-semibold); }
+  .settings-label--danger { color: var(--color-danger); }
+  .settings-card { margin: 0 var(--space-4); background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-md); padding: var(--space-3) var(--space-4); }
+  .settings-card + .settings-label { margin-top: var(--space-5); }
+  .settings-row { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: var(--space-3); padding: var(--space-2) 0; }
+  .settings-row + .settings-row { border-top: 1px solid var(--color-border); }
+  .settings-row--gated .settings-body { opacity: 0.55; }
+  .settings-body { min-width: 0; }
+  .settings-value { font-size: var(--font-size-sm); color: var(--color-text); font-weight: var(--font-weight-medium); }
+  .settings-value--not-configured { color: var(--color-text-muted); font-style: italic; }
+  .settings-value--mono { font-family: var(--font-mono); letter-spacing: 0.04em; }
+  .settings-meta { font-size: var(--font-size-xs); color: var(--color-text-dim); margin-top: 2px; line-height: var(--line-height-default); }
+  .settings-cta { background: transparent; border: 1px solid var(--color-border-strong); border-radius: var(--radius-pill); padding: var(--space-1) var(--space-3); font-family: inherit; font-size: var(--font-size-xs); font-weight: var(--font-weight-semibold); color: var(--color-text); cursor: pointer; flex-shrink: 0; white-space: nowrap; }
+  .settings-cta:hover { background: var(--color-bg); }
+  .settings-cta--danger { color: var(--color-danger); border-color: var(--color-danger-border); }
+  .settings-cta--danger:hover { background: var(--color-danger-soft); }
+  .settings-cta--disabled { color: var(--color-text-dim); border-color: var(--color-border); opacity: 0.55; cursor: help; }
+  .settings-cta--disabled:hover { background: transparent; }
+  .bottom-nav { height: var(--mobile-bottom-nav); flex-shrink: 0; display: grid; grid-template-columns: repeat(4, 1fr); background: var(--color-surface); border-top: 1px solid var(--color-border); }
+  .nav-item { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; padding: var(--space-2) 0; font-size: 10px; color: var(--color-text-dim); background: transparent; border: 0; cursor: pointer; }
+  .nav-item .nav-ico { width: 22px; height: 22px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+  .nav-item.active { color: var(--color-primary-strong); font-weight: var(--font-weight-semibold); position: relative; }
+  .nav-item.active::before { content: ''; position: absolute; top: 0; left: 20%; right: 20%; height: 2px; background: var(--color-primary); border-radius: 0 0 var(--radius-sm) var(--radius-sm); }
+  .nav-item.enabled-inactive { color: var(--color-text-muted); }
+  .nav-item.disabled { color: var(--color-text-dim); opacity: 0.4; cursor: not-allowed; }
+</style>
+</head>
+<body>
+<div class="mockup-meta"><strong>Mobile — Vault detail · Settings (multisig CSV)</strong> · <span class="status-validated">validated</span> · 2026-05-22 · 360×800</div>
+<div class="phone-frame">
+  <div class="phone-screen">
+    <div class="app-bar">
+      <button class="back-btn" aria-label="Back to Holdings"><svg viewBox="0 0 24 24" aria-hidden="true"><polyline points="15 6 9 12 15 18"/></svg></button>
+      <div class="app-bar-title">Family multisig</div>
+      <div></div>
+    </div>
+    <div class="scroll-area">
+      <button class="status-card" type="button" aria-label="Wallet connection status — tap to refresh">
+        <span class="status-mode">2-of-3 · 6-month lock per deposit</span>
+        <span class="status-line"><span class="status-dot status-dot--healthy" aria-hidden="true"></span><span class="status-state">Connected</span><span class="status-sep">·</span><span>Updated 2 min ago</span></span>
+      </button>
+      <div class="detail-hero">
+        <div class="hero-amount-line">
+          <span class="hero-amount">4.000</span>
+          <span class="hero-unit-label">BTC<button class="unit-toggle" aria-label="Cycle unit: sats / BTC">↻</button></span>
+        </div>
+      </div>
+      <div class="action-row">
+        <button class="action-btn" type="button" aria-label="Send (deferred)" aria-disabled="true">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="11" width="14" height="9" rx="2"/><line x1="5" y1="15" x2="19" y2="15"/><line x1="12" y1="9" x2="12" y2="2"/><polyline points="8 6 12 2 16 6"/></svg>
+          Send
+        </button>
+        <button class="action-btn" type="button" aria-label="Receive (deferred)" aria-disabled="true">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="11" width="14" height="9" rx="2"/><line x1="5" y1="15" x2="19" y2="15"/><line x1="12" y1="2" x2="12" y2="9"/><polyline points="8 5 12 9 16 5"/></svg>
+          Receive
+        </button>
+      </div>
+      <div class="tab-strip" role="tablist">
+        <button class="tab" role="tab" aria-selected="false">Operations</button>
+        <button class="tab tab--active" role="tab" aria-selected="true">Settings</button>
+      </div>
+
+      <div class="settings-label">Wallet</div>
+      <div class="settings-card">
+        <div class="settings-row">
+          <div class="settings-body">
+            <div class="settings-value">2-of-3 multisig · 6-month CSV per deposit</div>
+            <div class="settings-meta">Imported on May 9, 2026. The signing keys live on three hardware wallets — TallyKeep never sees them.</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="settings-label">Display name</div>
+      <div class="settings-card">
+        <div class="settings-row">
+          <div class="settings-body">
+            <div class="settings-value">Family multisig</div>
+            <div class="settings-meta">How this Vault appears across TallyKeep.</div>
+          </div>
+          <button class="settings-cta" type="button">Rename</button>
+        </div>
+      </div>
+
+      <div class="settings-label">Recovery setup notes</div>
+      <div class="settings-card">
+        <div class="settings-row">
+          <div class="settings-body">
+            <div class="settings-value">Geographic backup — Coldcard at home, BitBox02 at mother's, Trezor at notary.</div>
+            <div class="settings-meta">Free-text notes on how this Vault's keys are distributed and how heirs would recover funds.</div>
+          </div>
+          <button class="settings-cta" type="button">Edit</button>
+        </div>
+      </div>
+
+      <div class="settings-label">Descriptor</div>
+      <div class="settings-card">
+        <div class="settings-row">
+          <div class="settings-body">
+            <div class="settings-value settings-value--mono">•••• 4q3p9z</div>
+            <div class="settings-meta">2-of-3 multisig descriptor with three cosigners and a CSV timelock. Tap Show to inspect the cosigners and reveal the raw descriptor.</div>
+          </div>
+          <button class="settings-cta" type="button">Show</button>
+        </div>
+      </div>
+
+      <div class="settings-label">Auto-sweep rules</div>
+      <div class="settings-card">
+        <div class="settings-row">
+          <div class="settings-body">
+            <div class="settings-value settings-value--not-configured">None</div>
+            <div class="settings-meta">Receive BTC into this Vault automatically on a schedule or threshold (e.g. quarterly sweep from Cold storage).</div>
+          </div>
+          <button class="settings-cta" type="button">Add rule</button>
+        </div>
+      </div>
+
+      <div class="settings-label">Instant payments</div>
+      <div class="settings-card">
+        <div class="settings-row settings-row--gated">
+          <div class="settings-body">
+            <div class="settings-value">Not available on Vault</div>
+            <div class="settings-meta">Vault keys live on your hardware wallets only. Lightning needs hot keys — activate it on a Spending wallet.</div>
+          </div>
+          <button class="settings-cta settings-cta--disabled" type="button" aria-disabled="true" disabled>Activate</button>
+        </div>
+      </div>
+
+      <div class="settings-label settings-label--danger">Danger zone</div>
+      <div class="settings-card">
+        <div class="settings-row">
+          <div class="settings-body">
+            <div class="settings-value">Forget this Vault</div>
+            <div class="settings-meta">TallyKeep forgets the descriptor and stops scanning the chain. Your hardware wallets and the keys they hold are unaffected. Any categories you've assigned to this Vault's activity are erased with it.</div>
+          </div>
+          <button class="settings-cta settings-cta--danger" type="button">Forget</button>
+        </div>
+      </div>
+
+    </div>
+    <div class="bottom-nav">
+      <button class="nav-item active"><svg class="nav-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M 3 11 L 12 4 L 21 11"/><polyline points="5 10 5 20 19 20 19 10"/></svg>Home</button>
+      <button class="nav-item enabled-inactive"><svg class="nav-ico" viewBox="0 0 24 24" aria-hidden="true"><polyline points="4 12 9 17 20 6"/></svg>Activity</button>
+      <button class="nav-item enabled-inactive"><svg class="nav-ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M 12 2 L 12 6 M 12 18 L 12 22 M 4 12 L 8 12 M 16 12 L 20 12 M 6.34 6.34 L 8.46 8.46 M 15.54 15.54 L 17.66 17.66 M 6.34 17.66 L 8.46 15.54 M 15.54 8.46 L 17.66 6.34"/></svg>Settings</button>
+      <button class="nav-item disabled"><svg class="nav-ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>Help</button>
+    </div>
+  </div>
+</div>
+</body>
+</html>

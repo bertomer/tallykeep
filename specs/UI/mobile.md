@@ -3730,3 +3730,346 @@ future Accounting page.
 **Action-row icons.** Same arrow-and-wallet pair as
 Purse. Cross-type lock — Vault detail (when it ships)
 will adopt the same icons.
+
+## Vault detail
+
+### Status
+
+Designed in the Vault-detail-page iteration (active in
+`next_iteration.md` from 2026-05-22, promoted after Forget
+cascade closeout). All mockups listed below are the visual
+contract for the screens this section describes.
+
+### Screens
+
+- `mobile_vault_detail_operations_populated_csv_mixed.html` —
+  default state, multisig + CSV Vault, mixed unlocked /
+  sooner-locked / later-locked deposits. The lockup bar
+  exercises all three segments. Status card subtitle reads the
+  shape-and-lock summary ("2-of-3 · 6-month lock per deposit").
+- `mobile_vault_detail_operations_populated_cltv.html` —
+  single-sig + CLTV Vault. Lockup bar in degenerate single-
+  segment shape (one block-height unlock for the whole
+  Vault). Subtitle reads "Single-sig · unlocks ~Dec 2030".
+- `mobile_vault_detail_operations_populated_matured.html` —
+  CSV Vault whose deposits have all matured; bar is a single
+  bright-green segment ("Ready to move").
+- `mobile_vault_detail_operations_empty.html` — freshly created
+  Vault with no deposits. Bar collapses to a neutral "No
+  deposits yet" line.
+- `mobile_vault_detail_settings_multisig_csv.html` — Settings
+  tab for the multisig + CSV case. Cards in flat-list order
+  per the existing Strongbox / Purse pattern (Bucket A
+  cross-type restructure parked indefinitely per
+  `backlog/holding-detail-settings-reorganisation.md`).
+- `mobile_vault_detail_settings_singlesig_cltv.html` — Settings
+  tab for the single-sig + CLTV case. One row in the
+  per-cosigner block; no multisig parameters surfaced.
+- `mobile_vault_detail_settings_missing_metadata.html` —
+  Settings variant where two of three xpubs lack
+  `[fingerprint/path]` derivation origins. Aggregated indicator
+  on the masked descriptor tile header ("2 cosigners missing
+  metadata"); per-cosigner icon in the revealed view.
+- `mobile_vault_detail_descriptor_revealed_multisig.html` —
+  Descriptor tile in revealed state, structured per-cosigner
+  view, per-xpub inline label affordance, full descriptor in
+  mono with Copy.
+- `mobile_vault_detail_lockup_schedule_expanded.html` —
+  post-tap on the lockup bar. Full per-deposit unlock schedule
+  grouped under Available / Sooner / Later headings, each row
+  carrying block number + approximate calendar date.
+- `mobile_vault_detail_forget_confirm.html` — Forget bottom-
+  sheet, multisig variant (4 sentences, plural "wallets").
+  Single-sig + timelock variant documented in the header
+  `Replaces:` block (singular "wallet"; otherwise identical
+  copy).
+- `mobile_vault_detail_connection_error.html` — bitcoind
+  unreachable; status card shows red dot; toast slides in
+  below the app bar. Cached lockup bar + activity entries
+  still render.
+
+### Reconcilability gauntlet answers
+
+1. *Trust boundary.* Phone screen (UI); backend (descriptor
+   set + UTXO observation + lockup-schedule computation +
+   future PSBT broadcast); hardware wallets / cosigner devices
+   (signing material). Backend signs nothing and observes the
+   chain side only.
+
+2. *Keys and secrets.* All signing material lives on hardware
+   wallets (one for single-sig + timelock; n for multisig).
+   TallyKeep never sees a Vault key on any surface. Cosigner
+   labels (free-text), recovery setup notes (free-text), and
+   the user's display name are non-sensitive metadata stored
+   in the backend.
+
+3. *Self-hosted vs hosted.* Identical from the phone's POV.
+   Both backends register the descriptor, observe the chain,
+   compute the lockup schedule, and (when Send ships) broadcast.
+   Neither sees keys.
+
+4. *Confirmation honesty.* Vault detail is observation +
+   metadata in this iteration; no end-state lies are possible
+   because no end states are produced (Send greyed). The
+   lockup bar surfaces block-height- and chain-tip-derived
+   facts only — date estimates carry the muted "~" qualifier
+   per the ±10–15% block-time drift. "Available" segments are
+   computed against the latest observed chain tip; the
+   freshness indicator on the status card communicates how
+   recent that tip is.
+
+5. *Browser-only fallback.* All Vault-detail screens render
+   identically in the browser. Send (greyed) and Receive
+   (deferred) gate honestly regardless of platform. Descriptor
+   reveal works in both; the sensitive-screen flag
+   (FLAG_SECURE / iOS sensitive-screen) is set on the revealed
+   state in the Capacitor build, scaffolded as a NativeBridge
+   call that's a no-op in the browser.
+
+6. *Open-source and reproducibility.* No closed dependencies;
+   no server-side secrets specific to Vault detail. The
+   miniscript / descriptor parser is BDK (Rust, MIT/Apache,
+   already in tree). The lockup-schedule computation is a
+   straightforward sats-weighted sort of `(block_unlock,
+   confirmed_value_sats)` tuples — no proprietary algorithm.
+
+### Substantive Vault-specific calls
+
+**Lockup bar — the load-bearing visualization.** Single
+horizontal stacked bar placed directly below the status card,
+above the hero amount. Three segments:
+
+1. **Available** — bright green (`--color-success`-leaning).
+   Sum of confirmed sats currently spendable. CLTV: zero
+   until the unlock block, then 100%. CSV: per-UTXO, each
+   deposit goes from locked to available on its individual
+   unlock block.
+2. **Sooner** — medium iron (`--color-holding-strongbox` mid-
+   tone). Locked sats whose unlock dates fall in the first
+   half of the remaining-locked-sats timeline, split at the
+   **sats-weighted median** of locked sats (not the
+   UTXO-count median — value-weighted is the right framing
+   because it answers "how much of my value unlocks soon?").
+3. **Later** — dark iron / brushed steel. Sats whose unlock
+   dates fall in the second half.
+
+Each segment sized by share of **total Vault sats**, not by
+time. Date labels under each segment carry the upper boundary
+("Available" / "By {date}" / "By {date}"). Tap any segment →
+scroll Operations to the matching UTXO entry; tap the bar
+header → open the full per-deposit schedule (the
+`mobile_vault_detail_lockup_schedule_expanded.html` mockup).
+
+CLTV is the degenerate single-segment case (one unlock event
+covers the entire Vault); CSV is the multi-segment case. Same
+component, different data shape — no separate "CLTV bar" /
+"CSV bar" components.
+
+Pure-multisig Vaults (no timelock fragment) render **no
+lockup bar**; the bar's surface collapses to nothing and the
+hero amount sits directly below the status card. Locking
+isn't a concern for that shape; surfacing an always-100%-
+available bar would be visual noise.
+
+Boundary states: fresh Vault (0 UTXOs) collapses the bar
+entirely with a neutral "No deposits yet" line above the
+hero. 100%-unlocked Vault shows a single bright-green
+segment with "Ready to move" as the label.
+
+**Segment density on CSV Vaults.** A user DCAing weekly into
+a CSV Vault for two years produces ~100 individual UTXO
+unlock events. The three-bucket grouping collapses that to
+exactly three segments regardless of UTXO count — the
+sats-weighted median split keeps the shape readable. The
+detailed per-UTXO surface lives in the expanded view, which
+is scrollable and can carry as many rows as the wallet has.
+
+**Status card subtitle, per-shape mapping.** Locked
+vocabulary across the five Vault shapes (CSV / CLTV are
+mechanism names, not user-facing — kept in the descriptor
+tile's parameter section where power users find them):
+
+| Shape | Subtitle |
+|---|---|
+| Single-sig + CLTV | "Single-sig · unlocks ~{Month Year}" |
+| Single-sig + CSV | "Single-sig · {N}-{unit} lock per deposit" |
+| Pure multisig | "{M}-of-{N} multisig" |
+| Multisig + CLTV | "{M}-of-{N} · unlocks ~{Month Year}" |
+| Multisig + CSV | "{M}-of-{N} · {N}-{unit} lock per deposit" |
+
+The tilde acknowledges block-height-to-calendar drift. "Per
+deposit" prevents the CSV reader from misreading it as a
+wallet-wide lock. `{unit}` resolves to the largest natural
+unit at parse time (years ≥ 365 days, months ≥ 30 days, days
+otherwise) — same convention used by the parseback's
+auto-name templates.
+
+**Structured descriptor display.** The Settings tab's
+"Descriptor" card masks at rest (last 6 chars in mono, "Show"
+CTA) — identical to the shipped Strongbox / Purse pattern.
+**The revealed state is what changes for Vault.** Instead of
+a flat mono blob, the reveal renders a structured view:
+
+- Header line: script type + parameters (e.g. "Native SegWit
+  · P2WSH multisig" with "(2, 3)" pill, plus a "with CLTV
+  timelock" suffix when present).
+- One row per xpub: truncated fingerprint in mono + per-row
+  label edit affordance ("Coldcard in safe" / placeholder
+  "Add label"). Single-sig + timelock Vaults render as a
+  single-row case.
+- Timelock parameters (read-only): block height (CLTV) or
+  block count (CSV) + approximate calendar date or duration.
+- "Show full descriptor" sub-link below the structured view
+  → reveals the raw descriptor string in mono inside a
+  bordered card.
+- **Copy** affordance on the revealed state — copies the raw
+  descriptor string. Per the sharpened privacy-first-reveal
+  feedback memory, descriptors are public-key data and get
+  Copy; the no-Copy rule applies to signing material only.
+- Sensitive-screen flag set on reveal regardless (the user
+  may want privacy from over-the-shoulder viewers).
+
+The cosigner labels are NOT a separate Settings card — they
+live inside this structured reveal as a property of the
+descriptor itself. Cleaner cross-type vocabulary: labels are
+"part of the descriptor" rather than "data about the Vault."
+
+**Missing-derivation-metadata advisory — grouped per
+descriptor tile.** Multisig descriptors can have per-xpub
+metadata: a 2-of-3 Vault where xpub #2 was assembled from a
+bare-xpub paste while #1 and #3 came from BIP-388-clean
+exports. The aggregated count surfaces in the masked
+descriptor tile header ("2 cosigners missing metadata") and
+per-xpub icons render inside the revealed view next to the
+affected rows. "Fix this" → coming-soon stub from the
+Security-health-system iteration (same stub used by the
+Strongbox advisory). Wallet-wide `warning-soft` cards are
+**not** added on top of Settings — the grouped indicator on
+the descriptor tile is sufficient and keeps the visual
+rhythm consistent with Strongbox / Purse.
+
+**Action row — Send + Receive both greyed.** Cross-type
+icon lock from the Strongbox iteration (arrow-and-wallet
+pair). Both buttons render visually but route to the
+generic coming-soon stub in this iteration. Tap surfaces
+the deferred-reason copy ("Vault spending ships in a later
+iteration" / "Vault receiving ships in a later iteration").
+The real Vault Send and Receive flows ship together in the
+"Vault Send for all shapes" iteration; this iteration does
+not split them.
+
+**Settings tab — flat-list card order.** Per the Bucket A
+parking decision (cross-type restructure deferred
+indefinitely), Vault Settings inherits the shipped flat-list
+shape. Cards top to bottom:
+
+1. **Wallet** — info-only. Line 1: shape-and-lock summary
+   (mirrors the status card subtitle). Line 2: "Imported on
+   {date}". No "TallyKeep generated/imported keys" language
+   (TallyKeep never sees Vault keys).
+2. **Display name** — current name + Rename CTA. Cross-type
+   lockstep — Rename is non-destructive, lives outside
+   Danger zone.
+3. **Recovery setup notes** — current `recovery_setup_notes`
+   + Edit CTA. Free-text. Same shape as Strongbox's signing-
+   device-label card.
+4. **Descriptor** — masked → reveal (structured per-cosigner
+   view). The missing-metadata advisory groups into this
+   tile's header when applicable. The single Vault-detail-
+   only Settings card whose contents differ structurally
+   from the shipped Strongbox / Purse equivalents.
+5. **Auto-sweep rules** — "None" + "Add rule" CTA → coming-
+   soon stub. Same as Purse / Strongbox.
+6. **Instant payments** — **permanently gated.** Same
+   `settings-row--gated` styling as Strongbox. Copy: "Vault
+   keys live on your hardware wallets only. Lightning needs
+   hot keys — activate it on a Spending wallet."
+7. **Danger zone** — Forget only. Body copy per the variant
+   table below.
+
+The `banking.vault_outgoing_warns` opt-out toggle is **not**
+exposed on Vault detail in this iteration — the feature flag
+lives in the global Settings surface (designed later). Per
+ADR-0018, a per-Vault opt-out is not built proactively.
+
+**Forget body copy — shape-branch.** Same four-sentence
+shape as Strongbox, with branch by Vault shape on the
+hardware-wallet sentence:
+
+*Multisig (any timelock):*
+
+> *TallyKeep forgets the descriptor and stops scanning the
+> chain. Your hardware wallets and the keys they hold are
+> unaffected. Forgetting this Vault removes it from your
+> overall total. Any categories you've assigned to this
+> Vault's activity are erased with it.*
+
+*Single-sig + timelock:*
+
+> *TallyKeep forgets the descriptor and stops scanning the
+> chain. Your hardware wallet and the keys it holds are
+> unaffected. Forgetting this Vault removes it from your
+> overall total. Any categories you've assigned to this
+> Vault's activity are erased with it.*
+
+Cosigner labels, recovery notes, and any sweep policies
+attached are erased without explicit mention — matches the
+Strongbox precedent (`signing_device_label` erasure isn't
+called out either). 5-second fill-bar timer on the Forget
+button, identical to the cross-type lock from the Purse-
+detail iteration.
+
+**Operations tab.** Activity feed reads chain-side
+LedgerEntry rows. Same row shape and kind vocabulary as
+Strongbox / Purse ("Received · BTC", "Sent · BTC"). Empty
+state for fresh Vaults: title "No activity yet", sub
+"Incoming and outgoing payments will surface here as they
+hit the chain." Sample-data texture differs from Strongbox
+— Vaults are typically receive-heavy with very rare outflows
+once funded. Categorization chips on entries (read-only on
+this surface; assignment on the future Accounting page).
+
+**Connection-error toast.** Identical to the Strongbox /
+Purse pattern. Red dot in the status card + slide-in toast
+below the app bar ("Cannot reach the Bitcoin network" +
+"Try again now" CTA). The lockup bar renders the cached
+state without any error decoration — last-known facts are
+still facts.
+
+### Notes
+
+**Cross-type locks adopted from the Strongbox iteration.**
+Status card chrome and the iron-stripe pattern (here brass
+per `--color-holding-vault`), action-row icon pair, sticky
+tab strip, bottom nav, 5-second Forget fill-bar timer, the
+connection-error toast component, the sensitive-screen
+NativeBridge scaffold on descriptor reveal, the permanently-
+gated Lightning row's `settings-row--gated` styling, the
+empty-state activity panel shape — all reused as-is.
+
+**No "Recovery phrase" row.** TallyKeep never holds Vault
+signing material (cross-type lockstep with Strongbox). Same
+type-definition rationale as Strongbox; the row would be a
+category error.
+
+**Lockup bar palette.** Uses `--color-success` 200 for the
+Available segment and two shades from the gray ramp for
+Sooner / Later. Anchored against tokens.css rather than
+hardcoded hex; a future brand iteration that re-tunes the
+ramps repaints the bar automatically per the brand → tokens
+lockstep rule in `brand/README.md`.
+
+**No `purpose=long_term` field on the Settings tab.** Per
+ADR-0018, the `Purpose.LONG_TERM` enum value retires;
+Vault is long-term by type definition. The remaining four
+`Purpose` values are not surfaced on Vault detail in this
+iteration (no per-Vault "set purpose" affordance) — they
+remain a backend property usable by the Fortune-view
+breakdown.
+
+**Action-row icons.** Same arrow-and-wallet pair as Purse
+and Strongbox. Cross-type icon lock locked here for all
+chain-based Holdings; Account keeps Deposit / Withdraw
+(card-with-arrow) because Account is structurally a
+different kind of Holding (custodial pass-through, not
+wallet).

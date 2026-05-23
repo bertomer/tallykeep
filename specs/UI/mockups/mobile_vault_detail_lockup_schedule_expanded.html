@@ -1,0 +1,146 @@
+<!--
+  Title: Mobile — Vault detail · Lockup schedule (expanded after tap)
+  Status: validated  (Rémy greenlight 2026-05-22 closing the Vault-detail-page design pass)
+  Date last touched: 2026-05-22
+  Replaces: nothing on disk. Post-tap expanded view from the
+            Operations-tab lockup bar header chevron.
+
+  Design notes:
+  - **Modal-like sheet that takes over the scroll area**
+    rather than a separate route — the user is still
+    contextually on this Vault. Back arrow returns to the
+    Operations view. Status card stays visible at the top
+    for context.
+  - **Three groupings** mirror the bar segments: Available
+    (already unlocked), Sooner (in the first half of
+    locked-sats-weighted timeline), Later (in the second
+    half). Each section has a header pill carrying the
+    aggregate amount.
+  - **Per-deposit rows** carry the unlock date (calendar
+    estimate), the block number it unlocks at, the
+    days-remaining estimate, and the amount.
+  - **Available rows** render in the success color and
+    show no "days remaining" (already spendable). When
+    multiple available deposits collapse into one summary
+    row by default (per the visualization sketch the
+    user approved); this mockup shows the collapsed
+    summary as one row labelled "3 deposits available
+    now".
+  - **Latest data freshness** indicator at the top —
+    "Computed against block tip {height} ({duration} ago)"
+    so the user knows how recent the calculation is.
+
+  Sample data:
+  - Same Vault as csv_mixed (Family multisig, 2-of-3, CSV).
+  - 9 deposits total: 3 already unlocked (collapsed),
+    3 in Sooner, 3 in Later.
+-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>TallyKeep — Mobile — Vault detail · Lockup schedule</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="_shared/tokens.css">
+<link rel="stylesheet" href="_shared/shell.css">
+<style>
+  .phone-screen { background: var(--color-bg); }
+  .app-bar { height: var(--mobile-app-bar); flex-shrink: 0; display: grid; grid-template-columns: 44px 1fr 44px; align-items: center; padding: 0 var(--space-2); background: var(--color-surface); border-bottom: 1px solid var(--color-border); }
+  .app-bar .back-btn { width: 36px; height: 36px; display: inline-flex; align-items: center; justify-content: center; background: transparent; border: 0; border-radius: var(--radius-md); color: var(--color-text); cursor: pointer; justify-self: start; margin-left: var(--space-2); }
+  .app-bar .back-btn svg { width: 22px; height: 22px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+  .app-bar-title { text-align: center; font-size: var(--font-size-base); font-weight: var(--font-weight-semibold); color: var(--color-text); }
+  .scroll-area { flex: 1; overflow-y: auto; padding-bottom: var(--space-5); }
+  .schedule-header { padding: var(--space-4) var(--space-4) var(--space-2); }
+  .schedule-title { font-size: var(--font-size-lg); font-weight: var(--font-weight-semibold); color: var(--color-text); margin: 0 0 var(--space-1); }
+  .schedule-sub { font-size: var(--font-size-xs); color: var(--color-text-muted); line-height: var(--line-height-default); }
+  .group-label { margin: var(--space-4) var(--space-4) var(--space-2); display: flex; align-items: center; justify-content: space-between; font-size: var(--font-size-xs); color: var(--color-text-muted); text-transform: uppercase; letter-spacing: 0.06em; font-weight: var(--font-weight-semibold); }
+  .group-amount { font-variant-numeric: tabular-nums; font-weight: var(--font-weight-semibold); color: var(--color-text); }
+  .schedule-card { margin: 0 var(--space-4); background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-md); }
+  .schedule-row { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: var(--space-3); padding: var(--space-3) var(--space-4); border-bottom: 1px solid var(--color-border); }
+  .schedule-row:last-child { border-bottom: 0; }
+  .schedule-main { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+  .schedule-when { font-size: var(--font-size-sm); color: var(--color-text); font-weight: var(--font-weight-medium); }
+  .schedule-when--ready { color: var(--color-success); }
+  .schedule-meta { font-size: 10px; color: var(--color-text-dim); }
+  .schedule-amount { font-size: var(--font-size-sm); font-weight: var(--font-weight-semibold); font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .schedule-amount--ready { color: var(--color-success); }
+  .schedule-amount .unit { color: var(--color-text-dim); font-size: 10px; margin-left: var(--space-1); font-weight: var(--font-weight-normal); }
+</style>
+</head>
+<body>
+<div class="mockup-meta"><strong>Mobile — Vault detail · Lockup schedule expanded</strong> · <span class="status-validated">validated</span> · 2026-05-22 · 360×800</div>
+<div class="phone-frame">
+  <div class="phone-screen">
+    <div class="app-bar">
+      <button class="back-btn" aria-label="Back to Operations"><svg viewBox="0 0 24 24" aria-hidden="true"><polyline points="15 6 9 12 15 18"/></svg></button>
+      <div class="app-bar-title">Lockup schedule</div>
+      <div></div>
+    </div>
+    <div class="scroll-area">
+      <div class="schedule-header">
+        <h1 class="schedule-title">Family multisig</h1>
+        <div class="schedule-sub">Computed against block tip 850,180 (2 min ago). 9 deposits across the descriptor; dates approximate per the ~10-min block average.</div>
+      </div>
+
+      <div class="group-label"><span>Available</span><span class="group-amount">0.500 BTC</span></div>
+      <div class="schedule-card">
+        <div class="schedule-row">
+          <span class="schedule-main">
+            <span class="schedule-when schedule-when--ready">3 deposits available now</span>
+            <span class="schedule-meta">Earliest at block 812,408 · received 2024-09-12</span>
+          </span>
+          <span class="schedule-amount schedule-amount--ready">0.500<span class="unit">BTC</span></span>
+        </div>
+      </div>
+
+      <div class="group-label"><span>Sooner</span><span class="group-amount">1.500 BTC</span></div>
+      <div class="schedule-card">
+        <div class="schedule-row">
+          <span class="schedule-main">
+            <span class="schedule-when">Jun 12, 2026</span>
+            <span class="schedule-meta">block 854,210 · ~22 days</span>
+          </span>
+          <span class="schedule-amount">0.400<span class="unit">BTC</span></span>
+        </div>
+        <div class="schedule-row">
+          <span class="schedule-main">
+            <span class="schedule-when">Jul 03, 2026</span>
+            <span class="schedule-meta">block 857,180 · ~43 days</span>
+          </span>
+          <span class="schedule-amount">0.600<span class="unit">BTC</span></span>
+        </div>
+        <div class="schedule-row">
+          <span class="schedule-main">
+            <span class="schedule-when">Aug 18, 2026</span>
+            <span class="schedule-meta">block 863,560 · ~89 days</span>
+          </span>
+          <span class="schedule-amount">0.500<span class="unit">BTC</span></span>
+        </div>
+      </div>
+
+      <div class="group-label"><span>Later</span><span class="group-amount">2.000 BTC</span></div>
+      <div class="schedule-card">
+        <div class="schedule-row">
+          <span class="schedule-main">
+            <span class="schedule-when">Nov 05, 2026</span>
+            <span class="schedule-meta">block 875,820 · ~168 days</span>
+          </span>
+          <span class="schedule-amount">0.900<span class="unit">BTC</span></span>
+        </div>
+        <div class="schedule-row">
+          <span class="schedule-main">
+            <span class="schedule-when">Mar 14, 2027</span>
+            <span class="schedule-meta">block 894,205 · ~297 days</span>
+          </span>
+          <span class="schedule-amount">1.100<span class="unit">BTC</span></span>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+</body>
+</html>

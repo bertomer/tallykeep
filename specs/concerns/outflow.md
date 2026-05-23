@@ -66,11 +66,15 @@ API surface in `api/openapi.yaml`.
 `BankingService.build_payment_request`:
 
 1. Loads the source Holding and its Descriptors.
-2. **Per-Holding-type guardrails** apply here. For Vault with
-   `purpose=long_term`, the guardrail returns
+2. **Per-Holding-type guardrails** apply here. For any Vault
+   source Holding, the guardrail returns
    `requires_confirmation=true` (per `holdings/04_vault.md`).
    The frontend re-submits with explicit acknowledgement to
-   proceed. Configurable via `banking.vault_outgoing_warns`.
+   proceed. Configurable via `banking.vault_outgoing_warns`
+   (user-final-authority feature flag; default `true`). The
+   guardrail is unconditional on Vault type per ADR-0018 —
+   Vault is long-term by definition (ADR-0010), so a per-Vault
+   tag governing the guardrail would be redundant.
 3. Loads current unspent UTXOs for the Descriptor(s), excluding
    frozen ones.
 4. Asks BDK to build a transaction:
@@ -337,6 +341,4 @@ the interface contract.
 | Settlement-rails framing with confirmation probability | `backlog/settlement-rails-payment-status-with-confirmation-probability.md` |
 | Multi-frame QR PSBT roundtrip (BBQr / UR2) | `backlog/psbt-by-qr-roundtrip-on-mobile.md` |
 | Replace-By-Fee (RBF) bumping a stuck transaction | `backlog/replace-by-fee-rbf-support.md` |
-| BIP21 with Lightning fallback (sending side) | `concerns/lightning_placeholder.md` |
-| CoinJoin / PayJoin initiation | `backlog/coinjoin-payjoin.md` |
-| Coin-selection algorithm review session | `backlog/coin-selection-algorithm-review-session.md` |
+| BIP21 with Lightning fallback (unified payment URI) | `backlog/bolt12-offers.md` |

@@ -46,10 +46,16 @@ class Holding(ABC):
 class Purpose(Enum):
     SPENDING = "spending"               # day-to-day outflows
     RESERVE = "reserve"                 # medium-term hold
-    LONG_TERM = "long_term"             # multi-year, retirement-style
     TRANSIT = "transit"                 # in motion, e.g. funds on a custodial provider
     UNDECLARED = "undeclared"           # default when user has not tagged
 ```
+
+Per ADR-0018, `LONG_TERM` is **not** a value. Vault is long-term by
+type definition (ADR-0010 friction-as-type-axis); the outgoing-payment
+guardrail in `concerns/outflow.md` fires on every Vault Send rather
+than on a tag. The remaining four `Purpose` values stay as a
+cross-cutting label used by the Fortune-view breakdown
+(`concerns/observation.md`) and any future per-purpose UI slicing.
 
 ```python
 @dataclass

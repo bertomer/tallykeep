@@ -1,15 +1,18 @@
 # Usage-based feedback for long-term Vaults
 
 - **Captured:** 2026-05-15 (during Vault-wizard brainstorm, ADR-0010
-  β).
-- **Motivation:** A `purpose=long_term` Vault whose observed
-  outflow frequency contradicts the declared long-term intent is
-  a real declared-vs-observable mismatch — declaration is the
-  flag, observable is the spend frequency, the analyzer has
-  substance to flag. Surface as a security-health item suggesting
-  an on-chain timelock upgrade or migration to Strongbox when the
-  gap is wide enough. Honest variant of the rejected
-  soft-timelock-declaration idea.
+  β). **Reframed 2026-05-22** per ADR-0018 — `Purpose.LONG_TERM`
+  retired; Vault is long-term by type. The analyzer no longer
+  needs a per-Vault tag to compare against; the baseline is the
+  type definition itself.
+- **Motivation:** Any Vault whose observed outflow frequency
+  contradicts the type-implied long-term-storage intent is signal
+  worth surfacing — a Vault with weekly outflows is the canonical
+  treasury-misuse pattern. With ADR-0018 the analyzer compares
+  observed spend frequency against the type-implied "rare-by-
+  design" baseline rather than a user-declared tag. Surface as a
+  security-health item suggesting a tighter setup (on-chain
+  timelock, or possibly that the user wanted an Account / Purse).
 - **Touches:** security-health system (pending `seed-backup-
   disclosure` arbitration), Vault detail (where the user sees the
   warning), holdings/04_vault.md type-specific safeguards (already

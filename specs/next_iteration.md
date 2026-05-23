@@ -101,397 +101,341 @@ sequence in `PROCESS.md §4.4` stages 3–5.
 
 ---
 
-## No active coding iteration.
+## Active iteration
 
-<!--
-
-### Iteration: Strongbox detail page + Purse descriptor Copy retrofit
+### Iteration: Vault detail page
 
 **Started:** 2026-05
-**Goal:** Tapping a Strongbox row on Home opens a per-Holding
-detail page that renders honestly for the hardware-wallet trust
-posture, generalising the Purse-detail chrome and adding the
-Strongbox-specific bits (signing-device-label subtitle,
-missing-signing-metadata inline advisory, permanently-gated
-Lightning) — plus a small cross-type retrofit adding a Copy
-affordance to the Purse descriptor reveal now that the
-privacy-first-reveal rule has been sharpened to apply to
-signing material only, not descriptors.
+**Goal:** Tapping a Vault row on Home opens a per-Holding detail
+page that renders honestly for the friction-bearing Vault type —
+shape-aware lockup visualization, structured per-cosigner
+descriptor display, grouped missing-derivation-metadata advisory,
+shape-branched Forget body — while keeping Send and Receive
+deferred to the dedicated Vault Send iteration.
 
 #### Scope (in) — required
 
-- **Strongbox detail page** at `/holding/[id]` for Holdings of
-  type `strongbox`. Two-tab layout (Operations | Settings),
-  SSE-driven freshness, single-unit hero with the shared ↻
-  toggle, pull-to-refresh + tap-status-card-to-refresh. Same
-  chrome generalised from the Purse-detail iteration. Mockups
-  listed in the Mockup contract below. Canonical prose:
-  `UI/mobile.md §Strongbox detail` (new section, written in
-  the design pass alongside the mockups).
+- **Vault detail page** at `/holding/[id]` for Holdings of type
+  `vault`. Two-tab layout (Operations | Settings), SSE-driven
+  freshness, single-unit hero with the shared ↻ toggle,
+  pull-to-refresh + tap-status-card-to-refresh. Generalised
+  chrome from the shipped Strongbox / Purse detail pages.
+- **Status card** carries the Vault-type left-stripe (brass,
+  `--color-holding-vault: #b89968`) and a **shape-summary
+  subtitle** following the per-shape mapping locked in
+  `UI/mobile.md §Vault detail`:
+  - Single-sig + CLTV → "Single-sig · unlocks ~{Month Year}"
+  - Single-sig + CSV → "Single-sig · {N}-{unit} lock per deposit"
+  - Pure multisig → "{M}-of-{N} multisig"
+  - Multisig + CLTV → "{M}-of-{N} · unlocks ~{Month Year}"
+  - Multisig + CSV → "{M}-of-{N} · {N}-{unit} lock per deposit"
 
-- **Status card** carries a Strongbox-type left-stripe (iron,
-  `--color-holding-strongbox: #4a4d4f`) and a **status-card
-  subtitle** that uses the user-set `signing_device_label`
-  when present (e.g. "Coldcard Mk4 in safe", "BitBox02 —
-  drawer"), falling back to **"External signing device"** when
-  the label is empty. Connection-state dot sources from
-  `system.chain.connection_state_changed` (bitcoind health),
-  same as Purse. Per-Holding-type stripe-colour lock from the
-  Account-detail iteration; subtitle-fallback vocabulary lock
-  established here.
-
-- **Action row — Send + Receive** at light-CTA weight, using
-  the unified arrow-and-wallet icon pair locked in the
-  Purse-detail iteration. Both Send and Receive route to
-  **coming-soon stubs** in this iteration — the real
-  PSBT-export Send and the verify-on-device Receive ship with
-  the Send + Receive iteration (roadmap step 4). No
-  Send-blocked screen variant: Strongbox always has a path,
-  it's just deferred. Same routing posture as Purse Receive.
-
-- **Operations tab.** Activity feed from chain-side
-  `LedgerEntry` rows for the descriptor (BDK observation,
-  per-Strongbox). Identical row shape to Purse Operations:
-  text-only kind descriptor, relative time, optional category
-  chip (read-only on this surface, same as Purse), signed
-  amount in the active unit with sign-based colour. SSE-driven
-  insertion at the top via the existing chain-scan event
-  topic. Empty state for fresh Strongboxes: title "No activity
-  yet", sub "Incoming and outgoing payments will surface here
-  as they hit the chain." No illustration.
-
-- **Settings tab — single variant** (Strongbox has no mode
-  axis like Purse's `purse_mode`; the only conditional bit is
-  the missing-metadata advisory, surfaced as a card overlay
-  rather than a mode variant). Sections (top to bottom):
-    - **Missing-signing-metadata advisory** (conditional —
-      only when the descriptor was imported without
-      `[fingerprint/path]` brackets, i.e. bare xpub). A
-      `warning-soft` card at the top of the Settings tab,
-      above Wallet. Copy: *"Missing derivation metadata. Your
-      hardware wallet may refuse to sign transactions with
-      this descriptor. Receiving funds works as expected."* +
-      **Fix this** CTA → coming-soon stub. Per-Holding inline
-      surfacing of a security-health item; the centralised
-      Security-health surface is still under arbitration
-      (`seed-backup-disclosure`) and out of scope. The
-      Fix-this remediation sub-flow (re-export from HW wallet
-      with full origin metadata; manual fingerprint +
-      derivation-path entry) ships with the Security-health-
-      system iteration per `backlog/security-health-system.md`.
-    - **Wallet** — info-only. Line 1: "External signing
-      device". Line 2: creation date ("Imported on May 14,
-      2026"). No "TallyKeep generated/imported keys" framing
-      because TallyKeep never sees the keys for a Strongbox.
-    - **Display name** — current display name + **Rename**
-      CTA. Same pattern as Purse / Account post-2026-05-19
-      round-2 fix (Rename is non-destructive; lives outside
-      Danger zone).
-    - **Signing device label** — current `signing_device_label`
-      (e.g. "Coldcard Mk4 in safe") + **Edit** CTA → inline
-      edit. Free-text. Persisted via the existing Holding-
-      update endpoint. This is the field that drives the
-      status-card subtitle.
-    - **Descriptor** — last 6 chars (mono, masked) + short
-      explanation + **Show** CTA. Tap to reveal full
-      descriptor inline in a bordered card, with sensitive-
-      screen flag for Capacitor (FLAG_SECURE / iOS sensitive-
-      screen) when the NativeBridge ships. **Copy CTA on the
-      revealed state** — descriptors are public-key data
-      routinely pasted between wallet clients; the
-      privacy-first-reveal feedback memory's no-Copy rule
-      applies to signing material only (recovery phrases,
-      xprv), not descriptors. Tap Hide to mask again.
-    - **Auto-sweep rules** — "None" + explanation + **Add
-      rule** CTA. Routes to SweepPolicy creation (coming-soon
-      stub). Same as Purse.
-    - **Instant payments** — **permanently gated.** Row
-      visible with greyed `settings-row--gated` styling; copy:
-      *"Strongbox keys live on your hardware wallet only.
-      Lightning needs hot keys — activate it on a Spending
-      wallet."* CTA disabled. Same three-state gating pattern
-      as Purse Lightning, with the distinction that this gate
-      is permanent (not "fix it later" — the type definition
-      makes it unreachable). Row stays visible for
-      discoverability per the no-dead-capability rule.
-    - **Danger zone** — last section, label in `danger` text
-      colour. **Forget only.** Body copy: *"TallyKeep forgets
-      the descriptor and stops scanning the chain. Your
-      hardware wallet and the keys it holds are unaffected.
-      Any categories you've assigned to this Strongbox's
-      activity are erased with it."* No seed-destruction
-      warning panel (no seed on TK side).
-
-- **No Recovery phrase row.** TK never holds Strongbox
-  signing material. Same logic as Purse WATCH_ONLY.
-
-- **Forget bottom-sheet modal.** Two-button confirm pattern
-  with the **5-second fill-bar timer** locked cross-type in
-  the Purse-detail iteration. Forget body copy per the
-  Danger-zone bullet above. No load-bearing warning panel
-  above the body (no seed to destroy). Cancel active
-  throughout; Forget button enables at zero. Mocked in
-  `mobile_strongbox_detail_forget_confirm.html`.
-
-- **Connection-error toast** (bitcoind unreachable). Identical
-  pattern to Purse: `danger-soft` toast slide-in below the
-  app bar, title "Cannot reach the Bitcoin network", "Try
-  again now" CTA, persistent red dot in the status card with
-  "Connection lost · Last seen N min ago". Driven by
-  `system.chain.connection_state_changed`. Auto-dismisses
-  after ~5 seconds; re-appears on each failed retry.
-
-- **Home → Strongbox detail navigation.** Tapping a Strongbox
-  row on Home navigates to `/holding/[id]`. The placeholder
-  route shipped 2026-05-16 is replaced for `strongbox`-type
-  Holdings. Vault placeholder remains.
-
-- **Purse descriptor Copy retrofit (cross-type fix).** Per
-  the corrected privacy-first-reveal scope (sharpened
-  2026-05-20), descriptors are not in scope of the no-Copy
-  lock. The lock applies to signing material only. The Purse
-  detail Settings mockups
-  (`mobile_purse_detail_settings_watch_only.html`,
-  `mobile_purse_detail_settings_on_device.html`) gain a Copy
-  CTA on the revealed descriptor state, matching the new
-  Strongbox pattern. The corresponding implementation on the
-  Purse detail Settings tab gains the same affordance.
-  `UI/mobile.md §Purse detail` Descriptor bullet and the
-  Behaviors section's "Descriptor reveal" paragraph are
-  edited in lockstep to remove the no-Copy lock and document
-  the Copy affordance. Cosmetic-class edit per PROCESS.md §7
-  routing table (no ADR — corrects a prior over-application
-  of a feedback rule; doesn't touch a locked principle,
-  vocabulary, or trust boundary). Both retrofitted mockup
-  files' `Date last touched` bumped.
+  Connection-state dot reads `system.chain.connection_state_changed`,
+  cross-type pattern.
+- **Lockup bar** — Vault-specific component, placed directly
+  below the status card, above the hero. Three segments
+  (Available / Sooner / Later) sized by sats-weighted share of
+  total Vault sats, ordered by unlock date. Sats-weighted median
+  splits Sooner from Later. CLTV is the degenerate single-segment
+  case; pure multisig (no timelock) renders **no bar** at all.
+  Per the harmonization pass: amount only inside each segment,
+  status / date label below (with lock icon prefixing locked-
+  segment labels). Tap a segment → scroll Operations to the
+  matching UTXO. Tap the bar header chevron → open the expanded
+  per-deposit schedule. See
+  `mobile_vault_detail_lockup_schedule_expanded.html` for the
+  expanded surface.
+- **Action row — Send + Receive both greyed.** Cross-type icon
+  lock (arrow-and-wallet pair), visually distinguished from the
+  active Strongbox state via reduced opacity + neutral fill
+  (per the mockup styling). Tap surfaces the deferred-reason
+  copy. Per ADR-0010, both ship in the Vault Send iteration.
+- **Operations tab.** Activity feed from chain-side `LedgerEntry`
+  rows for the descriptor(s). Identical row shape to Strongbox /
+  Purse: "Received · BTC" / "Sent · BTC", relative time, optional
+  category chip (read-only on this surface), signed amount in the
+  active unit. SSE-driven insertion at the top via the existing
+  chain-scan event topic. Empty state for fresh Vaults per the
+  empty mockup.
+- **Settings tab** — flat-list-of-cards (Bucket A cross-type
+  restructure parked indefinitely per
+  `backlog/holding-detail-settings-reorganisation.md`). Card
+  order top to bottom:
+    1. **Wallet** — info-only. Line 1: shape-and-lock summary
+       (mirrors status card subtitle). Line 2: creation date.
+    2. **Display name** — Rename CTA (cross-type lockstep).
+    3. **Recovery setup notes** — free-text `recovery_setup_notes`
+       + Edit CTA. New per Vault detail. Same shape as
+       Strongbox's signing-device-label card.
+    4. **Descriptor** — masked at rest; revealed state shows
+       the **structured per-cosigner view** with per-xpub
+       free-text label affordance, timelock parameters
+       (read-only), sub-link to the raw descriptor string,
+       Copy CTA on the raw-string state. When any xpub lacks
+       `[fingerprint/path]` derivation metadata, an
+       **aggregated indicator** lives inside the masked tile
+       header ("N cosigners missing metadata") with an inline
+       "Fix this" CTA → coming-soon stub. Per-xpub warning
+       icons render in the revealed view next to the affected
+       rows.
+    5. **Auto-sweep rules** — "None" + "Add rule" CTA →
+       coming-soon stub. Cross-type lock.
+    6. **Instant payments** — permanently gated. Same
+       `settings-row--gated` styling as Strongbox; Vault-
+       specific copy ("Vault keys live on your hardware
+       wallets only. Lightning needs hot keys — activate it
+       on a Spending wallet.").
+    7. **Danger zone** — Forget only. Body copy per the
+       shape-branched variant (multisig: plural "wallets";
+       single-sig + timelock: singular "wallet"; otherwise
+       identical four-sentence shape).
+- **No `purpose=long_term` Settings affordance** per ADR-0018.
+  Not in the flat-list card order; the field retired from the
+  domain.
+- **No `banking.vault_outgoing_warns` opt-out on Vault detail.**
+  The user-final-authority feature flag lives in global Settings
+  (designed later). Per ADR-0018, a per-Vault opt-out is not
+  built proactively.
+- **Forget bottom-sheet modal** with the 5-second fill-bar timer
+  (cross-type lock from Purse), branched body copy on Vault
+  shape, no load-bearing warning panel (no seed on TallyKeep
+  side). Wire to the backend Forget endpoint (ADR-0017 cascade).
+- **Connection-error toast** — `danger-soft` slide-in, identical
+  pattern to Strongbox / Purse. Reuse the shipped component.
+  The lockup bar renders the cached state without any error
+  decoration; last-known facts are still facts.
+- **Home → Vault detail navigation.** Tapping a Vault row on
+  Home navigates to `/holding/[id]`. The placeholder route
+  shipped in earlier iterations is replaced for `vault`-type
+  Holdings.
 
 #### Scope (out) — required
 
-- **Send and Receive flows.** Both route to coming-soon stubs.
-  The real PSBT-export Send (with the "verify destination on
-  signing device" prompt) and the verify-on-device Receive
-  flow ship with the Send + Receive iteration (roadmap
-  step 4).
+- **Vault Send and Receive flows.** Both greyed; ship together
+  in the Vault Send iteration per
+  `backlog/vault-send-for-all-shapes.md`.
 - **The real "Fix this" remediation sub-flow** for missing
-  signing metadata. Routes to coming-soon stub; the
-  re-export-or-manual-entry sub-flow ships with the
+  derivation metadata. Coming-soon stub; ships with the
   Security-health-system iteration per
-  `backlog/security-health-system.md`.
+  `backlog/security-health-system.md`. Same stub Strongbox uses.
 - **Centralised Security-health surface.** Out of scope. The
-  missing-metadata advisory on this iteration is per-Holding
-  inline surfacing only; the Home aggregator surface remains
-  under arbitration.
-- **Auto-sweep rule creation.** Coming-soon stub. SweepPolicy
-  creation UX is its own iteration.
+  Vault-detail advisory is per-Holding inline surfacing only;
+  the Home aggregator surface remains under arbitration.
+- **Auto-sweep rule creation.** Coming-soon stub.
 - **Lightning activation flow.** Permanently gated by type
-  definition. No flow lives behind this row.
+  definition. No flow lives behind that row.
 - **Categorization affordances** on Operations entries.
   Read-only chip only; assignment lives on the future
-  Accounting page per the Purse iteration's posture.
-- **Strongbox geolocation correlation.** Out of scope
-  (idea-likely-discard per
-  `backlog/strongbox-geolocation-correlation-idea-low-priority.md`).
-- **TK-initiated vs external on-chain event distinction.**
-  Same posture as Purse / Account detail; render all entries
-  identically until the chain-side linkage arbitration
-  closes.
-- **Vault detail page.** Own future iteration; this one only
-  changes `strongbox`-type routing on Home.
+  Accounting page per the cross-type posture.
+- **Cross-type Settings-tab restructure** (`backlog/holding-detail-settings-reorganisation.md`).
+  Parked indefinitely; Vault ships in the current flat-list
+  shape.
+- **Strongbox → Vault promotion** migration path. Lives in
+  `backlog/vault-send-for-all-shapes.md`.
 - **API changes.** None expected. The detail page consumes
-  existing endpoints (`GET /api/v1/holdings/{id}`, the
-  chain-scan SSE topics, the ledger-by-holding query) and
-  existing domain shapes. The Signing-device-label inline
-  editor uses the existing Holding-update endpoint; if the
-  coding agent finds that `signing_device_label` is not in
-  the current PATCH shape, surface to Rémy before scoping a
-  backend addition (do not silently add it). No OpenAPI regen
-  unless that surfaces.
+  existing endpoints (`GET /api/v1/holdings/{id}`, chain-scan
+  SSE topics, ledger-by-holding query) and existing domain
+  shapes. The cosigner-label inline editors and the
+  recovery-setup-notes editor use the existing Holding-update
+  endpoint; if the coding agent finds either field missing from
+  the current PATCH shape, **stop and surface to Rémy** before
+  scoping a backend addition (do not silently add). No OpenAPI
+  regen unless that surfaces.
 
 #### Affected canonical docs
 
-- `UI/mobile.md` — new `## Strongbox detail` section after
-  `## Purse detail`; small in-lockstep edits to
-  `## Purse detail` Descriptor bullet + Behaviors "Descriptor
-  reveal" paragraph removing the no-Copy lock.
-- `holdings/03_strongbox.md` — short forward-reference
-  paragraph acknowledging the Strongbox detail page surface;
-  vocabulary lockstep on the action verbs (Send / Receive)
-  and the wallet-card subtitle fallback ("External signing
-  device").
-- `UI/README.md §Holding detail` — small update so the
-  per-type bullet for Strongbox references the mockups.
+All already updated in lockstep during the 2026-05-22 design
+pass (no further canonical-doc edits expected from the coding
+agent):
 
-These edits land in the design pass alongside the mockups
-(per PROCESS.md §2 Design / brand agent — mobile.md prose
-describes intent, mockup HTML is the contract).
+- `UI/mobile.md §Vault detail` — ground truth for screen-by-screen intent.
+- `UI/README.md §Holding detail` — Vault per-type bullet updated.
+- `holdings/04_vault.md` — ADR-0018 + Vault-detail-page forward-references.
+- `02_domain_model.md` — `Purpose.LONG_TERM` removed from the enum.
+- `03_data_model.md` — `'long_term'` dropped from the `purpose` CHECK constraint.
+- `concerns/outflow.md` — Vault guardrail unconditional on type.
+- `decisions/0018-vault-is-long-term-by-type.md` — Accepted.
+- `decisions/README.md` — ADR-0018 indexed.
 
 #### Mockup contract — required if iteration touches UI
 
-By design-pass close (Rémy greenlight), each of these is
-`Status: validated`. The coding agent reads every file in
-this list before writing the corresponding screen. Copy,
-spacing, states, affordances, error variants — the mockup
-HTML is the contract. Deviation rule per PROCESS.md §2
-Coding agent.
+All 11 files at `Status: validated`, `Date last touched:
+2026-05-22`, flipped at the 2026-05-22 design-pass greenlight
+per PROCESS.md §2 Design / brand agent. Coding-agent rule
+(PROCESS.md §2 Coding agent — Visual contract): read each file
+before writing the corresponding screen. The mockup HTML is the
+contract; deviation is either a code bug or a spec drift event.
 
-New mockups:
-
-- `UI/mockups/mobile_strongbox_detail_operations_populated.html` — default state, balance hero, status card with `signing_device_label`-driven subtitle, 6 chain-side activity entries.
-- `UI/mockups/mobile_strongbox_detail_operations_empty.html` — fresh Strongbox, zero activity, no balance.
-- `UI/mockups/mobile_strongbox_detail_settings.html` — Settings tab with cleanly-parsed descriptor (no missing-metadata advisory). All sections rendered.
-- `UI/mockups/mobile_strongbox_detail_settings_missing_metadata.html` — Settings tab variant rendering the `warning-soft` advisory card at the top + Fix-this CTA.
-- `UI/mockups/mobile_strongbox_detail_forget_confirm.html` — Forget bottom-sheet, Strongbox body copy, 5-second fill-bar timer (mid-countdown sample state).
-- `UI/mockups/mobile_strongbox_detail_connection_error.html` — Operations tab with red dot in the status card + slide-in connection-error toast + cached activity entries rendered normally.
-
-Retrofitted mockups (Purse descriptor Copy):
-
-- `UI/mockups/mobile_purse_detail_settings_watch_only.html` — gains Copy CTA on revealed descriptor state; `Date last touched` bumped.
-- `UI/mockups/mobile_purse_detail_settings_on_device.html` — same.
+- `UI/mockups/mobile_vault_detail_operations_populated_csv_mixed.html`
+  — anchor mockup for the lockup bar's three-segment shape.
+- `UI/mockups/mobile_vault_detail_operations_populated_cltv.html`
+  — single-segment CLTV variant.
+- `UI/mockups/mobile_vault_detail_operations_populated_matured.html`
+  — fully-unlocked variant.
+- `UI/mockups/mobile_vault_detail_operations_empty.html`
+  — fresh Vault, no deposits, bar collapses.
+- `UI/mockups/mobile_vault_detail_settings_multisig_csv.html`
+  — anchor Settings mockup.
+- `UI/mockups/mobile_vault_detail_settings_singlesig_cltv.html`
+  — single-sig + CLTV Settings variant.
+- `UI/mockups/mobile_vault_detail_settings_missing_metadata.html`
+  — Settings with grouped missing-metadata indicator.
+- `UI/mockups/mobile_vault_detail_descriptor_revealed_multisig.html`
+  — structured per-cosigner reveal state.
+- `UI/mockups/mobile_vault_detail_lockup_schedule_expanded.html`
+  — post-tap full per-deposit schedule.
+- `UI/mockups/mobile_vault_detail_forget_confirm.html`
+  — multisig Forget body; single-sig variant documented in
+  the header `Replaces:` block.
+- `UI/mockups/mobile_vault_detail_connection_error.html`
+  — toast + red dot + cached lockup bar.
 
 #### Tasks — required
 
-1. **Read every mockup file in the Mockup contract.** Required
-   before writing any code; the visual ground truth is the
-   mockup, not the prose.
-2. **Wire `/holding/[id]` routing for `strongbox` Holdings.**
-   Add the Strongbox page component to the type-dispatch
-   alongside the existing Purse case. Vault placeholder stays.
-3. **Build the page chrome** — app bar, status card with
-   `signing_device_label`-driven subtitle + "External signing
-   device" fallback, hero, action row, sticky tab strip,
-   bottom nav. Reuse Purse-detail-shipped chrome components;
-   Strongbox-specifics are the stripe colour, the subtitle
-   resolver, and the action-row routing.
-4. **Build the Operations tab.** SSE subscription + entry
-   rendering identical to Purse Operations. Empty-state panel
-   per mockup.
-5. **Build the Settings tab.** Conditional rendering of the
-   missing-metadata advisory card (descriptor parsed without
-   `bip32_derivation_origins` → render the card). All
-   non-real CTAs route to the parameterized `coming-soon`
-   stub.
-6. **Build the descriptor reveal with Copy.** Privacy-first
-   reveal (masked at rest, full on tap) + Copy CTA on the
-   revealed state + sensitive-screen flag scaffolded for
-   Capacitor. Browser is the dev surface. Copy triggers the
-   shared "Copied" toast confirmation.
-7. **Build the Signing-device-label inline editor.** Free-text
-   input bound to `signing_device_label`. Verify the existing
-   Holding-update endpoint accepts this field via Swagger /
-   the OpenAPI contract; if missing, **stop and surface to
-   Rémy** before scoping a backend change (do not silently
-   add). On success, the status-card subtitle updates
-   immediately.
-8. **Build the Forget bottom-sheet modal** with the 5-second
-   fill-bar timer + Strongbox body copy. Wire to the backend
-   Forget endpoint. **No** NativeBridge.secureStorage.delete
-   call (no seed on TK side for Strongbox).
-9. **Build the connection-error toast** on
-   `system.chain.connection_state_changed` transitions. Reuse
-   the Purse-detail-shipped component.
-10. **Retrofit Purse descriptor Copy.** Edit the two Purse
-    Settings mockups (`Date last touched` bump) + the
-    corresponding implementation on the Purse detail Settings
-    tab. Add the Copy CTA on the revealed descriptor state.
-    Update `UI/mobile.md §Purse detail` Descriptor bullet +
-    Behaviors "Descriptor reveal" paragraph in lockstep.
+1. **Read every mockup file in the Mockup contract**, plus
+   `decisions/0010-vault-gated-until-multisig.md`,
+   `decisions/0018-vault-is-long-term-by-type.md`,
+   `holdings/04_vault.md`, and `UI/mobile.md §Vault detail`.
+   Required before writing any code; the mockup HTML is the
+   visual ground truth, not the prose.
+2. **Wire `/holding/[id]` routing for `vault` Holdings.** Add
+   the Vault detail page component to the type-dispatch
+   alongside Account / Purse / Strongbox. Placeholder removal.
+3. **Build the page chrome** — app bar, status card with the
+   per-shape subtitle resolver, hero, action row (both greyed),
+   sticky tab strip, bottom nav. Reuse Strongbox / Purse-detail
+   chrome components; Vault-specifics are the brass stripe
+   colour, the subtitle resolver (five shape variants), and the
+   action-row gating.
+4. **Build the lockup bar component.** Sats-weighted three-
+   bucket grouping; handle CLTV (single segment), CSV (three
+   segments), pure multisig (no bar), empty Vault (collapsed).
+   Amount-only inside segments, status/date labels below per
+   the harmonized pattern (lock icon on locked-segment labels).
+   Tap-to-scroll-to-UTXO behaviour. Tap-bar-header → expanded
+   schedule modal/route. Compute against the current chain tip
+   exposed via the existing chain-state SSE topic.
+5. **Build the Operations tab.** SSE-driven activity feed, row
+   rendering identical to Strongbox / Purse. Empty-state panel
+   per the empty mockup.
+6. **Build the Settings tab.** Flat-list card order per Scope
+   (in). Recovery-setup-notes editor is new (free-text
+   textarea, same shape as `signing_device_label`). All
+   non-real CTAs route to the parameterised coming-soon stub.
+   Verify `recovery_setup_notes` (and the per-xpub
+   cosigner-label field used by task 7) are in the existing
+   Holding-update PATCH shape via Swagger / the OpenAPI
+   contract; if missing, **stop and surface to Rémy** before
+   scoping a backend change.
+7. **Build the structured descriptor reveal.** Privacy-first
+   reveal (masked at rest, structured per-cosigner on tap) +
+   per-xpub free-text label affordances + timelock-parameter
+   row + sub-link to raw descriptor + Copy CTA on the raw
+   state + sensitive-screen flag scaffolded for Capacitor.
+   Browser is the dev surface (NativeBridge stub is a no-op
+   there).
+8. **Build the grouped missing-derivation-metadata advisory.**
+   Aggregated count on the masked tile header; per-row icons
+   on the revealed view next to affected xpubs. "Fix this" →
+   coming-soon stub (same one Strongbox uses).
+9. **Build the Forget bottom-sheet modal** with the 5-second
+   fill-bar timer + shape-branched body copy (the frontend
+   selects the variant by inspecting `subtype_data.total_signers`
+   — if 1, singular hardware-wallet sentence; otherwise plural).
+   Wire to the backend Forget endpoint (ADR-0017 cascade).
+   **No** `NativeBridge.secureStorage.delete` call (no seed on
+   TK side for Vault).
+10. **Build the connection-error toast** on
+    `system.chain.connection_state_changed` transitions. Reuse
+    the Strongbox-shipped component. The lockup bar continues
+    to render cached state without error decoration.
 11. **Run `tools/check-spec.ps1`** (Windows) or
     `tools/check-spec.sh` (Linux/Mac). Must pass before
     stage-3 handoff.
-12. **Stop and report** per PROCESS.md §4.4 stage 3. No
-    OpenAPI regen unless task 7 surfaced a missing PATCH path
-    and a backend change landed.
+12. **Stop and report** per PROCESS.md §4.4 stage 3. Surface as
+    a Decision-needed item any cosigner-label / recovery-notes
+    backend gap if task 6 or 7 hit it.
 
 #### Acceptance / done-when — required
 
-- Tapping a Strongbox row on Home navigates to
-  `/holding/[id]`; title bar shows the Holding's display
-  name; status card shows the iron stripe and the
-  `signing_device_label` subtitle (or "External signing
-  device" fallback when the label is empty).
-- The Operations tab shows the user's chain-side activity for
-  this Strongbox, newest-first, with sign-based amount
-  colour. Empty Strongboxes render the empty-state panel.
-- The Settings tab renders the missing-metadata advisory card
-  iff the descriptor's bip32-derivation-origin info was
-  absent at parse time. Fix-this CTA routes to coming-soon.
-  All other Settings CTAs route correctly (Rename, Edit
-  signing-device-label, Add rule → coming-soon, disabled
-  Lightning, Forget).
-- Descriptor reveal: masked at rest; Show flips to revealed +
-  Copy + Hide; tapping Copy puts the descriptor on the
-  clipboard with a brief "Copied" toast.
+- Tapping a Vault row on Home navigates to `/holding/[id]`;
+  title bar shows the Holding's display name; status card
+  shows the brass stripe and the per-shape subtitle.
+- The lockup bar renders correctly across all five Vault
+  shapes (the four observable variants — CLTV, CSV mixed,
+  CSV matured, multisig no-timelock — exercise the
+  Available-only / three-segment / single-segment / no-bar
+  code paths). Amount inside segments, status/date labels
+  below per the harmonized pattern.
+- Tapping a bar segment scrolls Operations to the matching
+  UTXO; tapping the bar header opens the expanded schedule
+  view with Available / Sooner / Later groupings.
+- The Operations tab renders the user's chain-side activity
+  for the Vault, newest-first, with sign-based amount
+  colour. Empty Vaults render the empty-state panel.
+- The Settings tab renders the seven cards in the locked
+  order. The descriptor tile's revealed state renders the
+  structured per-cosigner view with per-xpub label editors,
+  timelock parameters, raw-descriptor sub-link, Copy. The
+  missing-metadata indicator renders inside the descriptor
+  tile when any xpub lacks origin metadata.
 - The Forget bottom-sheet shows the 5-second fill-bar timer;
   Cancel is active immediately; confirming triggers the
-  backend Forget call; no NativeBridge.secureStorage.delete
-  call fires.
-- The Lightning row is rendered greyed and disabled with the
-  Strongbox-specific copy; tap surfaces the explanation.
+  backend Forget call. Body copy matches the multisig or
+  single-sig variant per `subtype_data.total_signers`.
+- The Lightning row is rendered greyed and disabled with
+  Vault-specific copy.
 - Disconnecting bitcoind (smoke-test) flips the connection
-  dot red and slides the connection-error toast in.
-- Purse descriptor reveal now ships with the Copy CTA on
-  both Settings mockups + the corresponding screens; the
-  `UI/mobile.md §Purse detail` no-Copy language is gone.
-- `tools/check-spec.ps1` passes (8 checks): mockup index
-  includes the 6 new files; both retrofitted Purse mockup
-  mtimes are recent enough to escape the un-flushed-edit
-  flag.
+  dot red and slides the connection-error toast in. The
+  cached lockup bar continues to render.
+- `tools/check-spec.ps1` passes (8 checks).
 - No OpenAPI regen needed (verified: no endpoint, schema,
   SSE topic, error type, or locked-state behaviour changed)
-  — unless task 7 surfaced a missing PATCH path, in which
-  case the change landed and the regen ran as part of the
-  same iteration.
+  — unless tasks 6 or 7 surfaced a missing PATCH path, in
+  which case the change landed and the regen ran as part of
+  the same iteration.
 
 #### Dependencies
 
-- **Design-pass validation by Rémy.** The 6 new mockups and
-  the 2 retrofitted Purse mockups must be `Status: validated`
-  before the coding agent starts. Per PROCESS.md §2 Design
-  agent — mockup status flips at the design-pass greenlight,
-  not at coding closeout. The design pass also writes the
-  new `## Strongbox detail` section in `UI/mobile.md` and
-  performs the small `## Purse detail` no-Copy retrofit.
+- **Forget-cascade iteration shipped** (2026-05-22, per
+  `shipped.md`). The Vault Forget bottom-sheet calls the
+  unified `DELETE /holdings/{id}` endpoint introduced by
+  ADR-0017.
+- **Design-pass shipped 2026-05-22.** 11 new mockups
+  validated, canonical docs updated, ADR-0018 accepted,
+  backlog hygiene done. Coding agent does not need to do any
+  spec work to start.
 - **No arbitration blockers.** `seed-backup-disclosure` and
   the wider security-health framing remain open in
   `pre-implementation.md`; the Fix-this CTA routes to a
-  coming-soon stub the future Security-health-system
-  iteration replaces.
-- **Purse detail iteration shipped.** Generalises chrome,
-  Forget fill-bar timer, descriptor-reveal pattern (now
-  retrofitted with Copy), the SSE plumbing, and the
-  connection-error toast component.
+  coming-soon stub.
 
 #### Verification (Rémy)
 
-- Open each of the 6 new mockups in the browser at 360×800;
-  verify chrome consistency with the validated Purse-detail
-  mockups, copy correctness, and the missing-metadata
-  advisory card placement.
-- Open the 2 retrofitted Purse mockups; confirm the Copy CTA
-  is present on the revealed descriptor state without
-  regressing the rest of the Settings layout.
-- Hand-test the running app: tap a Strongbox row on Home,
-  exercise both tabs, edit the `signing_device_label` and
-  verify the status-card subtitle updates, test the
-  descriptor reveal + Copy, test Forget, simulate a bitcoind
-  disconnect to surface the toast.
-- Test the Purse descriptor reveal in the running app — Copy
-  CTA present and copies cleanly.
+- Open each of the 11 new mockups at 360×800 in the running
+  app; verify chrome consistency with shipped Strongbox /
+  Purse detail mockups, copy correctness, lockup-bar shape
+  correctness across the four observable variants, and the
+  missing-metadata indicator placement (inside the descriptor
+  tile, not as a wallet-wide card).
+- Hand-test the running app for each Vault shape: lockup bar
+  correctness against known unlock dates, status-card
+  subtitle correctness, structured descriptor reveal, per-
+  cosigner label editing, Forget body copy branch.
 - Run the project's `.ps1` smoke-test suite. Walk through
   Swagger UI for any touched endpoint (read-only — none
-  expected unless task 7 surfaced one).
+  expected unless tasks 6 or 7 surfaced one).
 
 #### Closeout
 
 The agent does **not** start closeout until Rémy gives an
 explicit greenlight after stage-4 validation. On greenlight
 the agent: appends a condensed entry to `shipped.md`, clears
-the active block in this file, runs `tools/check-spec.ps1`,
-commits. **No OpenAPI regen** for this iteration unless
-task 7 surfaced a missing PATCH path. Full sequence in
+the active block in this file back to "No active coding
+iteration.", runs `tools/check-spec.ps1`, commits. **No
+OpenAPI regen** for this iteration unless tasks 6 or 7
+surfaced a missing PATCH path. Full sequence in
 `PROCESS.md §4.4` stages 3–5.
-
--->
 
 ---
 
