@@ -171,12 +171,13 @@ swept into Strongbox (self-custody) as fast as policy allows.
 
 - **Verify-on-device** required on receive (defends against
   clipboard-hijack on the display path).
-- **Strongbox frequent-usage warning** — when a Strongbox is
-  used for daily-spending-frequency outflows above some
-  threshold, the security-health system surfaces a warning that
-  the user's declared `signing_model=hardware_offline` may not
-  match observed behavior. Lives in the broader security-health
-  system (pending arbitration `seed-backup-disclosure`).
+- **Strongbox frequent-usage warning** — historically planned as a
+  security-health item flagging declared `signing_model=hardware_offline`
+  against observed daily-spending behavior. **Deferred indefinitely
+  per ADR-0019** "Out of scope" — the natural advice ("use a Purse
+  for daily spending") is already covered by the Holding-type
+  taxonomy itself. Revisit only if a real user-feedback case
+  surfaces.
 
 ## Strongbox detail page
 
@@ -206,9 +207,10 @@ calls are:
   brackets (bare xpub paste), Settings renders a
   `warning-soft` advisory card at the top with a **Fix
   this** CTA → coming-soon stub. Per-Holding inline
-  surfacing of a security-health item; the centralised
-  Security-health surface is still under arbitration
-  (`seed-backup-disclosure`).
+  surfacing of a security-health item per ADR-0019's
+  hybrid model; the centralised dashboard + bell-badge
+  propagation land with the Security-health-system v1
+  iteration.
 - **Lightning permanently gated**: Strongbox is cold by type
   definition; Lightning needs hot keys. The Instant payments
   row stays visible (no-dead-capability rule) but is
@@ -242,5 +244,5 @@ calls are:
 | Multi-frame QR PSBT roundtrip | `backlog/psbt-by-qr-roundtrip-on-mobile.md` |
 | Replace-By-Fee (RBF) | `backlog/replace-by-fee-rbf-support.md` |
 | Strongbox → anywhere sweeps (with scheduled-reminder UX) | `backlog/holding-to-holding-sweeps-beyond-account-originated.md` |
-| Strongbox-frequent-usage warning in security-health | `pre-implementation.md` `seed-backup-disclosure` (full security-health system) |
+| Strongbox-frequent-usage warning in security-health | Deferred indefinitely per ADR-0019 — "use a Purse for daily spending" already covered by type taxonomy |
 | Multisig descriptor support (would extend Strongbox into Vault territory) | `backlog/add-holding-vault-wizard.md` + `backlog/vault-send-for-all-shapes.md` |

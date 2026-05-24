@@ -447,6 +447,23 @@ since they have nothing to show yet; More stays enabled
 unpair, etc.). The exact tab set is not locked — sharpens with
 the Settings + Activity iterations.
 
+**Bottom nav restructure 2026-05-24 — 4 tabs → 3 tabs +
+app-bar gear icon (per ADR-0019).** The Security-health-system
+v1 iteration locks the final nav shape: **Home / Security
+Health / Activity** (three tabs). Holdings tab retires — the
+Holdings list-card on Home is the only index needed (tap-
+through reaches detail pages, already locked behaviour). More
+tab retires — Settings moves to a **gear icon top-right on
+the app bar**, visible on every page that shows the app bar
+(banking-app standard: Revolut, N26, Wise). The Security
+Health tab is the 2nd slot; its icon is a bell glyph with a
+**red badge counting critical-severity items only** (per
+ADR-0019's severity → discovery-channel mapping). Three tabs
+gives each slot ~120 px width at the 360 px baseline, generous
+breathing room. The mockups in this iteration (existing
+`mobile_home_empty.html` / `mobile_home_populated.html` updated +
+new dashboard family) lock the visual contract.
+
 **Section structure is preserved even at zero state.** The
 "Holdings" section header + `+ Add` link sits between the
 consolidated view and the (empty) list — even with nothing in
@@ -635,16 +652,17 @@ fallback.** Sharpened across the onboarding sessions
   User dismisses it from there by tapping into the item and
   acknowledging.
 
-The Security health zone is its own iteration (per
-`backlog/security-health-system.md`, milestone pre-shipping). For
-the current Onboarding iteration's empty
-Home, the zone does not yet appear — meaning a skip during
-personal-use phase leaves the principles unacknowledged with
-no re-surface (acceptable since Rémy is the only user during
-this phase and will acknowledge on first launch). Public-ship
-requires the Security health iteration to have landed for the
-cycle to close cleanly. Cross-iteration dependency captured
-in `next_iteration.md` transient bullets.
+The Security health zone is locked per ADR-0019 and its v1
+iteration is active in `next_iteration.md` (Security-health-system
+v1). The principles-ack-on-skip item is one of three
+application-level items the v1 iteration ships (alongside the
+seed-backup item and the missing-derivation-metadata item).
+For the current Onboarding iteration's empty Home, the zone does
+not yet appear — meaning a skip during personal-use phase leaves
+the principles unacknowledged with no re-surface (acceptable since
+Rémy is the only user during this phase and will acknowledge on
+first launch). Public-ship requires the Security health iteration
+to have landed for the cycle to close cleanly.
 
 The user-visible heading on Home for this zone is
 **"Security health"** — consistent with banking-grade norms
@@ -1157,11 +1175,13 @@ card on the input screen.
   iteration's Information section.
   Continue CTA is **always enabled** in this state. Reveal is
   optional; the user can write the words down later from Purse
-  Detail. No backup-acknowledgement checkbox — per the leading
-  direction in `pre-implementation.md` `seed-backup-disclosure`,
-  the persistent-warning model lives on Home in the
-  security-health system (private-ship gate iteration), not as
-  a hard gate at seed-generation time.
+  Detail. No backup-acknowledgement checkbox — per ADR-0019,
+  the persistent-warning model lives in the security-health
+  system as a `critical`-severity item: inline card on Purse
+  detail Settings, dashboard row, and a red badge on the
+  Security Health bottom-nav tab (the v1 iteration's tab #2,
+  visible across every page). Persists until the user
+  acknowledges. Not a hard gate at seed-generation time.
   No "Copy" button. Clipboard is a known seed-leak vector
   (Windows Clipboard History, Apple Universal Clipboard,
   Microsoft Cloud Clipboard, Gboard suggestions all persist or
@@ -1472,12 +1492,15 @@ across the wizard for future per-type sibling reuse:
   banner. The user gets two clear actions ("re-export" /
   "continue as is") and the in-wizard signal continues on step 2
   via the tinted Derivation row. Where the warning persists
-  post-Holding-create and how the user later resolves it is a
-  design question carried by the security-health iteration in
-  `backlog/security-health-system.md` — flagged there as needing
-  rework before the user-facing surface lands, since "Security health"
-  as a product-design concept users encounter directly is not
-  yet committed (Rémy 2026-05-14).
+  post-Holding-create and how the user later resolves it is locked
+  per ADR-0019 — inline card on Strongbox detail Settings (already
+  shipped, "Fix this" CTA currently coming-soon-stubbed), plus a
+  row in the central Security Health dashboard. Missing-metadata
+  is a `warning`-severity item: it does NOT drive the nav-tab red
+  badge (badge counts criticals only, per the no-alarm-fatigue
+  rule). The Fix-this remediation sub-flow ships with the
+  Security-health-system v1 iteration (see
+  `next_iteration.md` (Security-health-system v1)).
 
   Why this is Strongbox-only and not Purse: TallyKeep coordinates
   PSBT signing for Strongbox (per `holdings/03_strongbox.md`
@@ -1514,10 +1537,16 @@ variants in this iteration:
   inline info icon for users who want to re-read the why. Other
   parse-card rows stay neutral. CTA "Looks right" enabled — the
   user proceeds; the security-health item gets created server-
-  side on Holding-create so the same warning surfaces on Home
-  under the security-health heading with a "Fix this" affordance
-  (remediation sub-flow specified in
-  `backlog/security-health-system.md`).
+  side on Holding-create (per ADR-0019: `item_type=missing_signing_metadata`,
+  severity `warning`, `holding_id=<the new Strongbox>`). The same
+  warning surfaces inline on Strongbox detail Settings and as a
+  row in the central Security Health dashboard (the v1 iteration's
+  bottom-nav tab #2). It does NOT drive the nav-tab red badge —
+  that badge counts critical-severity items only. Per-Holding items
+  do not surface in the Home "Security health" section (that
+  section is reserved for application-level items only —
+  duplication-avoidance per ADR-0019). The Fix-this remediation
+  sub-flow is specified in `next_iteration.md` (Security-health-system v1).
 
 Both variants share the same shape. The screen lands with the
 **auto-name preview at the top**, directly under the heading:
@@ -3337,7 +3366,7 @@ calls:
    BlueWallet xpub copy), a `warning-soft` advisory card
    renders at the top of the Settings tab. Per-Holding
    inline surfacing of a security-health item (option (c)
-   hybrid per `backlog/security-health-system.md`); the
+   hybrid per `next_iteration.md` (Security-health-system v1)); the
    centralised Security-health surface is still under
    arbitration. **Fix this** CTA routes to coming-soon
    in this iteration; the real remediation sub-flow
@@ -3682,7 +3711,7 @@ locked chrome.
 advisory card on Strongbox detail is the at-rest
 surfacing of a security-health item — option (c)
 hybrid (per-Holding inline) in the
-`backlog/security-health-system.md` framing. When the
+`next_iteration.md` (Security-health-system v1) framing. When the
 centralised Security-health surface ships, it
 aggregates this item across all affected Strongboxes;
 the per-Holding inline card stays as the
@@ -4085,3 +4114,273 @@ chain-based Holdings; Account keeps Deposit / Withdraw
 (card-with-arrow) because Account is structurally a
 different kind of Holding (custodial pass-through, not
 wallet).
+ Purse pattern. `system.chain.connection_state_changed`
+subscription with the "Cannot reach the Bitcoin network"
+title.
+
+---
+
+## Security health dashboard
+
+Locked per ADR-0019. Page reached by tapping the
+**Security Health** bottom-nav tab (tab #2 of 3, between
+Home and Activity). Single-source-of-truth for application-
+level items (principles-ack, future hosted-tier acks) plus
+the aggregated index of per-Holding items (whose source of
+truth lives inline on the affected Holding's detail page).
+
+### Page chrome
+
+Stacked top-to-bottom:
+
+- **App bar** — back chevron (left), centered title
+  "Security health", gear icon top-right (Settings entry-
+  point, new chrome per ADR-0019). The title text is the
+  locked vocabulary — "Security health" with lowercase 'h',
+  not "Security Health" (the nav-tab abbreviation "Security"
+  is the tab-label compromise at 360 px width; the page
+  title is the full phrase).
+- **Tab strip** — segmented control with two tabs:
+  **Active** and **History**. Active is default. Same
+  shape as the Operations | Settings tab strip used on
+  per-Holding detail pages — cross-type lockstep.
+- **Bottom nav** — 3-tab nav with Security tab marked
+  active (verdigris top-indicator, bell-icon glyph). When
+  one or more critical items are open, the bell carries a
+  red badge with the critical-count. The badge stays
+  visible while the user is on this page (the user might
+  resolve one item and want to see the count tick down in
+  real time).
+
+### Active tab
+
+- **Item rows.** Each row: severity dot (red `#b8351b`
+  for critical, amber `#a05210` for warning), per-type
+  title + one-line summary + **"Opened {relative date}"
+  stamp** (small muted line, third row in the body —
+  e.g. "Opened today", "Opened 3 days ago"), right
+  chevron. Whole row carries the severity-soft background
+  (`--color-danger-soft` / `--color-warning-soft`) with
+  text inheriting the matching text-on-soft stop. Tap on
+  a per-Holding row deep-links to that Holding's detail
+  page Settings tab, scrolled to the inline card. Tap on
+  an application-level row opens a bottom-sheet
+  resolution flow inside this dashboard. The date stamp
+  is a client-side relative rendering of the item's
+  `created_at` timestamp; API ships ISO.
+- **Sort order — locked.** Severity descending, then
+  `created_at` descending. Critical items always at top;
+  newest items above older items within a severity.
+- **List label** above the list: "N open" — pure count
+  for orientation. No filter / sort affordances at v1.
+- **Empty state.** When zero items are open, the list is
+  replaced with a calm empty-state panel: green check-
+  mark icon, title "You're all caught up", body "This
+  page shows anything TallyKeep wants your attention on.
+  Nothing open right now." Banking-grade voice; not
+  breezy, not alarmist.
+- **SSE wire-up.** Subscribes to
+  `security_health.item_added`,
+  `security_health.item_resolved`, and
+  `security_health.item_revived`. New items prepend;
+  resolved items animate out to History; revived items
+  animate back in.
+
+Visual contract: `mobile_security_health_dashboard_active_populated.html`
+(populated) + `mobile_security_health_dashboard_active_empty.html`
+(empty).
+
+### History tab
+
+- **Row shape.** Terminal-state verb prefix in small caps
+  ("FIXED" / "ACKNOWLEDGED AS INTENTIONAL" /
+  "ACKNOWLEDGED"), relative date, title, summary. Same
+  per-type renderer as Active.
+- **Revive affordance.** Renders only on user-attested
+  rows (`DISMISSED_INTENTIONAL` and `ACKNOWLEDGED`),
+  as a small "Move back to open" text link below the
+  summary. Tap → confirm → call the revive endpoint →
+  item returns to Active. System-verified rows
+  (`RESOLVED_BY_FIX`) carry no revive — the truth is
+  computed and if the underlying condition recurs, a
+  fresh row appears in Active.
+- **Reverse-chronological** order. No prune policy at v1
+  (item velocity is low; revisit if size becomes a
+  problem).
+- **Empty state.** "Nothing has been resolved yet."
+
+Visual contract: `mobile_security_health_dashboard_history.html`.
+
+### Reconcilability gauntlet answers
+
+1. **Trust boundary.** Phone (UI), backend (the
+   `security_health_item` table + endpoints + SSE). No
+   third-party crosses this boundary.
+2. **Keys and secrets.** None. The table stores item
+   metadata (type, severity, state, holding-id pointer,
+   raw context JSON) — no signing material, no
+   credentials. Revive endpoint authenticates as a
+   normal API call; no special privilege.
+3. **Self-hosted vs hosted.** Identical from the phone's
+   POV. Both backends serve the same endpoints + SSE.
+   Hosted-tier adds the hosted-tier acks themselves but
+   the surface is the same.
+4. **Confirmation honesty.** "Resolved" is computed from
+   real state — for `RESOLVED_BY_FIX` it's the system
+   verifying the underlying condition no longer holds;
+   for the user-attested terminal states it's the user's
+   own claim, which is why those rows are revivable.
+   No optimistic UI — items don't disappear from Active
+   until the resolve endpoint returns success.
+5. **Browser-only fallback.** Dashboard renders in the
+   browser identically. Acknowledgment flows work in
+   browser (no signing material involved). Fix-metadata
+   sub-flow's Path A (re-export) works in browser via
+   paste/upload; QR scan stub-gates per ADR-0007.
+6. **Open-source and reproducibility.** No closed
+   dependencies. Bell-icon glyph + gear-icon glyph: in-tree
+   SVG paths.
+
+---
+
+## Security health item resolution flows
+
+Three sub-flows in v1. Application-level items use
+bottom-sheets rendered inside the dashboard;
+per-Holding items use full sub-pages reached via
+deep-link from the inline card's CTA.
+
+### Principles-ack bottom-sheet
+
+Triggered by tapping the
+"Acknowledge how TallyKeep works" item in the dashboard
+or the Home "Security health" section. Renders as a
+bottom-sheet over the dashboard (background dimmed by
+`--color-overlay`). Content:
+
+- **Drag handle** at the top (dismissal affordance).
+- **Title** "How TallyKeep works" — locked.
+- **Three principle rows** with icon + label + body:
+  - Open source — "The code is public. Anyone can read it."
+  - No accounts — "We don't know who you are. No email, no
+    profile, no record on our side."
+  - Your keys stay yours — "They live on this device, on your
+    hardware wallet, or with your custodial provider — never on
+    our servers. If you lose them, we cannot recover them."
+- **Summary block** (warning-soft background, banking-
+  grade register): "TallyKeep is a tool, not a service.
+  You hold the funds. You hold the keys. You're the one
+  responsible for backing them up and keeping them safe —
+  we can't do that for you and we can't recover what's
+  lost. Tap below to confirm you've read this and you
+  accept it."
+- **Primary CTA** "I understand and accept" → resolves the
+  item to `ACKNOWLEDGED`, sets
+  `user.principles_acknowledged_at`.
+
+Visual contract:
+`mobile_security_health_principles_ack_bottomsheet.html`.
+
+### Fix-metadata sub-flow (Path A — re-export, recommended)
+
+Reached from the "Fix this" CTA on the Strongbox / Vault
+detail's inline missing-metadata advisory OR from the
+dashboard's missing-metadata item row. Full sub-page at
+`/security-health/fix-metadata/{holding_id}` (not a
+bottom-sheet — the re-export task is too dense for a
+sheet).
+
+Layout:
+
+- **App-bar** — back chevron + centered title "Fix
+  derivation metadata". No gear icon here (sub-page chrome;
+  the dashboard's gear is the entry point).
+- **Page intro** — "Re-export the descriptor from your
+  hardware wallet with full origin metadata, then paste
+  it below. TallyKeep will verify it matches **{Holding
+  name}** and update the record in place." The Holding
+  name pulls from the item's `holding_id` lookup.
+- **Vendor hint banner** (info-tinted) — three-step
+  instruction tailored to the vendor (slug from
+  `raw_context.vendor`). Same per-vendor copy as the
+  Strongbox-wizard's Step 1 helper banner.
+- **Input card** — labeled "Re-exported descriptor",
+  monospace textarea + Paste / Upload / Scan QR triad
+  (same triad pattern as the Strongbox wizard).
+- **Primary CTA** "Verify and update" — disabled until
+  input is non-empty. On submit: backend parses,
+  verifies `bip32_derivation` origin present, verifies
+  derived addresses still match the existing watched
+  ones. On success: same Holding record updated in
+  place, item flips to `RESOLVED_BY_FIX`, SSE fires,
+  user routed back to the originating page (Strongbox/
+  Vault detail Settings, scrolled to the now-removed
+  inline card; or dashboard with the item moved to
+  History).
+- **Secondary link** "Enter manually instead" → routes
+  to Path B (manual entry sub-page).
+- **Tertiary danger link** "Mark as intentional · skip
+  the fix" → confirm dialog + optional reason textarea
+  → resolves to `DISMISSED_INTENTIONAL`.
+
+Visual contract:
+`mobile_security_health_fix_metadata_reexport.html`.
+
+### Fix-metadata sub-flow (Path B — manual entry)
+
+Reached from Path A's "Enter manually instead" link. Same
+app-bar chrome.
+
+- **Page intro** — "Enter the metadata directly. TallyKeep
+  will derive the first addresses with these values and
+  compare them against the ones it's already watching for
+  **{Holding name}**. The fix only goes through if they
+  match."
+- **Input card 1 — Master fingerprint.** Text input,
+  8 hex chars, case-insensitive, validated inline.
+  Helper: "8 hex characters from the wallet's root
+  metadata. Case-insensitive."
+- **Input card 2 — Derivation path.** Dropdown with five
+  options: BIP 84 (default, native SegWit), BIP 49
+  (nested SegWit), BIP 44 (legacy), BIP 86 (taproot),
+  Custom. Custom unlocks a freetext input validating
+  BIP-32-derivation syntax.
+- **Primary CTA** "Verify and update" — same backend
+  flow as Path A: derives, compares, persists on match.
+  Same terminal state.
+- **Secondary link** "Re-export from the wallet instead"
+  → routes back to Path A.
+
+Visual contract:
+`mobile_security_health_fix_metadata_manual.html`.
+
+### Seed-backup inline card (Purse detail Settings)
+
+Not a sub-flow per se — an inline card rendered above
+the Wallet card on the Purse detail Settings tab when
+the seed-backup item is OPEN for that Purse. Renders
+only for `ON_DEVICE_TK_GENERATED` and
+`ON_DEVICE_USER_IMPORTED` Purses (`WATCH_ONLY` never
+generates this item — TallyKeep holds no seed).
+
+- **Card visual.** `--color-danger-soft` background +
+  1 px `--color-danger-border` border + bell-icon glyph
+  at top-left (matches the nav-tab visual vocabulary).
+- **Title** "Back up your recovery phrase" — locked.
+- **Body** (locked): "Without a backup, losing this phone
+  means losing these funds. TallyKeep cannot recover them
+  — the keys live only on this device."
+- **CTA** "I've backed it up" — surface-coloured button
+  with danger-text-on-soft label. Tap → resolves the
+  item to `ACKNOWLEDGED`, card disappears, nav-tab badge
+  decrements.
+
+Visual contract:
+`mobile_purse_detail_settings_on_device_with_seed_backup.html`.
+
+The card's position above the Wallet card is deliberate
+— the seed-backup item is critical-severity and lives
+above all configuration. Once acknowledged, the Wallet
+card moves up and the Settings stack reads as the
+shipped on_device variant
+(`mobile_purse_detail_settings_on_device.html`).

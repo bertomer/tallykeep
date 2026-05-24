@@ -1,0 +1,105 @@
+<!--
+  Title: Mobile — Security Health · Fix missing metadata (Path B: manual entry)
+  Status: validated (Security-health-system v1 design-pass; Rémy greenlight
+                   2026-05-24)
+  Date last touched: 2026-05-24
+  Replaces: nothing. New mockup.
+
+  Design note: Path B reached from Path A's "Enter manually
+  instead" secondary link. Two inputs: master fingerprint (8 hex
+  chars, validated inline) + derivation path dropdown with 5
+  options (BIP 84 default + BIP 49 / BIP 44 / BIP 86 / Custom).
+  Custom unlocks a freetext field validating BIP-32-derivation
+  syntax. Backend verifies derived addresses match the existing
+  watched ones before persisting.
+
+  Reaches the same RESOLVED_BY_FIX terminal state as Path A. The
+  secondary link inverts: "Re-export from the wallet instead".
+-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>TallyKeep — Mobile — Fix metadata · Manual</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="_shared/tokens.css">
+<link rel="stylesheet" href="_shared/shell.css">
+<style>
+  .phone-screen { padding-top: var(--mobile-safe-top); padding-bottom: var(--mobile-safe-bottom); background: var(--color-bg); }
+  .app-bar { height: var(--mobile-app-bar); flex-shrink: 0; display: flex; align-items: center; justify-content: space-between; padding: 0 var(--space-2); background: var(--color-surface); border-bottom: 1px solid var(--color-border); }
+  .app-bar-back { width: 44px; height: 44px; display: inline-flex; align-items: center; justify-content: center; background: transparent; border: 0; cursor: pointer; padding: 0; color: var(--color-text); }
+  .app-bar-back svg { width: 24px; height: 24px; }
+  .app-bar-title { font-size: var(--font-size-md); font-weight: var(--font-weight-semibold); color: var(--color-text); flex: 1; text-align: center; margin: 0 44px 0 0; }
+
+  .scroll-area { flex: 1; overflow-y: auto; padding: var(--space-4); display: flex; flex-direction: column; gap: var(--space-4); }
+
+  .page-intro { font-size: var(--font-size-base); color: var(--color-text-muted); line-height: var(--line-height-default); }
+  .page-intro strong { color: var(--color-text); font-weight: var(--font-weight-semibold); }
+
+  .input-card { background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-md); padding: var(--space-4); display: flex; flex-direction: column; gap: var(--space-3); }
+  .input-label { font-size: var(--font-size-xs); font-weight: var(--font-weight-semibold); color: var(--color-text-muted); text-transform: uppercase; letter-spacing: 0.05em; }
+  .input-help { font-size: var(--font-size-xs); color: var(--color-text-dim); margin-top: -4px; }
+  .input-text { width: 100%; font-family: var(--font-mono); font-size: var(--font-size-base); color: var(--color-text); border: 1px solid var(--color-border); border-radius: var(--radius-sm); padding: var(--space-3); box-sizing: border-box; }
+  .input-text::placeholder { color: var(--color-text-dim); }
+  .input-select { width: 100%; font-family: var(--font-sans); font-size: var(--font-size-base); color: var(--color-text); border: 1px solid var(--color-border); border-radius: var(--radius-sm); padding: var(--space-3); box-sizing: border-box; background: var(--color-surface); }
+
+  .cta-primary { background: var(--color-primary); color: var(--color-on-primary); border: 0; border-radius: var(--radius-md); padding: var(--space-3) var(--space-4); font-size: var(--font-size-base); font-weight: var(--font-weight-semibold); cursor: pointer; font-family: inherit; }
+  .cta-primary[disabled] { background: var(--color-border-strong); cursor: not-allowed; }
+
+  .secondary-link { background: transparent; border: 0; padding: 0; color: var(--color-primary-strong); font-size: var(--font-size-sm); cursor: pointer; align-self: center; font-family: inherit; text-decoration: underline; }
+</style>
+</head>
+<body>
+
+<div class="mockup-meta">
+  <strong>Mobile — Fix metadata · Manual (Path B)</strong> ·
+  <span class="status-validated">validated</span> ·
+  2026-05-24 · 360×800
+</div>
+
+<div class="phone-frame">
+  <div class="phone-screen">
+
+    <div class="app-bar">
+      <button class="app-bar-back" aria-label="Back"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg></button>
+      <span class="app-bar-title">Fix derivation metadata</span>
+    </div>
+
+    <div class="scroll-area">
+
+      <div class="page-intro">
+        Enter the metadata directly. TallyKeep will derive the first addresses with these values and compare them against the ones it's already watching for <strong>My Coldcard</strong>. The fix only goes through if they match.
+      </div>
+
+      <div class="input-card">
+        <span class="input-label">Master fingerprint</span>
+        <input class="input-text" type="text" placeholder="e.g. a1b2c3d4" maxlength="8" />
+        <span class="input-help">8 hex characters from the wallet's root metadata. Case-insensitive.</span>
+      </div>
+
+      <div class="input-card">
+        <span class="input-label">Derivation path</span>
+        <select class="input-select">
+          <option>BIP 84 — m/84'/0'/0' (Native SegWit, default)</option>
+          <option>BIP 49 — m/49'/0'/0' (Nested SegWit)</option>
+          <option>BIP 44 — m/44'/0'/0' (Legacy)</option>
+          <option>BIP 86 — m/86'/0'/0' (Taproot)</option>
+          <option>Custom...</option>
+        </select>
+        <span class="input-help">Matches the script type used when you set up the wallet.</span>
+      </div>
+
+      <button class="cta-primary" type="button" disabled>Verify and update</button>
+
+      <button class="secondary-link" type="button">Re-export from the wallet instead</button>
+
+    </div>
+
+  </div>
+</div>
+
+</body>
+</html>

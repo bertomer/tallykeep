@@ -1,0 +1,185 @@
+<!--
+  Title: Mobile — Security Health dashboard (Active, populated)
+  Status: validated (Security-health-system v1 design-pass; Rémy greenlight
+                   2026-05-24)
+  Date last touched: 2026-05-24
+  Replaces: nothing. New mockup.
+
+  Design note: dashboard page reached by tapping the Security Health
+  nav tab. Active + History segmented tab strip; this is the Active
+  tab with a representative mix:
+  - 1 critical (unbacked-up Purse seed — drives the nav-tab badge)
+  - 1 warning (Strongbox missing-signing-metadata — per-Holding;
+    deep-links to the Strongbox detail Settings inline card)
+  - 1 warning (principles-ack-on-skip — application-level; opens
+    bottom-sheet inside this dashboard)
+  Sort: severity desc (critical first), then created_at desc.
+  Severity dot: red for critical, amber for warning.
+  Tap behaviour:
+  - per-Holding items → deep-link to Holding detail → Settings tab →
+    scroll to inline card
+  - application-level items → bottom-sheet inside dashboard
+-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>TallyKeep — Mobile — Security Health (Active, populated)</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="_shared/tokens.css">
+<link rel="stylesheet" href="_shared/shell.css">
+<style>
+  .phone-screen { padding-top: var(--mobile-safe-top); padding-bottom: var(--mobile-safe-bottom); background: var(--color-bg); }
+
+  .app-bar { height: var(--mobile-app-bar); flex-shrink: 0; display: flex; align-items: center; justify-content: space-between; padding: 0 var(--space-2); background: var(--color-surface); border-bottom: 1px solid var(--color-border); }
+  .app-bar-back { width: 44px; height: 44px; display: inline-flex; align-items: center; justify-content: center; background: transparent; border: 0; cursor: pointer; padding: 0; color: var(--color-text); }
+  .app-bar-back svg { width: 24px; height: 24px; }
+  .app-bar-title { font-size: var(--font-size-md); font-weight: var(--font-weight-semibold); color: var(--color-text); flex: 1; text-align: center; margin: 0 -44px 0 0; }
+  .app-bar-gear { width: 44px; height: 44px; display: inline-flex; align-items: center; justify-content: center; background: transparent; border: 0; cursor: pointer; padding: 0; color: var(--color-text-muted); }
+  .app-bar-gear svg { width: 24px; height: 24px; }
+
+  /* Tab strip — Active | History */
+  .tab-strip { flex-shrink: 0; display: grid; grid-template-columns: 1fr 1fr; background: var(--color-surface); border-bottom: 1px solid var(--color-border); }
+  .tab-btn { padding: var(--space-3) 0; font-size: var(--font-size-base); font-weight: var(--font-weight-medium); background: transparent; border: 0; cursor: pointer; color: var(--color-text-dim); font-family: inherit; position: relative; }
+  .tab-btn.active { color: var(--color-primary-strong); font-weight: var(--font-weight-semibold); }
+  .tab-btn.active::after { content: ''; position: absolute; bottom: -1px; left: 25%; right: 25%; height: 2px; background: var(--color-primary); border-radius: var(--radius-sm) var(--radius-sm) 0 0; }
+
+  .scroll-area { flex: 1; overflow-y: auto; padding: var(--space-3) 0 var(--space-4); }
+
+  /* Items list — severity-tinted row backgrounds for far-glance
+     scanability. Critical = --color-danger-soft (warm holly-berry
+     tint); warning = --color-warning-soft (warm autumn-maple tint).
+     The dot stays as the secondary close-up signal, but the row
+     background is the load-bearing severity cue. Title + summary
+     inherit color from the row's text-on-soft stop so contrast
+     holds on the tinted background. */
+  .item-list { margin: 0 var(--space-4) var(--space-3); background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-md); overflow: hidden; }
+  .item-row { display: grid; grid-template-columns: auto 1fr auto; align-items: center; width: 100%; border: 0; border-bottom: 1px solid var(--color-border); padding: var(--space-3) var(--space-4); font-family: inherit; text-align: left; cursor: pointer; gap: var(--space-3); }
+  .item-row:last-child { border-bottom: 0; }
+  .item-row.critical { background: var(--color-danger-soft); color: var(--color-danger-text-on-soft); }
+  .item-row.warning  { background: var(--color-warning-soft); color: var(--color-warning-text-on-soft); }
+  .sev-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+  .sev-dot.warning { background: var(--color-warning); }
+  .sev-dot.critical { background: var(--color-danger); }
+  .item-body { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+  .item-title { font-size: var(--font-size-base); font-weight: var(--font-weight-semibold); color: inherit; line-height: var(--line-height-tight); }
+  .item-summary { font-size: var(--font-size-xs); color: inherit; opacity: 0.75; line-height: var(--line-height-tight); }
+  .item-date { font-size: 11px; color: inherit; opacity: 0.6; line-height: var(--line-height-tight); margin-top: 2px; }
+  .item-chevron { color: inherit; opacity: 0.6; font-size: 18px; line-height: 1; }
+
+  .list-label { padding: 0 var(--space-4) var(--space-2); font-size: var(--font-size-xs); font-weight: var(--font-weight-semibold); color: var(--color-text-muted); text-transform: uppercase; letter-spacing: 0.05em; }
+
+  .bottom-nav { height: var(--mobile-bottom-nav); flex-shrink: 0; display: grid; grid-template-columns: repeat(3, 1fr); background: var(--color-surface); border-top: 1px solid var(--color-border); }
+  .nav-item { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; padding: var(--space-2) 0; font-size: 10px; color: var(--color-text-dim); background: transparent; border: 0; cursor: pointer; position: relative; }
+  .nav-item .nav-ico { width: 22px; height: 22px; color: currentColor; }
+  .nav-item.active { color: var(--color-primary-strong); font-weight: var(--font-weight-semibold); }
+  .nav-item.active::before { content: ''; position: absolute; top: 0; left: 20%; right: 20%; height: 2px; background: var(--color-primary); border-radius: 0 0 var(--radius-sm) var(--radius-sm); }
+  .nav-item.enabled-inactive { color: var(--color-text-muted); }
+  .nav-bell-wrap { position: relative; display: inline-block; width: 22px; height: 22px; }
+  .nav-badge { position: absolute; top: -4px; right: -8px; min-width: 16px; height: 16px; padding: 0 4px; border-radius: var(--radius-pill); background: var(--color-danger); color: #FFFFFF; font-size: 10px; font-weight: var(--font-weight-semibold); font-family: var(--font-sans); line-height: 16px; text-align: center; box-sizing: border-box; border: 1.5px solid var(--color-surface); }
+</style>
+</head>
+<body>
+
+<div class="mockup-meta">
+  <strong>Mobile — Security Health (Active, populated)</strong> ·
+  <span class="status-validated">validated</span> ·
+  2026-05-24 · 360×800
+</div>
+
+<div class="phone-frame">
+  <div class="phone-screen">
+
+    <div class="app-bar">
+      <button class="app-bar-back" aria-label="Back">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="15 18 9 12 15 6"/>
+        </svg>
+      </button>
+      <span class="app-bar-title">Security health</span>
+      <button class="app-bar-gear" aria-label="Settings">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="3"/>
+          <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33h.01a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82v.01a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+        </svg>
+      </button>
+    </div>
+
+    <div class="tab-strip" role="tablist">
+      <button class="tab-btn active" role="tab" aria-selected="true">Active</button>
+      <button class="tab-btn" role="tab" aria-selected="false">History</button>
+    </div>
+
+    <div class="scroll-area">
+      <div class="list-label">3 open</div>
+      <div class="item-list" role="list">
+
+        <button class="item-row critical" type="button" role="listitem">
+          <span class="sev-dot critical" aria-hidden="true"></span>
+          <span class="item-body">
+            <span class="item-title">Back up your recovery phrase</span>
+            <span class="item-summary">Phone wallet · without a backup, losing this phone loses the funds</span>
+            <span class="item-date">Opened 3 days ago</span>
+          </span>
+          <span class="item-chevron" aria-hidden="true">›</span>
+        </button>
+
+        <button class="item-row warning" type="button" role="listitem">
+          <span class="sev-dot warning" aria-hidden="true"></span>
+          <span class="item-body">
+            <span class="item-title">Missing derivation metadata</span>
+            <span class="item-summary">My Coldcard · hardware wallet may refuse to sign without it</span>
+            <span class="item-date">Opened today</span>
+          </span>
+          <span class="item-chevron" aria-hidden="true">›</span>
+        </button>
+
+        <button class="item-row warning" type="button" role="listitem">
+          <span class="sev-dot warning" aria-hidden="true"></span>
+          <span class="item-body">
+            <span class="item-title">Acknowledge how TallyKeep works</span>
+            <span class="item-summary">You skipped the principles at setup</span>
+            <span class="item-date">Opened today</span>
+          </span>
+          <span class="item-chevron" aria-hidden="true">›</span>
+        </button>
+
+      </div>
+    </div>
+
+    <nav class="bottom-nav" aria-label="Primary navigation">
+      <button class="nav-item enabled-inactive">
+        <svg class="nav-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M 3 12 L 12 3 L 21 12 M 6 10 L 6 21 L 18 21 L 18 10"/>
+        </svg>
+        Home
+      </button>
+      <button class="nav-item active" aria-current="page">
+        <span class="nav-bell-wrap">
+          <svg class="nav-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <svg class="nav-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M6 8a6 6 0 1 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/>
+            <path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/>
+          </svg>
+          <span class="nav-badge" aria-hidden="true">1</span>
+        </span>
+        Security
+      </button>
+      <button class="nav-item enabled-inactive">
+        <svg class="nav-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+          <line x1="5" y1="7"  x2="19" y2="7"/>
+          <line x1="5" y1="12" x2="19" y2="12"/>
+          <line x1="5" y1="17" x2="19" y2="17"/>
+        </svg>
+        Activity
+      </button>
+    </nav>
+
+  </div>
+</div>
+
+</body>
+</html>

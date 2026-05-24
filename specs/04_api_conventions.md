@@ -113,7 +113,12 @@ GET /api/v1/events/stream
 The frontend opens this stream once on app load and keeps it open.
 The backend forwards bus events through this stream, filtered by the
 requested topic patterns. Topic taxonomy lives in
-`01_architecture.md` §"Event taxonomy".
+`01_architecture.md` §"Event taxonomy". Active namespaces:
+`treasury.custodial.*` (custodial provider lifecycle, per the Account
+iteration), `system.*` (lock state, chain connection), and
+`security_health.*` (item lifecycle for the security-health system
+per ADR-0019 — `item_added`, `item_resolved`, `item_revived`;
+subscribers may filter the badge-count subset by `severity == 'critical'`).
 
 Backpressure: the backend buffers up to N events per client and
 drops the oldest if a client falls behind. The stream is the **only**

@@ -350,16 +350,14 @@ Vault-source sweeps land post-shipping alongside Vault Send.
   mechanism for the type; operates independently of whether the
   descriptor encodes a timelock. Currently unreachable because
   Send is deferred.
-- **Usage-based feedback (deferred)** — for Vaults whose observed
-  outflow frequency contradicts the type-implied long-term
-  intent, surface a security-health item suggesting an on-chain
-  timelock or migration to Strongbox. With ADR-0018 the analyzer
-  no longer needs a `purpose=long_term` tag to compare against;
-  the baseline is the type itself (Vault = friction-bearing
-  storage; a Vault with weekly outflows is signal). Captured in
-  `backlog/usage-based-feedback-for-long-term-vaults.md`; lives
-  in the broader security-health system pending
-  `seed-backup-disclosure` arbitration.
+- **Usage-based feedback (deferred indefinitely per ADR-0019)** —
+  the idea of surfacing a security-health item for Vaults whose
+  observed outflow frequency contradicts the type-implied long-term
+  intent. ADR-0019 defers this from the v1 security-health surface:
+  per ADR-0018 the outgoing-payment guardrail already fires on
+  every Vault Send, which carries the user-discipline signal at
+  spend time; a separate persistent item is redundant. Captured
+  for future revisit in `backlog/usage-based-feedback-for-long-term-vaults.md`.
 
 Multisig parameters cannot diverge from the descriptor —
 they're parsed, not declared. Same for any present timelock
@@ -374,5 +372,5 @@ they're parsed, not declared. Same for any present timelock
 | Multi-path Vault descriptors (hot path + recovery path) | `backlog/multi-path-vault-descriptors-hot-path-recovery-path.md` |
 | Usage-based feedback for Vaults (observed-vs-type-implied) | `backlog/usage-based-feedback-for-long-term-vaults.md` |
 | Vault → anywhere sweeps | `backlog/holding-to-holding-sweeps-beyond-account-originated.md` |
-| Inheritance / recovery-path UX surface | post-shipping (touched indirectly via `seed-backup-disclosure` system) |
+| Inheritance / recovery-path UX surface | post-shipping (touched indirectly via the security-health system per ADR-0019) |
 | Investment layer with structured yield (DLC / LSP-mediated) — a sibling product, not a generalization of Vault | `backlog/investment-layer-with-structured-yield-the-v5-sketch.md` |

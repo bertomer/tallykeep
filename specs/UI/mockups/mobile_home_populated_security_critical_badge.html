@@ -1,33 +1,30 @@
 <!--
-  Title: Mobile — Home (populated, one row per Holding type)
-  Status: validated (Rémy greenlight 2026-05-24 for the v1 iteration; previously validated 2026-05-13 for the prior 4-tab nav
-                   version; re-touched 2026-05-24 for the
-                   Security-health-system v1 iteration — 4-tab nav
-                   replaced with 3-tab (Home / Security Health /
-                   Activity), gear icon added top-right on the app
-                   bar for Settings entry. Re-validated 2026-05-24.)
+  Title: Mobile — Home (populated, Security Health tab with critical badge "2")
+  Status: validated (Security-health-system v1 design-pass; Rémy greenlight
+                   2026-05-24)
   Date last touched: 2026-05-24
-  Replaces: this file's prior 4-tab nav version (Holdings + More tabs
-            retired per ADR-0019).
+  Replaces: nothing. New mockup.
 
-  Design note: same Holdings list-card sample data as the prior
-  validated version (Account → Purse → Strongbox → Vault in
-  custody-tier order, total = 4 358 921 sats). Nav restructured
-  4 → 3 tabs; gear icon added top-right.
+  Design note: identical chrome to mobile_home_populated.html. The
+  only delta is the Security Health bottom-nav tab now carries a
+  red badge "2" on the bell glyph. Per ADR-0019: badge counts
+  CRITICAL-severity items only (warnings don't propagate). Sample
+  scenario: user has an unbacked-up ON_DEVICE_TK_GENERATED Purse seed
+  AND a hypothetical second critical item (e.g., a second Purse —
+  future state — or hosted-tier credentials backup when hosted tier
+  ships). For v1 the realistic max is 1 (single seed_backup item per
+  Purse, single user); 2 demonstrates the layout for multi-critical.
 
-  This is the BASELINE populated home with no security-health items
-  open. Two variants live in sibling files:
-  - mobile_home_populated_security_critical_badge.html — Security
-    Health tab carries a red badge "2" (2 critical items open).
-  - mobile_home_populated_security_health_zone.html — Home inline
-    "Security health" section shows an application-level item
-    (principles-ack-on-skip warning).
+  Badge visual: red pill (background #b8351b), white text, min-width
+  16px, 1.5px white border separating it from the bell glyph.
+  Positioned top-right of the bell (translate from icon top-right
+  corner). Tab label stays "Security".
 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>TallyKeep — Mobile — Home (populated)</title>
+<title>TallyKeep — Mobile — Home (populated · 2 critical)</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -40,7 +37,6 @@
   .app-bar { height: var(--mobile-app-bar); flex-shrink: 0; display: flex; align-items: center; justify-content: space-between; padding: 0 var(--space-4); background: var(--color-surface); border-bottom: 1px solid var(--color-border); }
   .app-bar svg.wordmark-icony { width: 120px; height: auto; display: block; }
   .app-bar-gear { width: 44px; height: 44px; display: inline-flex; align-items: center; justify-content: center; background: transparent; border: 0; cursor: pointer; padding: 0; color: var(--color-text-muted); margin-right: -10px; }
-  .app-bar-gear:hover { color: var(--color-text); }
   .app-bar-gear svg { width: 24px; height: 24px; }
 
   .hero { flex-shrink: 0; padding: var(--space-5) var(--space-4) var(--space-4); background: var(--color-surface); border-bottom: 1px solid var(--color-border); display: flex; flex-direction: column; align-items: flex-start; gap: var(--space-2); }
@@ -79,12 +75,32 @@
   .nav-item.active::before { content: ''; position: absolute; top: 0; left: 20%; right: 20%; height: 2px; background: var(--color-primary); border-radius: 0 0 var(--radius-sm) var(--radius-sm); }
   .nav-item.enabled-inactive { color: var(--color-text-muted); }
   .nav-bell-wrap { position: relative; display: inline-block; width: 22px; height: 22px; }
+  /* Red badge — per ADR-0019. Critical-count only. White border
+     separates from the bell glyph (no visual collision). */
+  .nav-badge {
+    position: absolute;
+    top: -4px;
+    right: -8px;
+    min-width: 16px;
+    height: 16px;
+    padding: 0 4px;
+    border-radius: var(--radius-pill);
+    background: var(--color-danger);
+    color: #FFFFFF;
+    font-size: 10px;
+    font-weight: var(--font-weight-semibold);
+    font-family: var(--font-sans);
+    line-height: 16px;
+    text-align: center;
+    box-sizing: border-box;
+    border: 1.5px solid var(--color-surface);
+  }
 </style>
 </head>
 <body>
 
 <div class="mockup-meta">
-  <strong>Mobile — Home (populated)</strong> ·
+  <strong>Mobile — Home (populated · Security Health badge "2")</strong> ·
   <span class="status-validated">validated</span> ·
   2026-05-24 · 360×800
 </div>
@@ -184,6 +200,7 @@
 
     </div>
 
+    <!-- Bottom nav — Security Health tab carries a red badge "2" -->
     <nav class="bottom-nav" aria-label="Primary navigation">
       <button class="nav-item active" aria-current="page">
         <svg class="nav-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -191,12 +208,13 @@
         </svg>
         Home
       </button>
-      <button class="nav-item enabled-inactive">
+      <button class="nav-item enabled-inactive" aria-label="Security health · 2 open critical items">
         <span class="nav-bell-wrap">
           <svg class="nav-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M6 8a6 6 0 1 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/>
             <path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/>
           </svg>
+          <span class="nav-badge" aria-hidden="true">2</span>
         </span>
         Security
       </button>

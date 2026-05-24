@@ -1,33 +1,38 @@
 <!--
-  Title: Mobile — Home (populated, one row per Holding type)
-  Status: validated (Rémy greenlight 2026-05-24 for the v1 iteration; previously validated 2026-05-13 for the prior 4-tab nav
-                   version; re-touched 2026-05-24 for the
-                   Security-health-system v1 iteration — 4-tab nav
-                   replaced with 3-tab (Home / Security Health /
-                   Activity), gear icon added top-right on the app
-                   bar for Settings entry. Re-validated 2026-05-24.)
+  Title: Mobile — Home (populated, Security health zone with principles-ack)
+  Status: validated (Security-health-system v1 design-pass; Rémy greenlight
+                   2026-05-24)
   Date last touched: 2026-05-24
-  Replaces: this file's prior 4-tab nav version (Holdings + More tabs
-            retired per ADR-0019).
+  Replaces: nothing. New mockup.
 
-  Design note: same Holdings list-card sample data as the prior
-  validated version (Account → Purse → Strongbox → Vault in
-  custody-tier order, total = 4 358 921 sats). Nav restructured
-  4 → 3 tabs; gear icon added top-right.
+  Design note: same chrome as mobile_home_populated.html but adds the
+  inline "Security health" section at the top of the scroll area
+  (above Holdings). Surfaces application-level open items only — per
+  ADR-0019, per-Holding items live as inline cards on the affected
+  Holding's detail page and do NOT duplicate here. This sample shows
+  the principles-ack-on-skip warning item (the user reached Home
+  without tapping [I understand] on the Onboarding 01 principles
+  card).
 
-  This is the BASELINE populated home with no security-health items
-  open. Two variants live in sibling files:
-  - mobile_home_populated_security_critical_badge.html — Security
-    Health tab carries a red badge "2" (2 critical items open).
-  - mobile_home_populated_security_health_zone.html — Home inline
-    "Security health" section shows an application-level item
-    (principles-ack-on-skip warning).
+  Severity-driven: the Security Health nav-tab carries NO badge
+  because the principles-ack item is `warning` severity, not
+  `critical`. The Home section is the load-bearing surface for
+  application-level warnings (badge ignores them; user lands on Home
+  and sees the section inline). Tap row → bottom-sheet inside the
+  dashboard with the principles re-show + [I understand and accept]
+  CTA (see mobile_security_health_principles_ack_bottomsheet.html).
+
+  Section header: "Security health" — locked vocabulary. Row body:
+  short title + one-line summary in muted secondary text. Chevron
+  hints navigation. No "View all" link on this sample (only one
+  item); add it when item count > 1 (final rule decided at sharpen
+  time per the iteration scope).
 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>TallyKeep — Mobile — Home (populated)</title>
+<title>TallyKeep — Mobile — Home (Security health zone)</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -40,7 +45,6 @@
   .app-bar { height: var(--mobile-app-bar); flex-shrink: 0; display: flex; align-items: center; justify-content: space-between; padding: 0 var(--space-4); background: var(--color-surface); border-bottom: 1px solid var(--color-border); }
   .app-bar svg.wordmark-icony { width: 120px; height: auto; display: block; }
   .app-bar-gear { width: 44px; height: 44px; display: inline-flex; align-items: center; justify-content: center; background: transparent; border: 0; cursor: pointer; padding: 0; color: var(--color-text-muted); margin-right: -10px; }
-  .app-bar-gear:hover { color: var(--color-text); }
   .app-bar-gear svg { width: 24px; height: 24px; }
 
   .hero { flex-shrink: 0; padding: var(--space-5) var(--space-4) var(--space-4); background: var(--color-surface); border-bottom: 1px solid var(--color-border); display: flex; flex-direction: column; align-items: flex-start; gap: var(--space-2); }
@@ -55,6 +59,26 @@
   .section-head .title { font-size: var(--font-size-xs); font-weight: var(--font-weight-semibold); color: var(--color-text-muted); text-transform: uppercase; letter-spacing: 0.05em; }
   .section-head .add-btn { width: 28px; height: 28px; border-radius: var(--radius-md); border: 0; background: var(--color-primary); color: var(--color-on-primary); display: inline-flex; align-items: center; justify-content: center; cursor: pointer; padding: 0; }
   .section-head .add-btn svg { width: 14px; height: 14px; }
+
+  /* Security health section card on Home — application-level items
+     only. Row backgrounds severity-tinted (same pattern as the
+     Security health dashboard); critical → --color-danger-soft,
+     warning → --color-warning-soft. Title + summary inherit color
+     from the row's text-on-soft stop for legible contrast on the
+     tinted bg. */
+  .security-health-list { margin: 0 var(--space-4) var(--space-3); background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-md); overflow: hidden; }
+  .sh-row { display: grid; grid-template-columns: auto 1fr auto; align-items: center; width: 100%; border: 0; border-bottom: 1px solid var(--color-border); padding: var(--space-3) var(--space-4); font-family: inherit; text-align: left; cursor: pointer; gap: var(--space-3); }
+  .sh-row:last-child { border-bottom: 0; }
+  .sh-row.warning  { background: var(--color-warning-soft); color: var(--color-warning-text-on-soft); }
+  .sh-row.critical { background: var(--color-danger-soft); color: var(--color-danger-text-on-soft); }
+  .sh-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+  .sh-dot.warning { background: var(--color-warning); }
+  .sh-dot.critical { background: var(--color-danger); }
+  .sh-body { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+  .sh-title { font-size: var(--font-size-base); font-weight: var(--font-weight-semibold); color: inherit; line-height: var(--line-height-tight); }
+  .sh-summary { font-size: var(--font-size-xs); color: inherit; opacity: 0.75; line-height: var(--line-height-tight); }
+  .sh-date { font-size: 11px; color: inherit; opacity: 0.6; line-height: var(--line-height-tight); margin-top: 2px; }
+  .sh-chevron { color: inherit; opacity: 0.6; font-size: 18px; line-height: 1; }
 
   .holding-list { margin: 0 var(--space-4) var(--space-3); background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-md); overflow: hidden; }
   .holding-row { display: grid; grid-template-columns: 4px 1fr auto; align-items: stretch; width: 100%; border: 0; border-bottom: 1px solid var(--color-border); background: transparent; padding: 0; font-family: inherit; color: inherit; text-align: left; cursor: pointer; }
@@ -84,7 +108,7 @@
 <body>
 
 <div class="mockup-meta">
-  <strong>Mobile — Home (populated)</strong> ·
+  <strong>Mobile — Home (populated · Security health zone)</strong> ·
   <span class="status-validated">validated</span> ·
   2026-05-24 · 360×800
 </div>
@@ -137,6 +161,22 @@
         <button class="show-fiat-link">Show in fiat</button>
       </div>
 
+      <!-- Security health section — application-level items only -->
+      <div class="section-head">
+        <span class="title">Security health</span>
+      </div>
+      <div class="security-health-list" role="list">
+        <button class="sh-row warning" type="button" role="listitem">
+          <span class="sh-dot warning" aria-hidden="true"></span>
+          <span class="sh-body">
+            <span class="sh-title">Acknowledge how TallyKeep works</span>
+            <span class="sh-summary">You skipped the principles at setup. Take a moment to read them.</span>
+            <span class="sh-date">Opened today</span>
+          </span>
+          <span class="sh-chevron" aria-hidden="true">›</span>
+        </button>
+      </div>
+
       <div class="section-head">
         <span class="title">Holdings</span>
         <button class="add-btn" aria-label="Add a Holding">
@@ -150,34 +190,22 @@
       <div class="holding-list" role="list">
         <button class="holding-row account" type="button" role="listitem">
           <span class="holding-stripe" aria-hidden="true"></span>
-          <span class="holding-body">
-            <span class="holding-name">EUR account</span>
-            <span class="holding-meta">Kraken</span>
-          </span>
+          <span class="holding-body"><span class="holding-name">EUR account</span><span class="holding-meta">Kraken</span></span>
           <span class="holding-amt">250 000<span class="unit">sats</span></span>
         </button>
         <button class="holding-row purse" type="button" role="listitem">
           <span class="holding-stripe" aria-hidden="true"></span>
-          <span class="holding-body">
-            <span class="holding-name">Phone wallet</span>
-            <span class="holding-meta">Phoenix</span>
-          </span>
+          <span class="holding-body"><span class="holding-name">Phone wallet</span><span class="holding-meta">Phoenix</span></span>
           <span class="holding-amt">358 921<span class="unit">sats</span></span>
         </button>
         <button class="holding-row strongbox" type="button" role="listitem">
           <span class="holding-stripe" aria-hidden="true"></span>
-          <span class="holding-body">
-            <span class="holding-name">My Coldcard</span>
-            <span class="holding-meta">Coldcard Mk4</span>
-          </span>
+          <span class="holding-body"><span class="holding-name">My Coldcard</span><span class="holding-meta">Coldcard Mk4</span></span>
           <span class="holding-amt">1 500 000<span class="unit">sats</span></span>
         </button>
         <button class="holding-row vault" type="button" role="listitem">
           <span class="holding-stripe" aria-hidden="true"></span>
-          <span class="holding-body">
-            <span class="holding-name">Family reserve</span>
-            <span class="holding-meta">2-of-3 multisig</span>
-          </span>
+          <span class="holding-body"><span class="holding-name">Family reserve</span><span class="holding-meta">2-of-3 multisig</span></span>
           <span class="holding-amt">2 250 000<span class="unit">sats</span></span>
         </button>
       </div>
@@ -198,7 +226,7 @@
             <path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/>
           </svg>
         </span>
-        Security
+            Security
       </button>
       <button class="nav-item enabled-inactive">
         <svg class="nav-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">

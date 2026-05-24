@@ -115,8 +115,10 @@ nobody can spend from. UX nuisance, not a security risk.
 
 At seed generation, the user is shown the seed and warned about
 backup responsibility. The persistent-warning model lives in the
-**security-health system** (pending arbitration
-`seed-backup-disclosure` in `pre-implementation.md`).
+**security-health system** (locked per ADR-0019; the seed-backup
+item is `critical`-severity, bell-badge bearer, surfaces inline on
+Purse detail Settings and in the central dashboard until the user
+acknowledges).
 
 ## Add-Holding — `ON_DEVICE_USER_IMPORTED` (target, pending arbitration)
 
@@ -247,10 +249,10 @@ None at the Purse-type level. The relevant hygiene checks
 (address reuse, dust, suspected consolidation) apply to all
 non-Account Holdings and live in `concerns/observation.md`.
 
-The seed-backup disclosure (pending `seed-backup-disclosure`
-arbitration) is Purse-specific in that it applies to
-`ON_DEVICE_TK_GENERATED` and `ON_DEVICE_USER_IMPORTED` Purses —
-both modes where TallyKeep holds the seed.
+The seed-backup disclosure (locked per ADR-0019) is Purse-specific
+in that it applies to `ON_DEVICE_TK_GENERATED` and
+`ON_DEVICE_USER_IMPORTED` Purses — both modes where TallyKeep holds
+the seed.
 
 ## Purse detail page
 
@@ -308,7 +310,7 @@ funnel), not a separate promotion banner or Settings card.
 | Pairing-based PSBT roundtrip between TallyKeep instances | `backlog/psbt-by-qr-roundtrip-on-mobile.md` |
 | Auto-sweep from an on-device Purse (and the broader Holding-to-Holding sweep UX) | `backlog/holding-to-holding-sweeps-beyond-account-originated.md` |
 | `ON_DEVICE_USER_IMPORTED` upgrade flow details | `pre-implementation.md` `purse-upgrade-path` + `backlog/purse-upgrade-path-watch-only-on-device-imported.md` |
-| Seed-backup disclosure full system | `pre-implementation.md` `seed-backup-disclosure` + `backlog/security-health-system.md` |
+| Seed-backup disclosure full system | ADR-0019; v1 iteration active in `next_iteration.md` (Security-health-system v1) |
 | Lightning support per Purse | `concerns/lightning_placeholder.md` + `backlog/lightning-support.md` |
 | Receive in static / merchant mode | `backlog/receive-in-static-merchant-mode.md` |
 | Possible Purse / Strongbox vocabulary collapse (observation mode) | `backlog/possible-purse-strongbox-collapse.md` |

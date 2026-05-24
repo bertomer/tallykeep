@@ -1,0 +1,125 @@
+<!--
+  Title: Mobile — Security Health · Principles-ack bottom-sheet
+  Status: validated (Security-health-system v1 design-pass; Rémy greenlight
+                   2026-05-24)
+  Date last touched: 2026-05-24
+  Replaces: nothing. New mockup.
+
+  Design note: bottom-sheet rendered ON TOP of the dashboard
+  (background dimmed by overlay). Triggered by tapping the
+  "Acknowledge how TallyKeep works" row in the dashboard or Home
+  section. Re-shows the three Onboarding 01 principle lines + a
+  banking-grade summary of what the user is acknowledging + a single
+  primary CTA. Sheet drags down to dismiss (no explicit close X is
+  needed; affordance is the drag handle at top).
+
+  Copy register: the principle lines lock the Onboarding 01 wording.
+  The summary paragraph below is the "real warning" framing Rémy
+  approved 2026-05-24 — banking-grade rephrase of "treasury manager"
+  language. Sentence structure: (a) what TallyKeep is, (b) what the
+  user keeps, (c) what we don't do, (d) what they're accepting.
+-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>TallyKeep — Mobile — Principles-ack bottom-sheet</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="_shared/tokens.css">
+<link rel="stylesheet" href="_shared/shell.css">
+<style>
+  /* Inherits .phone-screen from shell.css (position:absolute; inset:0;
+     flex column; safe-area padding). No override needed. The .behind
+     and .overlay children below use position:absolute and fill the
+     phone-screen via inset:0 — works because .phone-screen IS the
+     nearest positioned ancestor. */
+
+  /* Faded background — dashboard chrome visible behind overlay.
+     inset:0 pins to the phone-screen edges, IGNORING the screen's
+     safe-area padding so the dashboard chrome reaches the top of
+     the frame the same way it would on the real screen. */
+  .behind { position: absolute; inset: 0; opacity: 0.5; filter: blur(1px); pointer-events: none; padding-top: var(--mobile-safe-top); padding-bottom: var(--mobile-safe-bottom); display: flex; flex-direction: column; }
+
+  .overlay { position: absolute; inset: 0; background: var(--color-overlay); display: flex; flex-direction: column; justify-content: flex-end; }
+
+  .sheet { background: var(--color-surface); border-radius: var(--radius-xl) var(--radius-xl) 0 0; padding: var(--space-3) var(--space-4) var(--space-5); display: flex; flex-direction: column; gap: var(--space-4); }
+
+  .sheet-handle { width: 36px; height: 4px; background: var(--color-border-strong); border-radius: var(--radius-pill); align-self: center; margin-bottom: var(--space-3); }
+
+  .sheet-title { font-size: var(--font-size-lg); font-weight: var(--font-weight-semibold); color: var(--color-text); margin: 0; }
+
+  .principle-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-3); }
+  .principle { display: flex; align-items: flex-start; gap: var(--space-3); }
+  .principle .ico { width: 20px; height: 20px; flex-shrink: 0; margin-top: 2px; color: var(--color-primary-strong); }
+  .principle .label { font-size: var(--font-size-base); font-weight: var(--font-weight-semibold); color: var(--color-text); line-height: var(--line-height-tight); }
+  .principle .body { font-size: var(--font-size-sm); color: var(--color-text-muted); line-height: var(--line-height-default); margin-top: 2px; }
+
+  .summary-block { background: var(--color-warning-soft); border: 1px solid var(--color-warning-border); border-radius: var(--radius-md); padding: var(--space-3) var(--space-4); font-size: var(--font-size-sm); color: var(--color-warning-text-on-soft); line-height: var(--line-height-default); }
+
+  .cta-primary { background: var(--color-primary); color: var(--color-on-primary); border: 0; border-radius: var(--radius-md); padding: var(--space-3) var(--space-4); font-size: var(--font-size-base); font-weight: var(--font-weight-semibold); cursor: pointer; font-family: inherit; }
+  .cta-primary:hover { background: var(--color-primary-strong); }
+</style>
+</head>
+<body>
+
+<div class="mockup-meta">
+  <strong>Mobile — Security Health · Principles-ack bottom-sheet</strong> ·
+  <span class="status-validated">validated</span> ·
+  2026-05-24 · 360×800
+</div>
+
+<div class="phone-frame">
+  <div class="phone-screen">
+
+    <!-- Dashboard faded in the background -->
+    <div class="behind">
+      <div style="height: var(--mobile-app-bar); display:flex; align-items:center; padding: 0 var(--space-4); background: var(--color-surface); border-bottom: 1px solid var(--color-border); font-weight: 600; font-size: 16px; color: var(--color-text); justify-content: center;">Security health</div>
+      <div style="height: 44px; display:grid; grid-template-columns: 1fr 1fr; background: var(--color-surface); border-bottom: 1px solid var(--color-border);"><div style="display:flex; align-items:center; justify-content:center; color: var(--color-primary-strong); font-weight: 600;">Active</div><div style="display:flex; align-items:center; justify-content:center; color: var(--color-text-dim);">History</div></div>
+    </div>
+
+    <div class="overlay">
+      <div class="sheet">
+        <div class="sheet-handle" aria-hidden="true"></div>
+
+        <h2 class="sheet-title">How TallyKeep works</h2>
+
+        <ul class="principle-list">
+          <li class="principle">
+            <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+            <div>
+              <div class="label">Open source</div>
+              <div class="body">The code is public. Anyone can read it.</div>
+            </div>
+          </li>
+          <li class="principle">
+            <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/><line x1="2" y1="2" x2="22" y2="22"/></svg>
+            <div>
+              <div class="label">No accounts</div>
+              <div class="body">We don't know who you are. No email, no profile, no record on our side.</div>
+            </div>
+          </li>
+          <li class="principle">
+            <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+            <div>
+              <div class="label">Your keys stay yours</div>
+              <div class="body">They live on this device, on your hardware wallet, or with your custodial provider — never on our servers. If you lose them, we cannot recover them.</div>
+            </div>
+          </li>
+        </ul>
+
+        <div class="summary-block">
+          TallyKeep is a tool, not a service. You hold the funds. You hold the keys. You're the one responsible for backing them up and keeping them safe — we can't do that for you and we can't recover what's lost. Tap below to confirm you've read this and you accept it.
+        </div>
+
+        <button class="cta-primary" type="button">I understand and accept</button>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+</body>
+</html>
