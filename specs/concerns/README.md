@@ -15,6 +15,7 @@ Threat model). Reorganized 2026-05.
 | File | Covers |
 |---|---|
 | [observation.md](observation.md) | Chain monitoring, UTXO persistence, hygiene flags, declared-vs-observable security analysis, categorization, fortune view |
+| [classification.md](classification.md) | Descriptor → Holding-type routing surface, accept-set per type, rejection taxonomy, paste-time invocation pattern |
 | [outflow.md](outflow.md) | PSBT construction, fee user experience, broadcast, payment-request lifecycle, invoice flow |
 | [sweep_policies.md](sweep_policies.md) | Cross-Holding sweep model, safety validator (warn-don't-block), daily caps, execution path |
 | [feature_flags.md](feature_flags.md) | Flag catalog, onboarding-question-driven defaults, resolution rules |

@@ -28,16 +28,18 @@ sweep policies are `concerns/sweep_policies.md`.
 Accepts BIP 380 output descriptors or legacy xpub/ypub/zpub
 (converted to canonical form via BDK).
 
-Supported descriptor types: `pkh(...)`, `sh(wpkh(...))`,
-`wpkh(...)`, `tr(...)` — single-key only.
+The decision of *which Holding type a pasted descriptor belongs
+to* — single-key Purse vs Strongbox vs multisig/timelock Vault
+vs unsupported — lives in `concerns/classification.md`. This
+section covers what the observation layer does *after* a
+descriptor has been classified and a Holding has been created:
+address derivation, gap-limit handling, chain scanning, UTXO
+persistence.
 
-**Multisig descriptors are deferred.** Even when creating a Vault
-Holding (which has multisig metadata fields), the current build
-accepts only single-key descriptors. The Vault metadata is stored
-for future use; the analyzer surfaces the discrepancy honestly.
-Captured for future sharpening in `backlog/add-holding-vault-wizard.md`
-(onboarding) and `backlog/vault-send-for-all-shapes.md` (spending). See
-`holdings/04_vault.md` for the per-Vault treatment.
+Per-type accept-set detail (the full Vault accept set under
+ADR-0010 β, Strongbox signing-metadata semantics, Purse
+script-type set) lives in `holdings/<type>.md` and is summarised
+in `classification.md`'s routing table.
 
 ## Gap limit
 

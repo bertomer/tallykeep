@@ -1822,16 +1822,29 @@ selected by what the parser identifies in the pasted descriptor:
   lock fragment." Secondary CTA "Set up as Strongbox" routes to
   the Strongbox wizard. Mirror of the Strongbox-wizard's
   multisig-redirect pattern, reversed.
-- **`mobile_add_holding_vault_input_error_inline.html`** — user
-  pasted something the parser couldn't classify as a supported
-  Vault shape (bare `multi(...)` without script wrapper,
-  multi-path miniscript, or unparseable text). Danger palette.
-  Error title: "Unsupported descriptor." (not "TallyKeep can't
-  read this as a Vault" — the failure is the input, not
-  TallyKeep, per Rémy's review 2026-05-15). The error region
-  lists the v1 supported forms (single-sig + timelock and
-  multisig variants) and points users with complex setups to a
-  "contact us" path.
+- **`mobile_add_holding_vault_input_error_inline.html`** — the
+  residual `unsupported_form` rejection per
+  `concerns/classification.md`'s rejection taxonomy. Fires when
+  the descriptor is structurally invalid but doesn't match the
+  more-specific categories below. Danger palette. Error title:
+  "Unsupported descriptor." (not "TallyKeep can't read this as
+  a Vault" — the failure is the input, not TallyKeep, per
+  Rémy's review 2026-05-15). Error region lists the supported
+  forms and points users with complex setups to a "contact us"
+  path.
+- **`mobile_add_holding_vault_input_error_inline_lsp_wallet.html`** —
+  the `lsp_coordinated_wallet` rejection. Fires when the
+  descriptor adapter's LSP-pattern detector matches the Phoenix
+  swap-in-potentiam shape (`or_d(pk(K_lsp), and_v(v:pk(K_user),
+  older(N)))` and structurally equivalent two-party-with-
+  timelock-fallback constructs). Title: "This looks like a
+  Lightning-coordinated wallet." Body explains the joint-custody
+  posture with the LSP and states we don't support these
+  wallets today. Same visual treatment carries to Purse / Strongbox
+  wizards when the same rejection fires there; same template
+  also carries `multi_path_miniscript` copy (generic branching
+  miniscript that isn't an LSP shape) — copy locked in the
+  rejection-taxonomy table in `classification.md`.
 
 The earlier "multisig-deferred" error variant (drawn 2026-05-15,
 archived same day) is gone — under the broader β scope multisig
@@ -4054,7 +4067,6 @@ category error.
 
 **Lockup bar palette.** Uses `--color-success` 200 for the
 Available segment and two shades from the gray ramp for
-Sooner / Later. Anchored against tokens.css rather than
 hardcoded hex; a future brand iteration that re-tunes the
 ramps repaints the bar automatically per the brand → tokens
 lockstep rule in `brand/README.md`.
