@@ -16,8 +16,8 @@
 
   Key differences from Strongbox wizard:
     1. No vendor dropdown.
-    2. parse_category from validate drives routing:
-       parseback_ready → step 2; single_key_no_timelock → redirect error.
+    2. best_fit from validate drives routing:
+       vault → step 2; purse/strongbox → redirect error; null → rejection error.
     3. Four parseback rows instead of three:
        Signers required, Signing keys, Script type, Timelock.
     4. Auto-name comes from backend (validate response.auto_name).
@@ -37,8 +37,12 @@
   type Step = 'input' | 'parseback' | 'success';
 
   type ErrorState =
-    | { kind: 'single-key-redirect' }
-    | { kind: 'unsupported' }
+    | { kind: 'single_address_input' }
+    | { kind: 'lsp_coordinated_wallet' }
+    | { kind: 'multi_path_miniscript' }
+    | { kind: 'unsupported_form' }
+    | { kind: 'unparseable' }
+    | { kind: 'redirect'; bestFit: 'purse' | 'strongbox' }
     | { kind: 'network'; message: string }
     | { kind: 'create'; message: string };
 
@@ -51,7 +55,10 @@
     timelock_value: number | null;
     cosigner_fingerprints: string[];
     auto_name: string | null;
-    parse_category: string;
+    best_fit: string | null;
+    rejection_category: string | null;
+    canonical_expression: string | null;
+    canonical_change_expression: string | null;
     first_addresses: string[];
     signing_metadata_present: boolean;
   }
@@ -82,6 +89,9 @@
   let derivedExpression = $state('');
   let derivedNetwork = $state<'mainnet' | 'regtest'>('regtest');
   let parseResult = $state<ValidateResult | null>(null);
+  let pendingResult = $state<ValidateResult | null>(null);
+  let lastValidatedText = $state('');
+  let validateTimer: ReturnType<typeof setTimeout> | null = null;
 
   // Parseback display values
   let holdingName = $state('');
@@ -98,7 +108,8 @@
   // -------------------------------------------------------------------------
 
   let inputCtaDisabled = $derived(
-    descriptorText.trim() === '' || error?.kind === 'single-key-redirect' || error?.kind === 'unsupported'
+    descriptorText.trim() === '' ||
+    (error !== null && error.kind !== 'network' && error.kind !== 'create')
   );
 
   let canScanQR = $derived(capabilities.canScanQR());
@@ -195,6 +206,47 @@
     if (content) { descriptorText = content.trim(); error = null; }
   }
 
+  function setRejectionError(category: string) {
+    switch (category) {
+      case 'single_address_input':   error = { kind: 'single_address_input' }; break;
+      case 'lsp_coordinated_wallet': error = { kind: 'lsp_coordinated_wallet' }; break;
+      case 'multi_path_miniscript':  error = { kind: 'multi_path_miniscript' }; break;
+      case 'unsupported_form':       error = { kind: 'unsupported_form' }; break;
+      default:                       error = { kind: 'unparseable' }; break;
+    }
+  }
+
+  async function runPasteTimeValidation(raw: string) {
+    if (!raw) return;
+    const network = detectNetwork(raw);
+    try {
+      const result = await validateDescriptor(raw, network);
+      pendingResult = result;
+      lastValidatedText = raw;
+      if (result.best_fit === null) {
+        setRejectionError(result.rejection_category ?? 'unsupported_form');
+      } else if (result.best_fit !== 'vault') {
+        error = { kind: 'redirect', bestFit: result.best_fit as 'purse' | 'strongbox' };
+      } else {
+        error = null;
+      }
+    } catch (e: unknown) {
+      const err = e as Record<string, unknown>;
+      if (err?._status === 401) return;
+      pendingResult = null;
+    }
+  }
+
+  function scheduleValidation() {
+    if (error?.kind === 'network' || error?.kind === 'create') error = null;
+    parseResult = null;
+    pendingResult = null;
+    if (validateTimer !== null) clearTimeout(validateTimer);
+    const text = descriptorText.trim();
+    if (!text) return;
+    validateTimer = setTimeout(() => runPasteTimeValidation(text), 300);
+  }
+
   async function handleContinueInput() {
     const raw = descriptorText.trim();
     if (!raw) return;
@@ -202,16 +254,23 @@
     error = null;
     loading = true;
     try {
-      const network = detectNetwork(raw);
-      const result = await validateDescriptor(raw, network);
-
-      if (result.parse_category === 'single_key_no_timelock') {
-        error = { kind: 'single-key-redirect' };
+      if (!pendingResult || lastValidatedText !== raw) {
+        await runPasteTimeValidation(raw);
+      }
+      if (!pendingResult || error) return;
+      const result = pendingResult;
+      if (result.best_fit === null) {
+        setRejectionError(result.rejection_category ?? 'unsupported_form');
+        return;
+      }
+      if (result.best_fit !== 'vault') {
+        error = { kind: 'redirect', bestFit: result.best_fit as 'purse' | 'strongbox' };
         return;
       }
 
+      const network = detectNetwork(raw);
       parseResult = result;
-      derivedExpression = raw;
+      derivedExpression = result.canonical_expression ?? raw;
       derivedNetwork = network;
       holdingName = result.auto_name ?? 'Vault';
       nameDraft = holdingName;
@@ -227,7 +286,7 @@
       if (!status || status >= 500) {
         error = { kind: 'network', message: 'Could not reach the server. Check your connection.' };
       } else {
-        error = { kind: 'unsupported' };
+        error = { kind: 'unsupported_form' };
       }
     } finally {
       loading = false;
@@ -344,16 +403,13 @@
         <textarea
           id="descriptor-input"
           class="descriptor-textarea"
-          class:descriptor-warning={error?.kind === 'single-key-redirect'}
-          class:descriptor-error={error?.kind === 'unsupported'}
+          class:descriptor-warning={error?.kind === 'redirect'}
+          class:descriptor-error={error !== null && error.kind !== 'redirect' && error.kind !== 'network' && error.kind !== 'create'}
           placeholder="wsh(and_v(v:after(900000),pk([abc12345/86h/0h/0h]xpub6D…/0/*)))"
           aria-label="Descriptor"
-          aria-invalid={error?.kind === 'single-key-redirect' || error?.kind === 'unsupported' ? true : undefined}
+          aria-invalid={error !== null && error.kind !== 'network' && error.kind !== 'create' ? true : undefined}
           bind:value={descriptorText}
-          oninput={() => {
-            if (error?.kind === 'unsupported' || error?.kind === 'network') error = null;
-            parseResult = null;
-          }}
+          oninput={scheduleValidation}
         ></textarea>
         <button class="paste-btn" type="button" aria-label="Paste from clipboard" onclick={handlePaste}>
           <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -396,39 +452,114 @@
   {/snippet}
 
   {#snippet errorRegion()}
-    {#if error?.kind === 'single-key-redirect'}
+    {#if error?.kind === 'single_address_input'}
+      <div class="footer-error footer-error--danger" role="alert">
+        <svg class="fe-icon" viewBox="0 0 24 24" aria-hidden="true" fill="none"
+             stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="10"/>
+          <line x1="12" y1="8" x2="12" y2="13"/>
+          <line x1="12" y1="16" x2="12" y2="16.5"/>
+        </svg>
+        <div>
+          <p class="fe-title">That looks like an address.</p>
+          <p class="fe-body">
+            To watch a wallet, TallyKeep needs the wallet's descriptor
+            or extended public key, not a single receive address. Look
+            for "Export descriptor", "Show extended public key", or
+            "Account public key" in your wallet's settings.
+          </p>
+        </div>
+      </div>
+    {:else if error?.kind === 'lsp_coordinated_wallet'}
+      <div class="footer-error footer-error--danger" role="alert">
+        <svg class="fe-icon" viewBox="0 0 24 24" aria-hidden="true" fill="none"
+             stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="10"/>
+          <line x1="12" y1="8" x2="12" y2="13"/>
+          <line x1="12" y1="16" x2="12" y2="16.5"/>
+        </svg>
+        <div>
+          <p class="fe-title">This looks like a Lightning-coordinated wallet.</p>
+          <p class="fe-body">
+            Wallets like Phoenix hold their on-chain balance jointly with
+            a Lightning service provider, using a script TallyKeep can't
+            watch independently yet. We don't support these wallets today.
+          </p>
+        </div>
+      </div>
+    {:else if error?.kind === 'multi_path_miniscript'}
+      <div class="footer-error footer-error--danger" role="alert">
+        <svg class="fe-icon" viewBox="0 0 24 24" aria-hidden="true" fill="none"
+             stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="10"/>
+          <line x1="12" y1="8" x2="12" y2="13"/>
+          <line x1="12" y1="16" x2="12" y2="16.5"/>
+        </svg>
+        <div>
+          <p class="fe-title">This descriptor has multiple spending paths.</p>
+          <p class="fe-body">
+            TallyKeep currently supports single-path descriptors (one
+            spending route per wallet). Descriptors with branching
+            script logic such as recovery paths, conditional spends,
+            or hash preimage gates aren't supported yet.
+          </p>
+        </div>
+      </div>
+    {:else if error?.kind === 'unsupported_form' || error?.kind === 'unparseable'}
+      <div class="footer-error footer-error--danger" role="alert">
+        <svg class="fe-icon" viewBox="0 0 24 24" aria-hidden="true" fill="none"
+             stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="10"/>
+          <line x1="12" y1="8" x2="12" y2="13"/>
+          <line x1="12" y1="16" x2="12" y2="16.5"/>
+        </svg>
+        <div>
+          <p class="fe-title">
+            {error.kind === 'unparseable' ? "TallyKeep can't read this." : "Unsupported descriptor."}
+          </p>
+          <p class="fe-body">
+            {#if error.kind === 'unparseable'}
+              This doesn't parse as a Bitcoin descriptor or an extended
+              public key. Check for missing characters, copy errors, or
+              paste truncation.
+            {:else}
+              Supported forms are listed in each wizard's input help
+              text. If you're sure this descriptor describes a
+              single-key wallet, a multisig, or a timelocked vault,
+              double-check the export format from your wallet.
+            {/if}
+          </p>
+        </div>
+      </div>
+    {:else if error?.kind === 'redirect'}
+      {@const redirectTarget = error.bestFit}
       <div class="footer-error footer-error--warning" role="alert">
-        <svg class="fe-icon" viewBox="0 0 24 24" aria-hidden="true">
+        <svg class="fe-icon" viewBox="0 0 24 24" aria-hidden="true" fill="none"
+             stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <path d="M 12 2 L 2 22 L 22 22 Z"/>
-          <line x1="12" y1="9"  x2="12" y2="14"/>
+          <line x1="12" y1="9" x2="12" y2="14"/>
           <line x1="12" y1="17" x2="12" y2="17.5"/>
         </svg>
         <div class="fe-content">
           <p class="fe-title">No timelock or multi-signature detected.</p>
-          <p class="fe-body">Set this up as a Strongbox instead. If you meant to add a timelock, export the descriptor again with the lock fragment.</p>
-          <button class="fe-redirect-cta" type="button" onclick={() => goto('/holding/new/strongbox')}>
-            Set up as Strongbox
-            <svg viewBox="0 0 24 24" aria-hidden="true">
+          <p class="fe-body">
+            Set this up as a {redirectTarget === 'purse' ? 'Purse' : 'Strongbox'} instead.
+            If you meant to add a timelock, export the descriptor again with the lock fragment.
+          </p>
+          <button class="fe-redirect-cta" type="button"
+                  onclick={() => goto(`/holding/new/${redirectTarget}`)}>
+            Set up as {redirectTarget === 'purse' ? 'Purse' : 'Strongbox'}
+            <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor"
+                 stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <polyline points="9 6 15 12 9 18"/>
             </svg>
           </button>
         </div>
       </div>
-    {:else if error?.kind === 'unsupported'}
-      <div class="footer-error footer-error--danger" role="alert">
-        <svg class="fe-icon" viewBox="0 0 24 24" aria-hidden="true">
-          <circle cx="12" cy="12" r="10"/>
-          <line x1="12" y1="8"  x2="12" y2="13"/>
-          <line x1="12" y1="16" x2="12" y2="16.5"/>
-        </svg>
-        <div>
-          <p class="fe-title">Unsupported descriptor.</p>
-          <p class="fe-body">Supported forms: <code>wsh(and_v(v:after(…),pk(…)))</code> or <code>wsh(and_v(v:older(…),pk(…)))</code> for a single-key timelocked Vault; multisig variants (<code>wsh(multi(…))</code>, <code>wsh(sortedmulti(…))</code>, <code>tr(multi_a(…))</code>) with or without a timelock. If your setup is more complex, contact us.</p>
-        </div>
-      </div>
     {:else if error?.kind === 'network'}
       <div class="footer-error footer-error--danger" role="alert">
-        <svg class="fe-icon" viewBox="0 0 24 24" aria-hidden="true">
+        <svg class="fe-icon" viewBox="0 0 24 24" aria-hidden="true" fill="none"
+             stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <circle cx="12" cy="12" r="10"/>
           <line x1="12" y1="8"  x2="12" y2="13"/>
           <line x1="12" y1="16" x2="12" y2="16.5"/>

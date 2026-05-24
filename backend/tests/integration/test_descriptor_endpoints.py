@@ -347,9 +347,10 @@ def test_validate_bare_address_returns_typed_error(app_with_db) -> None:
         "/api/v1/descriptors/validate",
         json={"input": "bc1qar0srrr7xfkvy5l643lydnw9re59gtzzwf5mdq", "network": "mainnet"},
     )
-    assert response.status_code == 422
-    detail = response.json()["detail"]
-    assert detail["error_code"] == "SINGLE_ADDRESS_INPUT"
+    assert response.status_code == 200
+    data = response.json()
+    assert data["best_fit"] is None
+    assert data["rejection_category"] == "single_address_input"
 
 
 def test_validate_invalid_expression_returns_parse_error(app_with_db) -> None:
@@ -358,9 +359,10 @@ def test_validate_invalid_expression_returns_parse_error(app_with_db) -> None:
         "/api/v1/descriptors/validate",
         json={"input": "not-a-descriptor-at-all", "network": "mainnet"},
     )
-    assert response.status_code == 422
-    detail = response.json()["detail"]
-    assert detail["error_code"] == "PARSE_ERROR"
+    assert response.status_code == 200
+    data = response.json()
+    assert data["best_fit"] is None
+    assert data["rejection_category"] == "unparseable"
 
 
 # --- signing_metadata_present flag -------------------------------------------
@@ -416,8 +418,10 @@ def test_validate_single_address_returns_typed_error(app_with_db) -> None:
         "/api/v1/descriptors/validate",
         json={"input": "1A1zP1eP5QGefi2DMPTfTL5SLmv7Divf", "network": "mainnet"},
     )
-    assert response.status_code == 422
-    assert response.json()["detail"]["error_code"] == "SINGLE_ADDRESS_INPUT"
+    assert response.status_code == 200
+    data = response.json()
+    assert data["best_fit"] is None
+    assert data["rejection_category"] == "single_address_input"
 
 
 # --- parse_category routing metadata -----------------------------------------
@@ -485,8 +489,7 @@ def test_validate_csv_descriptor_returns_parseback_ready(app_with_db) -> None:
 
 def test_validate_or_d_branching_descriptor_rejected(app_with_db) -> None:
     """Descriptors with or_d/or_i/thresh (multi-path miniscript) must return
-    UNSUPPORTED_DESCRIPTOR — not be misrouted to Vault parseback on the
-    strength of the older() fragment they may contain."""
+    rejection_category=multi_path_miniscript — not be misrouted to Vault parseback."""
     client, _ = app_with_db
     # Liana-style swap-in: primary key can always spend, or after CSV delay
     # a secondary key can spend. Contains or_d(..., older(...)).
@@ -501,6 +504,100 @@ def test_validate_or_d_branching_descriptor_rejected(app_with_db) -> None:
         "/api/v1/descriptors/validate",
         json={"input": or_d_expr, "network": "mainnet"},
     )
-    assert response.status_code == 422
-    detail = response.json()["detail"]
-    assert detail["error_code"] == "UNSUPPORTED_DESCRIPTOR"
+    assert response.status_code == 200
+    data = response.json()
+    assert data["best_fit"] is None
+    assert data["rejection_category"] == "multi_path_miniscript"
+
+
+# --- classification surface (best_fit / rejection_category) -------------------
+
+_LSP_EXPR = (
+    "wsh(or_d(pk(xpub6BosfCnifzxcFwrSzQiqu2DBVTshkCXacvNsWGYJVVhhawA7d4R5WSWGFNbi8Aw6ZRc1brxMyWMzG3DSSSSoekkudhUd9yLb6qx39T9nMdj),"
+    "and_v(v:pk(xpub6BosfCnifzxcFwrSzQiqu2DBVTshkCXacvNsWGYJVVhhawA7d4R5WSWGFNbi8Aw6ZRc1brxMyWMzG3DSSSSoekkudhUd9yLb6qx39T9nMdj),"
+    "older(4032))))"
+)
+
+
+def test_validate_purse_returns_best_fit_purse(app_with_db) -> None:
+    client, _ = app_with_db
+    response = client.post(
+        "/api/v1/descriptors/validate",
+        json={"input": WPKH_MAINNET, "network": "mainnet"},
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert data["best_fit"] == "purse"
+    assert data["rejection_category"] is None
+
+
+def test_validate_strongbox_descriptor_returns_best_fit_strongbox(app_with_db) -> None:
+    client, _ = app_with_db
+    response = client.post(
+        "/api/v1/descriptors/validate",
+        json={"input": _WPKH_WITH_KEY_ORIGIN, "network": "mainnet"},
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert data["best_fit"] == "strongbox"
+    assert data["rejection_category"] is None
+
+
+def test_validate_vault_returns_best_fit_vault(app_with_db) -> None:
+    client, _ = app_with_db
+    response = client.post(
+        "/api/v1/descriptors/validate",
+        json={"input": _WSH_MULTISIG, "network": "mainnet"},
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert data["best_fit"] == "vault"
+    assert data["rejection_category"] is None
+
+
+def test_validate_bare_xpub_auto_wraps_to_wpkh(app_with_db) -> None:
+    client, _ = app_with_db
+    bare_xpub = "xpub6BosfCnifzxcFwrSzQiqu2DBVTshkCXacvNsWGYJVVhhawA7d4R5WSWGFNbi8Aw6ZRc1brxMyWMzG3DSSSSoekkudhUd9yLb6qx39T9nMdj"
+    response = client.post(
+        "/api/v1/descriptors/validate",
+        json={"input": bare_xpub, "network": "mainnet"},
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert data["best_fit"] == "purse"
+    assert data["canonical_expression"] is not None
+    assert data["canonical_expression"].startswith("wpkh(")
+    assert data["canonical_change_expression"] is not None
+    assert data["canonical_change_expression"].startswith("wpkh(")
+    assert "/0/*" in data["canonical_expression"]
+    assert "/1/*" in data["canonical_change_expression"]
+
+
+def test_validate_lsp_wallet_returns_lsp_rejection(app_with_db) -> None:
+    client, _ = app_with_db
+    response = client.post(
+        "/api/v1/descriptors/validate",
+        json={"input": _LSP_EXPR, "network": "mainnet"},
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert data["best_fit"] is None
+    assert data["rejection_category"] == "lsp_coordinated_wallet"
+
+
+def test_validate_idempotent_with_canonical_expression(app_with_db) -> None:
+    """Calling validate with an already-canonical descriptor returns the same
+    best_fit as calling it with the raw bare key."""
+    client, _ = app_with_db
+    bare = "xpub6BosfCnifzxcFwrSzQiqu2DBVTshkCXacvNsWGYJVVhhawA7d4R5WSWGFNbi8Aw6ZRc1brxMyWMzG3DSSSSoekkudhUd9yLb6qx39T9nMdj"
+    r1 = client.post(
+        "/api/v1/descriptors/validate",
+        json={"input": bare, "network": "mainnet"},
+    ).json()
+    canonical = r1["canonical_expression"]
+    r2 = client.post(
+        "/api/v1/descriptors/validate",
+        json={"input": canonical, "network": "mainnet"},
+    ).json()
+    assert r2["best_fit"] == r1["best_fit"]
+    assert r2["rejection_category"] == r1["rejection_category"]

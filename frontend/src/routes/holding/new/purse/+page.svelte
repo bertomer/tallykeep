@@ -41,13 +41,20 @@
   type Mode = 'import' | 'generate';
 
   type ErrorState =
-    | { kind: 'single-address' }
-    | { kind: 'multisig' }
-    | { kind: 'parse'; message: string }
+    | { kind: 'single_address_input' }
+    | { kind: 'lsp_coordinated_wallet' }
+    | { kind: 'multi_path_miniscript' }
+    | { kind: 'unsupported_form' }
+    | { kind: 'unparseable' }
+    | { kind: 'redirect'; bestFit: string }
     | { kind: 'network'; message: string }
     | { kind: 'create'; message: string };
 
   interface ValidateResult {
+    best_fit: string | null;
+    rejection_category: string | null;
+    canonical_expression: string | null;
+    canonical_change_expression: string | null;
     script_type: string;
     is_multisig: boolean;
     required_signers?: number;
@@ -93,6 +100,11 @@
   let serverUrl = $state('');
   let autoWrapNote = $state<string | null>(null);
 
+  // Paste-time validation state
+  let pendingResult = $state<ValidateResult | null>(null);
+  let lastValidatedText = $state('');
+  let validateTimer: ReturnType<typeof setTimeout> | null = null;
+
   // -------------------------------------------------------------------------
   // Constants
   // -------------------------------------------------------------------------
@@ -131,84 +143,6 @@
   // -------------------------------------------------------------------------
   // Helpers
   // -------------------------------------------------------------------------
-
-  // ── Base58check version-byte conversion ────────────────────────────────────
-  // BDK only accepts standard xpub/tpub version bytes inside descriptors.
-  // zpub/ypub/vpub/upub must be re-encoded with the standard bytes first.
-
-  const B58 = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
-
-  function b58decode(s: string): Uint8Array {
-    let n = 0n;
-    for (const c of s) { const d = B58.indexOf(c); if (d < 0) throw new Error('bad b58'); n = n * 58n + BigInt(d); }
-    let lead = 0; for (const c of s) { if (c === '1') lead++; else break; }
-    const out: number[] = [];
-    while (n > 0n) { out.unshift(Number(n & 0xffn)); n >>= 8n; }
-    return new Uint8Array([...new Array(lead).fill(0), ...out]);
-  }
-
-  function b58encode(bytes: Uint8Array): string {
-    let n = 0n; for (const b of bytes) n = n * 256n + BigInt(b);
-    let s = ''; while (n > 0n) { s = B58[Number(n % 58n)] + s; n /= 58n; }
-    for (const b of bytes) { if (b === 0) s = '1' + s; else break; }
-    return s;
-  }
-
-  async function convertKeyVersion(key: string, ver: number[]): Promise<string> {
-    const full = b58decode(key);              // 82 bytes: 78 payload + 4 checksum
-    const payload = new Uint8Array(full.slice(0, 78));
-    payload[0] = ver[0]; payload[1] = ver[1]; payload[2] = ver[2]; payload[3] = ver[3];
-    const h1 = new Uint8Array(await crypto.subtle.digest('SHA-256', payload));
-    const h2 = new Uint8Array(await crypto.subtle.digest('SHA-256', h1));
-    return b58encode(new Uint8Array([...payload, ...h2.slice(0, 4)]));
-  }
-
-  // ── Auto-wrap helpers ───────────────────────────────────────────────────────
-
-  function isBareExtendedKey(raw: string): boolean {
-    if (!raw || /[([/]/.test(raw)) return false;
-    const lo = raw.toLowerCase();
-    return ['xpub','ypub','zpub','tpub','upub','vpub'].some(p => lo.startsWith(p));
-  }
-
-  interface AutoWrap { expression: string; changeExpression: string; note: string; }
-
-  async function buildAutoWrapDescriptor(raw: string): Promise<AutoWrap | null> {
-    if (!isBareExtendedKey(raw)) return null;
-    const lo = raw.toLowerCase();
-    // zpub → xpub version bytes, then wpkh()
-    if (lo.startsWith('zpub')) {
-      const k = await convertKeyVersion(raw, [0x04,0x88,0xB2,0x1E]);
-      return { expression: `wpkh(${k}/0/*)`, changeExpression: `wpkh(${k}/1/*)`,
-               note: 'Native SegWit (P2WPKH) — auto-detected from zpub' };
-    }
-    // vpub → tpub version bytes, then wpkh()
-    if (lo.startsWith('vpub')) {
-      const k = await convertKeyVersion(raw, [0x04,0x35,0x87,0xCF]);
-      return { expression: `wpkh(${k}/0/*)`, changeExpression: `wpkh(${k}/1/*)`,
-               note: 'Native SegWit (P2WPKH) — auto-detected from vpub' };
-    }
-    // ypub → xpub version bytes, then sh(wpkh())
-    if (lo.startsWith('ypub')) {
-      const k = await convertKeyVersion(raw, [0x04,0x88,0xB2,0x1E]);
-      return { expression: `sh(wpkh(${k}/0/*))`, changeExpression: `sh(wpkh(${k}/1/*))`,
-               note: 'Wrapped SegWit (P2SH-P2WPKH) — auto-detected from ypub' };
-    }
-    // upub → tpub version bytes, then sh(wpkh())
-    if (lo.startsWith('upub')) {
-      const k = await convertKeyVersion(raw, [0x04,0x35,0x87,0xCF]);
-      return { expression: `sh(wpkh(${k}/0/*))`, changeExpression: `sh(wpkh(${k}/1/*))`,
-               note: 'Wrapped SegWit (P2SH-P2WPKH) — auto-detected from upub' };
-    }
-    // xpub / tpub — already standard bytes, just wrap
-    if (lo.startsWith('xpub'))
-      return { expression: `wpkh(${raw}/0/*)`, changeExpression: `wpkh(${raw}/1/*)`,
-               note: 'Native SegWit (P2WPKH) — auto-detected from xpub' };
-    if (lo.startsWith('tpub'))
-      return { expression: `wpkh(${raw}/0/*)`, changeExpression: `wpkh(${raw}/1/*)`,
-               note: 'Native SegWit (P2WPKH) — auto-detected from tpub' };
-    return null;
-  }
 
   function detectNetwork(input: string): 'mainnet' | 'regtest' {
     if (/tpub|tprv|upub|uprv|vpub|vprv|Upub|Uprv|Vpub|Vprv/.test(input)) return 'regtest';
@@ -280,10 +214,66 @@
   // -------------------------------------------------------------------------
 
   let inputCtaDisabled = $derived(
-    descriptorText.trim() === '' || error?.kind === 'multisig'
+    descriptorText.trim() === '' || loading ||
+    (error !== null &&
+      error.kind !== 'redirect' &&
+      error.kind !== 'create' &&
+      error.kind !== 'network')
   );
 
-  let bareKeyDetected = $derived(isBareExtendedKey(descriptorText.trim()));
+  // -------------------------------------------------------------------------
+  // Paste-time validation
+  // -------------------------------------------------------------------------
+
+  function setRejectionError(category: string | null): void {
+    switch (category) {
+      case 'single_address_input':   error = { kind: 'single_address_input' }; break;
+      case 'lsp_coordinated_wallet': error = { kind: 'lsp_coordinated_wallet' }; break;
+      case 'multi_path_miniscript':  error = { kind: 'multi_path_miniscript' }; break;
+      case 'unsupported_form':       error = { kind: 'unsupported_form' }; break;
+      default:                       error = { kind: 'unparseable' }; break;
+    }
+  }
+
+  async function runPasteTimeValidation(raw: string): Promise<void> {
+    const network = detectNetwork(raw);
+    try {
+      const result = await validateDescriptor(raw, network);
+      if (result.best_fit === null) {
+        setRejectionError(result.rejection_category);
+        pendingResult = null;
+      } else if (result.best_fit === 'vault') {
+        error = { kind: 'redirect', bestFit: 'vault' };
+        pendingResult = null;
+      } else {
+        error = null;
+        pendingResult = result;
+        lastValidatedText = raw;
+        autoWrapNote = result.canonical_expression
+          ? 'Extended key auto-detected — verify the first addresses match your wallet.'
+          : null;
+      }
+    } catch (e: unknown) {
+      const err = e as Record<string, unknown>;
+      if (err?._status === 401) {
+        const msg = extractApiError(err);
+        if (msg.includes('locked') || msg.includes('unlock')) { goto('/unlock'); return; }
+        await auth.clearCredential(); goto('/'); return;
+      }
+      error = { kind: 'network', message: 'Could not reach the server. Check your connection.' };
+      pendingResult = null;
+    }
+  }
+
+  function scheduleValidation(): void {
+    error = null;
+    errorDetailsOpen = false;
+    pendingResult = null;
+    if (validateTimer) clearTimeout(validateTimer);
+    const raw = descriptorText.trim();
+    if (!raw) return;
+    validateTimer = setTimeout(() => { void runPasteTimeValidation(raw); }, 300);
+  }
 
   // -------------------------------------------------------------------------
   // Event handlers
@@ -326,44 +316,34 @@
     if (!raw) return;
     error = null;
     errorDetailsOpen = false;
-    autoWrapNote = null;
     loading = true;
     try {
-      const wrapped = await buildAutoWrapDescriptor(raw);
-      const expression = wrapped ? wrapped.expression : raw;
-      const changeExpr = wrapped ? wrapped.changeExpression : null;
-      const network = detectNetwork(raw);
-      const result = await validateDescriptor(expression, network);
-      if (result.is_multisig) {
-        error = { kind: 'multisig' };
+      if (!pendingResult || lastValidatedText !== raw) {
+        await runPasteTimeValidation(raw);
+      }
+      if (!pendingResult || error) return;
+      if (pendingResult.best_fit === 'vault') {
+        error = { kind: 'redirect', bestFit: 'vault' };
         return;
       }
+      const result = pendingResult;
+      const expr = result.canonical_expression ?? raw;
+      const changeExpr = result.canonical_change_expression ?? null;
+      const network = detectNetwork(raw);
       parseResult = result;
-      derivedExpression = expression;
+      derivedExpression = expr;
       derivedChangeExpression = changeExpr;
       derivedNetwork = network;
-      if (wrapped) autoWrapNote = wrapped.note;
-      const meta = extractDescriptorMeta(expression);
+      autoWrapNote = result.canonical_expression
+        ? 'Extended key auto-detected — verify the first addresses match your wallet.'
+        : null;
+      const meta = extractDescriptorMeta(expr);
       derivationPath = meta.derivation;
       masterKeyTrunc = truncateKey(meta.xpub);
       scriptTypeLabel = formatScriptType(result.script_type);
       holdingName = deriveAutoName('import', source, result.script_type);
       nameDraft = holdingName;
       step = 'parseback';
-    } catch (e: unknown) {
-      const err = e as Record<string, unknown>;
-      const msg = extractApiError(err);
-      if (err?._status === 401) {
-        if (msg.includes('locked') || msg.includes('unlock')) { goto('/unlock'); return; }
-        await auth.clearCredential(); goto('/'); return;
-      }
-      if (msg.includes('address') || msg.includes('single') || msg.includes('bech32')) {
-        error = { kind: 'single-address' };
-      } else if (msg) {
-        error = { kind: 'parse', message: msg };
-      } else {
-        error = { kind: 'network', message: 'Could not reach the server. Check your connection.' };
-      }
     } finally {
       loading = false;
     }
@@ -586,7 +566,7 @@
             aria-invalid={!!error}
             placeholder="Paste your xpub or output descriptor here…"
             bind:value={descriptorText}
-            oninput={() => { error = null; errorDetailsOpen = false; }}
+            oninput={scheduleValidation}
           ></textarea>
           <button class="paste-btn" type="button" aria-label="Paste from clipboard"
                   onclick={handlePaste}>
@@ -599,18 +579,13 @@
         </div>
       </div>
 
-      {#if bareKeyDetected}
-        <p class="auto-wrap-hint">
-          Looks like a bare extended key — we'll try building a descriptor from it automatically.
-        </p>
-      {/if}
     </div>
 
   </div>
   {/snippet}
 
   {#snippet errorRegion()}
-    {#if error?.kind === 'single-address'}
+    {#if error?.kind === 'single_address_input'}
       <div class="wizard-error" role="alert">
         <svg class="error-icon" viewBox="0 0 24 24" aria-hidden="true" fill="none"
              stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -619,11 +594,98 @@
           <line x1="12" y1="16" x2="12" y2="16.5"/>
         </svg>
         <div>
-          <p class="error-title">That's a single Bitcoin address.</p>
+          <p class="error-title">That looks like an address.</p>
           <p class="error-body">
-            TallyKeep tracks wallets, not isolated addresses — paste
-            the wallet's xpub or output descriptor instead.
+            To watch a wallet, TallyKeep needs the wallet's descriptor
+            or extended public key, not a single receive address. Look
+            for "Export descriptor", "Show extended public key", or
+            "Account public key" in your wallet's settings.
           </p>
+        </div>
+      </div>
+    {:else if error?.kind === 'lsp_coordinated_wallet'}
+      <div class="wizard-error" role="alert">
+        <svg class="error-icon" viewBox="0 0 24 24" aria-hidden="true" fill="none"
+             stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="10"/>
+          <line x1="12" y1="8" x2="12" y2="13"/>
+          <line x1="12" y1="16" x2="12" y2="16.5"/>
+        </svg>
+        <div>
+          <p class="error-title">This looks like a Lightning-coordinated wallet.</p>
+          <p class="error-body">
+            Wallets like Phoenix hold their on-chain balance jointly with
+            a Lightning service provider, using a script TallyKeep can't
+            watch independently yet. We don't support these wallets today.
+          </p>
+        </div>
+      </div>
+    {:else if error?.kind === 'multi_path_miniscript'}
+      <div class="wizard-error" role="alert">
+        <svg class="error-icon" viewBox="0 0 24 24" aria-hidden="true" fill="none"
+             stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="10"/>
+          <line x1="12" y1="8" x2="12" y2="13"/>
+          <line x1="12" y1="16" x2="12" y2="16.5"/>
+        </svg>
+        <div>
+          <p class="error-title">This descriptor has multiple spending paths.</p>
+          <p class="error-body">
+            TallyKeep currently supports single-path descriptors (one
+            spending route per wallet). Descriptors with branching
+            script logic such as recovery paths, conditional spends,
+            or hash preimage gates aren't supported yet.
+          </p>
+        </div>
+      </div>
+    {:else if error?.kind === 'unsupported_form' || error?.kind === 'unparseable'}
+      <div class="wizard-error" role="alert">
+        <svg class="error-icon" viewBox="0 0 24 24" aria-hidden="true" fill="none"
+             stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="10"/>
+          <line x1="12" y1="8" x2="12" y2="13"/>
+          <line x1="12" y1="16" x2="12" y2="16.5"/>
+        </svg>
+        <div>
+          <p class="error-title">
+            {error.kind === 'unparseable' ? "TallyKeep can't read this." : "Unsupported descriptor."}
+          </p>
+          <p class="error-body">
+            {#if error.kind === 'unparseable'}
+              This doesn't parse as a Bitcoin descriptor or an extended
+              public key. Check for missing characters, copy errors, or
+              paste truncation.
+            {:else}
+              Supported forms are listed in each wizard's input help
+              text. If you're sure this descriptor describes a
+              single-key wallet, a multisig, or a timelocked vault,
+              double-check the export format from your wallet.
+            {/if}
+          </p>
+        </div>
+      </div>
+    {:else if error?.kind === 'redirect'}
+      <div class="wizard-error redirect" role="alert">
+        <svg class="error-icon" viewBox="0 0 24 24" aria-hidden="true" fill="none"
+             stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M 12 2 L 2 22 L 22 22 Z"/>
+          <line x1="12" y1="9" x2="12" y2="14"/>
+          <line x1="12" y1="17" x2="12" y2="17.5"/>
+        </svg>
+        <div class="error-content">
+          <p class="error-title">This looks like a Vault descriptor.</p>
+          <p class="error-body">
+            Multisig or timelocked Holdings are Vaults in TallyKeep.
+            Set this up as a Vault instead.
+          </p>
+          <button class="redirect-cta" type="button"
+                  onclick={() => goto('/holding/new/vault')}>
+            Set up as Vault
+            <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor"
+                 stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="9 6 15 12 9 18"/>
+            </svg>
+          </button>
         </div>
       </div>
     {:else if error?.kind === 'network'}
@@ -635,52 +697,8 @@
           <line x1="12" y1="16" x2="12" y2="16.5"/>
         </svg>
         <div>
-          <p class="error-title">Couldn't read that descriptor.</p>
+          <p class="error-title">Couldn't reach the server.</p>
           <p class="error-body">{error.message}</p>
-        </div>
-      </div>
-    {:else if error?.kind === 'parse'}
-      <div class="wizard-error" role="alert">
-        <svg class="error-icon" viewBox="0 0 24 24" aria-hidden="true" fill="none"
-             stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <circle cx="12" cy="12" r="10"/>
-          <line x1="12" y1="8" x2="12" y2="13"/>
-          <line x1="12" y1="16" x2="12" y2="16.5"/>
-        </svg>
-        <div class="error-content">
-          <p class="error-title">Couldn't read that descriptor.</p>
-          <p class="error-body">Check it came from a compatible wallet and try again.</p>
-          <button class="error-details-toggle" type="button"
-                  onclick={() => { errorDetailsOpen = !errorDetailsOpen; }}>
-            {errorDetailsOpen ? 'Hide details' : 'Show details'}
-          </button>
-          {#if errorDetailsOpen}
-            <p class="error-details-text">{error.message}</p>
-          {/if}
-        </div>
-      </div>
-    {:else if error?.kind === 'multisig'}
-      <div class="wizard-error redirect" role="alert">
-        <svg class="error-icon" viewBox="0 0 24 24" aria-hidden="true" fill="none"
-             stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M 12 2 L 2 22 L 22 22 Z"/>
-          <line x1="12" y1="9" x2="12" y2="14"/>
-          <line x1="12" y1="17" x2="12" y2="17.5"/>
-        </svg>
-        <div class="error-content">
-          <p class="error-title">This is a multisig descriptor.</p>
-          <p class="error-body">
-            Multisig Holdings are Vaults in TallyKeep — multiple keys
-            are required to move funds. Set this up as a Vault instead.
-          </p>
-          <button class="redirect-cta" type="button"
-                  onclick={() => goto('/holding/new/vault')}>
-            Set up as Vault
-            <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor"
-                 stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <polyline points="9 6 15 12 9 18"/>
-            </svg>
-          </button>
         </div>
       </div>
     {/if}
@@ -1222,14 +1240,6 @@
   }
   .paste-btn:hover { background: var(--color-bg); }
   .paste-btn svg { width: 12px; height: 12px; }
-
-  /* ---------- Auto-wrap hint (below textarea) ---------- */
-  .auto-wrap-hint {
-    margin: var(--space-2) 0 0;
-    font-size: var(--font-size-xs);
-    color: var(--color-text-muted);
-    line-height: var(--line-height-default);
-  }
 
   /* ---------- Auto-wrap notice (parseback) ---------- */
   .auto-wrap-notice {

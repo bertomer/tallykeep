@@ -31,9 +31,11 @@ from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy.orm import Session
 
 from tallykeep.adapters.descriptor_adapter import (
+    ClassifiedDescriptor,
     DescriptorAdapter,
     DescriptorParseError,
     UnsupportedDescriptorError,
+    classify_descriptor,
 )
 from tallykeep.adapters.node_adapter import NodeAdapter, NodeError
 from tallykeep.api.dependencies import get_db_session, get_node_adapter
@@ -47,19 +49,6 @@ from tallykeep.schemas.holding import (
     DescriptorInput,
     DescriptorResponse,
     NextReceivingAddressResponse,
-)
-
-
-# --- bitcoin address detection ------------------------------------------------
-# Used by the validate endpoint to give a typed rejection when the caller passes
-# a bare address instead of a BIP 380 descriptor.
-_ADDRESS_PATTERN = re.compile(
-    r'^(?:'
-    r'bc1[a-zA-HJ-NP-Z0-9]{6,87}'   # mainnet bech32/bech32m
-    r'|tb1[a-zA-HJ-NP-Z0-9]{6,87}'  # testnet bech32/bech32m
-    r'|bcrt1[a-zA-HJ-NP-Z0-9]{6,87}' # regtest bech32/bech32m
-    r'|[13mn2][a-km-zA-HJ-NP-Z1-9]{24,34}'  # base58check (P2PKH / P2SH)
-    r')$'
 )
 
 
@@ -161,27 +150,41 @@ _KEY_ORIGIN_PATTERN = re.compile(r'\[')
 class ValidateDescriptorResponse(BaseModel):
     """Validate response.
 
-    `parse_category`:
-      - "parseback_ready" — descriptor is a valid Vault shape (multisig and/or timelock).
-        The Vault wizard advances to parseback.
-      - "single_key_no_timelock" — descriptor is a valid single-key wallet without
-        timelock. The Vault wizard redirects to Strongbox; the Strongbox wizard proceeds.
+    New fields (classification.md):
+      - best_fit: "purse" | "strongbox" | "vault" | null
+            null means the descriptor is rejected; see rejection_category.
+      - rejection_category: present iff best_fit is null. One of:
+            "single_address_input" | "unparseable" | "lsp_coordinated_wallet" |
+            "multi_path_miniscript" | "unsupported_form".
+      - canonical_expression: set when the raw input was a bare key and was
+            auto-wrapped on the backend (e.g. xpub → wpkh(xpub/0/*)).
+      - canonical_change_expression: companion change-chain descriptor when
+            canonical_expression is set.
 
-    Unsupported / unparseable descriptors still return 422 (PARSE_ERROR /
-    UNSUPPORTED_DESCRIPTOR / SINGLE_ADDRESS_INPUT).
+    Metadata fields (script_type, is_multisig, …) are populated when
+    best_fit is not null; they default to empty/false for rejected inputs.
+
+    Legacy field parse_category is kept for backwards compatibility:
+      - "parseback_ready" when best_fit == "vault"
+      - "single_key_no_timelock" otherwise (including rejection cases)
     """
 
-    script_type: str
-    is_multisig: bool
+    best_fit: str | None = None
+    rejection_category: str | None = None
+    canonical_expression: str | None = None
+    canonical_change_expression: str | None = None
+
+    script_type: str = ""
+    is_multisig: bool = False
     required_signers: int | None = None
     total_signers: int | None = None
     timelock_kind: str | None = None       # "cltv" | "csv" | None
     timelock_value: int | None = None      # block height (CLTV) or count (CSV)
     cosigner_fingerprints: list[str] = []
-    auto_name: str | None = None           # suggested Vault name (only when parseback_ready)
+    auto_name: str | None = None
     parse_category: str = "single_key_no_timelock"
-    first_addresses: list[str]
-    signing_metadata_present: bool
+    first_addresses: list[str] = []
+    signing_metadata_present: bool = False
 
 
 @router.post(
@@ -193,43 +196,40 @@ async def validate_descriptor(
     body: ValidateDescriptorRequest,
     session: Session = Depends(get_db_session),
 ) -> ValidateDescriptorResponse:
-    """Validate a descriptor expression and return its parsed properties.
+    """Classify and validate a descriptor expression.
 
-    Accepts single-key, multisig, and miniscript (timelock) BIP 380 descriptors.
-    Returns a typed 422 error when given a bare bitcoin address instead of
-    a descriptor (error_code: SINGLE_ADDRESS_INPUT).
+    Bare extended keys (xpub, zpub, ypub, tpub, vpub, upub) are auto-wrapped.
+    All semantic rejections return HTTP 200 with best_fit=null + rejection_category;
+    only malformed requests and auth failures return 4xx.
 
-    `parse_category` signals the routing intent for wizard UIs:
-    - "parseback_ready": valid Vault shape — wizard advances to parseback.
-    - "single_key_no_timelock": valid Strongbox shape — Vault wizard redirects;
-      Strongbox wizard proceeds normally.
+    best_fit: "purse" | "strongbox" | "vault" | null
+    rejection_category: one of single_address_input / unparseable /
+        lsp_coordinated_wallet / multi_path_miniscript / unsupported_form
+    parse_category: legacy field kept for backwards compatibility
     """
-    expr = body.input.strip()
+    classification = classify_descriptor(body.input, body.network)
 
-    if _ADDRESS_PATTERN.match(expr):
-        raise HTTPException(
-            status_code=422,
-            detail={
-                "error_code": "SINGLE_ADDRESS_INPUT",
-                "message": (
-                    "A bare bitcoin address is not a valid descriptor. "
-                    "Wrap it in a descriptor function such as wpkh(...) or tr(...)."
-                ),
-            },
+    if classification.best_fit is None:
+        return ValidateDescriptorResponse(
+            best_fit=None,
+            rejection_category=classification.rejection_category,
+            canonical_expression=classification.canonical_expression,
+            canonical_change_expression=classification.canonical_change_expression,
         )
+
+    # Use the canonical expression (auto-wrap may have replaced the raw input).
+    expr = classification.canonical_expression or body.input.strip()
 
     try:
         parsed = _ADAPTER.parse(expr, body.network, allow_multisig=True)
-    except DescriptorParseError as exc:
-        raise HTTPException(
-            status_code=422,
-            detail={"error_code": "PARSE_ERROR", "message": str(exc)},
-        ) from exc
-    except UnsupportedDescriptorError as exc:
-        raise HTTPException(
-            status_code=422,
-            detail={"error_code": "UNSUPPORTED_DESCRIPTOR", "message": str(exc)},
-        ) from exc
+    except (DescriptorParseError, UnsupportedDescriptorError):
+        # classify_descriptor validated parseability; this is a safety net.
+        return ValidateDescriptorResponse(
+            best_fit=None,
+            rejection_category='unsupported_form',
+            canonical_expression=classification.canonical_expression,
+            canonical_change_expression=classification.canonical_change_expression,
+        )
 
     first_addresses: list[str] = []
     try:
@@ -243,16 +243,13 @@ async def validate_descriptor(
     script_type_key = _SCRIPT_TYPE_LABELS.get(
         parsed.address_type.value, parsed.address_type.value
     )
-    # Append " miniscript" suffix when the descriptor contains a timelock fragment.
     if parsed.timelock_kind is not None:
         script_type = f"{script_type_key} miniscript"
     else:
         script_type = script_type_key
 
-    # Key-origin brackets ([fingerprint/path]) present → signing metadata available.
     signing_metadata_present = bool(_KEY_ORIGIN_PATTERN.search(expr))
 
-    # Vault shape: has multisig OR a timelock.
     is_vault = parsed.is_multisig or parsed.timelock_kind is not None
     parse_category = "parseback_ready" if is_vault else "single_key_no_timelock"
 
@@ -267,6 +264,9 @@ async def validate_descriptor(
         auto_name = _vault_auto_name_with_collision(session, base)
 
     return ValidateDescriptorResponse(
+        best_fit=classification.best_fit,
+        canonical_expression=classification.canonical_expression,
+        canonical_change_expression=classification.canonical_change_expression,
         script_type=script_type,
         is_multisig=parsed.is_multisig,
         required_signers=parsed.required_signers,

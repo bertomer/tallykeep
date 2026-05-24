@@ -38,20 +38,25 @@
   type Step = 'input' | 'parseback' | 'success';
 
   type ErrorState =
-    | { kind: 'single-address' }
-    | { kind: 'multisig' }
-    | { kind: 'timelock-redirect' }
-    | { kind: 'parse'; message: string }
+    | { kind: 'single_address_input' }
+    | { kind: 'lsp_coordinated_wallet' }
+    | { kind: 'multi_path_miniscript' }
+    | { kind: 'unsupported_form' }
+    | { kind: 'unparseable' }
+    | { kind: 'redirect'; bestFit: string }
     | { kind: 'network'; message: string }
     | { kind: 'create'; message: string };
 
   interface ValidateResult {
+    best_fit: string | null;
+    rejection_category: string | null;
+    canonical_expression: string | null;
+    canonical_change_expression: string | null;
     script_type: string;
     is_multisig: boolean;
     required_signers?: number;
     total_signers?: number;
     timelock_kind?: string | null;
-    parse_category?: string;
     first_addresses: string[];
     signing_metadata_present: boolean;
   }
@@ -164,6 +169,11 @@
   let serverUrl = $state('');
   let autoWrapNote = $state<string | null>(null);
 
+  // Paste-time validation state
+  let pendingResult = $state<ValidateResult | null>(null);
+  let lastValidatedText = $state('');
+  let validateTimer: ReturnType<typeof setTimeout> | null = null;
+
   // -------------------------------------------------------------------------
   // Computed
   // -------------------------------------------------------------------------
@@ -171,77 +181,18 @@
   let selectedVendor = $derived(VENDORS.find(v => v.slug === vendorSlug) ?? VENDORS[0]);
 
   let inputCtaDisabled = $derived(
-    descriptorText.trim() === '' || error?.kind === 'multisig' || error?.kind === 'single-address' || error?.kind === 'timelock-redirect'
+    descriptorText.trim() === '' || loading ||
+    (error !== null &&
+      error.kind !== 'redirect' &&
+      error.kind !== 'create' &&
+      error.kind !== 'network')
   );
-
-  let bareKeyDetected = $derived(isBareExtendedKey(descriptorText.trim()));
 
   let canScanQR = $derived(capabilities.canScanQR());
 
   // -------------------------------------------------------------------------
-  // Helpers (shared with Purse wizard)
+  // Helpers
   // -------------------------------------------------------------------------
-
-  const B58 = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
-
-  function b58decode(s: string): Uint8Array {
-    let n = 0n;
-    for (const c of s) { const d = B58.indexOf(c); if (d < 0) throw new Error('bad b58'); n = n * 58n + BigInt(d); }
-    let lead = 0; for (const c of s) { if (c === '1') lead++; else break; }
-    const out: number[] = [];
-    while (n > 0n) { out.unshift(Number(n & 0xffn)); n >>= 8n; }
-    return new Uint8Array([...new Array(lead).fill(0), ...out]);
-  }
-
-  function b58encode(bytes: Uint8Array): string {
-    let n = 0n; for (const b of bytes) n = n * 256n + BigInt(b);
-    let s = ''; while (n > 0n) { s = B58[Number(n % 58n)] + s; n /= 58n; }
-    for (const b of bytes) { if (b === 0) s = '1' + s; else break; }
-    return s;
-  }
-
-  async function convertKeyVersion(key: string, ver: number[]): Promise<string> {
-    const full = b58decode(key);
-    const payload = new Uint8Array(full.slice(0, 78));
-    payload[0] = ver[0]; payload[1] = ver[1]; payload[2] = ver[2]; payload[3] = ver[3];
-    const h1 = new Uint8Array(await crypto.subtle.digest('SHA-256', payload));
-    const h2 = new Uint8Array(await crypto.subtle.digest('SHA-256', h1));
-    return b58encode(new Uint8Array([...payload, ...h2.slice(0, 4)]));
-  }
-
-  function isBareExtendedKey(raw: string): boolean {
-    if (!raw || /[([/]/.test(raw)) return false;
-    const lo = raw.toLowerCase();
-    return ['xpub','ypub','zpub','tpub','upub','vpub'].some(p => lo.startsWith(p));
-  }
-
-  interface AutoWrap { expression: string; changeExpression: string; }
-
-  async function buildAutoWrapDescriptor(raw: string): Promise<AutoWrap | null> {
-    if (!isBareExtendedKey(raw)) return null;
-    const lo = raw.toLowerCase();
-    if (lo.startsWith('zpub')) {
-      const k = await convertKeyVersion(raw, [0x04,0x88,0xB2,0x1E]);
-      return { expression: `wpkh(${k}/0/*)`, changeExpression: `wpkh(${k}/1/*)` };
-    }
-    if (lo.startsWith('vpub')) {
-      const k = await convertKeyVersion(raw, [0x04,0x35,0x87,0xCF]);
-      return { expression: `wpkh(${k}/0/*)`, changeExpression: `wpkh(${k}/1/*)` };
-    }
-    if (lo.startsWith('ypub')) {
-      const k = await convertKeyVersion(raw, [0x04,0x88,0xB2,0x1E]);
-      return { expression: `sh(wpkh(${k}/0/*))`, changeExpression: `sh(wpkh(${k}/1/*))` };
-    }
-    if (lo.startsWith('upub')) {
-      const k = await convertKeyVersion(raw, [0x04,0x35,0x87,0xCF]);
-      return { expression: `sh(wpkh(${k}/0/*))`, changeExpression: `sh(wpkh(${k}/1/*))` };
-    }
-    if (lo.startsWith('xpub'))
-      return { expression: `wpkh(${raw}/0/*)`, changeExpression: `wpkh(${raw}/1/*)` };
-    if (lo.startsWith('tpub'))
-      return { expression: `wpkh(${raw}/0/*)`, changeExpression: `wpkh(${raw}/1/*)` };
-    return null;
-  }
 
   function detectNetwork(input: string): 'mainnet' | 'regtest' {
     if (/tpub|tprv|upub|uprv|vpub|vprv/.test(input)) return 'regtest';
@@ -303,9 +254,9 @@
     return res.json();
   }
 
-  function applyDescriptorToState(raw: string, result: ValidateResult, wrapped: AutoWrap | null) {
-    const expression = wrapped ? wrapped.expression : raw;
-    const changeExpr = wrapped ? wrapped.changeExpression : null;
+  function applyDescriptorToState(raw: string, result: ValidateResult) {
+    const expression = result.canonical_expression ?? raw;
+    const changeExpr = result.canonical_change_expression ?? null;
     const network = detectNetwork(raw);
 
     parseResult = result;
@@ -313,7 +264,7 @@
     derivedChangeExpression = changeExpr;
     derivedNetwork = network;
     signingMetadataPresent = result.signing_metadata_present;
-    if (wrapped) autoWrapNote = 'Bare key auto-wrapped to descriptor';
+    autoWrapNote = result.canonical_expression ? 'Bare key auto-wrapped to descriptor' : null;
 
     const meta = extractDescriptorMeta(expression);
     derivationPath = meta.derivation;
@@ -321,6 +272,59 @@
     scriptTypeLabel = SCRIPT_TYPE_LABELS[result.script_type] ?? result.script_type;
     holdingName = deriveAutoName(result.script_type);
     nameDraft = holdingName;
+  }
+
+  // -------------------------------------------------------------------------
+  // Paste-time validation
+  // -------------------------------------------------------------------------
+
+  function setRejectionError(category: string | null): void {
+    switch (category) {
+      case 'single_address_input':   error = { kind: 'single_address_input' }; break;
+      case 'lsp_coordinated_wallet': error = { kind: 'lsp_coordinated_wallet' }; break;
+      case 'multi_path_miniscript':  error = { kind: 'multi_path_miniscript' }; break;
+      case 'unsupported_form':       error = { kind: 'unsupported_form' }; break;
+      default:                       error = { kind: 'unparseable' }; break;
+    }
+  }
+
+  async function runPasteTimeValidation(raw: string): Promise<void> {
+    const network = detectNetwork(raw);
+    try {
+      const result = await validateDescriptor(raw, network);
+      if (result.best_fit === null) {
+        setRejectionError(result.rejection_category);
+        pendingResult = null;
+      } else if (result.best_fit !== 'strongbox' && result.best_fit !== 'purse') {
+        error = { kind: 'redirect', bestFit: result.best_fit };
+        pendingResult = null;
+      } else {
+        error = null;
+        pendingResult = result;
+        lastValidatedText = raw;
+        // Pre-populate signingMetadataPresent for advisory (shown before parseback).
+        signingMetadataPresent = result.signing_metadata_present;
+      }
+    } catch (e: unknown) {
+      const err = e as Record<string, unknown>;
+      if (err?._status === 401) {
+        const msg = extractApiError(err);
+        if (msg.includes('locked') || msg.includes('unlock')) { goto('/unlock'); return; }
+        await auth.clearCredential(); goto('/'); return;
+      }
+      error = { kind: 'network', message: 'Could not reach the server. Check your connection.' };
+      pendingResult = null;
+    }
+  }
+
+  function scheduleValidation(): void {
+    error = null;
+    pendingResult = null;
+    parseResult = null;
+    if (validateTimer) clearTimeout(validateTimer);
+    const raw = descriptorText.trim();
+    if (!raw) return;
+    validateTimer = setTimeout(() => { void runPasteTimeValidation(raw); }, 300);
   }
 
   // -------------------------------------------------------------------------
@@ -362,46 +366,20 @@
     }
 
     error = null;
-    autoWrapNote = null;
     loading = true;
     try {
-      const wrapped = await buildAutoWrapDescriptor(raw);
-      const expression = wrapped ? wrapped.expression : raw;
-      const network = detectNetwork(raw);
-      const result = await validateDescriptor(expression, network);
-
-      if (result.is_multisig) {
-        error = { kind: 'multisig' };
+      if (!pendingResult || lastValidatedText !== raw) {
+        await runPasteTimeValidation(raw);
+      }
+      if (!pendingResult || error) return;
+      if (pendingResult.best_fit === 'vault') {
+        error = { kind: 'redirect', bestFit: 'vault' };
         return;
       }
-
-      if (result.parse_category === 'parseback_ready' || result.timelock_kind) {
-        error = { kind: 'timelock-redirect' };
-        return;
-      }
-
-      applyDescriptorToState(raw, result, wrapped);
+      applyDescriptorToState(raw, pendingResult);
       // Stay on step 1 to show advisory; second Continue advances.
-      if (!result.signing_metadata_present) return;
+      if (!pendingResult.signing_metadata_present) return;
       step = 'parseback';
-    } catch (e: unknown) {
-      const err = e as Record<string, unknown>;
-      const detail = (err as { detail?: { error_code?: string; message?: string } }).detail;
-      if (err?._status === 401) {
-        const msg = extractApiError(err);
-        if (msg.includes('locked') || msg.includes('unlock')) { goto('/unlock'); return; }
-        await auth.clearCredential(); goto('/'); return;
-      }
-      if (detail?.error_code === 'SINGLE_ADDRESS_INPUT' || extractApiError(err).includes('address') || extractApiError(err).includes('single')) {
-        error = { kind: 'single-address' };
-      } else {
-        const msg = extractApiError(err);
-        if (msg) {
-          error = { kind: 'parse', message: msg };
-        } else {
-          error = { kind: 'network', message: 'Could not reach the server. Check your connection.' };
-        }
-      }
     } finally {
       loading = false;
     }
@@ -555,15 +533,12 @@
         <textarea
           id="descriptor-input"
           class="descriptor-textarea"
-          class:descriptor-error={error?.kind === 'single-address' || error?.kind === 'multisig'}
+          class:descriptor-error={error !== null && error.kind !== 'redirect' && error.kind !== 'create' && error.kind !== 'network'}
           placeholder="wpkh([abc12345/84h/0h/0h]xpub6CUGRUo…"
           aria-label="Descriptor"
-          aria-invalid={error?.kind === 'single-address' || error?.kind === 'multisig' || undefined}
+          aria-invalid={error !== null && error.kind !== 'redirect' && error.kind !== 'create' && error.kind !== 'network' ? true : undefined}
           bind:value={descriptorText}
-          oninput={() => {
-            if (error?.kind === 'single-address' || error?.kind === 'parse' || error?.kind === 'network') error = null;
-            parseResult = null;
-          }}
+          oninput={scheduleValidation}
         ></textarea>
         <button class="paste-btn" type="button" aria-label="Paste from clipboard" onclick={handlePaste}>
           <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -607,7 +582,7 @@
   {/snippet}
 
   {#snippet errorRegion()}
-    {#if error?.kind === 'single-address'}
+    {#if error?.kind === 'single_address_input'}
       <div class="footer-error footer-error--danger" role="alert">
         <svg class="fe-icon" viewBox="0 0 24 24" aria-hidden="true">
           <circle cx="12" cy="12" r="10"/>
@@ -615,11 +590,53 @@
           <line x1="12" y1="16" x2="12" y2="16.5"/>
         </svg>
         <div>
-          <p class="fe-title">That's a single Bitcoin address.</p>
-          <p class="fe-body">TallyKeep tracks wallets, not isolated addresses — export the wallet descriptor or xpub from your hardware wallet and paste that instead.</p>
+          <p class="fe-title">That looks like an address.</p>
+          <p class="fe-body">To watch a wallet, TallyKeep needs the wallet's descriptor or extended public key, not a single receive address. Look for "Export descriptor", "Show extended public key", or "Account public key" in your wallet's settings.</p>
         </div>
       </div>
-    {:else if error?.kind === 'multisig'}
+    {:else if error?.kind === 'lsp_coordinated_wallet'}
+      <div class="footer-error footer-error--danger" role="alert">
+        <svg class="fe-icon" viewBox="0 0 24 24" aria-hidden="true">
+          <circle cx="12" cy="12" r="10"/>
+          <line x1="12" y1="8"  x2="12" y2="13"/>
+          <line x1="12" y1="16" x2="12" y2="16.5"/>
+        </svg>
+        <div>
+          <p class="fe-title">This looks like a Lightning-coordinated wallet.</p>
+          <p class="fe-body">Wallets like Phoenix hold their on-chain balance jointly with a Lightning service provider, using a script TallyKeep can't watch independently yet. We don't support these wallets today.</p>
+        </div>
+      </div>
+    {:else if error?.kind === 'multi_path_miniscript'}
+      <div class="footer-error footer-error--danger" role="alert">
+        <svg class="fe-icon" viewBox="0 0 24 24" aria-hidden="true">
+          <circle cx="12" cy="12" r="10"/>
+          <line x1="12" y1="8"  x2="12" y2="13"/>
+          <line x1="12" y1="16" x2="12" y2="16.5"/>
+        </svg>
+        <div>
+          <p class="fe-title">This descriptor has multiple spending paths.</p>
+          <p class="fe-body">TallyKeep currently supports single-path descriptors (one spending route per wallet). Descriptors with branching script logic such as recovery paths, conditional spends, or hash preimage gates aren't supported yet.</p>
+        </div>
+      </div>
+    {:else if error?.kind === 'unsupported_form' || error?.kind === 'unparseable'}
+      <div class="footer-error footer-error--danger" role="alert">
+        <svg class="fe-icon" viewBox="0 0 24 24" aria-hidden="true">
+          <circle cx="12" cy="12" r="10"/>
+          <line x1="12" y1="8"  x2="12" y2="13"/>
+          <line x1="12" y1="16" x2="12" y2="16.5"/>
+        </svg>
+        <div>
+          <p class="fe-title">{error.kind === 'unparseable' ? "TallyKeep can't read this." : "Unsupported descriptor."}</p>
+          <p class="fe-body">
+            {#if error.kind === 'unparseable'}
+              This doesn't parse as a Bitcoin descriptor or an extended public key. Check for missing characters, copy errors, or paste truncation.
+            {:else}
+              Supported forms are listed in each wizard's input help text. If you're sure this descriptor describes a single-key wallet, a multisig, or a timelocked vault, double-check the export format from your wallet.
+            {/if}
+          </p>
+        </div>
+      </div>
+    {:else if error?.kind === 'redirect'}
       <div class="footer-error footer-error--warning" role="alert">
         <svg class="fe-icon" viewBox="0 0 24 24" aria-hidden="true">
           <path d="M 12 2 L 2 22 L 22 22 Z"/>
@@ -627,8 +644,8 @@
           <line x1="12" y1="17" x2="12" y2="17.5"/>
         </svg>
         <div class="fe-content">
-          <p class="fe-title">This is a multisig descriptor.</p>
-          <p class="fe-body">Multisig Holdings are Vaults in TallyKeep — multiple keys are required to move funds. Set this up as a Vault instead.</p>
+          <p class="fe-title">This looks like a Vault descriptor.</p>
+          <p class="fe-body">Multisig or timelocked Holdings are Vaults in TallyKeep. Set this up as a Vault instead.</p>
           <button class="fe-redirect-cta" type="button" onclick={() => goto('/holding/new/vault')}>
             Set up as Vault
             <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -637,25 +654,7 @@
           </button>
         </div>
       </div>
-    {:else if error?.kind === 'timelock-redirect'}
-      <div class="footer-error footer-error--warning" role="alert">
-        <svg class="fe-icon" viewBox="0 0 24 24" aria-hidden="true">
-          <path d="M 12 2 L 2 22 L 22 22 Z"/>
-          <line x1="12" y1="9"  x2="12" y2="14"/>
-          <line x1="12" y1="17" x2="12" y2="17.5"/>
-        </svg>
-        <div class="fe-content">
-          <p class="fe-title">This descriptor has a timelock.</p>
-          <p class="fe-body">Descriptors with a timelock (CLTV or CSV) are Vault-type holdings in TallyKeep. Set this up as a Vault instead.</p>
-          <button class="fe-redirect-cta" type="button" onclick={() => goto('/holding/new/vault')}>
-            Set up as Vault
-            <svg viewBox="0 0 24 24" aria-hidden="true">
-              <polyline points="9 6 15 12 9 18"/>
-            </svg>
-          </button>
-        </div>
-      </div>
-    {:else if error?.kind === 'parse' || error?.kind === 'network'}
+    {:else if error?.kind === 'network'}
       <div class="footer-error footer-error--danger" role="alert">
         <svg class="fe-icon" viewBox="0 0 24 24" aria-hidden="true">
           <circle cx="12" cy="12" r="10"/>
@@ -663,13 +662,12 @@
           <line x1="12" y1="16" x2="12" y2="16.5"/>
         </svg>
         <div>
-          <p class="fe-title">{error.kind === 'network' ? 'Connection error' : 'Could not parse descriptor'}</p>
+          <p class="fe-title">Couldn't reach the server.</p>
           <p class="fe-body">{error.message}</p>
         </div>
       </div>
-    {:else if bareKeyDetected || (parseResult !== null && !signingMetadataPresent)}
-      <!-- Advisory: bare key pasted (immediate, client-side) or validate returned
-           signing_metadata_present:false. CTA stays enabled; second Continue advances. -->
+    {:else if parseResult !== null && !signingMetadataPresent}
+      <!-- Advisory: signing metadata absent. CTA stays enabled; second Continue advances. -->
       <div class="footer-advisory" role="note">
         <svg class="adv-icon" viewBox="0 0 24 24" aria-hidden="true">
           <path d="M 12 2 L 2 22 L 22 22 Z"/>

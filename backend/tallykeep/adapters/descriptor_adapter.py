@@ -22,6 +22,7 @@ values without first sending one in).
 
 from __future__ import annotations
 
+import hashlib
 import re
 from dataclasses import dataclass, field
 
@@ -49,6 +50,96 @@ _TAPROOT_MULTISIG_RE = re.compile(r'(?:sorted)?multi_a\(')
 _UNSUPPORTED_FRAGMENT_RE = re.compile(
     r'\bor_[idcb]\(|\bthresh\(|\bsha256\(|\bhash256\(|\bripemd160\(|\bhash160\('
 )
+# LSP-coordinated wallet: Phoenix swap-in-potentiam shape and structurally
+# equivalent two-party-with-timelock-fallback constructs.
+# Pattern: or_<combinator>(pk(K_lsp), and_v(v:pk(K_user), older(N)))
+# Checked before the generic multi-path guard to give a more specific label.
+_LSP_PATTERN_RE = re.compile(
+    r'\bor_[dcib]\s*\(\s*pk\s*\([^)]+\)\s*,\s*and_v\s*\(\s*v:pk\s*\([^)]+\)\s*,\s*older\s*\(\s*\d+\s*\)\s*\)\s*\)'
+)
+# Bare Bitcoin address pattern — used by classifier to give single_address_input
+# rejection before attempting BDK parse.
+_ADDRESS_PATTERN_CLASSIFIER = re.compile(
+    r'^(?:'
+    r'bc1[a-zA-HJ-NP-Z0-9]{6,87}'    # mainnet bech32/bech32m
+    r'|tb1[a-zA-HJ-NP-Z0-9]{6,87}'   # testnet bech32/bech32m
+    r'|bcrt1[a-zA-HJ-NP-Z0-9]{6,87}' # regtest bech32/bech32m
+    r'|[13mn2][a-km-zA-HJ-NP-Z1-9]{24,34}'  # base58check (P2PKH/P2SH)
+    r')$'
+)
+
+# --- Base58Check helpers for version-byte recoding ---------------------------
+# Used to convert zpub/ypub/vpub/upub to canonical xpub/tpub before wrapping.
+
+_B58_ALPHABET = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz'
+_B58_LOOKUP = {c: i for i, c in enumerate(_B58_ALPHABET)}
+
+_XPUB_VERSION = bytes.fromhex('0488B21E')  # mainnet standard (P2WPKH / P2PKH)
+_TPUB_VERSION = bytes.fromhex('043587CF')  # testnet/regtest standard
+
+
+def _b58decode(s: str) -> bytes:
+    n = 0
+    for c in s:
+        n = n * 58 + _B58_LOOKUP[c]
+    lead = len(s) - len(s.lstrip('1'))
+    if n == 0:
+        return b'\x00' * lead
+    return b'\x00' * lead + n.to_bytes((n.bit_length() + 7) // 8, 'big')
+
+
+def _b58encode(data: bytes) -> str:
+    n = int.from_bytes(data, 'big')
+    s = ''
+    while n > 0:
+        n, rem = divmod(n, 58)
+        s = _B58_ALPHABET[rem] + s
+    lead = len(data) - len(data.lstrip(b'\x00'))
+    return '1' * lead + s
+
+
+def _recode_extended_key_version(key: str, new_version: bytes) -> str:
+    """Re-encode a Base58Check extended public key with a different version prefix."""
+    decoded = _b58decode(key)
+    if len(decoded) < 78:
+        raise ValueError(f"Not a valid extended key (got {len(decoded)} bytes)")
+    payload = new_version + decoded[4:78]
+    checksum = hashlib.sha256(hashlib.sha256(payload).digest()).digest()[:4]
+    return _b58encode(payload + checksum)
+
+
+def _auto_wrap_bare_key(expression: str) -> tuple[str, str] | None:
+    """Wrap a bare extended public key in the canonical descriptor form.
+
+    Returns (canonical_expression, canonical_change_expression) or None when
+    the input is not a bare key.  Supported prefixes: xpub, zpub, ypub, tpub,
+    vpub, upub (and capitalised variants).
+    """
+    s = expression.strip()
+    # Bare keys have no descriptor punctuation.
+    if not s or re.search(r'[()\[\]/]', s):
+        return None
+    lo = s.lower()
+    try:
+        if lo.startswith('zpub'):
+            k = _recode_extended_key_version(s, _XPUB_VERSION)
+            return f"wpkh({k}/0/*)", f"wpkh({k}/1/*)"
+        if lo.startswith('ypub'):
+            k = _recode_extended_key_version(s, _XPUB_VERSION)
+            return f"sh(wpkh({k}/0/*))", f"sh(wpkh({k}/1/*))"
+        if lo.startswith('xpub'):
+            return f"wpkh({s}/0/*)", f"wpkh({s}/1/*)"
+        if lo.startswith('vpub'):
+            k = _recode_extended_key_version(s, _TPUB_VERSION)
+            return f"wpkh({k}/0/*)", f"wpkh({k}/1/*)"
+        if lo.startswith('upub'):
+            k = _recode_extended_key_version(s, _TPUB_VERSION)
+            return f"sh(wpkh({k}/0/*))", f"sh(wpkh({k}/1/*))"
+        if lo.startswith('tpub'):
+            return f"wpkh({s}/0/*)", f"wpkh({s}/1/*)"
+    except (ValueError, KeyError):
+        pass
+    return None
 
 
 # --- network mapping ---------------------------------------------------------
@@ -572,8 +663,145 @@ class BuiltPsbt:
     change_keychain_index: int | None
 
 
+@dataclass(frozen=True)
+class ClassifiedDescriptor:
+    """Result of classify_descriptor().
+
+    best_fit: 'purse' | 'strongbox' | 'vault' | None
+        None = rejected; rejection_category explains why.
+    rejection_category: str | None
+        Present iff best_fit is None. One of: 'unparseable' |
+        'single_address_input' | 'lsp_coordinated_wallet' |
+        'multi_path_miniscript' | 'unsupported_form'.
+    canonical_expression: str | None
+        Set when the raw input was a bare key and got auto-wrapped
+        (e.g. xpub → wpkh(xpub/0/*)). None when no wrap was applied.
+    canonical_change_expression: str | None
+        Companion change-chain descriptor when canonical_expression is set.
+    """
+
+    best_fit: str | None
+    rejection_category: str | None
+    canonical_expression: str | None = None
+    canonical_change_expression: str | None = None
+
+
+def classify_descriptor(raw: str, network: Network) -> ClassifiedDescriptor:
+    """Classify a raw descriptor input into a Holding type or rejection category.
+
+    Match order per classification.md §Rejection taxonomy:
+      auto-wrap → single_address_input → unparseable → lsp_coordinated_wallet
+      → multi_path_miniscript → unsupported_form → classify by accept set.
+    """
+    expression = raw.strip()
+    canonical_expression: str | None = None
+    canonical_change_expression: str | None = None
+
+    # 1. Auto-wrap bare extended keys before any other check.
+    wrapped = _auto_wrap_bare_key(expression)
+    if wrapped is not None:
+        canonical_expression, canonical_change_expression = wrapped
+        expression = canonical_expression
+
+    # 2. Bare Bitcoin address — more informative than "unparseable".
+    if _ADDRESS_PATTERN_CLASSIFIER.match(expression):
+        return ClassifiedDescriptor(
+            best_fit=None, rejection_category='single_address_input',
+            canonical_expression=canonical_expression,
+            canonical_change_expression=canonical_change_expression,
+        )
+
+    # 3. BDK parse attempt.
+    try:
+        descriptor = bdk.Descriptor(expression, _NETWORK_TO_BDK[network])
+    except Exception:
+        return ClassifiedDescriptor(
+            best_fit=None, rejection_category='unparseable',
+            canonical_expression=canonical_expression,
+            canonical_change_expression=canonical_change_expression,
+        )
+
+    # <0;1> multipath shorthand — not in the v1 accept set (unsupported_form,
+    # not multi_path_miniscript — it's a descriptor format, not script logic).
+    if descriptor.is_multipath():
+        return ClassifiedDescriptor(
+            best_fit=None, rejection_category='unsupported_form',
+            canonical_expression=canonical_expression,
+            canonical_change_expression=canonical_change_expression,
+        )
+
+    # 4. LSP-coordinated wallet — checked before generic multi-path.
+    if _LSP_PATTERN_RE.search(expression):
+        return ClassifiedDescriptor(
+            best_fit=None, rejection_category='lsp_coordinated_wallet',
+            canonical_expression=canonical_expression,
+            canonical_change_expression=canonical_change_expression,
+        )
+
+    # 5. Generic multi-path / branching miniscript fragments.
+    if _UNSUPPORTED_FRAGMENT_RE.search(expression):
+        return ClassifiedDescriptor(
+            best_fit=None, rejection_category='multi_path_miniscript',
+            canonical_expression=canonical_expression,
+            canonical_change_expression=canonical_change_expression,
+        )
+
+    # 6. Classify by BDK descriptor type.
+    desc_type = descriptor.desc_type()
+    has_key_origin = bool(_FINGERPRINT_RE.search(expression))
+
+    if desc_type == bdk.DescriptorType.TR:
+        timelock_kind, _ = _extract_timelock(expression)
+        has_taproot_multisig = bool(_TAPROOT_MULTISIG_RE.search(expression))
+        if timelock_kind or has_taproot_multisig:
+            # TR Vault shape — unsupported fragment check already ran above.
+            return ClassifiedDescriptor(
+                best_fit='vault', rejection_category=None,
+                canonical_expression=canonical_expression,
+                canonical_change_expression=canonical_change_expression,
+            )
+        # Plain TR single-key.
+        return ClassifiedDescriptor(
+            best_fit='strongbox' if has_key_origin else 'purse',
+            rejection_category=None,
+            canonical_expression=canonical_expression,
+            canonical_change_expression=canonical_change_expression,
+        )
+
+    if desc_type in _SINGLE_KEY_TYPES:
+        return ClassifiedDescriptor(
+            best_fit='strongbox' if has_key_origin else 'purse',
+            rejection_category=None,
+            canonical_expression=canonical_expression,
+            canonical_change_expression=canonical_change_expression,
+        )
+
+    if desc_type in _MULTISIG_TYPES or desc_type in _MINISCRIPT_TYPES:
+        # SH without multi clause — unsupported form.
+        if desc_type == bdk.DescriptorType.SH and not _MULTISIG_THRESHOLD_RE.search(
+            expression
+        ):
+            return ClassifiedDescriptor(
+                best_fit=None, rejection_category='unsupported_form',
+                canonical_expression=canonical_expression,
+                canonical_change_expression=canonical_change_expression,
+            )
+        return ClassifiedDescriptor(
+            best_fit='vault', rejection_category=None,
+            canonical_expression=canonical_expression,
+            canonical_change_expression=canonical_change_expression,
+        )
+
+    return ClassifiedDescriptor(
+        best_fit=None, rejection_category='unsupported_form',
+        canonical_expression=canonical_expression,
+        canonical_change_expression=canonical_change_expression,
+    )
+
+
 __all__ = [
     "BuiltPsbt",
+    "ClassifiedDescriptor",
     "DerivedAddress",
     "DescriptorAdapter",
     "DescriptorParseError",
@@ -582,4 +810,5 @@ __all__ = [
     "UtxoForBuild",
     "_MINISCRIPT_TYPES",
     "_MULTISIG_TYPES",
+    "classify_descriptor",
 ]

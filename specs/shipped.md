@@ -14,6 +14,22 @@ commit.
 
 ---
 
+## 2026-05-24 — Descriptor classification consolidation
+
+`POST /api/v1/descriptors/validate` extended with `best_fit` (`"purse" | "strongbox" | "vault" | null`), `rejection_category` (one of `single_address_input / lsp_coordinated_wallet / multi_path_miniscript / unsupported_form / unparseable`, present when `best_fit` is `null`), `canonical_expression`, and `canonical_change_expression`. All semantic rejections return HTTP 200 in-band; pre-existing 4xx responses for malformed requests and auth failures unchanged.
+
+**Backend.** New `classify_descriptor()` function in the descriptor adapter: bare-key auto-wrap (xpub/zpub/ypub/tpub version-byte recoding → `wpkh()` or `sh(wpkh())`), single-address detection, Phoenix swap-in-potentiam LSP-pattern detector (`or_d(pk(K_lsp), and_v(v:pk(K_user), older(N)))`), generic multi-path miniscript catch, unsupported-form catch-all; strongbox vs purse tie-break by key-origin-bracket presence. 35 integration tests covering all rejection categories, all `best_fit` values, idempotency, and auto-wrap.
+
+**Frontend.** All three Add-Holding wizards refactored to thin clients: inline bare-key detection, single-address detection, and accept-set branching removed from Purse, Strongbox, and Vault wizards. Paste-time debounced validation (~300ms) fires on every keystroke; `best_fit` drives routing; rejection-category kinds map to locked inline-error copy from `classification.md`. Strongbox advisory two-step flow preserved; Vault redirect CTA now routes to `best_fit` target (`purse` or `strongbox`) dynamically.
+
+**Mockups.** New `mobile_add_holding_vault_input_error_inline_lsp_wallet.html` (LSP rejection in Vault wizard). Body copy on three existing inline-error mockups reconciled to `classification.md` locked strings.
+
+**Smoke test.** Sections 13b and 13d updated: rejection tests converted from catch-422 pattern to in-band 200 assertions; `best_fit` + `rejection_category` checks added; bare-xpub auto-wrap and LSP-detection cases added.
+
+Canonical docs touched at closeout: `api/openapi.yaml` (regenerated; new `ValidateDescriptorResponse` fields). No changes to per-Holding-type chapters; `classification.md` and `concerns/README.md` landed at spec sharpening.
+
+---
+
 ## 2026-05-23 — Vault detail page
 
 Full detail page shipped at `/holding/[id]` for `vault`-type Holdings. Two-tab layout

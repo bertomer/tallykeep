@@ -2,7 +2,7 @@
   Title: Mobile — Add Vault · step 1 · inline error (unsupported descriptor form)
   Status: validated  (Rémy greenlight 2026-05-15 closing the
                        Vault-wizard design pass; ADR-0010 β)
-  Date last touched: 2026-05-15
+  Date last touched: 2026-05-24
   Replaces: an earlier draft (pre-β accept-set framing).
 
   Design notes:
@@ -308,14 +308,10 @@
         <div>
           <p class="error-title">Unsupported descriptor.</p>
           <p class="error-body">
-            Supported forms:
-            <code>wsh(and_v(v:after(…),pk(…)))</code> or
-            <code>wsh(and_v(v:older(…),pk(…)))</code> for a
-            single-key timelocked Vault; multisig variants
-            (<code>wsh(multi(…))</code>,
-            <code>wsh(sortedmulti(…))</code>,
-            <code>tr(multi_a(…))</code>) with or without a
-            timelock. If your setup is more complex, contact us.
+            Supported forms are listed in each wizard&#8217;s input
+            help text. If you&#8217;re sure this descriptor describes
+            a single-key wallet, a multisig, or a timelocked vault,
+            double-check the export format from your wallet.
           </p>
         </div>
       </div>

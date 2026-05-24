@@ -243,47 +243,57 @@ Show "holding_type"  $changed.holding_type
 
 # --- 13b. Descriptor validate (pure parser) ------------------------------------
 
-Section "13b. POST /api/v1/descriptors/validate - happy paths + rejection"
+Section "13b. POST /api/v1/descriptors/validate - happy paths + classification"
 
-# Happy path: P2WPKH
+# Happy path: P2WPKH (no key-origin → purse)
 $validateBody = @{ input = $wpkhMainnet; network = "mainnet" } | ConvertTo-Json -Compress
 $validated = Invoke-RestMethod -Method Post -Uri "$BaseUrl/api/v1/descriptors/validate" `
     -ContentType 'application/json' -Body $validateBody -Headers $Headers
 Show "script_type"    $validated.script_type
 Show "is_multisig"    $validated.is_multisig
+Show "best_fit"       $validated.best_fit
 Show "first_addr[0]"  ($validated.first_addresses | Select-Object -First 1)
 
-# Happy path: WSH multisig
+# Happy path: WSH multisig → vault
 $validateMultisig = @{ input = $wshMultisig; network = "mainnet" } | ConvertTo-Json -Compress
 $validatedMs = Invoke-RestMethod -Method Post -Uri "$BaseUrl/api/v1/descriptors/validate" `
     -ContentType 'application/json' -Body $validateMultisig -Headers $Headers
 Show "multisig script" $validatedMs.script_type
 Show "is_multisig"     $validatedMs.is_multisig
 Show "required"        $validatedMs.required_signers
+Show "multisig best_fit" $validatedMs.best_fit
 
-# Error path: bare bitcoin address should return SINGLE_ADDRESS_INPUT
-try {
-    Invoke-RestMethod -Method Post -Uri "$BaseUrl/api/v1/descriptors/validate" `
-        -ContentType 'application/json' `
-        -Body '{"input":"bc1qar0srrr7xfkvy5l643lydnw9re59gtzzwf5mdq","network":"mainnet"}' `
-        -Headers $Headers | Out-Null
-    Show "address rejection" '(unexpected 200!)'
-} catch {
-    $errBody = ($_.ErrorDetails.Message | ConvertFrom-Json)
-    Show "SINGLE_ADDRESS_INPUT" ($errBody.detail.error_code -eq "SINGLE_ADDRESS_INPUT")
-}
+# Bare xpub auto-wrap: xpub without wpkh() wrapper → canonical_expression filled
+$bareXpub = "xpub661MyMwAqRbcFtXgS5sYJABqqG9YLmC3dkQmq7z68xGCRtomHHfvqczr5HTfJ82t14xQJy3jq4kV2bxFAW4HnjcGoaHePRFWMQGDGEEcAaos"
+$bareBody = @{ input = $bareXpub; network = "mainnet" } | ConvertTo-Json -Compress
+$bareResult = Invoke-RestMethod -Method Post -Uri "$BaseUrl/api/v1/descriptors/validate" `
+    -ContentType 'application/json' -Body $bareBody -Headers $Headers
+Show "bare xpub best_fit"           $bareResult.best_fit
+Show "bare xpub canonical_starts"   ($bareResult.canonical_expression -like "wpkh(*")
 
-# Error path: garbage -> PARSE_ERROR
-try {
-    Invoke-RestMethod -Method Post -Uri "$BaseUrl/api/v1/descriptors/validate" `
-        -ContentType 'application/json' `
-        -Body '{"input":"not-a-descriptor","network":"mainnet"}' `
-        -Headers $Headers | Out-Null
-    Show "parse error rejection" '(unexpected 200!)'
-} catch {
-    $errBody = ($_.ErrorDetails.Message | ConvertFrom-Json)
-    Show "PARSE_ERROR" ($errBody.detail.error_code -eq "PARSE_ERROR")
-}
+# Rejection: bare bitcoin address → 200, best_fit null, rejection_category single_address_input
+$addrResult = Invoke-RestMethod -Method Post -Uri "$BaseUrl/api/v1/descriptors/validate" `
+    -ContentType 'application/json' `
+    -Body '{"input":"bc1qar0srrr7xfkvy5l643lydnw9re59gtzzwf5mdq","network":"mainnet"}' `
+    -Headers $Headers
+Show "address best_fit=null"    ($null -eq $addrResult.best_fit)
+Show "address rejection_cat"    $addrResult.rejection_category
+
+# Rejection: garbage → 200, best_fit null, rejection_category unparseable
+$garbageResult = Invoke-RestMethod -Method Post -Uri "$BaseUrl/api/v1/descriptors/validate" `
+    -ContentType 'application/json' `
+    -Body '{"input":"not-a-descriptor","network":"mainnet"}' `
+    -Headers $Headers
+Show "garbage best_fit=null"    ($null -eq $garbageResult.best_fit)
+Show "garbage rejection_cat"    $garbageResult.rejection_category
+
+# Rejection: LSP-coordinated wallet → 200, best_fit null, rejection_category lsp_coordinated_wallet
+$lspExpr = 'wsh(or_d(pk([deadbeef/84h/0h/0h]tpubD6NzVbkrYhZ4XHndKkuB8FifXm8r5FQHwrN6oZuWCz13qb93rtgKvD4PQsqC4HP4yhV3tA2fqr2RbY5mNXfM7RxXUoeABoDtsFUq2zJq6YK/0/*),and_v(v:pk([cafebabe/84h/0h/0h]tpubD6NzVbkrYhZ4Y7QKrVFYGjE9P7K8YyvhXBQHbcAVgW7GiqV7ZpJ7JDc9QWEZ4gbJLCeHWjhXWiZ6VkFqnc7BqzjXPJJhBqCDkRrb1TRTHxH/0/*),older(4032))))'
+$lspBody = @{ input = $lspExpr; network = "mainnet" } | ConvertTo-Json -Compress
+$lspResult = Invoke-RestMethod -Method Post -Uri "$BaseUrl/api/v1/descriptors/validate" `
+    -ContentType 'application/json' -Body $lspBody -Headers $Headers
+Show "lsp best_fit=null"        ($null -eq $lspResult.best_fit)
+Show "lsp rejection_cat"        $lspResult.rejection_category
 
 
 # --- 13c. Global holdings summary (meta + scan_status) -------------------------
@@ -308,6 +318,7 @@ $validatedRegtest = Invoke-RestMethod -Method Post -Uri "$BaseUrl/api/v1/descrip
     -ContentType 'application/json' -Body $validateRegtest -Headers $Headers
 Show "regtest script_type"    $validatedRegtest.script_type
 Show "regtest is_multisig"    $validatedRegtest.is_multisig
+Show "regtest best_fit"       $validatedRegtest.best_fit
 Show "regtest first_addr[0]"  ($validatedRegtest.first_addresses | Select-Object -First 1)
 
 # Create a on_device_tk_generated Purse — exercises the generate mode path.
@@ -353,22 +364,14 @@ try {
     } else { throw }
 }
 
-# Phoenix miniscript graceful rejection — verify the backend returns a typed
-# error (not a 500) when a miniscript fragment is submitted.
-# Frontend shows the error text; the server must not crash.
-try {
-    $phoenixMiniscript = 'wsh(and_v(v:pk([deadbeef/84h/0h/0h]tpubD6NzVbkrYhZ4XHndKkuB8FifXm8r5FQHwrN6oZuWCz13qb93rtgKvD4PQsqC4HP4yhV3tA2fqr2RbY5mNXfM7RxXUoeABoDtsFUq2zJq6YK/0/*),older(144)))'
-    $phoenixBody = @{ input = $phoenixMiniscript; network = "regtest" } | ConvertTo-Json -Compress
-    Invoke-RestMethod -Method Post -Uri "$BaseUrl/api/v1/descriptors/validate" `
-        -ContentType 'application/json' -Body $phoenixBody -Headers $Headers | Out-Null
-    Show "phoenix miniscript" "200 — backend accepted it (unexpected but not fatal)"
-} catch {
-    $sc = $_.Exception.Response.StatusCode.value__
-    Show "phoenix miniscript rejection" "status=$sc (not 500 = $($sc -ne 500))"
-    if ($sc -eq 500) {
-        throw "Phoenix miniscript returned 500 — backend must return a typed error, not crash"
-    }
-}
+# Phoenix-like miniscript graceful rejection — single-path timelock shape:
+# backend classifies as unsupported_form (not lsp) and returns 200 in-band.
+$phoenixMiniscript = 'wsh(and_v(v:pk([deadbeef/84h/0h/0h]tpubD6NzVbkrYhZ4XHndKkuB8FifXm8r5FQHwrN6oZuWCz13qb93rtgKvD4PQsqC4HP4yhV3tA2fqr2RbY5mNXfM7RxXUoeABoDtsFUq2zJq6YK/0/*),older(144)))'
+$phoenixBody = @{ input = $phoenixMiniscript; network = "regtest" } | ConvertTo-Json -Compress
+$phoenixResult = Invoke-RestMethod -Method Post -Uri "$BaseUrl/api/v1/descriptors/validate" `
+    -ContentType 'application/json' -Body $phoenixBody -Headers $Headers
+Show "phoenix best_fit=null"     ($null -eq $phoenixResult.best_fit)
+Show "phoenix rejection_cat"     $phoenixResult.rejection_category
 
 
 # --- 14. Chain scan against regtest (M5.2) -----------------------------------

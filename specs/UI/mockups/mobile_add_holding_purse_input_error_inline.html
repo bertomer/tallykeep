@@ -2,7 +2,7 @@
   Title: Mobile — Add Purse · step 1 · inline error (single address)
   Status: validated  (Rémy greenlight 2026-05-13 closing the
                       Purse-wizard design pass)
-  Date last touched: 2026-05-13
+  Date last touched: 2026-05-24
   Replaces: superseded earlier 4-step variant.
 
   Design notes:
@@ -383,10 +383,13 @@
           <line x1="12" y1="16" x2="12" y2="16.5"/>
         </svg>
         <div>
-          <p class="error-title">That's a single Bitcoin address.</p>
+          <p class="error-title">That looks like an address.</p>
           <p class="error-body">
-            TallyKeep tracks wallets, not isolated addresses — paste
-            the wallet's xpub or output descriptor instead.
+            To watch a wallet, TallyKeep needs the wallet's descriptor
+            or extended public key, not a single receive address. Look
+            for &#8220;Export descriptor&#8221;, &#8220;Show extended
+            public key&#8221;, or &#8220;Account public key&#8221; in
+            your wallet&#8217;s settings.
           </p>
         </div>
       </div>
