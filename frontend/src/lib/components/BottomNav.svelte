@@ -1,60 +1,47 @@
 <!--
-  BottomNav — four-tab bottom navigation bar.
+  BottomNav — three-tab bottom navigation bar (ADR-0019).
 
-  Tabs: Home | Activity | Holdings | More
-  Active tab controlled by `active` prop. Disabled tabs (e.g. Activity when empty)
-  are greyed out and non-interactive until their iteration ships.
-
-  Tab set is not locked — sharpens with the Settings + Activity iterations
-  (per next_iteration.md pre-bagged decisions).
+  Tabs: Home | Security Health | Activity
+  Active tab controlled by `active` prop.
+  Security Health tab shows a red pill badge when criticalCount > 0 (critical-only per ADR-0019).
 -->
 <script lang="ts">
   import Icon from './Icon.svelte';
 
   let {
     active = 'home',
-    activityDisabled = false,
-    holdingsDisabled = false,
+    criticalCount = 0,
   }: {
-    active?: 'home' | 'activity' | 'holdings' | 'more';
-    activityDisabled?: boolean;
-    holdingsDisabled?: boolean;
+    active?: 'home' | 'security' | 'activity';
+    criticalCount?: number;
   } = $props();
 
   const tabs = [
-    { id: 'home',      label: 'Home',     icon: 'home'     },
-    { id: 'activity',  label: 'Activity', icon: 'activity' },
-    { id: 'holdings',  label: 'Holdings', icon: 'holdings' },
-    { id: 'more',      label: 'More',     icon: 'more'     },
+    { id: 'home',     label: 'Home',     icon: 'home',     href: '/home' },
+    { id: 'security', label: 'Security', icon: 'bell',     href: '/security-health' },
+    { id: 'activity', label: 'Activity', icon: 'activity', href: '/activity' },
   ] as const;
-
-  function isDisabled(id: string): boolean {
-    if (id === 'activity') return activityDisabled;
-    if (id === 'holdings') return holdingsDisabled;
-    return false;
-  }
-
-  function href(id: string): string {
-    if (id === 'home') return '/home';
-    if (id === 'more') return '/more';
-    return '#'; // placeholder until those iterations ship
-  }
 </script>
 
 <nav class="bottom-nav" aria-label="Main navigation">
   {#each tabs as tab (tab.id)}
-    {@const disabled = isDisabled(tab.id)}
     {@const isActive = active === tab.id}
     <a
-      href={href(tab.id)}
+      href={tab.href}
       class="nav-tab"
       class:active={isActive}
-      class:disabled
       aria-current={isActive ? 'page' : undefined}
-      aria-disabled={disabled}
-      tabindex={disabled ? -1 : 0}
     >
-      <Icon name={tab.icon} size={22} />
+      {#if tab.id === 'security'}
+        <span class="bell-wrap">
+          <Icon name="bell" size={22} />
+          {#if criticalCount > 0}
+            <span class="nav-badge" aria-label="{criticalCount} critical security item{criticalCount === 1 ? '' : 's'}">{criticalCount}</span>
+          {/if}
+        </span>
+      {:else}
+        <Icon name={tab.icon} size={22} />
+      {/if}
       <span class="tab-label">{tab.label}</span>
     </a>
   {/each}
@@ -103,12 +90,39 @@
     background: var(--color-primary);
     border-radius: 0 0 var(--radius-sm) var(--radius-sm);
   }
-  .nav-tab.disabled {
-    pointer-events: none;
-    opacity: 0.35;
-  }
   .tab-label {
     font-size: 10px;
     letter-spacing: 0.01em;
+  }
+
+  /* Bell wrapper allows absolute-positioned badge */
+  .bell-wrap {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+  }
+
+  /* Red pill badge — critical items only, per ADR-0019 */
+  .nav-badge {
+    position: absolute;
+    top: -4px;
+    right: -8px;
+    min-width: 16px;
+    height: 16px;
+    padding: 0 4px;
+    border-radius: var(--radius-pill);
+    background: var(--color-danger);
+    color: #ffffff;
+    font-size: 10px;
+    font-weight: var(--font-weight-semibold);
+    font-family: var(--font-sans);
+    line-height: 16px;
+    text-align: center;
+    box-sizing: border-box;
+    border: 1.5px solid var(--color-surface);
+    pointer-events: none;
   }
 </style>

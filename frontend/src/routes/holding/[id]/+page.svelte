@@ -37,6 +37,7 @@
   import { page } from '$app/stores';
   import { auth, authHeaders } from '$lib/stores/auth.svelte';
   import { preferences } from '$lib/stores/preferences.svelte';
+  import { securityHealth } from '$lib/stores/security_health.svelte';
   import { secureStorage } from '$lib/native-bridge';
   import BottomNav from '$lib/components/BottomNav.svelte';
 
@@ -126,10 +127,18 @@
   let holdingId = $derived($page.params.id ?? '');
   let serverUrl = $state('');
 
+  const seedBackupItem = $derived(
+    securityHealth.openItems.find(
+      i => i.holding_id === holdingId && i.item_type === 'seed_backup'
+    ) ?? null
+  );
+
   let snapshot = $state<HoldingSnapshot | null>(null);
   let detail = $derived(snapshot?.account_detail ?? null);
 
-  let activeTab = $state<'operations' | 'settings'>('operations');
+  let activeTab = $state<'operations' | 'settings'>(
+    $page.url.searchParams.get('tab') === 'settings' ? 'settings' : 'operations'
+  );
 
   // ─── Account: connection-error toast ─────────────────────────────────────────
 
@@ -1117,6 +1126,21 @@
     showPurseRenameInput = true;
   }
 
+  async function acknowledgeSeedBackup(): Promise<void> {
+    if (!seedBackupItem) return;
+    try {
+      const resp = await fetch(
+        `${serverUrl}/api/v1/security_health/items/${seedBackupItem.id}/resolve`,
+        {
+          method: 'POST',
+          headers: { ...authHeaders(), 'Content-Type': 'application/json' },
+          body: JSON.stringify({ state: 'acknowledged' }),
+        },
+      );
+      if (resp.ok) await securityHealth.refresh();
+    } catch { /* ignore */ }
+  }
+
   async function submitPurseRename(): Promise<void> {
     if (!purseRenameValue.trim()) return;
     purseRenaming = true;
@@ -1449,6 +1473,25 @@
       <!-- ── Purse: Settings tab ── -->
       {#if activeTab === 'settings'}
 
+        <!-- Critical: seed-backup inline card (ON_DEVICE only, while item is open) -->
+        {#if seedBackupItem && snapshot?.purse_mode?.startsWith('on_device')}
+          <div class="critical-card">
+            <div class="critical-card-head">
+              <svg class="critical-card-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M6 8a6 6 0 1 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/>
+                <path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/>
+              </svg>
+              <div class="critical-card-title">Back up your recovery phrase</div>
+            </div>
+            <div class="critical-card-body">
+              Without a backup, losing this phone means losing these funds. TallyKeep cannot recover them — the keys live only on this device.
+            </div>
+            <button class="critical-card-cta" type="button" onclick={acknowledgeSeedBackup}>
+              I've backed it up
+            </button>
+          </div>
+        {/if}
+
         <!-- Wallet -->
         <div class="settings-label">Wallet</div>
         <div class="settings-card">
@@ -1762,7 +1805,7 @@
                 Missing derivation metadata
               </span>
               <button class="advisory-cta" type="button"
-                onclick={() => goto(`/holding/strongbox/${holdingId}/fix-metadata`)}>
+                onclick={() => goto(`/security-health/fix-metadata/${holdingId}`)}>
                 Fix this
               </button>
             </div>
@@ -2241,7 +2284,7 @@
                 </svg>
                 {vaultMissingMetadataCount()} cosigner{vaultMissingMetadataCount() === 1 ? '' : 's'} missing metadata
               </span>
-              <button class="settings-cta" type="button" onclick={() => {}}>Fix this</button>
+              <button class="settings-cta" type="button" onclick={() => goto(`/security-health/fix-metadata/${holdingId}`)}>Fix this</button>
             </div>
           {/if}
 
@@ -2702,7 +2745,7 @@
 
   </div>
 
-  <BottomNav active="home" />
+  <BottomNav active="home" criticalCount={securityHealth.openItems.length} />
 
   <!-- ── Account forget modal (fill-bar timer) ── -->
   {#if showRemoveConfirm}
@@ -3800,4 +3843,51 @@
   }
   .advisory-cta:hover { background: var(--color-warning-soft); }
   .advisory-card + .settings-label { margin-top: var(--space-4); }
+
+  /* Critical seed-backup inline card */
+  .critical-card {
+    background: var(--color-danger-soft);
+    border: 1px solid var(--color-danger-border);
+    border-radius: var(--radius-md);
+    padding: var(--space-4);
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+    margin: var(--space-4) var(--space-4) 0;
+  }
+  .critical-card-head {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--space-3);
+  }
+  .critical-card-icon {
+    width: 22px;
+    height: 22px;
+    color: var(--color-danger);
+    flex-shrink: 0;
+    margin-top: 2px;
+  }
+  .critical-card-title {
+    font-size: var(--font-size-base);
+    font-weight: var(--font-weight-semibold);
+    color: var(--color-danger-text-on-soft);
+    line-height: var(--line-height-tight);
+  }
+  .critical-card-body {
+    font-size: var(--font-size-sm);
+    color: var(--color-danger-text-on-soft);
+    line-height: var(--line-height-default);
+  }
+  .critical-card-cta {
+    background: var(--color-surface);
+    color: var(--color-danger-text-on-soft);
+    border: 1px solid var(--color-danger-border);
+    border-radius: var(--radius-md);
+    padding: var(--space-2) var(--space-4);
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-weight-semibold);
+    cursor: pointer;
+    font-family: inherit;
+    align-self: flex-start;
+  }
 </style>

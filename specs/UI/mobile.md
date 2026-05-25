@@ -457,8 +457,8 @@ tab retires — Settings moves to a **gear icon top-right on
 the app bar**, visible on every page that shows the app bar
 (banking-app standard: Revolut, N26, Wise). The Security
 Health tab is the 2nd slot; its icon is a bell glyph with a
-**red badge counting critical-severity items only** (per
-ADR-0019's severity → discovery-channel mapping). Three tabs
+**red badge counting all open items** (critical and warning;
+same count as the "N open" label on the Active tab). Three tabs
 gives each slot ~120 px width at the 360 px baseline, generous
 breathing room. The mockups in this iteration (existing
 `mobile_home_empty.html` / `mobile_home_populated.html` updated +
@@ -1497,8 +1497,8 @@ across the wizard for future per-type sibling reuse:
   shipped, "Fix this" CTA currently coming-soon-stubbed), plus a
   row in the central Security Health dashboard. Missing-metadata
   is a `warning`-severity item: it does NOT drive the nav-tab red
-  badge (badge counts criticals only, per the no-alarm-fatigue
-  rule). The Fix-this remediation sub-flow ships with the
+  badge (badge counts all open items — critical and warning).
+  The Fix-this remediation sub-flow ships with the
   Security-health-system v1 iteration (see
   `next_iteration.md` (Security-health-system v1)).
 
@@ -1541,8 +1541,8 @@ variants in this iteration:
   severity `warning`, `holding_id=<the new Strongbox>`). The same
   warning surfaces inline on Strongbox detail Settings and as a
   row in the central Security Health dashboard (the v1 iteration's
-  bottom-nav tab #2). It does NOT drive the nav-tab red badge —
-  that badge counts critical-severity items only. Per-Holding items
+  bottom-nav tab #2). It does contribute to the nav-tab badge —
+  the badge counts all open items (critical and warning). Per-Holding items
   do not surface in the Home "Security health" section (that
   section is reserved for application-level items only —
   duplication-avoidance per ADR-0019). The Fix-this remediation
@@ -4146,11 +4146,11 @@ Stacked top-to-bottom:
   per-Holding detail pages — cross-type lockstep.
 - **Bottom nav** — 3-tab nav with Security tab marked
   active (verdigris top-indicator, bell-icon glyph). When
-  one or more critical items are open, the bell carries a
-  red badge with the critical-count. The badge stays
-  visible while the user is on this page (the user might
-  resolve one item and want to see the count tick down in
-  real time).
+  one or more items are open (any severity), the bell
+  carries a red badge with the total open count. The badge
+  stays visible while the user is on this page (the user
+  might resolve one item and want to see the count tick
+  down in real time).
 
 ### Active tab
 
@@ -4168,6 +4168,12 @@ Stacked top-to-bottom:
   resolution flow inside this dashboard. The date stamp
   is a client-side relative rendering of the item's
   `created_at` timestamp; API ships ISO.
+- **Holding name display.** For per-Holding items, the Holding's
+  current display name is shown below the item title as a small
+  secondary label. The name is fetched live from
+  `GET /api/v1/holdings/summary/global` on page mount (not from
+  stale `raw_context.holding_name`) so renames are reflected
+  immediately.
 - **Sort order — locked.** Severity descending, then
   `created_at` descending. Critical items always at top;
   newest items above older items within a severity.
@@ -4196,14 +4202,17 @@ Visual contract: `mobile_security_health_dashboard_active_populated.html`
   ("FIXED" / "ACKNOWLEDGED AS INTENTIONAL" /
   "ACKNOWLEDGED"), relative date, title, summary. Same
   per-type renderer as Active.
-- **Revive affordance.** Renders only on user-attested
-  rows (`DISMISSED_INTENTIONAL` and `ACKNOWLEDGED`),
-  as a small "Move back to open" text link below the
-  summary. Tap → confirm → call the revive endpoint →
-  item returns to Active. System-verified rows
-  (`RESOLVED_BY_FIX`) carry no revive — the truth is
-  computed and if the underlying condition recurs, a
-  fresh row appears in Active.
+- **Revive affordance.** Renders only on
+  `DISMISSED_INTENTIONAL` rows (user explicitly marked
+  something as intentional). Shown as a small "Move back
+  to open" text link below the summary. Tap → confirm →
+  call the revive endpoint → item returns to Active.
+  `ACKNOWLEDGED` rows (`seed_backup`, `principles_ack`)
+  carry no revive — once a user says they backed up or
+  accepted the principles, taking that back is not
+  actionable. `RESOLVED_BY_FIX` rows carry no revive
+  either — the truth is computed; if the condition
+  recurs, a fresh row appears in Active.
 - **Reverse-chronological** order. No prune policy at v1
   (item velocity is low; revisit if size becomes a
   problem).
@@ -4252,11 +4261,14 @@ deep-link from the inline card's CTA.
 
 ### Principles-ack bottom-sheet
 
-Triggered by tapping the
-"Acknowledge how TallyKeep works" item in the dashboard
-or the Home "Security health" section. Renders as a
-bottom-sheet over the dashboard (background dimmed by
-`--color-overlay`). Content:
+Triggered by tapping the "Acknowledge how TallyKeep works"
+item in the dashboard Active tab or the Home "Security
+health" section. Tap navigates to `/home?open=principles`;
+the sheet renders on the Home page (not over the dashboard).
+The `?open=principles` URL param is the source of truth for
+sheet visibility — `$page.url.searchParams.get('open') ===
+'principles'`. Dismiss (backdrop tap or drag down) clears the
+param (`goto('?')`). Content:
 
 - **Drag handle** at the top (dismissal affordance).
 - **Title** "How TallyKeep works" — locked.

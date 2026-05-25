@@ -881,6 +881,77 @@ $recompOne = Invoke-RestMethod -Method Post `
 Show "single recompute count" $recompOne.holding_count
 
 
+# --- 16c. Security health (ADR-0019) -----------------------------------------
+
+Section "16c. Security health — list, resolve, revive"
+
+# GET open items — uses the purse created earlier in the smoke test run.
+$shItems = Invoke-RestMethod -Uri "$BaseUrl/api/v1/security_health/items?state=open" `
+    -Headers $Headers
+Show "open items count (>= 0)" ($shItems.Count -ge 0)
+
+# GET history — should be empty at this point.
+$shHistory = Invoke-RestMethod -Uri "$BaseUrl/api/v1/security_health/items?state=history" `
+    -Headers $Headers
+Show "history count (>= 0)" ($shHistory.Count -ge 0)
+
+# If there are open items, resolve the first user-resolvable one and then revive it.
+$firstOpen = $shItems | Where-Object { $_.item_type -ne 'missing_signing_metadata' } | Select-Object -First 1
+if ($firstOpen) {
+    $resolveResp = Invoke-RestMethod -Method Post `
+        -Uri "$BaseUrl/api/v1/security_health/items/$($firstOpen.id)/resolve" `
+        -ContentType "application/json" `
+        -Body '{"state":"acknowledged"}' `
+        -Headers $Headers
+    Show "resolve item state" ($resolveResp.state -eq "acknowledged")
+    Show "resolve item resolved_at set" ($null -ne $resolveResp.resolved_at)
+
+    # Revive it back to open.
+    $reviveResp = Invoke-RestMethod -Method Post `
+        -Uri "$BaseUrl/api/v1/security_health/items/$($firstOpen.id)/revive" `
+        -ContentType "application/json" `
+        -Body '{}' `
+        -Headers $Headers
+    Show "revive item state" ($reviveResp.state -eq "open")
+} else {
+    Show "no resolvable open items (skip resolve/revive)" "(ok)"
+}
+
+# resolve unknown item — 404
+try {
+    Invoke-RestMethod -Method Post `
+        -Uri "$BaseUrl/api/v1/security_health/items/00000000-0000-0000-0000-000000000099/resolve" `
+        -ContentType "application/json" `
+        -Body '{"state":"acknowledged"}' `
+        -Headers $Headers | Out-Null
+    Show "resolve unknown item" "(unexpected 200!)"
+} catch {
+    $sc = $_.Exception.Response.StatusCode.value__
+    Show "resolve unknown item 404" ($sc -eq 404)
+}
+
+# revive unknown item — 404
+try {
+    Invoke-RestMethod -Method Post `
+        -Uri "$BaseUrl/api/v1/security_health/items/00000000-0000-0000-0000-000000000099/revive" `
+        -ContentType "application/json" `
+        -Body '{}' `
+        -Headers $Headers | Out-Null
+    Show "revive unknown item" "(unexpected 200!)"
+} catch {
+    $sc = $_.Exception.Response.StatusCode.value__
+    Show "revive unknown item 404" ($sc -eq 404)
+}
+
+# fix_metadata with a random holding id — returns a 200 with success:false or 404
+$fixResp = Invoke-WebRequest -UseBasicParsing -Method Post `
+    -Uri "$BaseUrl/api/v1/security_health/fix_metadata/00000000-0000-0000-0000-000000000099/reexport" `
+    -ContentType "application/json" `
+    -Body '{"descriptor_expression":"wpkh(xpub6BosfCnifzxcFwrSzQiqu2DBVTshkCXacvNsWGYJVVhhawA7d4R5WSWGFNbi8Aw6ZRc1brxMyWMzG3DSSSSoekkudhUd9yLb6qx39T9nMdj/0/*)"}' `
+    -Headers $Headers
+Show "fix_metadata unknown holding (200 or 404)" ($fixResp.StatusCode -in @(200, 404))
+
+
 # --- 17. Stubs (sanity-check the OpenAPI surface for routes not yet landed) ----
 
 Section "17. Stubs return 501 with milestone tag"

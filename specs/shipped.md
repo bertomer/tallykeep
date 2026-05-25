@@ -14,6 +14,33 @@ commit.
 
 ---
 
+## 2026-05-25 — Security-health system v1
+
+Full security health surface shipped end-to-end (ADR-0019).
+
+**Backend.** New `security_health_item` table (Alembic migration) with indexes for Active query, History query, per-Holding lookup, and open-state badge count. Three endpoints: `GET /api/v1/security_health/items?state=open|history` (paginated, severity desc + `created_at` desc), `POST /security_health/items/{id}/resolve` (state transition with 422 guard), `POST /security_health/items/{id}/revive` (user-attested only — `dismissed_intentional`; raises `revive_not_allowed_on_system_verified` for `resolved_by_fix`). Three SSE topics: `security_health.item_added`, `security_health.item_resolved`, `security_health.item_revived`. Per-type hooks: `purse_service.create_holding` emits `seed_backup` (critical) for `ON_DEVICE_*` modes; `strongbox_service` + `vault_service` emit `missing_signing_metadata` (warning) when descriptor lacks `bip32_derivation` origin; Home GET emits `principles_ack` (warning) idempotently when `principles_acknowledged_at IS NULL`. Server-side re-checker flips any open `missing_signing_metadata` item to `RESOLVED_BY_FIX` on descriptor update. `resolve_item` sets `user.principles_acknowledged_at` when resolving `principles_ack` to `acknowledged`.
+
+**Frontend — global chrome.** Bottom nav restructured 4 → 3 tabs (Home / Security Health / Activity); Holdings and More tabs retired. Security Health tab: bell-icon glyph with a red badge counting **all open items** (critical and warning; same count as "N open" on the Active tab). Gear icon top-right on every app bar → `/settings`. Settings is a plain coming-soon stub (the planned "How TallyKeep works" row deferred to the Settings iteration).
+
+**Frontend — Security Health dashboard** at `/security-health`. Active tab: SSE-driven list, severity rows with soft-tinted backgrounds, "Opened {relative date}" stamp per row, "N open" list label. History tab: terminal-state verb prefix, "Move back to open" affordance on `dismissed_intentional` rows only (`acknowledged` rows are not revivable — no actionable reason to un-confirm a backup or principles acceptance). Empty states on both tabs.
+
+**Frontend — resolution flows.** Seed-backup inline card on Purse detail Settings tab (critical style, "I've backed it up" → `acknowledged`). Missing-metadata Fix-this sub-flow at `/security-health/fix-metadata/{id}` (Path A: re-export + verify; Path B: fingerprint + derivation path + verify; Mark-as-intentional tertiary CTA). Back chevron in fix-metadata: `window.history.back()` when on Path A, `path = 'reexport'` when on Path B (returns to Path A form, not security center). Principles-ack: tapping from the dashboard or Home section navigates to `/home?open=principles`; the sheet renders on Home (not over the dashboard), driven by `$page.url.searchParams.get('open') === 'principles'`.
+
+**Frontend — Home.** Principles-ack bottom-sheet added to Home with full content (three principle rows + summary block + "I understand and accept" CTA). `?open=principles` URL param drives sheet visibility; backdrop dismiss clears it. SSE store rewritten as pure REST-authoritative design: `openItems` is set exclusively by `GET /security_health/items?state=open` (no client-side merge); SSE events trigger `refresh()` which re-fetches REST. `addOpen` and `removeOpen` methods removed entirely. All user actions call `securityHealth.refresh()` after the API call completes.
+
+**Frontend — per-Holding item display.** Holding names displayed live below item titles in the security center via lookup from `GET /api/v1/holdings/summary/global` fetched on page mount — immune to stale `raw_context.holding_name` from pre-rename records. Per-Holding item taps deep-link to `holding/{id}?tab=settings`.
+
+**Spec deviations from original plan (recorded at closeout).**
+- Badge counts all open items (not critical-only as spec'd; matches user preference for uniform "N open" count).
+- Principles-ack sheet renders on Home via URL param (not as a dashboard bottom-sheet; Home is the natural parent of application-level items).
+- Settings is a plain coming-soon stub (the "How TallyKeep works" row deferred to the Settings iteration).
+- Revive restricted to `dismissed_intentional` only (not `acknowledged`; acknowledging backup / principles is not reversibly actionable).
+- Live holding name display added (new; not in original spec).
+
+Canonical docs touched at closeout: `api/openapi.yaml` (regenerated; new `/security_health/*` endpoint family + `SecurityHealthItem` schema), `decisions/0019-security-health-system-hybrid-surface.md` (badge semantics, principles-ack location, revive restriction, Settings stub note updated), `UI/mobile.md` (badge semantics corrected in 4 places, principles-ack sheet section updated, revive section restricted, holding-name display added, History revive description updated).
+
+---
+
 ## 2026-05-24 — Descriptor classification consolidation
 
 `POST /api/v1/descriptors/validate` extended with `best_fit` (`"purse" | "strongbox" | "vault" | null`), `rejection_category` (one of `single_address_input / lsp_coordinated_wallet / multi_path_miniscript / unsupported_form / unparseable`, present when `best_fit` is `null`), `canonical_expression`, and `canonical_change_expression`. All semantic rejections return HTTP 200 in-band; pre-existing 4xx responses for malformed requests and auth failures unchanged.

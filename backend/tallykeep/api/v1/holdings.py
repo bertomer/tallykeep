@@ -19,7 +19,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from sqlalchemy.orm import Session
 
 from tallykeep.adapters.descriptor_adapter import DescriptorAdapter
-from tallykeep.api.dependencies import get_db_session, get_secret_store
+from tallykeep.api.dependencies import get_db_session, get_event_bus, get_secret_store
 from tallykeep.domain.enums import HoldingType, Purpose
 from tallykeep.domain.holding import Holding, SecurityClaim
 from tallykeep.infrastructure.secrets import SecretStore
@@ -42,8 +42,10 @@ from tallykeep.schemas.treasury import (
     CustodialLedgerEntryOut,
     LedgerEntryPreview,
 )
+from tallykeep.infrastructure.event_bus import EventBus
 from tallykeep.services import holding_service, treasury_service
 from tallykeep.services.holding_service import HoldingServiceError
+from tallykeep.services import security_health_service
 from tallykeep.services.treasury_service import (
     CredentialPermissionMismatch,
     InvalidPollingInterval,
@@ -150,8 +152,12 @@ def _claim_from_input(claim_input) -> SecurityClaim:
     status_code=201,
 )
 async def create_purse(
-    body: PurseCreate, session: Session = Depends(get_db_session)
+    body: PurseCreate,
+    session: Session = Depends(get_db_session),
+    bus: EventBus | None = Depends(get_event_bus),
 ) -> HoldingResponse:
+    from tallykeep.domain.enums import PurseMode
+
     try:
         holding = holding_service.create_purse(
             session,
@@ -172,6 +178,18 @@ async def create_purse(
     except (ValueError, HoldingServiceError) as exc:
         session.rollback()
         raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    if body.purse_mode in (
+        PurseMode.ON_DEVICE_TK_GENERATED,
+        PurseMode.ON_DEVICE_USER_IMPORTED,
+    ):
+        security_health_service.emit_seed_backup_item(
+            session,
+            holding_id=holding.id,
+            purse_mode=body.purse_mode.value,
+            bus=bus,
+        )
+
     return _to_response(holding)
 
 
@@ -181,7 +199,9 @@ async def create_purse(
     status_code=201,
 )
 async def create_strongbox(
-    body: StrongboxCreate, session: Session = Depends(get_db_session)
+    body: StrongboxCreate,
+    session: Session = Depends(get_db_session),
+    bus: EventBus | None = Depends(get_event_bus),
 ) -> HoldingResponse:
     try:
         holding = holding_service.create_strongbox(
@@ -205,6 +225,15 @@ async def create_strongbox(
     except (ValueError, HoldingServiceError) as exc:
         session.rollback()
         raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    if body.signing_metadata_present is False:
+        security_health_service.emit_missing_signing_metadata_item(
+            session,
+            holding_id=holding.id,
+            vendor=body.vendor,
+            bus=bus,
+        )
+
     return _to_response(holding)
 
 
@@ -214,7 +243,9 @@ async def create_strongbox(
     status_code=201,
 )
 async def create_vault(
-    body: VaultCreate, session: Session = Depends(get_db_session)
+    body: VaultCreate,
+    session: Session = Depends(get_db_session),
+    bus: EventBus | None = Depends(get_event_bus),
 ) -> HoldingResponse:
     try:
         holding = holding_service.create_vault(
@@ -236,6 +267,20 @@ async def create_vault(
     except (ValueError, HoldingServiceError) as exc:
         session.rollback()
         raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    # Emit one missing_signing_metadata item if the first descriptor lacks origin.
+    if body.descriptors:
+        import re as _re
+
+        _fp_check = _re.compile(r'\[([0-9a-fA-F]{8})[/\]]')
+        if not _fp_check.search(body.descriptors[0].expression):
+            security_health_service.emit_missing_signing_metadata_item(
+                session,
+                holding_id=holding.id,
+                vendor=None,
+                bus=bus,
+            )
+
     return _to_response(holding)
 
 
@@ -397,6 +442,7 @@ _CUSTODY_TIER: dict[HoldingType, int] = {
 @router.get("/holdings/summary/global")
 async def global_holdings_summary(
     session: Session = Depends(get_db_session),
+    bus: EventBus | None = Depends(get_event_bus),
 ):  # type: ignore[no-untyped-def]
     """Fortune view: per-Holding summary plus cross-Holding rollups.
 
@@ -491,6 +537,12 @@ async def global_holdings_summary(
         by_purpose[h.purpose.value] = (
             by_purpose.get(h.purpose.value, 0) + confirmed
         )
+
+    from tallykeep.repositories import user_profile as profile_repo
+
+    profile = profile_repo.get_or_create(session)
+    if profile.principles_acknowledged_at is None:
+        security_health_service.emit_principles_ack_item_if_needed(session, bus=bus)
 
     return {
         "holdings": summaries,

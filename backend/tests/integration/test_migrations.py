@@ -38,6 +38,7 @@ EXPECTED_TABLES = {
     "payment_request",
     "runtime_configuration",
     "secret",
+    "security_health_item",
     "sweep_execution",
     "sweep_policy",
     "user_profile",

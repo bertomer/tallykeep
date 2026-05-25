@@ -65,8 +65,11 @@ Items have **one source of truth** on the page where the fix happens:
 
 **Application-level items** that have no Holding to attach to
 (principles-ack, hosted-tier acks) live natively in the dashboard.
-Their resolution flows render as **bottom sheets** inside the
-dashboard, not as separate pages or routes.
+Their resolution flows navigate to the **Home page** via a URL
+param (`?open=<item-type>`); the sheet renders on Home, not over
+the dashboard. Example: tapping the principles-ack row navigates
+`goto('/home?open=principles')`; the sheet is `$derived` from
+`$page.url.searchParams.get('open') === 'principles'`.
 
 ### Discovery channels — three, severity-driven
 
@@ -77,13 +80,10 @@ dashboard, not as separate pages or routes.
 2. **Bottom-nav tab "Security Health"** — second tab after Home (per
    the 2026-05-24 framing session), visible on every page that shows
    the bottom nav. The tab's icon is a bell shape; when one or more
-   `critical`-severity items are open, the tab carries a **red badge
-   with the critical-count**. The badge does **not** count warning-
-   severity items (per the no-alarm-fatigue principle: warnings are
-   discovered via the dashboard tab itself, the Home section for
-   application-level items, or the inline card on the affected
-   Holding's detail page). The tab itself stays visible at all times;
-   only the badge appears/disappears with count. Tap → dashboard.
+   items are open (any severity), the tab carries a **red badge with
+   the total open count** — the same number as the "N open" label on
+   the Active tab. The tab itself stays visible at all times; only
+   the badge appears/disappears with count. Tap → dashboard.
 
    **Bottom-nav restructure: 4 tabs → 3 tabs.** The current 4-tab
    layout (Home / Activity / Holdings / More, per `UI/mobile.md` Home
@@ -199,9 +199,10 @@ verb in the History row:
 
 - **`ACKNOWLEDGED`** — user-attested. The user confirms a claim that
   resolves the item ("I backed up my seed"; "I understand the
-  principles"). History row: "Acknowledged on YYYY-MM-DD". **Revivable**
-  — the user can flip back to `OPEN` from History (the honest variant
-  of acknowledgment: take back a claim that was not true).
+  principles"). History row: "Acknowledged on YYYY-MM-DD". **Not
+  revivable in v1** — once a user confirms backup or accepts the
+  principles, there is no actionable reason to flip it back.
+  (`DISMISSED_INTENTIONAL` is the revivable user-attested state.)
 
 The revive affordance is the honest counter to ack-theater. System-
 verified items do not need it (truth is computed); user-attested items
@@ -245,9 +246,9 @@ existing event-taxonomy conventions:
 - `security_health.item_revived` — fires on terminal-state `→ OPEN`
   via the revive affordance (user-attested items only).
 
-The nav-tab red badge subscribes to all three but filters payload by
-`severity == 'critical'` for the count. The Home section subscribes to
-the application-level subset.
+The nav-tab red badge subscribes to all three and counts every open
+item regardless of severity (the store's `openItems.length` drives
+it). The Home section subscribes to the application-level subset.
 
 ### User-facing vocabulary — locked
 
@@ -358,13 +359,12 @@ critical-count > 0; the tab itself is always present.
 
 ### Frontend Settings hook
 
-The first iteration also introduces a Settings entry "How TallyKeep
-works" that re-opens the principles card content (read-only re-read,
-not the acknowledgment flow). This already exists as a forward-
-reference in `UI/mobile.md` Onboarding Notes ("Re-readable anytime via
-Settings → 'How TallyKeep works'"). The acknowledgment flow itself
-lives only in the dashboard's bottom-sheet for the principles-ack
-item.
+**Shipped as plain coming-soon stub.** The v1 iteration shipped
+`/settings` as a plain coming-soon stub (no rows). The planned
+"How TallyKeep works" entry (read-only re-read of the principles card)
+was deferred to the dedicated Settings iteration. The
+acknowledgment flow (principles-ack) lives on the Home page via
+`?open=principles` URL param (not the dashboard bottom-sheet).
 
 ## Out of scope (deferred)
 
@@ -437,10 +437,13 @@ When promoted to `next_iteration.md`, the iteration ships:
    remediation sub-flow (re-export or manual fingerprint +
    derivation-path entry with backend address-match verification).
 10. Principles-ack-on-skip item (warning) — server-side creation on
-    first non-principles-acknowledged Home land. Bottom-sheet re-show
-    flow inside the dashboard. Surfaces in the Home section (the
-    load-bearing discovery channel for application-level warnings).
-11. Revive-from-History affordance for user-attested items.
+    first non-principles-acknowledged Home land. Bottom-sheet renders
+    on the Home page (via `?open=principles` URL param), not inside
+    the dashboard. Dashboard tap navigates to `/home?open=principles`.
+    Surfaces in the Home section (the load-bearing discovery channel
+    for application-level warnings).
+11. Revive-from-History affordance for `DISMISSED_INTENTIONAL` rows
+    only. `ACKNOWLEDGED` rows are not revivable in v1.
 12. Home section "Security health" — renders inline only when at
     least one application-level item is open.
 

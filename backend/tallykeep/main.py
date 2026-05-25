@@ -34,6 +34,7 @@ from tallykeep.api.v1 import (
     lightning as lightning_routes,
     pairing as pairing_routes,
     profile as profile_routes,
+    security_health as security_health_routes,
     server_info as server_info_routes,
     treasury as treasury_routes,
     unlock,
@@ -208,6 +209,7 @@ def create_app() -> FastAPI:
     app.include_router(banking_routes.router, prefix="/api/v1")
     app.include_router(treasury_routes.router, prefix="/api/v1")
     app.include_router(analysis_routes.router, prefix="/api/v1")
+    app.include_router(security_health_routes.router, prefix="/api/v1")
     app.include_router(jobs_routes.router, prefix="/api/v1")
     app.include_router(export_routes.router, prefix="/api/v1")
     app.include_router(lightning_routes.router, prefix="/api/v1")
