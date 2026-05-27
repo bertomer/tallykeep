@@ -1,0 +1,152 @@
+<!--
+  Title: Web admin — Login
+  Status: draft
+  Date last touched: 2026-05-27
+  Replaces: (none — new surface per ADR-0020)
+-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>TallyKeep — Web admin — Login</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="_shared/tokens.css">
+<link rel="stylesheet" href="_shared/web_admin_shell.css">
+<style>
+  .login-card {
+    margin-top: var(--space-7);
+  }
+  .login-card h1 {
+    font-size: var(--font-size-lg);
+    font-weight: var(--font-weight-semibold);
+    color: var(--color-text);
+    margin: 0 0 var(--space-2);
+    line-height: var(--line-height-tight);
+  }
+  .login-card .lede {
+    font-size: var(--font-size-sm);
+    color: var(--color-text-muted);
+    margin: 0 0 var(--space-5);
+    line-height: var(--line-height-default);
+  }
+  .login-actions {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+    margin-top: var(--space-5);
+  }
+  .forgot-link {
+    text-align: center;
+    font-size: var(--font-size-sm);
+    color: var(--color-text-muted);
+    text-decoration: none;
+    margin-top: var(--space-2);
+  }
+  .forgot-link:hover { color: var(--color-text); }
+
+  .brand-row svg.wordmark-icony {
+    height: 32px;
+    width: auto;
+    display: block;
+  }
+</style>
+</head>
+<body>
+
+<div class="mockup-meta">
+  <strong>Web admin — Login</strong> ·
+  <span class="status-draft">draft</span> ·
+  2026-05-27 · 1280×800
+</div>
+
+<div class="desktop-frame">
+  <div class="desktop-screen">
+
+    <!-- Persistent admin header -->
+    <header class="admin-header">
+      <div class="brand brand-row">
+        <!-- Wordmark-icony, compact desktop size. Inlined frozen
+             copy of brand/identity/wordmark-icony.svg. Painted via
+             .mark-* class hooks per tokens.css convention. -->
+        <svg class="wordmark-icony" viewBox="0 0 450 145" xmlns="http://www.w3.org/2000/svg" aria-label="tallykeep" role="img">
+          <text x="0" y="92" font-family="Manrope, system-ui, sans-serif" font-weight="600" font-size="92" letter-spacing="-2" class="mark-text">tall</text>
+          <svg x="143" y="42" width="76" height="84" viewBox="36.43 27.79 131.9 146.43">
+            <defs>
+              <clipPath id="wm-stock-clip"><path d="M 168.33 42.19 L 54.27 174.22 L 36.43 139.77 L 54.47 118.86 L 65.07 128.02 L 151.67 27.81 Z"/></clipPath>
+              <clipPath id="wm-foil-clip"><polygon points="40.68,42.21 79.68,87.21 96.32,72.79 57.32,27.79"/></clipPath>
+            </defs>
+            <path d="M 168.33 42.19 L 54.27 174.22 L 36.43 139.77 L 54.47 118.86 L 65.07 128.02 L 151.67 27.81 Z" class="mark-wood"/>
+            <polygon points="40.68,42.21 79.68,87.21 96.32,72.79 57.32,27.79" class="mark-wood"/>
+            <g class="mark-grain" stroke-width="1.4" stroke-linecap="butt" opacity="0.6">
+              <line x1="163.79" y1="38.27" x2="46.07" y2="174.53" clip-path="url(#wm-stock-clip)"/>
+              <line x1="156.22" y1="31.73" x2="38.50" y2="167.99" clip-path="url(#wm-stock-clip)"/>
+              <line x1="45.22"  y1="38.27" x2="84.52" y2="83.64"  clip-path="url(#wm-foil-clip)"/>
+              <line x1="52.78"  y1="31.73" x2="92.08" y2="77.09"  clip-path="url(#wm-foil-clip)"/>
+            </g>
+            <circle cx="53.76" cy="147.31" r="2.8" class="mark-carving"/>
+            <polygon points="-3,12 3,12 2,5 -2,5"     class="mark-carving" transform="translate(147 50) rotate(130.82)"/>
+            <polygon points="-4,12 4,12 2,4 -2,4"     class="mark-carving" transform="translate(140 58) rotate(130.82)"/>
+            <polygon points="-3,12 3,12 2,5 -2,5"     class="mark-carving" transform="translate(133 66) rotate(130.82)"/>
+            <polygon points="-3,-12 3,-12 2,-5 -2,-5" class="mark-carving" transform="translate(62 50)  rotate(49.18)"/>
+            <polygon points="-4,-12 4,-12 2,-4 -2,-4" class="mark-carving" transform="translate(69 58)  rotate(49.18)"/>
+            <polygon points="-3,-12 3,-12 2,-5 -2,-5" class="mark-carving" transform="translate(76 66)  rotate(49.18)"/>
+          </svg>
+          <text x="228" y="92" font-family="Manrope, system-ui, sans-serif" font-weight="600" font-size="92" letter-spacing="-2" class="mark-text">keep</text>
+        </svg>
+        <span class="brand-text" style="margin-left: var(--space-3); color: var(--color-text-muted); font-weight: var(--font-weight-normal); font-size: var(--font-size-sm);">Admin</span>
+      </div>
+      <div class="server-label">
+        <span class="label">Server</span>
+        <span class="name">Rémy's home server</span>
+      </div>
+    </header>
+
+    <!-- Content shell — narrow column for the login form -->
+    <div class="content-shell">
+      <div class="content-narrow">
+
+        <div class="card login-card">
+          <h1>Sign in to admin</h1>
+          <p class="lede">
+            Enter the passphrase you set when you installed
+            this TallyKeep stack.
+          </p>
+
+          <!-- Inline info — shown after server restart. Drop on
+               normal returning-user case. -->
+          <div class="inline-info" style="margin-bottom: var(--space-4);">
+            <span>Server was restarted. Sign in to unlock its
+            encrypted store so background work resumes.</span>
+          </div>
+
+          <div class="form-row">
+            <label for="passphrase">Server passphrase</label>
+            <input id="passphrase" type="password" autocomplete="current-password" placeholder="••••••••••••••••" />
+            <span class="hint">
+              Validated locally on your server. Never sent
+              anywhere else.
+            </span>
+          </div>
+
+          <div class="login-actions">
+            <button class="btn btn-primary btn-block">Sign in</button>
+            <a href="#" class="forgot-link">Forgot passphrase?</a>
+          </div>
+        </div>
+
+        <p class="fine-print" style="text-align: center;">
+          Your session expires after 30 minutes of inactivity, or
+          8 hours total. Closing this tab signs you out.
+        </p>
+
+      </div>
+    </div>
+
+  </div>
+</div>
+
+</body>
+</html>

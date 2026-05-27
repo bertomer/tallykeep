@@ -39,8 +39,8 @@ decision slot.
 **Status:** open (deferred to brainstorm after the four Holding
 types are working end-to-end in code)
 
-**Item:** What additional warnings — beyond `no_maximum_cap_set`
-and `unverified_whitelist_on_provider` — should the SweepPolicy
+**Item:** What additional warnings, beyond `no_maximum_cap_set`
+and `unverified_whitelist_on_provider`, should the SweepPolicy
 safety validator surface? Earlier drafts had
 `destination_is_custodial`, `destination_keys_on_host`, and
 `same_security_tier` rated `high` / `medium`; those have been
@@ -52,22 +52,22 @@ flows).
 
 **Why deferred:** real validator design needs the four-Holding
 infrastructure working first. Without seeing the actual sweep
-flows for each (Account → Strongbox, Purse-on-device → Strongbox,
-Strongbox → anywhere, Vault → anywhere), the warning categories
+flows for each (Account to Strongbox, Purse-on-device to Strongbox,
+Strongbox to anywhere, Vault to anywhere), the warning categories
 will be either over-specified or wrong.
 
 **Direction to keep in mind for the brainstorm:**
 
-- The locked discipline is **warn don't block** — the validator
+- The locked discipline is **warn don't block**, the validator
   makes sure the user knows what they're doing; it does not
   second-guess.
 - Two patterns Rémy named worth designing against: *saving while
-  working* (income → Account → auto-sweep → Strongbox; Strongbox
-  → Purse top-up) and *spending while retiring* (Strongbox →
-  Account → manual sell). The validator shouldn't treat one as
+  working* (income to Account to auto-sweep to Strongbox; Strongbox
+  to Purse top-up) and *spending while retiring* (Strongbox to
+  Account to manual sell). The validator shouldn't treat one as
   more legitimate than the other.
 - A potential third pattern: *static address reuse for recurring
-  payments* (rent recipient, family, etc.) — a banking-IBAN
+  payments* (rent recipient, family, etc.), a banking-IBAN
   analogue. Touches `backlog/receive-in-static-merchant-mode.md`
   and `backlog/contact-book-saved-counterparties.md`.
   Worth thinking about whether sweep-policy destinations should
@@ -85,7 +85,7 @@ captured in `backlog/purse-upgrade-path-watch-only-on-device-imported.md`)
 
 **Item:** When upgrading a `WATCH_ONLY` Purse to spendable by
 importing the source wallet's seed, is `purse_mode` mutable in
-place (`WATCH_ONLY` → `ON_DEVICE_USER_IMPORTED`), or do we
+place (`WATCH_ONLY` to `ON_DEVICE_USER_IMPORTED`), or do we
 preserve the original mode and add a separate
 `spending_capability` flag on the Holding?
 
@@ -97,7 +97,7 @@ analyzer logic, and the security-health framing of upgraded
 Purses.
 
 **Leading direction:** `purse_mode` mutable along the
-`WATCH_ONLY → ON_DEVICE_USER_IMPORTED` axis only — already
+`WATCH_ONLY to ON_DEVICE_USER_IMPORTED` axis only, already
 encoded as target shape in `02_domain_model.md` invariant rule
 10, pending this arbitration's formal close. The alternative
 (separate `spending_capability` flag) adds a second axis the
@@ -124,7 +124,7 @@ and sharpens once this arbitration closes.
 
 **Item:** The "no multi-asset" line in the canonical out-of-scope
 list rejects custody of stablecoins, Monero, and non-Bitcoin
-chains — that part is firm and tied to regulatory surface. But
+chains, that part is firm and tied to regulatory surface. But
 Account aggregation is read-only: TallyKeep observes balances at
 connected providers, never holds keys, never moves non-BTC funds.
 Pulling read-only USDT, USDC, or other balances at the same
@@ -143,7 +143,7 @@ line.
 **Tensions.**
 
 - **Honest abstraction.** If we surface non-BTC balances, the
-  home page's "Total: 0.52 BTC" becomes ambiguous — does it
+  home page's "Total: 0.52 BTC" becomes ambiguous, does it
   include the USDT? If it does, in what unit and at what rate? If
   it doesn't, the user has to do the math themselves.
 - **Vocabulary.** TallyKeep's locked vocabulary (Holdings,
@@ -151,7 +151,7 @@ line.
   Holdings would either fragment the vocabulary or force a new
   "asset" axis on every Holding type.
 - **Custodial-only.** Non-BTC aggregation is *only* possible at
-  the Account level — Purse / Strongbox / Vault don't apply
+  the Account level, Purse / Strongbox / Vault don't apply
   outside of Bitcoin. So the asymmetry is structurally enforced,
   but the home page may need to acknowledge it.
 - **Scope creep.** Once we surface non-BTC balances, requests for
@@ -172,7 +172,7 @@ line.
 2. *Multi-currency consolidated total, BTC primary.* Home shows
    BTC plus a secondary "+ $X stablecoins at Lemon" line.
    Surface, not merge.
-3. *Reject — stay strict BTC-only.* Maintains vocabulary purity
+3. *Reject, stay strict BTC-only.* Maintains vocabulary purity
    at the cost of practical visibility for the target market.
 
 **Leading direction:** None yet. Rémy explicitly opened the
@@ -184,61 +184,9 @@ proposed ADR that would have locked the rejection.
 
 ---
 
-### `pairing-handshake-crypto`
-
-**Status:** open (sharpens at private-ship gate)
-
-**Item:** When the mobile client scans a QR generated by the user's
-TallyKeep stack to pair, what does the QR carry and what crypto secures
-the handshake? Plain bearer token + endpoint URL is the simple
-baseline; PAKE/Noise-style ephemeral-key handshake is the robust
-alternative.
-
-**Leading direction (Rémy + Claude, sharpened during onboarding-screen
-session 2026-05):** plain endpoint URL + single-use ephemeral pairing
-token (~60 second TTL, displayed by the desktop, redeemed once over
-TLS or local-network HTTP). Phone POSTs the token to the endpoint;
-backend validates and returns a long-lived per-device credential. The
-phone stores that credential in its Keychain/Keystore
-(biometric-protected). Per-device credentials are revocable from the
-desktop's "Paired devices" list.
-
-**Why this direction (and what it gives up):** matches the WhatsApp
-Web / Signal device-link pattern users already understand. The
-"QR display = proof of possession" argument makes the adversary
-model small — physical access to the desktop is required to scan
-the QR, and the same-LAN constraint per `01_architecture.md`
-§"Network security posture" narrows the window further. PAKE/Noise
-add ceremonial cost (mutual-auth handshake, ephemeral key
-generation, replay protection) for a threat largely mitigated by
-the deployment posture. Worth revisiting if remote pairing (post
-`backlog/remote-access-for-self-hosters.md`) lands and the
-same-LAN constraint goes away.
-
-**Open part — full session needed:**
-
-- Token format (UUID? base32 + checksum? something more compact for
-  QR density?), TTL precise value, single-use vs N-use, server-side
-  rate limit on pairing attempts.
-- Per-device credential format (opaque bearer? signed JWT?).
-  Rotation policy.
-- Revocation UX on the desktop side ("Paired devices" list with
-  last-seen timestamps and "Forget this device" affordance).
-- Confirmation UX after a successful pair (does the desktop show
-  "phone paired at HH:MM" so the user can verify they're the one
-  who scanned?).
-- Whether an additional confirmation step on the desktop ("approve
-  pairing from phone XYZ?") is worth the friction, or if QR
-  possession alone is enough.
-
-**Decision:** ___ (pending session)
-**Decided on:** ___
-
----
-
 ### `brand-canvas-vs-narrative-split`
 
-**Status:** open (deferred — depends on palette stabilising)
+**Status:** open (deferred, depends on palette stabilising)
 
 **Item:** `brand/README.md` "Lock-doc pattern" currently bundles
 narrative and live data into a single lock-doc per brand artifact. During the May 2026
@@ -268,7 +216,7 @@ canvas-vs-narrative split:
 
 - Canvas (`tallykeep_palette_canvas.html`) is the live data view;
   consumed by mockups and (later) frontend code via `tokens.css`.
-- Lock docs become narrative + anatomy + decisions log only —
+- Lock docs become narrative + anatomy + decisions log only,
   prose about why the brand is what it is, without re-stating
   the data. They reference the canvas for "what does it look like
   right now".
@@ -279,9 +227,9 @@ canvas-vs-narrative split:
 **Why deferred:** premature to restructure while the palette is
 still in flux. If the verdigris direction reverses or shifts, the
 restructure work would partly redo itself. Lock-step the ADR with
-the brand v1 → v2 bump if/when verdigris-on-cool is adopted.
+the brand v1 to v2 bump if/when verdigris-on-cool is adopted.
 
-**Open part — full session needed:**
+**Open part, full session needed:**
 
 - ADR copy: rules for what goes in canvas vs. narrative.
 - Migration plan for the four existing v1 lock docs (rewrite as
@@ -292,98 +240,126 @@ the brand v1 → v2 bump if/when verdigris-on-cool is adopted.
   Decision: rewrite identity SVGs to use class-based fills (more
   flexible, requires consumers to inline rather than `<img>`), or
   keep hex-baked and regenerate per brand version (matches
-  `brand/README.md` brand → tokens lockstep more cleanly).
+  `brand/README.md` brand to tokens lockstep more cleanly).
 - Whether the canvas should additionally expose non-color tokens
   (type, spacing, radius, shadow) in v2.
 
 **Recommendation:** keep the canvas + lock docs coexisting until
-brand v2 ships; do the restructure ADR as part of the brand v1 →
+brand v2 ships; do the restructure ADR as part of the brand v1 to
 v2 bump iteration. Do not redo the canvas-vs-lock-doc split as a
-standalone iteration — fold it into a "brand stabilises" iteration.
+standalone iteration, fold it into a "brand stabilises" iteration.
 
 **Decision:** ___ (pending session, blocked by palette adoption)
 **Decided on:** ___
 
 ---
 
-### `browser-pwa-auth-model`
+### `per-pod-stack-architecture`
 
-**Status:** open (must resolve before the Capacitor-mobile-wrapper
-iteration finishes; private-ship-event blocker per ADR-0003)
+**Status:** open (decision deadline: before the public-ship event
+ships; a Postgres to SQLite move after running self-hosted instances
+exist is significantly more painful than before)
 
-**Item:** ADR-0007 establishes browser-first development with
-NativeBridge stubs and the "honest gates" principle ("the browser
-does not pretend to have capabilities it doesn't"). But the
-long-term auth model for the shipped browser PWA isn't fully
-specified. Current dev-mode practice: the NativeBridge browser
-branch implements `secureStorage` via a `localStorage` fallback so
-pairing + device-credential persistence + unlock flow can be
-iterated against in browser without a Capacitor build. **This is
-a dev crutch, not a shipped behavior** — `localStorage` is not a
-secure store, browsers do not have Keychain. The Capacitor-wrap
-iteration must remove this crutch and replace the browser branch
-with the long-term model. This item is what that long-term model
-needs to be.
+**Item:** Single-tenant single-user pods are the locked deployment
+shape, one pod per user, both self-hosted and hosted-tier, never
+multi-tenant. Given that shape, should the per-pod stack stay on
+Postgres + RQ worker + Redis (current) or migrate to SQLite +
+in-process background tasks + no Redis (lighter)?
 
-**Leading direction (Claude + Rémy, sharpened during
-onboarding-implementation feedback 2026-05-10):** browser PWA is a
-**per-session client**, not a paired device. Concretely:
+The current stack was proposed early in the project and has shipped
+through every iteration so far. The single-tenant-pod commitment +
+the locked banking-grade reliability principle make the lighter
+alternative a coherent optimization for both deployment modes
+simultaneously, denser hosted-tier pods (lower per-user cost at
+scale) AND lighter self-hosted footprint (better fit for Pi-class
+hardware, fewer processes to fail).
 
-- No pairing concept in browser PWA. The Connect / Paired
-  onboarding screens are Capacitor-only flows. Browser PWA does
-  not show them.
-- No persistent device credential. No biometric. (Browser cannot
-  reliably integrate with platform biometric; WebAuthn is its own
-  separate decision.)
-- Each session: user enters the **server passphrase** at app
-  open → backend validates via the existing
-  `passphrase-validate` endpoint → backend issues a
-  **short-lived session token** held in browser memory only.
-  Token expires when the tab closes or its TTL elapses; next
-  visit, user re-authenticates.
-- Browser PWA's entry screen is a simplified
-  "Enter server URL + passphrase" form, not the Connect → Paired
-  flow.
-- All other flows (Home, Holding detail, Activity, etc.) work
-  the same as Capacitor against the same backend, authenticated
-  via the session token instead of the long-lived device
-  credential. Read-only operations are full-functional; write
-  operations that require signing (PSBT signing for Strongbox /
-  Vault, TallyKeep-managed Purse spends) remain Capacitor-only
-  per ADR-0006 / ADR-0007 gating.
+**Best-guess footprint comparison (must be validated by benchmark,
+not source-cited):**
 
-**Why this needs arbitration before the Capacitor-wrap iteration
-finishes:**
+- Current stack per pod: ~800 MB - 1.2 GB
+- Lightened stack per pod: ~150-300 MB
+- 3-5x density improvement on hosted-tier; comfortable headroom
+  on a Pi 4 instead of constrained
+- bitcoind / indexer is external in both cases and not counted in
+  per-pod weight
 
-- The Capacitor-wrap iteration swaps NativeBridge stubs for real
-  implementations on the Capacitor side. The browser branch must
-  also change, but to **what** depends on this decision.
-- If per-session-passphrase-login is the model, the browser
-  PWA's onboarding flow diverges from Capacitor's. Routing logic
-  in the SvelteKit build needs to know which client it's serving
-  and gate the Connect / Paired screens accordingly.
-- If we hard-gate the browser PWA out of secure operations
-  entirely (read-only viewing or nothing), the model is simpler
-  but the browser PWA becomes a very narrow surface — probably
-  too narrow for the LatAm/Africa target market that includes
-  users without a Capacitor-app distribution path.
+**Tensions:**
 
-**Open part — full session needed:**
+- *Postgres to SQLite migration:* shipped schema uses JSONB for
+  `subtype_data`, partial indexes for filtered queries, the
+  `MISSING` sentinel for partial JSONB updates, Alembic migrations.
+  SQLite has approximations, JSON1 extension, partial indexes since
+  3.8, but not drop-in. Real refactor work, best-guess 1-3 weeks of
+  focused effort depending on how entrenched the patterns are at
+  migration time.
+- *Worker collapse:* moving custodial polling from RQ to FastAPI
+  in-process background tasks loses RQ's job retry semantics and
+  process isolation between web requests and polling cycles.
+  Single-tenant single-user means the polling load is bounded (1-3
+  custodial accounts, 60s interval) so this is acceptable but the
+  failure modes need conscious design (in-flight cycle on restart,
+  exception isolation, slow custodial API affecting web latency).
+- *Redis removal:* SSE pub/sub moves to in-process asyncio channels;
+  queue infrastructure disappears entirely. Cleaner, but a single
+  failed FastAPI process drops all SSE consumers for that pod.
+  Tolerable for single-user-per-pod.
+- *Operational tooling regression:* Postgres has
+  `pg_stat_statements`, `EXPLAIN ANALYZE`, mature query-plan
+  inspection. SQLite has less. Debugging a perf issue on a Pi pod
+  under SQLite is harder. Trade-off, not a blocker.
 
-- Confirm per-session-passphrase-login as the model, or consider
-  stronger gates (read-only browser PWA; no-browser-PWA-at-all
-  hardening; WebAuthn as a complementary mechanism).
-- Session token format + TTL + refresh policy.
-- Cross-cutting impact on `UI/README.md` flow inventory: which
-  flows are full-functional in browser PWA vs Capacitor-only? A
-  comprehensive matrix would help future-iteration scoping.
-- Coding-side hygiene: the dev-mode `localStorage` fallback in
-  the current iteration's NativeBridge implementation must
-  carry a `// TODO(browser-pwa-auth-model)` comment so this
-  slug is back-referenced from code. The Capacitor-wrap
-  iteration grep-audits these TODOs as part of its cleanup.
+**Cost trajectory of continuing on current stack:**
 
-**Decision:** ___ (pending session)
+- Frontend / UI iterations: zero migration cost.
+- Pure business-logic iterations: minimal cost.
+- Backend-schema iterations (new tables, JSONB columns,
+  Postgres-specific patterns): real but bounded cost, best guess
+  1-3 days of additional migration work per iteration. Compounds
+  linearly with backend-schema additions.
+- After public-ship: cost crosses from "engineering work" into
+  "support disaster" (data migration on running self-hosted
+  instances). This is why the deadline is the public-ship event.
+
+**Leading direction:** migrate to the lighter stack before the
+public-ship event. Sequence the migration AFTER a benchmark
+iteration that (a) validates the density estimate isn't optimistic,
+(b) surfaces failure modes theoretical analysis misses, and (c)
+produces the metrics infrastructure that
+`backlog/self-hosted-operational-reliability.md` dimension 2
+(mobile-app server-health view) needs anyway. The benchmark serves
+three purposes simultaneously, one investment, three payoffs.
+
+**Open part, full session needed:**
+
+- Whether the migration is the next backend iteration (minimizes
+  future migration debt, delays Send/Receive feature work by ~2-3
+  weeks) or runs after Strongbox Send + Receive (lets the
+  immediate-value iteration ship first; accepts the ~1-3 days of
+  additional migration cost from that iteration).
+- Whether SQLite WAL-mode performance under SSE-heavy workload is
+  acceptable for the pod's actual workload, needs measurement, not
+  theoretical reasoning.
+- How the migration handles the Postgres-specific patterns:
+  refactor schema access patterns directly to SQLite-compatible
+  shapes, or extract a thin storage-adapter layer that supports
+  both backends (the latter preserves optionality but doubles test
+  surface for every write path).
+- Whether the lightened stack is the choice for hosted-tier too,
+  or whether hosted-tier diverges back to Postgres for
+  operational-tooling reasons. The "two stacks behind one codebase"
+  cost is real; one stack across both is the simpler commitment.
+- Benchmark scope: which metrics matter most (RAM peak +
+  steady-state, query latency p50/p99, SSE message latency, restart
+  time, disk usage growth, cold-start time on Pi-class hardware),
+  what represents a "real" workload (synthetic enough to be
+  reproducible, realistic enough to catch issues), and where the
+  metrics endpoints land (these are the same endpoints the
+  operational reliability layer's health-view needs, per cross-ref
+  above).
+
+**Decision:** ___ (pending session, deadline: before public-ship
+event commits)
 **Decided on:** ___
 
 ---

@@ -60,6 +60,11 @@
     grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
     gap: var(--space-5);
   }
+  /* Desktop-viewport groups (web admin etc.) — wider cards so the
+     1328×848 desktop frame is legible in the preview. */
+  .grid-desktop {
+    grid-template-columns: repeat(auto-fill, minmax(440px, 1fr));
+  }
   .section-heading {
     position: sticky;
     top: 0;
@@ -147,6 +152,9 @@
     position: relative;
     background: #cbd5e1;
   }
+  .preview-desktop {
+    aspect-ratio: 1328 / 848;
+  }
   .preview iframe {
     position: absolute;
     top: 0;
@@ -205,6 +213,7 @@
   // order. Adding a new group? Add it here in lifecycle position, then
   // reference its id from each new mockup entry's `group` field.
   const GROUPS = [
+    { id: 'web-admin',      label: 'Web admin' },
     { id: 'onboarding',     label: 'Onboarding' },
     { id: 'unlock',         label: 'Unlock' },
     { id: 'home',           label: 'Home' },
@@ -220,10 +229,31 @@
     { id: 'vault-detail',     label: 'Vault detail' },
   ];
 
+  // Groups whose mockups use the desktop viewport (1280×800 frame
+  // per UI/mockups/_shared/web_admin_shell.css) rather than the
+  // mobile phone-frame. Their cards render bigger and use a
+  // different aspect ratio. Add new desktop-viewport groups here.
+  const DESKTOP_GROUPS = new Set(['web-admin']);
+
   // Mockup index — update when adding or removing files.
   // Each entry: { file, title, status (draft|review|validated), group }
   // `group` MUST match an id in GROUPS above. No ad-hoc groups.
   const mockups = [
+    { file: 'web_admin_login.html',
+      title: 'Web admin — Login',
+      status: 'draft', group: 'web-admin' },
+    { file: 'web_admin_install_step1_passphrase.html',
+      title: 'Web admin — Install · 1 of 3 — Set passphrase',
+      status: 'draft', group: 'web-admin' },
+    { file: 'web_admin_install_step2_infrastructure.html',
+      title: 'Web admin — Install · 2 of 3 — Infrastructure review',
+      status: 'draft', group: 'web-admin' },
+    { file: 'web_admin_install_step3_pair.html',
+      title: 'Web admin — Install · 3 of 3 — Pair phone (QR)',
+      status: 'draft', group: 'web-admin' },
+    { file: 'web_admin_paired_devices.html',
+      title: 'Web admin — Paired devices (list + revoke)',
+      status: 'draft', group: 'web-admin' },
     { file: 'mobile_onboarding_01_connect.html',
       title: 'Onboarding 01 — Connect',
       status: 'validated', group: 'onboarding' },
@@ -456,6 +486,12 @@
   const IFRAME_W = 392;
   const IFRAME_H = 896;
 
+  // Web admin / desktop-viewport mockups use the desktop-frame from
+  // _shared/web_admin_shell.css. Body padding var(--space-5) = 24 on
+  // every side; frame is 1280×800 => content area is 1328 × 848.
+  const IFRAME_W_DESKTOP = 1328;
+  const IFRAME_H_DESKTOP = 848;
+
   const sectionsEl = document.getElementById('sections');
   const groupFiltersEl = document.getElementById('group-filters');
   let currentStatus = 'all';
@@ -484,14 +520,18 @@
 
   // ResizeObserver scales each iframe to fit its preview width while
   // keeping the body content area visible 1:1 (no overflow, no extra
-  // body background showing below the phone-frame).
+  // body background showing below the phone-frame). Desktop-viewport
+  // cards (data-viewport="desktop") use the desktop dimensions.
   const previewRO = new ResizeObserver(entries => {
     for (const e of entries) {
       const iframe = e.target.querySelector('iframe');
       if (iframe) {
-        iframe.style.width  = IFRAME_W + 'px';
-        iframe.style.height = IFRAME_H + 'px';
-        iframe.style.transform = `scale(${e.contentRect.width / IFRAME_W})`;
+        const isDesktop = e.target.dataset.viewport === 'desktop';
+        const w = isDesktop ? IFRAME_W_DESKTOP : IFRAME_W;
+        const h = isDesktop ? IFRAME_H_DESKTOP : IFRAME_H;
+        iframe.style.width  = w + 'px';
+        iframe.style.height = h + 'px';
+        iframe.style.transform = `scale(${e.contentRect.width / w})`;
       }
     }
   });
@@ -501,6 +541,9 @@
     card.href = m.file;
     card.target = '_blank';
     card.className = 'card';
+    const isDesktop = DESKTOP_GROUPS.has(m.group);
+    const previewClass = isDesktop ? 'preview preview-desktop' : 'preview';
+    const dataViewport = isDesktop ? ' data-viewport="desktop"' : '';
     card.innerHTML = `
       <div class="card-header">
         <div class="card-title">${m.title}</div>
@@ -509,7 +552,7 @@
           <span class="filename">${m.file}</span>
         </div>
       </div>
-      <div class="preview">
+      <div class="${previewClass}"${dataViewport}>
         <iframe src="${m.file}" loading="lazy"></iframe>
       </div>`;
     return card;
@@ -546,7 +589,7 @@
       sectionsEl.appendChild(heading);
 
       const grid = document.createElement('div');
-      grid.className = 'grid';
+      grid.className = DESKTOP_GROUPS.has(g.id) ? 'grid grid-desktop' : 'grid';
       for (const m of items) {
         const card = makeCard(m);
         grid.appendChild(card);

@@ -19,7 +19,8 @@ should first locate which surface is responsible.
 |---|---|---|---|
 | **Backend** | FastAPI app, Postgres, Redis, worker process. Docker Compose stack on the user's host (or hosted-tier infrastructure when that ships). | Observe the chain via bitcoind. Construct PSBTs. Persist Holdings, Descriptors, LedgerEntries. Call custodial-provider APIs. Emit and consume domain events. Encrypt and decrypt third-party credentials with the user's passphrase. | **Hold spending keys.** Sign anything. Create user accounts on TallyKeep infrastructure. |
 | **Capacitor client** | The mobile app (Capacitor wrap of the SvelteKit PWA), distributed via app store / sideload. | Hold spending keys for Purses with `purse_mode = ON_DEVICE_TK_GENERATED` or `ON_DEVICE_USER_IMPORTED`, in OS Keychain/Keystore, biometric-gated. Sign with the on-device key via NativeBridge. Read camera (QR). Subscribe to push notifications. | Transmit spending keys to the backend. Sign for Holdings whose keys live elsewhere (a Strongbox's hardware wallet, a `WATCH_ONLY` Purse's source wallet). |
-| **Browser PWA client** | The SvelteKit PWA in any browser (desktop Chrome / Safari / Firefox, mobile browsers, or installed-as-PWA). Same SvelteKit code as the Capacitor client; the `NativeBridge` interface stubs out. | Observe Holdings. Render flows. Compose PSBTs server-side and download the file. | Hold spending keys (no OS-grade secure storage primitive). Sign with on-device keys. Operations requiring keys gate honestly with "install the app / sign externally". |
+| **Web admin** | SvelteKit route-group inside the same frontend codebase (`/admin/*`), served by the same backend. Hosts the install wizard in first-boot mode and the small set of ongoing admin operations after setup-mode exits. Per ADR-0020. | First-boot setup (set the server passphrase). Generate pairing QR + accept redemption. List paired devices and revoke. Display infrastructure status (Bitcoin node, Lightning, Tor, pricing). Future Tier 2: rotate passphrase, surface version + logs. | Hold any signing material. Run any daily-use Holding flow (Holdings, Send, Receive, Activity — those belong to the Capacitor or future Browser PWA client). Operate without an authenticated session (per-session passphrase login per ADR-0020). |
+| **Browser PWA client** | The SvelteKit PWA in any browser (desktop Chrome / Safari / Firefox, mobile browsers, or installed-as-PWA). Same SvelteKit code as the Capacitor client; the `NativeBridge` interface stubs out. **Defers to the pre-public-ship phase per ADR-0020.** Private-ship is mobile (daily-use) + web admin (setup + admin ops); the daily-use browser PWA is intentionally not part of the private-ship surface. | (When it lands.) Observe Holdings. Render flows. Compose PSBTs server-side and download the file. Auth via per-session passphrase login (same model as the web admin per ADR-0020). | Hold spending keys (no OS-grade secure storage primitive). Sign with on-device keys. Operations requiring keys gate honestly with "install the app / sign externally". |
 | **bitcoind** | Bitcoin Core node, pruned or full, running on the user's host (or shared in the hosted tier — see `backlog/hosted-tier-infrastructure.md`). | Serve chain data via JSON-RPC. Push live events via ZeroMQ. Hold the source-of-truth view of the chain. | Sign anything. The backend never sends keys to bitcoind for signing. |
 | **Custodial provider** | Third-party exchange / broker API (Kraken, Bitstamp; future Lemon, Buenbit, Belo, Coinbase Advanced, Swissquote). | Hold custody of the user's BTC (and stablecoin) balances at the provider. Accept withdrawals to whitelisted addresses. | Anything TallyKeep is responsible for. TallyKeep owns the API credentials encrypted at rest; the provider owns the funds. |
 | **Hardware wallet** | The user's external signing device (Coldcard, Trezor, Ledger, Jade, BitBox, airgapped laptop). | Hold the spending key for Strongbox or Vault Holdings. Sign PSBTs offered to it by file / USB / QR. | Reach TallyKeep directly. The user is the bridge — they export a PSBT, walk it to the hardware wallet, walk the signed PSBT back. |
@@ -364,6 +365,32 @@ in `api/openapi.yaml`.
   permission gated; CORS denylist) lives in the hosted-tier
   iteration. In the dev phase, the localhost binding is the
   boundary like for every other route.
+- **Web admin auth posture (per ADR-0020).** The web admin
+  authenticates per session against the server passphrase via
+  `POST /api/v1/admin/session`. Token in `sessionStorage`,
+  TTL-bounded (sliding 30 min / absolute 8 h), invalidated on
+  server relock. Locked-state requests to admin routes return
+  `423 Locked` (same lock-aware contract as the rest of the
+  API per `04_api_conventions.md`). Admin routes carry the
+  `/api/v1/admin/` prefix and require the session token; the
+  pairing-redemption endpoint is the one exception — it is
+  authenticated by token possession, not by a session bearer,
+  for the 90-second TTL window during which the QR is live (per
+  ADR-0021).
+- **Pairing URL is operator-configured (per ADR-0020 + ADR-0021).**
+  The pairing exchange requires the backend URL to be reachable
+  from the operator's phone, and **the URL the phone uses is
+  separate from the URL the operator browses the admin from**.
+  The wizard does not auto-derive: it explicitly asks for the
+  pairing URL, pre-fills from the current browser origin as a
+  hint, warns on known-unreliable values (`localhost`, `.local`
+  mDNS, plain-HTTP private IPs), stores in the configuration
+  table as `pairing_external_url`, and uses it as the host
+  prefix for QR payloads. Deployment-layer reachability (Umbrel
+  MagicDNS, Tailscale, Cloudflare Tunnel, custom reverse proxy)
+  is solved at the host / mesh layer, not the architecture
+  layer — the wizard's job is to capture the operator's answer,
+  not to invent one.
 
 ## Configuration model
 
@@ -384,6 +411,15 @@ in `api/openapi.yaml`.
   and connection sanity-checks. Optional; absent value means
   clients render only the connection endpoint or hosted-tier
   connection-ID.
+- `pairing_external_url` — the URL the operator's phone uses to
+  reach this server. **Operator-set in the web admin's install
+  wizard step 3** (per ADR-0020 + ADR-0021), pre-filled from
+  the browser's current origin as a hint but explicitly
+  confirmed before the wizard advances. Used by the QR
+  generation endpoint as the host prefix for the pairing
+  payload (`<pairing_external_url>/api/v1/admin/pairing/redeem?t=<token>`).
+  Re-editable later from the paired-devices view's "Pair a new
+  device" sub-route. Stored in plaintext; not secret.
 
 ## Dependency discipline
 

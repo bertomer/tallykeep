@@ -170,3 +170,32 @@ one secret to remember.
   for hosted-tier-specific onboarding screens (backup-credentials
   acknowledgment, modified deep-recovery copy, traveling-user
   edge case) noted under the same model.
+
+## Addendum 2026-05-27 — Rotation hosted by web admin (deferred to Tier 2)
+
+ADR-0020 introduced the web admin as a dedicated operator surface.
+Passphrase rotation — previously listed as a future hosted-tier /
+mobile question, ambiguous as to which surface owned it — is now
+explicitly an admin operation:
+
+- **The web admin is the canonical surface for passphrase
+  rotation.** Mobile detects rotation via SSE
+  (`system.passphrase_rotated`, planned) and prompts the user to
+  re-enter the new passphrase on the next decryption-required
+  operation, without making rotation itself a mobile flow. This
+  matches the "one passphrase per stack" principle (rotation
+  affects the stack, not a per-device credential) and the
+  banking-app analogy (you change your bank password in the bank's
+  admin console, not from inside the mobile app's daily-use
+  surface).
+- **Implementation defers to Tier 2.** The web admin Tier 1
+  iteration ships login + install wizard + paired-devices + revoke;
+  rotation lands in a follow-up iteration tracked at
+  `backlog/web-admin-tier-2-rotation-and-status.md`. The
+  architectural call (rotation lives in web admin, not mobile) is
+  decided now; the implementation slot is scheduled later.
+
+This addendum does not change the daily-unlock or deep-recovery
+model. It pins down which surface hosts the third use of the
+passphrase (the rotation operation itself) without altering the
+others.

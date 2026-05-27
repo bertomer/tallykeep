@@ -72,3 +72,5 @@ iteration-done sanity sweep (`PROCESS.md §4.6`) checks it.
 - [0017 — Forget is hard delete; archive mechanism retires](0017-forget-is-hard-delete.md) — Accepted
 - [0018 — Vault is long-term by type; `Purpose.LONG_TERM` retires](0018-vault-is-long-term-by-type.md) — Accepted; extends 0010
 - [0019 — Security-health system: hybrid surface with severity-driven discovery](0019-security-health-system-hybrid-surface.md) — Accepted; migrated from `seed-backup-disclosure`
+- [0020 — Web admin as third surface, per-session passphrase login](0020-web-admin-surface.md) — Accepted; migrated from `browser-pwa-auth-model`
+- [0021 — Pairing handshake crypto](0021-pairing-handshake-crypto.md) — Accepted; migrated from `pairing-handshake-crypto`

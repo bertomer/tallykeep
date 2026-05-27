@@ -4,7 +4,8 @@ This file captures cross-platform UX decisions and the high-level
 flow inventory. Platform-specific implementation lives elsewhere:
 
 - `mobile.md` — mobile screens, screen-by-screen
-- `desktop.md` — desktop screens (later)
+- `web_admin.md` — web admin screens, screen-by-screen (per ADR-0020)
+- `desktop.md` — desktop screens (later, deferred to pre-public-ship)
 - `mockups/` — page-per-file HTML mockups for visual fine-tuning
 
 When something here contradicts a platform spec, this file wins for
@@ -24,7 +25,7 @@ in ADR-0001 and ADR-0002.
 **TallyKeep is for users who want banking ergonomics on Bitcoin.**
 
 The user we are designing for understands checking accounts, savings
-accounts, and safety-deposit boxes — and wants the same mental model
+accounts, and safety-deposit boxes, and wants the same mental model
 for their Bitcoin without the crypto-native friction. They are *not*:
 
 - A Bitcoin power-user who wants UTXO control as the primary
@@ -39,30 +40,51 @@ surgery. That's a feature, not a gap.
 
 ---
 
-## Mobile and desktop
+## Surfaces
 
-Mobile and desktop are two surfaces with different jobs. Mobile is
-the daily-use surface — quick balance checks, send, receive,
-categorize. Desktop is an operations console — setup, configuration,
-deep transaction history, accounting export, hardware-wallet PSBT
-roundtrips. They share the backend, the brand, and the data model.
+Three surfaces participate at private-ship; a fourth (full daily-use
+browser PWA / desktop operations console) defers to pre-public-ship.
+All consume the same backend, brand, and data model.
 
-**Mobile is being built first.** The Capacitor build is the only
-surface that holds spending keys; browser PWA on either platform
-never holds signing material. This is locked per ADR-0002 / ADR-0003
-/ threat model §Mobile addendum.
+**Mobile (Capacitor client).** Daily-use surface, quick balance
+checks, send, receive, categorize. The only surface that holds
+spending keys (on-device Purses; Strongbox and Vault keys live on
+hardware). Built first. Locked per ADR-0002 / ADR-0003 / threat
+model §Mobile addendum.
 
-**Codebase architecture for desktop is TBD.** A "single SvelteKit
-codebase, layout shell branches on viewport" pattern works only if
-mobile and desktop are mostly the same with light layout changes.
-Real-world banking apps suggest that's often not the case — CIC's
-mobile and web apps are an instructive comparison: same brand, same
-data, fundamentally different information architecture (mobile: one
-prominent account card with stacked actuality below; desktop: a
-three-column overview console). The call — one project with route-
-group divergence vs. two projects sharing an npm-package'd library
-— is deferred until desktop work begins and we have actual mobile UX
-to compare against.
+**Web admin.** Operator-facing admin surface, install wizard
+(first-boot), pair phones, paired-devices view, future passphrase
+rotation and version / log access. Small, rarely-used, lives on
+every install. Lives under `/admin/*` inside the same SvelteKit
+codebase; same brand, suppressed Capacitor / install-PWA / native-
+bridge affordances on its routes. Per ADR-0020. The web admin
+**is not** the desktop operations console mentioned in the next
+paragraph, it is intentionally minimal, and adding daily-use
+flows to it (Holdings, Send, Receive) is out of scope. The
+private-ship product is mobile (daily-use) + web admin (setup +
+admin ops); no daily-use browser/desktop surface ships at
+private-ship.
+
+**Browser PWA client / desktop operations console (deferred to
+pre-public-ship).** The eventual full daily-use browser/desktop
+PWA, deep transaction history, accounting export, hardware-
+wallet PSBT roundtrips, all the operations the mobile surface
+either compresses or doesn't carry. Auth inherits the web admin's
+per-session passphrase model per ADR-0020. Codebase architecture
+remains TBD: a "single SvelteKit codebase, layout shell branches
+on viewport" pattern works only if mobile and desktop are mostly
+the same with light layout changes. Real-world banking apps
+suggest that's often not the case, CIC's mobile and web apps are
+an instructive comparison: same brand, same data, fundamentally
+different information architecture (mobile: one prominent account
+card with stacked actuality below; desktop: a three-column
+overview console). The call, one project with route-group
+divergence vs. two projects sharing an npm-package'd library, is
+deferred until that work begins and we have actual mobile UX to
+compare against. **Whether this surface materially differs from
+the web admin's codebase placement** (same project, different
+route group vs. separate project) is part of the same deferred
+question.
 
 ---
 
@@ -95,10 +117,10 @@ value. Not authoritative; transparent about its origin.
 
 ### No performance metrics on the landing surface
 
-No "↑ 1.2% today," no daily change indicators, no portfolio-up/down
+No "up 1.2% today," no daily change indicators, no portfolio-up/down
 vocabulary. TallyKeep's user is *holding*, not trading. Performance
 and cost-basis surface on Holding detail pages (especially long-term
-ones — Vault), not on the landing.
+ones, Vault), not on the landing.
 
 ### Banking-first defaults
 
@@ -114,7 +136,7 @@ Reuse familiar banking vocabulary in the UI; surface Bitcoin reality
 in detail panes; never hide consequences. The reconcilability
 gauntlet (PROCESS.md §3) enforces this at design time. The
 *confirmation honesty* gauntlet question specifically catches
-optimistic UI states — never "sent" before broadcast acknowledgement,
+optimistic UI states, never "sent" before broadcast acknowledgement,
 never "confirmed" before chain inclusion, confirmation depth shown
 verbatim. Settlement-rails framing with confirmation probability is
 in `backlog/settlement-rails-payment-status-with-confirmation-probability.md`
@@ -133,18 +155,18 @@ clarity, not in the primary labels.
 | Account | Like an exchange account | Money you've got at a custodial provider that you want to manage from here |
 | Purse | Like a checking account | An everyday wallet for spending and small amounts |
 | Strongbox | Like a savings account, but you hold the key | A safer spot for medium-term holdings, usually on a hardware wallet |
-| Vault | Like a safety-deposit box or pension fund | A long-term holding whose spending requires friction — a script-enforced timelock, multiple keys, or both. Used rarely. |
+| Vault | Like a safety-deposit box or pension fund | A long-term holding whose spending requires friction, a script-enforced timelock, multiple keys, or both. Used rarely. |
 
 Purse has two seed origins per ADR-0006 (slug `purse-flavors`).
 The seed origin is a backend-stored intent field;
 *which client device actually holds the seed* is a per-client,
 runtime fact (see module 02 §"Signing capability is per-client").
 
-- **External-watch-only Purse** — onboarded via xpub / descriptor.
+- **External-watch-only Purse**, onboarded via xpub / descriptor.
   No seed lives in any TallyKeep client; the user's seed is in
   another hot wallet. Available on every platform. Spending always
   points back to the source wallet.
-- **TallyKeep-managed Purse** — TallyKeep generated the seed during
+- **TallyKeep-managed Purse**, TallyKeep generated the seed during
   Add-Holding; the seed lives in the Keychain/Keystore of *the
   specific client device that ran the creation flow*. From that
   device, native send (biometric + sign in-app + broadcast) is
@@ -161,19 +183,34 @@ runtime fact (see module 02 §"Signing capability is per-client").
 ## Flow inventory
 
 The product surfaces these flows. Each has its own section in
-`mobile.md` (and later `desktop.md`) with screen-by-screen detail
-plus reconcilability gauntlet answers. This list is the
-cross-platform truth about *which flows exist and what each one
-does*; the *how* lives in the platform specs.
+`mobile.md`, `web_admin.md`, or (later) `desktop.md` with
+screen-by-screen detail plus reconcilability gauntlet answers. This
+list is the cross-platform truth about *which flows exist and what
+each one does*; the *how* lives in the per-surface specs.
+
+### Web admin (per ADR-0020)
+
+Operator surface, separate from mobile daily-use. Two modes:
+
+- **First-boot mode**, three-step install wizard: set passphrase,
+  review infrastructure (Bitcoin node, Lightning, Tor, pricing,
+  display-only in iteration v1), pair your phone (first-pair QR
+  per ADR-0021).
+- **Authenticated mode**, login screen (per-session passphrase),
+  then paired-devices view with revoke. Tier 2 grows passphrase
+  rotation, version status, log access (see
+  `backlog/web-admin-tier-2-rotation-and-status.md`).
+
+Screen-by-screen detail in `UI/web_admin.md`.
 
 ### Onboarding
 
-Five screens: Welcome → Passphrase + biometric daily-unlock toggle →
-Hosting choice → Connection (self-hosted) or Hosted welcome (privacy
+Five screens: Welcome, Passphrase + biometric daily-unlock toggle,
+Hosting choice, Connection (self-hosted) or Hosted welcome (privacy
 acknowledgment).
 
 After step 4, the user lands on the home page in its empty state. No
-"first Holding" wizard step — the home page itself is where the user
+"first Holding" wizard step, the home page itself is where the user
 starts adding Holdings.
 
 ### Home
@@ -188,7 +225,7 @@ first visit. Contains:
 - Add affordances for the four Holding types
 
 Recent activity and categorization live in the Activity tab
-(cross-Holding view) and on per-Holding detail pages — never on the
+(cross-Holding view) and on per-Holding detail pages, never on the
 home / consolidated landing page. The home is for at-a-glance
 "where is my money" and primary actions; the Activity tab is for
 review and categorization work. The push-driven categorization
@@ -197,18 +234,18 @@ prompt is captured for later in
 
 ### Add Holding
 
-Type chooser → type-specific flow.
+Type chooser, then type-specific flow.
 
-- **Add Account:** provider selection → credentials → whitelist
+- **Add Account:** provider selection, credentials, whitelist
   verification.
 - **Add Purse:** binary at the start of the flow:
-    - **Import an existing wallet** (`purse_mode=watch_only`)
-      — paste / QR an xpub or descriptor. **xpub or descriptor only**
-      — single-address import is not supported (per ADR-0006;
+    - **Import an existing wallet** (`purse_mode=watch_only`),
+      paste / QR an xpub or descriptor. **xpub or descriptor only**,
+      single-address import is not supported (per ADR-0006;
       observing one address misrepresents wallet activity that
       rotates across many addresses).
     - **Create a new TallyKeep wallet**
-      (`purse_mode=on_device_tk_generated`) — TallyKeep generates a
+      (`purse_mode=on_device_tk_generated`), TallyKeep generates a
       fresh seed into the current client's Keychain/Keystore and
       registers the derived descriptor with the backend. Includes
       the seed-backup warning per pending pre-implementation item
@@ -228,7 +265,7 @@ Type chooser → type-specific flow.
   Rejects pure single-key (redirect to Strongbox) and multi-path
   miniscript (unsupported-form error). Per ADR-0010, Vault is
   the friction-bearing Holding; **Vault Send is deferred** for
-  v1 regardless of shape — that's where the multi-signer
+  v1 regardless of shape, that's where the multi-signer
   coordination UX lives.
 
 ### Holding detail
@@ -280,40 +317,40 @@ Per type:
 The Send experience differs significantly per Holding type because
 the underlying mechanic differs. Per type:
 
-- **Account** — "Withdraw to whitelist." Triggers a withdrawal at
+- **Account**, "Withdraw to whitelist." Triggers a withdrawal at
   the CustodialProvider via API; funds go to the pre-whitelisted
   destination set during Account onboarding (typically a Strongbox
   or Vault). The user does not choose a destination here. This is
   the only way TallyKeep moves funds out of an Account today.
 
-- **Purse (external-watch-only)** — Send is hidden by default.
+- **Purse (external-watch-only)**, Send is hidden by default.
   Primary affordance points the user at the source wallet ("Spend in
   [wallet]" with a deep-link where supported). Power-user toggle
   exposes "Construct PSBT for export" for the rare workflow that
   wants it. TallyKeep aggregates and observes; doesn't compete on
   spending UX where the source wallet already owns it.
 
-- **Purse (TallyKeep-managed)** — behavior depends on whether *this
+- **Purse (TallyKeep-managed)**, behavior depends on whether *this
   client* holds the seed for this Holding (runtime check against
   local Keychain/Keystore, keyed by holding_id):
 
-  - *On the device that holds the seed* — Native send:
+  - *On the device that holds the seed*, Native send:
     1. Compose (paste/scan address, amount, fee tier, label)
     2. Review
-    3. Sign — biometric prompt + signing in-app
+    3. Sign, biometric prompt + signing in-app
     4. Broadcast
     5. Confirmed (depth shown verbatim; confirmation probability
        when implemented per
        `backlog/settlement-rails-payment-status-with-confirmation-probability.md`)
   - *On any other client* (different phone, browser PWA on
-    desktop or mobile) — Send shows a clear gate: "This wallet's
+    desktop or mobile), Send shows a clear gate: "This wallet's
     keys are on another device. To spend, open TallyKeep on the
     device that holds them." No PSBT export, no pretend-to-sign.
     Pairing-based PSBT roundtrip between TallyKeep instances is
     captured for later in
     `backlog/psbt-by-qr-roundtrip-on-mobile.md`.
 
-- **Strongbox** — Five-step PSBT flow with the user's hardware
+- **Strongbox**, Five-step PSBT flow with the user's hardware
   wallet at step 3:
     1. Compose
     2. Review (with "verify destination on signing device" warning)
@@ -322,7 +359,7 @@ the underlying mechanic differs. Per type:
     4. Broadcast
     5. Confirmed
 
-- **Vault** — PSBT flow that branches by Vault shape (single-sig
+- **Vault**, PSBT flow that branches by Vault shape (single-sig
   PSBT roundtrip with chain-side timelock check for the
   single-sig + timelock shape, multi-signer coordination for the
   multisig shape). Deferred for v1 regardless of shape; Vault
@@ -332,15 +369,15 @@ the underlying mechanic differs. Per type:
 
 **Cross-platform behavior.** Only the TallyKeep-managed Purse on
 the Capacitor device that actually holds its seed signs natively
-inside TallyKeep. Everything else — external-watch-only Purse,
+inside TallyKeep. Everything else, external-watch-only Purse,
 Strongbox, Vault, **and TallyKeep-managed Purse viewed from any
-device that doesn't hold its seed** — requires external action
+device that doesn't hold its seed**, requires external action
 (PSBT roundtrip, source-wallet redirect, multisig ceremony, or "use
 TallyKeep on the device where the seed lives"). When the same user
 accesses the same TallyKeep instance from both the Capacitor app
 (phone) and a browser (laptop), the same TallyKeep-managed Purse is
 spendable from the phone and view-only from the browser, because
-the seed lives in the phone's Keychain/Keystore — not in the
+the seed lives in the phone's Keychain/Keystore, not in the
 backend, not in the browser.
 
 **Keys never transit through TallyKeep's backend in any case.** The
@@ -368,9 +405,9 @@ custodial-provider deposit address for Account):
 - **Purse (TallyKeep-managed):** derive next unused address from
   the descriptor registered at Holding creation. Receive works
   identically on every client (any device viewing the Holding can
-  show a fresh receive address — derivation is public).
+  show a fresh receive address, derivation is public).
 - **Strongbox:** derive next unused address from the hardware
-  wallet's descriptor. **Verify-on-device step required** — prompt
+  wallet's descriptor. **Verify-on-device step required**, prompt
   the user to confirm the address on the hardware wallet's screen
   before sharing. Defends against malware swapping the address
   between display and copy.
@@ -379,19 +416,19 @@ custodial-provider deposit address for Account):
 
 Receive supports BIP 21 payment URIs
 (`bitcoin:address?amount=0.5&label=invoice123`) so the sender's
-wallet can pre-fill the request. Specific layout — text, QR, copy,
-share — designed in the Receive iteration.
+wallet can pre-fill the request. Specific layout, text, QR, copy,
+share, designed in the Receive iteration.
 
 Receive uses fresh-per-payment addresses by default. Reuse is
 technically possible but flagged by the Blueprint analyzer for
 privacy reasons (deferred post-ship per
 `backlog/receive-in-static-merchant-mode.md`).
 The persistent identifier of the wallet is the descriptor / xpub,
-which stays internal — only fresh-derived addresses are shared
+which stays internal, only fresh-derived addresses are shared
 externally.
 
 Lightning Receive (deferred to the Lightning iteration) generates an
-invoice rather than an address — different mechanic, lives behind a
+invoice rather than an address, different mechanic, lives behind a
 tab visible-disabled today.
 
 ### Activity + Categorization
@@ -412,7 +449,7 @@ whitelist target, recent activity. Specific affordances (panel
 layout, controls, kill switches) are designed in the Treasury-view
 iteration.
 
-**Sweep policies — generalized.** Per `concerns/sweep_policies.md`, a SweepPolicy
+**Sweep policies, generalized.** Per `concerns/sweep_policies.md`, a SweepPolicy
 moves funds from any Holding to any Holding, with a safety validator
 that warns about risky configurations but never blocks (the user is
 the final authority). Specific UI for sweep-policy creation and
@@ -421,31 +458,31 @@ listing is designed in the Treasury-view iteration.
 **Auto-sweep is only feasible when TallyKeep can sign without
 external action.** Practically:
 
-- **Account → anywhere** — provider API, no signing required by
+- **Account to anywhere**, provider API, no signing required by
   TallyKeep.
-- **TallyKeep-managed Purse → anywhere** (only when scheduled on
-  the device that holds the seed) — biometric prompt + native
+- **TallyKeep-managed Purse to anywhere** (only when scheduled on
+  the device that holds the seed), biometric prompt + native
   signing on that device.
-- **Strongbox → anywhere** — not auto. Reduces to a scheduled
+- **Strongbox to anywhere**, not auto. Reduces to a scheduled
   reminder that prepares a PSBT awaiting the user's external
   signature on the hardware wallet.
-- **Vault → anywhere** — not auto. Same as Strongbox plus multisig
+- **Vault to anywhere**, not auto. Same as Strongbox plus multisig
   coordination.
-- **External-watch-only Purse → anywhere** — not possible (no keys
+- **External-watch-only Purse to anywhere**, not possible (no keys
   held by any TallyKeep client).
 
 **Dev-phase scope:** Account-originated outflow sweeps (the
-minimum-exposure-trading accumulation pattern: Account → TK
+minimum-exposure-trading accumulation pattern: Account to TK
 Holding) are the primary surface. TK-Holding-originated sweeps
 (inflow Account-bound for decumulation, plus inter-Holding
 rebalancing) are architecturally supported but their UX is
-design-deferred to a future iteration — see
+design-deferred to a future iteration, see
 `backlog/holding-to-holding-sweeps-beyond-account-originated.md`.
 
 Visible only when the user has at least one Account or has set up
 another sweep. **Order placement** (buying / selling Bitcoin
 through the connected provider) is explicitly out of scope
-through the personal-use phase — current scope is observation +
+through the personal-use phase, current scope is observation +
 Withdraw + Deposit + bi-directional SweepPolicies. Adding order
 placement crosses the fiat-operations boundary which is locked
 out, and would require a separate regulatory evaluation. Captured
@@ -465,7 +502,7 @@ These were originally scoped as in-scope-now features in earlier
 modules but have been deferred past the public-ship event per
 Rémy 2026-05:
 
-- **Blueprint analysis** — the four hygiene flags (address reuse,
+- **Blueprint analysis**, the four hygiene flags (address reuse,
   dust UTXOs, round-number outputs, suspected consolidation) plus
   later UTXO clustering graph. Backend logic per `concerns/observation.md` is
   implemented; UI surface deferred. Captured in
@@ -477,13 +514,13 @@ Rémy 2026-05:
 
 ## What this doc does NOT cover
 
-- Screen-by-screen layout, components, and states — see `mobile.md`
-  / `desktop.md`.
+- Screen-by-screen layout, components, and states, see `mobile.md`
+  / `web_admin.md` / `desktop.md`.
 - Implementation specifics (SvelteKit components, routing, state
-  stores) — those are code, not spec.
-- Brand identity, copy voice — see `brand/README.md` (mark,
+  stores), those are code, not spec.
+- Brand identity, copy voice, see `brand/README.md` (mark,
   wordmark, palette locked; voice/about draft; finalized at
   the public-ship event per ADR-0003).
-- Future iterations and parked ideas — see `backlog/`.
-- The threat-model implications of mobile and the Capacitor build
-  — see `concerns/threat_model.md` §Mobile addendum.
+- Future iterations and parked ideas, see `backlog/`.
+- The threat-model implications of mobile and the Capacitor build,
+  see `concerns/threat_model.md` §Mobile addendum.

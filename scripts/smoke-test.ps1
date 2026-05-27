@@ -2,7 +2,7 @@
 # of the still-501 stubs to confirm the API surface.
 #
 # Prereqs:
-#   1. Stack is up: `docker compose up -d` (or after `.\scripts\dev-reset.ps1`)
+#   1. Stack is up: `docker-compose up -d` (or after `.\scripts\dev-reset.ps1`)
 #   2. The secret store is initialized AND unlocked. If you just reset the
 #      stack, this script will initialize it for you with the passphrase
 #      passed via -Passphrase (default: 'smoke-test-passphrase').
@@ -417,16 +417,16 @@ try {
     $walletFlag = "-rpcwallet=$walletName"
     $rpcAuth = "-rpcuser=tallykeep", "-rpcpassword=tallykeep_dev", "-regtest"
 
-    $createOutput = docker compose exec -T bitcoind bitcoin-cli @rpcAuth createwallet $walletName 2>&1
+    $createOutput = docker-compose exec -T bitcoind bitcoin-cli @rpcAuth createwallet $walletName 2>&1
     if ($LASTEXITCODE -ne 0) {
         throw "createwallet '$walletName' failed: $createOutput"
     }
 
-    $faucetAddr = (docker compose exec -T bitcoind bitcoin-cli @rpcAuth $walletFlag getnewaddress).Trim()
-    docker compose exec -T bitcoind bitcoin-cli @rpcAuth generatetoaddress 150 $faucetAddr | Out-Null
-    $sendTxid = (docker compose exec -T bitcoind bitcoin-cli @rpcAuth $walletFlag sendtoaddress $firstAddr 0.00001500).Trim()
-    $minerAddr = (docker compose exec -T bitcoind bitcoin-cli @rpcAuth $walletFlag getnewaddress).Trim()
-    docker compose exec -T bitcoind bitcoin-cli @rpcAuth generatetoaddress 1 $minerAddr | Out-Null
+    $faucetAddr = (docker-compose exec -T bitcoind bitcoin-cli @rpcAuth $walletFlag getnewaddress).Trim()
+    docker-compose exec -T bitcoind bitcoin-cli @rpcAuth generatetoaddress 150 $faucetAddr | Out-Null
+    $sendTxid = (docker-compose exec -T bitcoind bitcoin-cli @rpcAuth $walletFlag sendtoaddress $firstAddr 0.00001500).Trim()
+    $minerAddr = (docker-compose exec -T bitcoind bitcoin-cli @rpcAuth $walletFlag getnewaddress).Trim()
+    docker-compose exec -T bitcoind bitcoin-cli @rpcAuth generatetoaddress 1 $minerAddr | Out-Null
     Show "funded txid" $sendTxid
 
     $rescan = Invoke-RestMethod -Method Post -Uri "$BaseUrl/api/v1/descriptors/$regtestDescId/rescan" -Headers $Headers
@@ -463,9 +463,9 @@ if ($regtestSkipped) {
     $liveAddr = $newAddrResp.address
     Show "fresh address" $liveAddr
 
-    $liveTxid = (docker compose exec -T bitcoind bitcoin-cli @rpcAuth $walletFlag sendtoaddress $liveAddr 0.00002000).Trim()
+    $liveTxid = (docker-compose exec -T bitcoind bitcoin-cli @rpcAuth $walletFlag sendtoaddress $liveAddr 0.00002000).Trim()
     Show "live txid" $liveTxid
-    docker compose exec -T bitcoind bitcoin-cli @rpcAuth generatetoaddress 1 $minerAddr | Out-Null
+    docker-compose exec -T bitcoind bitcoin-cli @rpcAuth generatetoaddress 1 $minerAddr | Out-Null
 
     # Poll the cross-descriptor UTXO endpoint for our txid showing up. The
     # listener thread fetches getrawtransaction + getblock then commits, so
@@ -479,7 +479,7 @@ if ($regtestSkipped) {
         Start-Sleep -Milliseconds 300
     }
     if (-not $found) {
-        throw "live listener never persisted UTXO for $liveTxid (worker logs: 'docker compose logs worker')"
+        throw "live listener never persisted UTXO for $liveTxid (worker logs: 'docker-compose logs worker')"
     }
     Show "auto-detected sats" $match.value_sats
     Show "confirmation_height" $match.confirmation_height
@@ -529,19 +529,19 @@ try {
     # skipped.
     $bankFunder     = "smoke_bank_$(Get-Random -Maximum 99999)"
     $bankFunderFlag = "-rpcwallet=$bankFunder"
-    $bankCreateOut  = docker compose exec -T bitcoind bitcoin-cli @rpcAuth createwallet $bankFunder 2>&1
+    $bankCreateOut  = docker-compose exec -T bitcoind bitcoin-cli @rpcAuth createwallet $bankFunder 2>&1
     if ($LASTEXITCODE -ne 0) { throw "createwallet '$bankFunder' failed: $bankCreateOut" }
-    $bankFunderAddr = (docker compose exec -T bitcoind bitcoin-cli @rpcAuth $bankFunderFlag getnewaddress).Trim()
-    docker compose exec -T bitcoind bitcoin-cli @rpcAuth generatetoaddress 150 $bankFunderAddr | Out-Null
+    $bankFunderAddr = (docker-compose exec -T bitcoind bitcoin-cli @rpcAuth $bankFunderFlag getnewaddress).Trim()
+    docker-compose exec -T bitcoind bitcoin-cli @rpcAuth generatetoaddress 150 $bankFunderAddr | Out-Null
 
     $bankRecvAddr = (Invoke-RestMethod `
         -Uri "$BaseUrl/api/v1/descriptors/$bankDescId/addresses?limit=1&is_change=false" `
         -Headers $Headers).addresses[0].address
-    $bankSendTxid = (docker compose exec -T bitcoind bitcoin-cli @rpcAuth $bankFunderFlag sendtoaddress $bankRecvAddr 0.00050000).Trim()
+    $bankSendTxid = (docker-compose exec -T bitcoind bitcoin-cli @rpcAuth $bankFunderFlag sendtoaddress $bankRecvAddr 0.00050000).Trim()
     if ($LASTEXITCODE -ne 0) { throw "sendtoaddress to '$bankRecvAddr' failed" }
     Show "bank funded txid" $bankSendTxid
-    $bankMinerAddr = (docker compose exec -T bitcoind bitcoin-cli @rpcAuth $bankFunderFlag getnewaddress).Trim()
-    docker compose exec -T bitcoind bitcoin-cli @rpcAuth generatetoaddress 1 $bankMinerAddr | Out-Null
+    $bankMinerAddr = (docker-compose exec -T bitcoind bitcoin-cli @rpcAuth $bankFunderFlag getnewaddress).Trim()
+    docker-compose exec -T bitcoind bitcoin-cli @rpcAuth generatetoaddress 1 $bankMinerAddr | Out-Null
 
     $bankRescan = Invoke-RestMethod -Method Post -Uri "$BaseUrl/api/v1/descriptors/$bankDescId/rescan" -Headers $Headers
     Show "utxos_discovered" $bankRescan.utxos_discovered
@@ -565,8 +565,8 @@ if (-not $bankingSkipped) {
 
     # -- 2. PaymentRequest (builds PSBT; no signing in smoke test) --
     $destWallet = "smoke_dest_$(Get-Random -Maximum 99999)"
-    docker compose exec -T bitcoind bitcoin-cli @rpcAuth createwallet $destWallet | Out-Null
-    $destAddr = (docker compose exec -T bitcoind bitcoin-cli @rpcAuth "-rpcwallet=$destWallet" getnewaddress).Trim()
+    docker-compose exec -T bitcoind bitcoin-cli @rpcAuth createwallet $destWallet | Out-Null
+    $destAddr = (docker-compose exec -T bitcoind bitcoin-cli @rpcAuth "-rpcwallet=$destWallet" getnewaddress).Trim()
 
     $pr = Invoke-RestMethod -Method Post -Uri "$BaseUrl/api/v1/banking/payment-requests" `
         -ContentType 'application/json' `

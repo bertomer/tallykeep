@@ -1,0 +1,143 @@
+<!--
+  Title: Web admin — Install wizard step 1 (set passphrase)
+  Status: draft
+  Date last touched: 2026-05-27
+  Replaces: (none — new surface per ADR-0020)
+-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>TallyKeep — Web admin — Install · 1 of 3</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="_shared/tokens.css">
+<link rel="stylesheet" href="_shared/web_admin_shell.css">
+<style>
+  .brand-row svg.wordmark-icony {
+    height: 32px;
+    width: auto;
+    display: block;
+  }
+</style>
+</head>
+<body>
+
+<div class="mockup-meta">
+  <strong>Web admin — Install · 1 of 3 — Set passphrase</strong> ·
+  <span class="status-draft">draft</span> ·
+  2026-05-27 · 1280×800
+</div>
+
+<div class="desktop-frame">
+  <div class="desktop-screen">
+
+    <header class="admin-header">
+      <div class="brand brand-row">
+        <svg class="wordmark-icony" viewBox="0 0 450 145" xmlns="http://www.w3.org/2000/svg" aria-label="tallykeep" role="img">
+          <text x="0" y="92" font-family="Manrope, system-ui, sans-serif" font-weight="600" font-size="92" letter-spacing="-2" class="mark-text">tall</text>
+          <svg x="143" y="42" width="76" height="84" viewBox="36.43 27.79 131.9 146.43">
+            <defs>
+              <clipPath id="wm-stock-clip-p1"><path d="M 168.33 42.19 L 54.27 174.22 L 36.43 139.77 L 54.47 118.86 L 65.07 128.02 L 151.67 27.81 Z"/></clipPath>
+              <clipPath id="wm-foil-clip-p1"><polygon points="40.68,42.21 79.68,87.21 96.32,72.79 57.32,27.79"/></clipPath>
+            </defs>
+            <path d="M 168.33 42.19 L 54.27 174.22 L 36.43 139.77 L 54.47 118.86 L 65.07 128.02 L 151.67 27.81 Z" class="mark-wood"/>
+            <polygon points="40.68,42.21 79.68,87.21 96.32,72.79 57.32,27.79" class="mark-wood"/>
+            <g class="mark-grain" stroke-width="1.4" stroke-linecap="butt" opacity="0.6">
+              <line x1="163.79" y1="38.27" x2="46.07" y2="174.53" clip-path="url(#wm-stock-clip-p1)"/>
+              <line x1="156.22" y1="31.73" x2="38.50" y2="167.99" clip-path="url(#wm-stock-clip-p1)"/>
+              <line x1="45.22"  y1="38.27" x2="84.52" y2="83.64"  clip-path="url(#wm-foil-clip-p1)"/>
+              <line x1="52.78"  y1="31.73" x2="92.08" y2="77.09"  clip-path="url(#wm-foil-clip-p1)"/>
+            </g>
+            <circle cx="53.76" cy="147.31" r="2.8" class="mark-carving"/>
+            <polygon points="-3,12 3,12 2,5 -2,5"     class="mark-carving" transform="translate(147 50) rotate(130.82)"/>
+            <polygon points="-4,12 4,12 2,4 -2,4"     class="mark-carving" transform="translate(140 58) rotate(130.82)"/>
+            <polygon points="-3,12 3,12 2,5 -2,5"     class="mark-carving" transform="translate(133 66) rotate(130.82)"/>
+            <polygon points="-3,-12 3,-12 2,-5 -2,-5" class="mark-carving" transform="translate(62 50)  rotate(49.18)"/>
+            <polygon points="-4,-12 4,-12 2,-4 -2,-4" class="mark-carving" transform="translate(69 58)  rotate(49.18)"/>
+            <polygon points="-3,-12 3,-12 2,-5 -2,-5" class="mark-carving" transform="translate(76 66)  rotate(49.18)"/>
+          </svg>
+          <text x="228" y="92" font-family="Manrope, system-ui, sans-serif" font-weight="600" font-size="92" letter-spacing="-2" class="mark-text">keep</text>
+        </svg>
+        <span class="brand-text" style="margin-left: var(--space-3); color: var(--color-text-muted); font-weight: var(--font-weight-normal); font-size: var(--font-size-sm);">First-boot setup</span>
+      </div>
+      <div class="server-label">
+        <span class="label">Server</span>
+        <span class="name">tallykeep.local</span>
+      </div>
+    </header>
+
+    <div class="content-shell">
+      <div class="content-narrow">
+
+        <!-- Wizard progress -->
+        <div class="wizard-progress">
+          <div class="step active">
+            <span class="num">1</span>
+            <span>Set passphrase</span>
+          </div>
+          <div class="connector"></div>
+          <div class="step">
+            <span class="num">2</span>
+            <span>Infrastructure</span>
+          </div>
+          <div class="connector"></div>
+          <div class="step">
+            <span class="num">3</span>
+            <span>Pair your phone</span>
+          </div>
+        </div>
+
+        <div class="page-heading">
+          <h1>Choose your server passphrase</h1>
+          <p class="subtitle">
+            This passphrase encrypts everything sensitive your
+            TallyKeep stack stores on disk. Pick it carefully — it
+            cannot be reset.
+          </p>
+        </div>
+
+        <div class="card">
+          <div class="form-row">
+            <label for="passphrase">Passphrase</label>
+            <input id="passphrase" type="password" autocomplete="new-password" placeholder="••••••••••••••••••" />
+            <div class="strength-meter">
+              <span class="bar on"></span>
+              <span class="bar on"></span>
+              <span class="bar on"></span>
+              <span class="bar warn"></span>
+              <span class="bar"></span>
+            </div>
+            <span class="strength-label">Strength: <strong>OK</strong> — a short phrase you alone would think of works better than a fancy single word.</span>
+          </div>
+
+          <div class="form-row">
+            <label for="passphrase-confirm">Confirm passphrase</label>
+            <input id="passphrase-confirm" type="password" autocomplete="new-password" placeholder="••••••••••••••••••" />
+            <span class="hint">Re-type to make sure you've got it.</span>
+          </div>
+        </div>
+
+        <div class="disclosure">
+          <div class="disclosure-title">What this passphrase does</div>
+          <ul>
+            <li><span><strong>Encrypts your server's secrets.</strong> Custodial-provider API keys and anything else sensitive on disk. The server cannot start without you typing this.</span></li>
+            <li><span><strong>Unlocks your phone if biometric fails.</strong> Your phone asks the server to validate; the passphrase itself never leaves the server's memory.</span></li>
+            <li><span><strong>Cannot be reset.</strong> TallyKeep doesn't store it anywhere recoverable. Write it down somewhere safe.</span></li>
+          </ul>
+        </div>
+
+        <div style="display: flex; justify-content: flex-end; gap: var(--space-3);">
+          <button class="btn btn-primary">Set passphrase &amp; continue</button>
+        </div>
+
+      </div>
+    </div>
+
+  </div>
+</div>
+
+</body>
+</html>

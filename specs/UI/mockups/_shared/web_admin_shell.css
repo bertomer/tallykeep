@@ -1,0 +1,650 @@
+/*
+  TallyKeep — web admin mockup shell styles
+
+  Desktop viewport for the web admin surface introduced by ADR-0020.
+  Separate from shell.css (mobile phone-frame); the two coexist
+  because the mockup environment renders both viewport classes.
+
+  Status: draft (lockstep with first web admin Tier 1 iteration)
+  Last touched: 2026-05-27
+
+  Body content area (used by the gallery's per-group aspect
+  override): (24+1280+24) × (24+800+24) = 1328 × 848.
+*/
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  font-family: var(--font-sans);
+  font-size: var(--font-size-base);
+  line-height: var(--line-height-default);
+  color: var(--color-text);
+  background: #cbd5e1; /* slate, matches phone mockups */
+}
+
+body {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: var(--space-5);
+}
+
+/* Desktop frame for visual review */
+.desktop-frame {
+  width: 1280px;
+  height: 800px;
+  background: var(--color-bg);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-lg);
+  overflow: hidden;
+  position: relative;
+  border: 1px solid var(--color-border-strong);
+}
+
+.desktop-screen {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--color-bg);
+  overflow: hidden;
+}
+
+/* Mockup metadata banner — same pattern as shell.css */
+.mockup-meta {
+  position: fixed;
+  top: var(--space-3);
+  left: var(--space-3);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: var(--space-2) var(--space-3);
+  font-size: var(--font-size-xs);
+  color: var(--color-text-muted);
+  box-shadow: var(--shadow-sm);
+  z-index: 50;
+}
+.mockup-meta strong { color: var(--color-text); }
+.mockup-meta .status-draft     { color: var(--color-warning); }
+.mockup-meta .status-review    { color: var(--color-info); }
+.mockup-meta .status-validated { color: var(--color-success); }
+
+/* ---------------- Web admin header ---------------- */
+/* Persistent compact header on every web admin screen. Wordmark
+   left, server-label right. The wordmark text-only variant is
+   used on authenticated screens; the full wordmark-icony is used
+   on login + install wizard (the brand-prominent screens). */
+
+.admin-header {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-4) var(--space-6);
+  background: var(--color-surface);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.admin-header .brand {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.admin-header .brand-text {
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text);
+  letter-spacing: -0.01em;
+}
+
+.admin-header .server-label {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+}
+
+.admin-header .server-label .label {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.admin-header .server-label .name {
+  font-size: var(--font-size-sm);
+  color: var(--color-text);
+  font-weight: var(--font-weight-medium);
+}
+
+.admin-header .header-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+/* ---------------- Content shell ---------------- */
+/* Centered content column. Two widths:
+   - .content-narrow (640px) for forms, login, wizard steps.
+   - .content-wide (960px) for lists, paired-devices view, future
+     log surfaces.                                                */
+
+.content-shell {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--space-6) var(--space-6);
+  display: flex;
+  justify-content: center;
+}
+
+.content-narrow {
+  width: 100%;
+  max-width: 640px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+
+.content-wide {
+  width: 100%;
+  max-width: 960px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+
+/* ---------------- Page heading ---------------- */
+
+.page-heading {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.page-heading h1 {
+  font-size: var(--font-size-xl);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text);
+  margin: 0;
+  line-height: var(--line-height-tight);
+}
+
+.page-heading .subtitle {
+  font-size: var(--font-size-base);
+  color: var(--color-text-muted);
+  margin: 0;
+  line-height: var(--line-height-default);
+}
+
+/* ---------------- Cards ---------------- */
+
+.card {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-5);
+}
+
+.card .card-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: var(--space-4);
+}
+
+.card .card-title {
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text);
+  margin: 0;
+}
+
+.card .card-subtitle {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+  margin: var(--space-1) 0 0;
+}
+
+/* ---------------- Forms ---------------- */
+
+.form-row {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.form-row + .form-row {
+  margin-top: var(--space-4);
+}
+
+.form-row label {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text);
+}
+
+.form-row .hint {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-muted);
+  line-height: var(--line-height-default);
+}
+
+.form-row input[type="password"],
+.form-row input[type="text"] {
+  width: 100%;
+  padding: var(--space-3) var(--space-4);
+  font-size: var(--font-size-base);
+  font-family: var(--font-sans);
+  color: var(--color-text);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-md);
+}
+
+.form-row input:focus {
+  outline: none;
+  border-color: var(--color-border-focus);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-primary) 18%, transparent);
+}
+
+/* Strength meter — minimal 5-bar indicator */
+.strength-meter {
+  display: flex;
+  gap: var(--space-1);
+  margin-top: var(--space-2);
+}
+
+.strength-meter .bar {
+  flex: 1;
+  height: 4px;
+  background: var(--color-border);
+  border-radius: var(--radius-sm);
+}
+
+.strength-meter .bar.on { background: var(--color-success); }
+.strength-meter .bar.warn { background: var(--color-warning); }
+
+.strength-label {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-muted);
+  margin-top: var(--space-1);
+}
+
+/* Inline error */
+.inline-error {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4);
+  background: var(--color-danger-soft);
+  border: 1px solid var(--color-danger-border);
+  border-radius: var(--radius-md);
+  color: var(--color-danger-text-on-soft);
+  font-size: var(--font-size-sm);
+  line-height: var(--line-height-default);
+}
+
+.inline-info {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4);
+  background: var(--color-info-soft);
+  border: 1px solid var(--color-info-border);
+  border-radius: var(--radius-md);
+  color: var(--color-info-text-on-soft);
+  font-size: var(--font-size-sm);
+  line-height: var(--line-height-default);
+}
+
+/* ---------------- Buttons ---------------- */
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-3) var(--space-5);
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-semibold);
+  font-family: var(--font-sans);
+  border-radius: var(--radius-md);
+  border: 1px solid transparent;
+  cursor: pointer;
+  text-decoration: none;
+  line-height: 1.2;
+}
+
+.btn-primary {
+  background: var(--color-primary);
+  color: var(--color-on-primary);
+  border-color: var(--color-primary);
+}
+
+.btn-secondary {
+  background: var(--color-surface);
+  color: var(--color-text);
+  border-color: var(--color-border-strong);
+}
+
+.btn-ghost {
+  background: transparent;
+  color: var(--color-text-muted);
+  border-color: transparent;
+  padding: var(--space-2) var(--space-3);
+  font-weight: var(--font-weight-normal);
+}
+
+.btn-danger {
+  background: var(--color-surface);
+  color: var(--color-danger);
+  border-color: var(--color-danger-border);
+}
+
+.btn-block {
+  width: 100%;
+}
+
+/* ---------------- Wizard chrome ---------------- */
+
+.wizard-progress {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin-bottom: var(--space-5);
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+}
+
+.wizard-progress .step {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-1) var(--space-3);
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-text-muted);
+}
+
+.wizard-progress .step .num {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--color-border);
+  color: var(--color-text-muted);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: var(--font-weight-bold);
+}
+
+.wizard-progress .step.active {
+  border-color: var(--color-primary);
+  background: var(--color-primary-soft);
+  color: var(--color-text);
+}
+
+.wizard-progress .step.active .num {
+  background: var(--color-primary);
+  color: var(--color-on-primary);
+}
+
+.wizard-progress .step.done {
+  border-color: var(--color-success-border);
+  background: var(--color-success-soft);
+  color: var(--color-success-text-on-soft);
+}
+
+.wizard-progress .step.done .num {
+  background: var(--color-success);
+  color: var(--color-on-primary);
+}
+
+.wizard-progress .connector {
+  flex: 0 0 24px;
+  height: 1px;
+  background: var(--color-border);
+}
+
+/* ---------------- Infrastructure rows ---------------- */
+
+.infra-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-4);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.infra-row:last-child { border-bottom: 0; }
+
+.infra-row .infra-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.infra-row .infra-name {
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-text);
+}
+
+.infra-row .infra-state {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+}
+
+.infra-row .infra-badge {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-muted);
+  padding: 2px var(--space-2);
+  border-radius: var(--radius-pill);
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-weight: var(--font-weight-semibold);
+}
+
+.infra-badge.ready { background: var(--color-success-soft); color: var(--color-success-text-on-soft); border-color: var(--color-success-border); }
+.infra-badge.deferred { background: var(--color-bg); color: var(--color-text-muted); }
+
+/* ---------------- QR pane ---------------- */
+
+.qr-pane {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-4);
+  padding: var(--space-5);
+}
+
+.qr-frame {
+  width: 240px;
+  height: 240px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  overflow: hidden;
+}
+
+/* Placeholder QR: a stylized grid pattern. Real implementation
+   uses a QR library. */
+.qr-placeholder {
+  width: 200px;
+  height: 200px;
+  background-image:
+    linear-gradient(45deg, #1a1a1a 25%, transparent 25%, transparent 75%, #1a1a1a 75%),
+    linear-gradient(45deg, #1a1a1a 25%, transparent 25%, transparent 75%, #1a1a1a 75%);
+  background-size: 12px 12px;
+  background-position: 0 0, 6px 6px;
+  position: relative;
+}
+
+.qr-placeholder::before,
+.qr-placeholder::after {
+  content: '';
+  position: absolute;
+  width: 56px;
+  height: 56px;
+  border: 8px solid #1a1a1a;
+  background: #ffffff;
+}
+
+.qr-placeholder::before { top: 0; left: 0; }
+.qr-placeholder::after  { top: 0; right: 0; }
+
+.qr-corner-bl {
+  position: absolute;
+  bottom: 16px; left: 16px;
+  width: 56px; height: 56px;
+  border: 8px solid #1a1a1a;
+  background: #ffffff;
+}
+
+.qr-url {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xs);
+  color: var(--color-text-muted);
+  word-break: break-all;
+  text-align: center;
+  max-width: 360px;
+  line-height: var(--line-height-default);
+}
+
+.qr-meta {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+}
+
+.qr-meta .ttl-bar {
+  width: 80px;
+  height: 4px;
+  background: var(--color-border);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+
+.qr-meta .ttl-bar .fill {
+  height: 100%;
+  background: var(--color-primary);
+  width: 65%;
+}
+
+/* ---------------- Device list ---------------- */
+
+.device-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.device-row {
+  display: grid;
+  grid-template-columns: 1fr 140px 160px auto;
+  gap: var(--space-4);
+  align-items: center;
+  padding: var(--space-4);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.device-row:last-child { border-bottom: 0; }
+
+.device-row .device-name {
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-text);
+}
+
+.device-row .device-platform {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+  font-family: var(--font-mono);
+}
+
+.device-row .device-lastseen {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+}
+
+.device-row .device-actions {
+  display: flex;
+  gap: var(--space-2);
+  justify-content: flex-end;
+}
+
+/* ---------------- Footer text ---------------- */
+
+.fine-print {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-muted);
+  line-height: var(--line-height-default);
+}
+
+.fine-print strong { color: var(--color-text); font-weight: var(--font-weight-semibold); }
+
+/* ---------------- Disclosure block ---------------- */
+
+.disclosure {
+  background: var(--color-sidebar);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: var(--space-4);
+}
+
+.disclosure .disclosure-title {
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: var(--space-3);
+}
+
+.disclosure ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.disclosure li {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+  line-height: var(--line-height-default);
+  display: flex;
+  gap: var(--space-2);
+  align-items: flex-start;
+}
+
+.disclosure li::before {
+  content: '·';
+  color: var(--color-primary);
+  font-weight: var(--font-weight-bold);
+  flex-shrink: 0;
+}
+
+.disclosure li strong {
+  color: var(--color-text);
+  font-weight: var(--font-weight-semibold);
+}
+
+/* ---------------- Type helpers ---------------- */
+
+.text-muted { color: var(--color-text-muted); }
+.text-dim   { color: var(--color-text-dim); }
+.mono       { font-family: var(--font-mono); }

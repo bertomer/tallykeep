@@ -34,19 +34,19 @@ if ($ResetPassphrase) {
 }
 
 # Derive the compose project name so volume names don't need to be hardcoded.
-$ProjectName = (docker compose config 2>$null |
+$ProjectName = (docker-compose config 2>$null |
     Select-String '^\s*name\s*:' |
     Select-Object -First 1) -replace '.*:\s*', ''
 if (-not $ProjectName) { $ProjectName = 'tallykeep' }
 
 if ($KeepDb) {
     Write-Host "==> Bringing the stack down (postgres-data kept)"
-    docker compose down --remove-orphans
+    docker-compose down --remove-orphans
     Write-Host "==> Removing Redis and bitcoind volumes"
     docker volume rm "${ProjectName}_redis-data" "${ProjectName}_bitcoind-data"
 } else {
     Write-Host "==> Bringing the stack down with all volumes (DESTRUCTIVE)"
-    docker compose down -v --remove-orphans
+    docker-compose down -v --remove-orphans
 }
 
 if ($KeepDown) {
@@ -55,7 +55,7 @@ if ($KeepDown) {
 }
 
 Write-Host "==> Bringing the stack back up"
-docker compose up -d
+docker-compose up -d
 
 Write-Host "==> Waiting for backend to be healthy"
 $deadline = (Get-Date).AddSeconds(60)
@@ -66,7 +66,7 @@ while ($true) {
     } catch {
         if ((Get-Date) -ge $deadline) {
             Write-Error "Backend did not become healthy within 60s."
-            docker compose ps
+            docker-compose ps
             exit 1
         }
         Start-Sleep -Seconds 1
